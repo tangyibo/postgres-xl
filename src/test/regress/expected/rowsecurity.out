@@ -100,11 +100,15 @@ SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
 -- try a sampled version
 SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0)
   WHERE f_leak(dtitle) ORDER BY did;
+NOTICE:  f_leak => my first manga
+NOTICE:  f_leak => great science fiction
+NOTICE:  f_leak => great manga
  did | cid | dlevel |      dauthor      |        dtitle         
 -----+-----+--------+-------------------+-----------------------
+   4 |  44 |      1 | rls_regress_user1 | my first manga
    6 |  22 |      1 | rls_regress_user2 | great science fiction
    8 |  44 |      1 | rls_regress_user2 | great manga
-(2 rows)
+(3 rows)
 
 -- viewpoint from rls_regress_user2
 SET SESSION AUTHORIZATION rls_regress_user2;
@@ -137,11 +141,17 @@ SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
 -- try a sampled version
 SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0)
   WHERE f_leak(dtitle) ORDER BY did;
+NOTICE:  f_leak => my first manga
+NOTICE:  f_leak => my second manga
+NOTICE:  f_leak => great science fiction
+NOTICE:  f_leak => great manga
  did | cid | dlevel |      dauthor      |        dtitle         
 -----+-----+--------+-------------------+-----------------------
+   4 |  44 |      1 | rls_regress_user1 | my first manga
+   5 |  44 |      2 | rls_regress_user1 | my second manga
    6 |  22 |      1 | rls_regress_user2 | great science fiction
    8 |  44 |      1 | rls_regress_user2 | great manga
-(2 rows)
+(4 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM document WHERE f_leak(dtitle);
                                QUERY PLAN                                

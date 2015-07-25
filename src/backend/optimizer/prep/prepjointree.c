@@ -1095,12 +1095,15 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 
 			switch (child_rte->rtekind)
 			{
+				case RTE_RELATION:
+					if (child_rte->tablesample)
+						child_rte->lateral = true;
+					break;
 				case RTE_SUBQUERY:
 				case RTE_FUNCTION:
 				case RTE_VALUES:
 					child_rte->lateral = true;
 					break;
-				case RTE_RELATION:
 				case RTE_JOIN:
 				case RTE_CTE:
 #ifdef XCP	
@@ -1916,6 +1919,13 @@ replace_vars_in_jointree(Node *jtnode,
 			{
 				switch (rte->rtekind)
 				{
+					case RTE_RELATION:
+						/* shouldn't be marked LATERAL unless tablesample */
+						Assert(rte->tablesample);
+						rte->tablesample = (TableSampleClause *)
+							pullup_replace_vars((Node *) rte->tablesample,
+												context);
+						break;
 					case RTE_SUBQUERY:
 						rte->subquery =
 							pullup_replace_vars_subquery(rte->subquery,
@@ -1931,7 +1941,6 @@ replace_vars_in_jointree(Node *jtnode,
 							pullup_replace_vars((Node *) rte->values_lists,
 												context);
 						break;
-					case RTE_RELATION:
 					case RTE_JOIN:
 					case RTE_CTE:
 #ifdef XCP

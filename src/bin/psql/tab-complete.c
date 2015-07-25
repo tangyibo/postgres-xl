@@ -754,9 +754,24 @@ static const SchemaQuery Query_for_list_of_matviews = {
 "  WHERE substring(pg_catalog.quote_ident(evtname),1,%d)='%s'"
 
 #define Query_for_list_of_tablesample_methods \
-" SELECT pg_catalog.quote_ident(tsmname) "\
-"   FROM pg_catalog.pg_tablesample_method "\
-"  WHERE substring(pg_catalog.quote_ident(tsmname),1,%d)='%s'"
+" SELECT pg_catalog.quote_ident(proname) "\
+"   FROM pg_catalog.pg_proc "\
+"  WHERE prorettype = 'pg_catalog.tsm_handler'::pg_catalog.regtype AND "\
+"        proargtypes[0] = 'pg_catalog.internal'::pg_catalog.regtype AND "\
+"        substring(pg_catalog.quote_ident(proname),1,%d)='%s'"
+
+#define Query_for_list_of_policies \
+" SELECT pg_catalog.quote_ident(polname) "\
+"   FROM pg_catalog.pg_policy "\
+"  WHERE substring(pg_catalog.quote_ident(polname),1,%d)='%s'"
+
+#define Query_for_list_of_tables_for_policy \
+"SELECT pg_catalog.quote_ident(relname) "\
+"  FROM pg_catalog.pg_class"\
+" WHERE (%d = pg_catalog.length('%s'))"\
+"   AND oid IN "\
+"       (SELECT polrelid FROM pg_catalog.pg_policy "\
+"         WHERE pg_catalog.quote_ident(polname)='%s')"
 
 /*
  * This is a list of all "things" in Pgsql, which can show up after CREATE or

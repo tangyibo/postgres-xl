@@ -1718,7 +1718,7 @@ create_seqscan_path(PlannerInfo *root, RelOptInfo *rel, Relids required_outer)
 
 /*
  * create_samplescan_path
- *	  Like seqscan but uses sampling function while scanning.
+ *	  Creates a path node for a sampled table scan.
  */
 Path *
 create_samplescan_path(PlannerInfo *root, RelOptInfo *rel, Relids required_outer)
@@ -1744,7 +1744,7 @@ create_samplescan_path(PlannerInfo *root, RelOptInfo *rel, Relids required_outer
 	}
 #endif
 
-	cost_samplescan(pathnode, root, rel);
+	cost_samplescan(pathnode, root, rel, pathnode->param_info);
 
 	return pathnode;
 }
@@ -3050,6 +3050,8 @@ reparameterize_path(PlannerInfo *root, Path *path,
 	{
 		case T_SeqScan:
 			return create_seqscan_path(root, rel, required_outer);
+		case T_SampleScan:
+			return (Path *) create_samplescan_path(root, rel, required_outer);
 		case T_IndexScan:
 		case T_IndexOnlyScan:
 			{
@@ -3087,8 +3089,6 @@ reparameterize_path(PlannerInfo *root, Path *path,
 			return create_subqueryscan_path(root, rel, path->pathkeys,
 											required_outer);
 #endif
-		case T_SampleScan:
-			return (Path *) create_samplescan_path(root, rel, required_outer);
 		default:
 			break;
 	}

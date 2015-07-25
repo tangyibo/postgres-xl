@@ -1,11 +1,14 @@
 CREATE EXTENSION tsm_system_time;
-CREATE TABLE test_tablesample (id int, name text) WITH (fillfactor=10); -- force smaller pages so we don't have to load too much data to get multiple pages
-INSERT INTO test_tablesample SELECT i, repeat(i::text, 1000) FROM generate_series(0, 30) s(i) ORDER BY i;
+CREATE TABLE test_tablesample (id int, name text);
+INSERT INTO test_tablesample SELECT i, repeat(i::text, 1000)
+  FROM generate_series(0, 30) s(i);
 ANALYZE test_tablesample;
-SELECT count(*) FROM test_tablesample TABLESAMPLE system_time (1000);
+-- It's a bit tricky to test SYSTEM_TIME in a platform-independent way.
+-- We can test the zero-time corner case ...
+SELECT count(*) FROM test_tablesample TABLESAMPLE system_time (0);
  count 
 -------
-    31
+     0
 (1 row)
 
 -- bad parameters should get through planning, but not execution:

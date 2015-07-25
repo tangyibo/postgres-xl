@@ -2321,6 +2321,7 @@ JumbleRangeTable(pgssJumbleState *jstate, List *rtable)
 		{
 			case RTE_RELATION:
 				APP_JUMB(rte->relid);
+				JumbleExpr(jstate, (Node *) rte->tablesample);
 				break;
 			case RTE_SUBQUERY:
 				JumbleQuery(jstate, rte->subquery);
@@ -2789,6 +2790,15 @@ JumbleExpr(pgssJumbleState *jstate, Node *node)
 				RangeTblFunction *rtfunc = (RangeTblFunction *) node;
 
 				JumbleExpr(jstate, rtfunc->funcexpr);
+			}
+			break;
+		case T_TableSampleClause:
+			{
+				TableSampleClause *tsc = (TableSampleClause *) node;
+
+				APP_JUMB(tsc->tsmhandler);
+				JumbleExpr(jstate, (Node *) tsc->args);
+				JumbleExpr(jstate, (Node *) tsc->repeatable);
 			}
 			break;
 		default:

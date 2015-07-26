@@ -402,33 +402,6 @@ select aa, bb, unique1, unique1
   where bb < bb and bb is null;
 
 --
--- regression test: check handling of empty-FROM subquery underneath outer join
---
-explain (costs off, nodes off)
-select * from int8_tbl i1 left join (int8_tbl i2 join
-  (select 123 as x) ss on i2.q1 = x) on i1.q2 = i2.q2
-order by 1, 2;
-
-select * from int8_tbl i1 left join (int8_tbl i2 join
-  (select 123 as x) ss on i2.q1 = x) on i1.q2 = i2.q2
-order by 1, 2;
-
---
--- regression test: check a case where join_clause_is_movable_into() gives
--- an imprecise result, causing an assertion failure
---
-select count(*)
-from
-  (select t3.tenthous as x1, coalesce(t1.stringu1, t2.stringu1) as x2
-   from tenk1 t1
-   left join tenk1 t2 on t1.unique1 = t2.unique1
-   join tenk1 t3 on t1.unique2 = t3.unique2) ss,
-  tenk1 t4,
-  tenk1 t5
-where t4.thousand = t5.unique1 and ss.x1 = t4.tenthous and ss.x2 = t5.stringu1;
-
-
---
 -- Clean up
 --
 
@@ -1249,6 +1222,7 @@ select atts.relid::regclass, s.* from pg_stats s join
     a.attrelid::regclass::text join (select unnest(indkey) attnum,
     indexrelid from pg_index i) atts on atts.attnum = a.attnum where
     schemaname != 'pg_catalog';
+
 --
 -- Test LATERAL
 --

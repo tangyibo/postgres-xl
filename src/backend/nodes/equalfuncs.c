@@ -2478,6 +2478,7 @@ _equalWithCheckOption(const WithCheckOption *a, const WithCheckOption *b)
 {
 	COMPARE_SCALAR_FIELD(kind);
 	COMPARE_STRING_FIELD(relname);
+	COMPARE_STRING_FIELD(polname);
 	COMPARE_NODE_FIELD(qual);
 	COMPARE_SCALAR_FIELD(cascaded);
 

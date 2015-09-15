@@ -1954,9 +1954,6 @@ DELETE FROM x1 WHERE f_leak(b) RETURNING *;
  2 | bcd_updt_updt | rls_regress_user1
  6 | fgh_updt_updt | rls_regress_user1
  8 | fgh_updt_updt | rls_regress_user2
- 3 | cde_updt      | rls_regress_user2
- 7 | fgh_updt      | rls_regress_user2
- 4 | def_updt_updt | rls_regress_user2
 (6 rows)
 
 --

@@ -426,22 +426,6 @@ static const struct config_enum_entry huge_pages_options[] = {
 	{NULL, 0, false}
 };
 
-/*
- * Although only "on", "off", and "force" are documented, we
- * accept all the likely variants of "on" and "off".
- */
-static const struct config_enum_entry row_security_options[] = {
-	{"on", ROW_SECURITY_ON, false},
-	{"off", ROW_SECURITY_OFF, false},
-	{"force", ROW_SECURITY_FORCE, false},
-	{"true", ROW_SECURITY_ON, true},
-	{"false", ROW_SECURITY_OFF, true},
-	{"yes", ROW_SECURITY_ON, true},
-	{"no", ROW_SECURITY_OFF, true},
-	{"1", ROW_SECURITY_ON, true},
-	{"0", ROW_SECURITY_OFF, true},
-	{NULL, 0, false}
-};
 
 #ifdef XCP
 /*
@@ -485,6 +469,7 @@ bool		log_remotesubplan_stats = false;
 bool		log_btree_build_stats = false;
 char	   *event_source;
 
+bool		row_security;
 bool		check_function_bodies = true;
 bool		default_with_oids = false;
 bool		SQL_inheritance = true;
@@ -519,8 +504,6 @@ int			tcp_keepalives_count;
 #ifdef XCP
 char	   *storm_catalog_remap_string;
 #endif
-int			row_security;
-
 /*
  * This really belongs in pg_shmem.c, but is defined here so that it doesn't
  * need to be duplicated in all the different implementations of pg_shmem.c.
@@ -1513,6 +1496,15 @@ static struct config_bool ConfigureNamesBool[] =
 		&XactDeferrable,
 		false,
 		check_transaction_deferrable, NULL, NULL
+	},
+	{
+		{"row_security", PGC_USERSET, CONN_AUTH_SECURITY,
+			gettext_noop("Enable row security."),
+			gettext_noop("When enabled, row security will be applied to all users.")
+		},
+		&row_security,
+		true,
+		NULL, NULL, NULL
 	},
 	{
 		{"check_function_bodies", PGC_USERSET, CLIENT_CONN_STATEMENT,
@@ -4041,16 +4033,6 @@ static struct config_enum ConfigureNamesEnum[] =
 		},
 		&huge_pages,
 		HUGE_PAGES_TRY, huge_pages_options,
-		NULL, NULL, NULL
-	},
-
-	{
-		{"row_security", PGC_USERSET, CONN_AUTH_SECURITY,
-			gettext_noop("Enable row security."),
-			gettext_noop("When enabled, row security will be applied to all users.")
-		},
-		&row_security,
-		ROW_SECURITY_ON, row_security_options,
 		NULL, NULL, NULL
 	},
 

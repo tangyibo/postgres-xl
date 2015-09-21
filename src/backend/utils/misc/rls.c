@@ -53,6 +53,10 @@ check_enable_rls(Oid relid, Oid checkAsUser, bool noError)
 	bool		relrowsecurity;
 	Oid			user_id = checkAsUser ? checkAsUser : GetUserId();
 
+	/* Nothing to do for built-in relations */
+	if (relid < FirstNormalObjectId)
+		return RLS_NONE;
+
 	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
 	if (!HeapTupleIsValid(tuple))
 		return RLS_NONE;

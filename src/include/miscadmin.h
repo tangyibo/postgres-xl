@@ -291,7 +291,6 @@ extern int	trace_recovery(int trace_level);
 /* flags to be OR'd to form sec_context */
 #define SECURITY_LOCAL_USERID_CHANGE	0x0001
 #define SECURITY_RESTRICTED_OPERATION	0x0002
-#define SECURITY_ROW_LEVEL_DISABLED		0x0004
 
 extern char *DatabasePath;
 

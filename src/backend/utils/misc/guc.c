@@ -2933,7 +2933,7 @@ static struct config_int ConfigureNamesInt[] =
 						 "this maximum number.")
 		},
 		&MaxDataNodes,
-		16, 2, 65535,
+		16, 2, MAX_DATANODES,
 		NULL, NULL, NULL
 	},
 
@@ -2944,7 +2944,7 @@ static struct config_int ConfigureNamesInt[] =
 						 "this maximum number.")
 		},
 		&MaxCoords,
-		16, 2, 65535,
+		16, 2, MAX_COORDINATORS,
 		NULL, NULL, NULL
 	},
 

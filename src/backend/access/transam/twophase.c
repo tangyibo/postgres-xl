@@ -71,6 +71,7 @@
 #include "utils/timestamp.h"
 #ifdef PGXC
 #include "pgxc/xc_maintenance_mode.h"
+#include "pgxc/nodemgr.h"
 #endif
 
 
@@ -115,7 +116,7 @@ int			max_prepared_xacts = 0;
  * typedef struct GlobalTransactionData *GlobalTransaction appears in
  * twophase.h
  */
-#define GIDSIZE 200
+#define GIDSIZE (200 + (MAX_COORDINATORS + MAX_DATANODES) * 15)
 
 typedef struct GlobalTransactionData
 {

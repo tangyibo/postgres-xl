@@ -1313,6 +1313,7 @@ extern Datum stormdb_promote_standby(PG_FUNCTION_ARGS);
 
 /* backend/access/transam/transam.c */
 extern Datum pgxc_is_committed(PG_FUNCTION_ARGS);
+extern Datum pgxc_is_inprogress(PG_FUNCTION_ARGS);
 #endif
 
 #endif   /* BUILTINS_H */

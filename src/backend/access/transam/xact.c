@@ -2308,9 +2308,8 @@ CommitTransaction(void)
 		 */
 		if (!IsOnCommitActions() && IsTwoPhaseCommitRequired(XactWriteLocalNode))
 		{
-			prepareGID = MemoryContextAlloc(TopTransactionContext, 256);
-			sprintf(prepareGID, implicit2PC_head"%u", GetTopTransactionId());
 
+			prepareGID = GetImplicit2PCGID(implicit2PC_head, XactWriteLocalNode);
 			savePrepareGID = MemoryContextStrdup(TopMemoryContext, prepareGID);
 
 			if (XactWriteLocalNode)

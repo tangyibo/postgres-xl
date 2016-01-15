@@ -1068,7 +1068,6 @@ EndPrepare(GlobalTransaction gxact)
 	/*
 	 * Create the 2PC state file.
 	 */
-
 	TwoPhaseFilePath(path, xid);
 
 	fd = OpenTransientFile(path,

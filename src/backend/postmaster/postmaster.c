@@ -555,6 +555,7 @@ static void ShmemBackendArrayRemove(Backend *bn);
 #ifdef XCP
 char *parentPGXCNode = NULL;
 int  parentPGXCNodeId = -1;
+int	 parentPGXCPid = -1;
 char parentPGXCNodeType = PGXC_NODE_DATANODE;
 #endif
 

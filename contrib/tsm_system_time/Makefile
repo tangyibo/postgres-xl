@@ -7,7 +7,7 @@ PGFILEDESC = "tsm_system_time - SYSTEM TABLESAMPLE method which accepts number r
 EXTENSION = tsm_system_time
 DATA = tsm_system_time--1.0.sql
 
-REGRESS = tsm_system_time
+REGRESS = tsm_system_time xl_known_bugs
 
 ifdef USE_PGXS
 PG_CONFIG = pg_config

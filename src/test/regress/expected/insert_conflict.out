@@ -514,10 +514,10 @@ insert into cities values ('Las Vegas', 5.83E+5, 2001) on conflict (name) do upd
 select * from cities;
      name      | population | altitude 
 ---------------+------------+----------
+ Madison       |     191300 |      845
  San Francisco |     724000 |       63
  Mariposa      |       1200 |     1953
  Las Vegas     |     583000 |     2001
- Madison       |     191300 |      845
  Sacramento    |  466400000 |       30
 (5 rows)
 
@@ -536,10 +536,10 @@ select * from capitals;
 select * from cities;
      name      | population | altitude 
 ---------------+------------+----------
+ Madison       |     191300 |      845
  San Francisco |     724000 |       63
  Mariposa      |       1200 |     1953
  Las Vegas     |     583000 |     2001
- Madison       |     191300 |      845
  Sacramento    |  466400000 |       30
  Las Vegas     |     583000 |     2222
 (6 rows)
@@ -549,10 +549,10 @@ insert into cities values ('Las Vegas', 5.86E+5, 2223) on conflict (name) do upd
 select * from cities;
      name      | population | altitude 
 ---------------+------------+----------
+ Madison       |     191300 |      845
  San Francisco |     724000 |       63
  Mariposa      |       1200 |     1953
  Las Vegas     |     586000 |     2223
- Madison       |     191300 |      845
  Sacramento    |  466400000 |       30
  Las Vegas     |     583000 |     2222
 (6 rows)

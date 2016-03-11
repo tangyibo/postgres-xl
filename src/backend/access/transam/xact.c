@@ -3238,7 +3238,9 @@ AbortTransaction(void)
 	if (!is_parallel_worker)
 	{
 #ifdef XCP
-		if (!IsConnFromDatanode())
+		if (IsConnFromDatanode())
+			latestXid = InvalidTransactionId;
+		else
 #endif
 			latestXid = RecordTransactionAbort(false);
 	}

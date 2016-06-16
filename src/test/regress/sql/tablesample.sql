@@ -36,8 +36,32 @@ FETCH NEXT FROM tablesample_cur;
 CLOSE tablesample_cur;
 END;
 
-EXPLAIN SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (10);
-EXPLAIN SELECT * FROM test_tablesample_v1;
+EXPLAIN (COSTS OFF)
+  SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (50) REPEATABLE (2);
+EXPLAIN (COSTS OFF)
+  SELECT * FROM test_tablesample_v1;
+
+-- check inheritance behavior
+explain (costs off)
+  select count(*) from person tablesample bernoulli (100);
+select count(*) from person tablesample bernoulli (100);
+select count(*) from person;
+
+-- check that collations get assigned within the tablesample arguments
+SELECT count(*) FROM test_tablesample TABLESAMPLE bernoulli (('1'::text < '0'::text)::int);
+
+-- check behavior during rescans, as well as correct handling of min/max pct
+select * from
+  (values (0),(100)) v(pct),
+  lateral (select count(*) from tenk1 tablesample bernoulli (pct)) ss;
+select * from
+  (values (0),(100)) v(pct),
+  lateral (select count(*) from tenk1 tablesample system (pct)) ss;
+explain (costs off)
+select pct, count(unique1) from
+  (values (0),(100)) v(pct),
+  lateral (select * from tenk1 tablesample bernoulli (pct)) ss
+  group by pct;
 
 -- errors
 SELECT id FROM test_tablesample TABLESAMPLE FOOBAR (1);

@@ -3262,6 +3262,10 @@ _readRemoteStmt(void)
 			token = pg_strtok(&length);
 			rparam->paramid = atoi(token);
 
+			token = pg_strtok(&length); /* skip  :paramused */
+			token = pg_strtok(&length);
+			rparam->paramused = atoi(token);
+
 			token = pg_strtok(&length); /* skip  :paramtype */
 			if (portable_input)
 			{

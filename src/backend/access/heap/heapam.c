@@ -229,7 +229,7 @@ initscan(HeapScanDesc scan, ScanKey key, bool keep_startblock)
 	 * results for a non-MVCC snapshot, the caller must hold some higher-level
 	 * lock that ensures the interesting tuple(s) won't change.)
 	 */
-	if (!is_rescan)
+	if (!keep_startblock)
 		scan->rs_nblocks = RelationGetNumberOfBlocks(scan->rs_rd);
 
 	/*

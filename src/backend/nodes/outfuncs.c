@@ -720,16 +720,6 @@ _outSeqScan(StringInfo str, const SeqScan *node)
 }
 
 static void
-_outSampleScan(StringInfo str, const SampleScan *node)
-{
-	WRITE_NODE_TYPE("SAMPLESCAN");
-
-	_outScanInfo(str, (const Scan *) node);
-
-	WRITE_NODE_FIELD(tablesample);
-}
-
-static void
 _outIndexScan(StringInfo str, const IndexScan *node)
 {
 	WRITE_NODE_TYPE("INDEXSCAN");

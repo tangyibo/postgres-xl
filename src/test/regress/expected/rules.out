@@ -2077,7 +2077,7 @@ SELECT viewname, definition FROM pg_views WHERE schemaname <> 'information_schem
                                  |      JOIN pg_class c ON ((c.oid = s.starelid)))                                                                                                                                                                                                                                                            +
                                  |      JOIN pg_attribute a ON (((c.oid = a.attrelid) AND (a.attnum = s.staattnum))))                                                                                                                                                                                                                         +
                                  |      LEFT JOIN pg_namespace n ON ((n.oid = c.relnamespace)))                                                                                                                                                                                                                                               +
-                                 |   WHERE ((NOT a.attisdropped) AND has_column_privilege(c.oid, a.attnum, 'select'::text) AND ((c.relrowsecurity = false) OR (NOT row_security_active(c.oid))));
+                                 |   WHERE ((NOT a.attisdropped) AND has_column_privilege(c.oid, a.attnum, 'select'::text));
  pg_tables                       |  SELECT n.nspname AS schemaname,                                                                                                                                                                                                                                                                           +
                                  |     c.relname AS tablename,                                                                                                                                                                                                                                                                                +
                                  |     pg_get_userbyid(c.relowner) AS tableowner,                                                                                                                                                                                                                                                             +
@@ -3930,13 +3930,13 @@ SELECT tablename, rulename, definition FROM pg_rules
 
 -- ensure explain works for on insert conflict rules
 explain (costs off) INSERT INTO hats VALUES ('h8', 'forbidden') RETURNING *;
-                                              QUERY PLAN                                               
--------------------------------------------------------------------------------------------------------
+                              QUERY PLAN                              
+----------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1)
    ->  Insert on hat_data
          Conflict Resolution: UPDATE
          Conflict Arbiter Indexes: hat_data_unique_idx
-         Conflict Filter: ((excluded.hat_color <> 'forbidden'::bpchar) AND (hat_data.* <> excluded.*))
+         Conflict Filter: (excluded.hat_color <> 'forbidden'::bpchar)
          ->  Result
 (6 rows)
 
@@ -3958,13 +3958,13 @@ EXPLAIN (nodes off, costs off) WITH data(hat_name, hat_color) AS (
 INSERT INTO hats
     SELECT * FROM data
 RETURNING *;
-                                              QUERY PLAN                                               
--------------------------------------------------------------------------------------------------------
+                              QUERY PLAN                              
+----------------------------------------------------------------------
  Remote Subquery Scan on all
    ->  Insert on hat_data
          Conflict Resolution: UPDATE
          Conflict Arbiter Indexes: hat_data_unique_idx
-         Conflict Filter: ((excluded.hat_color <> 'forbidden'::bpchar) AND (hat_data.* <> excluded.*))
+         Conflict Filter: (excluded.hat_color <> 'forbidden'::bpchar)
          CTE data
            ->  Values Scan on "*VALUES*"
          ->  Remote Subquery Scan on all

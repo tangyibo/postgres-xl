@@ -20,7 +20,7 @@ DO $$
   END
 $$;
 ERROR:  query string argument of EXECUTE is null
-CONTEXT:  PL/pgSQL function inline_code_block line 3 at EXECUTE
+CONTEXT:  PL/pgSQL function inline_code_block line 3 at EXECUTE statement
 SELECT
 	rol.rolname
 FROM

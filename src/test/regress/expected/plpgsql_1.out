@@ -2036,7 +2036,7 @@ select trap_matching_test(1);
 ERROR:  Internal subtransactions not supported in Postgres-XL
 CONTEXT:  PL/pgSQL function trap_matching_test(integer) line 6 during statement block entry
 create temp table foo (f1 int);
-create function subxact_rollback_semantics() returns int as $$
+create function blockme() returns int as $$
 declare x int;
 begin
   x := 1;
@@ -2044,46 +2044,31 @@ begin
   begin
     x := x + 1;
     insert into foo values(x);
-    raise exception 'inner';
+    -- we assume this will take longer than 2 seconds:
+    select count(*) into x from tenk1 a, tenk1 b, tenk1 c;
   exception
     when others then
+      raise notice 'caught others?';
+      return -1;
+    when query_canceled then
+      raise notice 'nyeah nyeah, can''t stop me';
       x := x * 10;
   end;
   insert into foo values(x);
   return x;
 end$$ language plpgsql;
-select subxact_rollback_semantics();
+set statement_timeout to 2000;
+select blockme();
 ERROR:  Internal subtransactions not supported in Postgres-XL
-CONTEXT:  PL/pgSQL function subxact_rollback_semantics() line 6 during statement block entry
-select * from foo;
+CONTEXT:  PL/pgSQL function blockme() line 6 during statement block entry
+reset statement_timeout;
+select * from foo order by 1;
  f1 
 ----
   1
 (1 row)
 
 drop table foo;
-create function trap_timeout() returns void as $$
-begin
-  declare x int;
-  begin
-    -- we assume this will take longer than 2 seconds:
-    select count(*) into x from tenk1 a, tenk1 b, tenk1 c;
-  exception
-    when others then
-      raise notice 'caught others?';
-    when query_canceled then
-      raise notice 'nyeah nyeah, can''t stop me';
-  end;
-  -- Abort transaction to abandon the statement_timeout setting.  Otherwise,
-  -- the next top-level statement would be vulnerable to the timeout.
-  raise exception 'end of function';
-end$$ language plpgsql;
-begin;
-set statement_timeout to 2000;
-select trap_timeout();
-ERROR:  Internal subtransactions not supported in Postgres-XL
-CONTEXT:  PL/pgSQL function trap_timeout() line 4 during statement block entry
-rollback;
 -- Test for pass-by-ref values being stored in proper context
 create function test_variable_storage() returns text as $$
 declare x text;
@@ -3109,7 +3094,7 @@ begin
 end$$ language plpgsql;
 select footest();
 ERROR:  query returned no rows
-CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE
+CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE statement
 create or replace function footest() returns void as $$
 declare x record;
 begin
@@ -3119,7 +3104,7 @@ begin
 end$$ language plpgsql;
 select footest();
 ERROR:  query returned more than one row
-CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE
+CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE statement
 drop function footest();
 -- test printing parameters after failure due to STRICT
 set plpgsql.print_strict_params to true;
@@ -3171,7 +3156,7 @@ end$$ language plpgsql;
 select footest();
 ERROR:  query returned no rows
 DETAIL:  parameters: $1 = '0', $2 = 'foo'
-CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE
+CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE statement
 create or replace function footest() returns void as $$
 declare x record;
 begin
@@ -3182,7 +3167,7 @@ end$$ language plpgsql;
 select footest();
 ERROR:  query returned more than one row
 DETAIL:  parameters: $1 = '1'
-CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE
+CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE statement
 create or replace function footest() returns void as $$
 declare x record;
 begin
@@ -3192,7 +3177,7 @@ begin
 end$$ language plpgsql;
 select footest();
 ERROR:  query returned more than one row
-CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE
+CONTEXT:  PL/pgSQL function footest() line 5 at EXECUTE statement
 create or replace function footest() returns void as $$
 -- override the global
 #print_strict_params off
@@ -4184,7 +4169,7 @@ end;
 $$ language plpgsql;
 select stacked_diagnostics_test();
 ERROR:  GET STACKED DIAGNOSTICS cannot be used outside an exception handler
-CONTEXT:  PL/pgSQL function stacked_diagnostics_test() line 6 at GET STACKED DIAGNOSTICS
+CONTEXT:  PL/pgSQL function stacked_diagnostics_test() line 6 at GET DIAGNOSTICS
 drop function zero_divide();
 drop function stacked_diagnostics_test();
 -- check cases where implicit SQLSTATE variable could be confused with
@@ -4628,63 +4613,6 @@ ERROR:  current transaction is aborted, commands ignored until end of transactio
 rollback;
 drop function error2(p_name_table text);
 drop function error1(text);
--- Test for proper handling of cast-expression caching
-create function sql_to_date(integer) returns date as $$
-select $1::text::date
-$$ language sql immutable strict;
-create cast (integer as date) with function sql_to_date(integer) as assignment;
-create function cast_invoker(integer) returns date as $$
-begin
-  return $1;
-end$$ language plpgsql;
-select cast_invoker(20150717);
- cast_invoker 
---------------
- 07-17-2015
-(1 row)
-
-select cast_invoker(20150718);  -- second call crashed in pre-release 9.5
- cast_invoker 
---------------
- 07-18-2015
-(1 row)
-
-begin;
-select cast_invoker(20150717);
- cast_invoker 
---------------
- 07-17-2015
-(1 row)
-
-select cast_invoker(20150718);
- cast_invoker 
---------------
- 07-18-2015
-(1 row)
-
-savepoint s1;
-ERROR:  SAVEPOINT is not yet supported.
-select cast_invoker(20150718);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-select cast_invoker(-1); -- fails
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-rollback to savepoint s1;
-ERROR:  no such savepoint
-select cast_invoker(20150719);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-select cast_invoker(20150720);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-commit;
-drop function cast_invoker(integer);
-drop function sql_to_date(integer) cascade;
-NOTICE:  drop cascades to cast from integer to date
--- Test handling of cast cache inside DO blocks
--- (to check the original crash case, this must be a cast not previously
--- used in this session)
-begin;
-do $$ declare x text[]; begin x := '{1.23, 4.56}'::numeric[]; end $$;
-do $$ declare x text[]; begin x := '{1.23, 4.56}'::numeric[]; end $$;
-end;
 -- Test for consistent reporting of error context
 create function fail() returns int language plpgsql as $$
 begin

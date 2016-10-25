@@ -1699,7 +1699,7 @@ ERROR:  Postgres-XL does not support TRIGGER yet
 DETAIL:  The feature is not currently supported
 CREATE VIEW rw_view1 AS SELECT * FROM base_tbl WHERE a < b WITH CHECK OPTION;
 INSERT INTO rw_view1 VALUES (5,0); -- ok
-ERROR:  new row violates check option for view "rw_view1"
+ERROR:  new row violates WITH CHECK OPTION for "rw_view1"
 DETAIL:  Failing row contains (5, 0).
 INSERT INTO rw_view1 VALUES (15, 20); -- should fail
 UPDATE rw_view1 SET a = 20, b = 30; -- should fail
@@ -1734,7 +1734,7 @@ DETAIL:  The feature is not currently supported
 CREATE VIEW rw_view2 AS
   SELECT * FROM rw_view1 WHERE a > 0 WITH LOCAL CHECK OPTION;
 INSERT INTO rw_view2 VALUES (-5); -- should fail
-ERROR:  new row violates check option for view "rw_view2"
+ERROR:  new row violates WITH CHECK OPTION for "rw_view2"
 DETAIL:  Failing row contains (-5, null).
 INSERT INTO rw_view2 VALUES (5); -- ok
 INSERT INTO rw_view2 VALUES (50); -- ok, but not in view
@@ -1749,7 +1749,7 @@ SELECT * FROM base_tbl;
 -- Check option won't cascade down to base view with INSTEAD OF triggers
 ALTER VIEW rw_view2 SET (check_option=cascaded);
 INSERT INTO rw_view2 VALUES (100); -- ok, but not in view (doesn't fail rw_view1's check)
-ERROR:  new row violates check option for view "rw_view1"
+ERROR:  new row violates WITH CHECK OPTION for "rw_view1"
 DETAIL:  Failing row contains (100, null).
 UPDATE rw_view2 SET a = 200 WHERE a = 5; -- ok, but not in view (doesn't fail rw_view1's check)
 SELECT * FROM base_tbl;

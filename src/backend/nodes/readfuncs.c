@@ -2050,7 +2050,18 @@ _readTableSampleClause(void)
 {
 	READ_LOCALS(TableSampleClause);
 
+#ifdef XCP
+	if (portable_input)
+	{
+		READ_FUNCID_FIELD(tsmhandler);
+	}
+	else
+	{
+#endif
 	READ_OID_FIELD(tsmhandler);
+#ifdef XCP
+	}
+#endif
 	READ_NODE_FIELD(args);
 	READ_NODE_FIELD(repeatable);
 
@@ -2325,6 +2336,17 @@ _readSeqScan(void)
 	READ_DONE();
 }
 
+/*
+ * _readSampleScan
+ */
+static SampleScan *
+_readSampleScan(void)
+{
+	READ_SCAN_FIELDS(SampleScan);
+	READ_NODE_FIELD(tablesample);
+
+	READ_DONE();
+}
 
 /*
  * _readIndexScan
@@ -3546,6 +3568,8 @@ parseNodeString(void)
 		return_value = _readScan();
 	else if (MATCH("SEQSCAN", 7))
 		return_value = _readSeqScan();
+	else if (MATCH("SAMPLESCAN", 10))
+		return_value = _readSampleScan();
 	else if (MATCH("INDEXSCAN", 9))
 		return_value = _readIndexScan();
 	else if (MATCH("INDEXONLYSCAN", 13))

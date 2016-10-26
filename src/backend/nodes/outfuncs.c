@@ -720,6 +720,16 @@ _outSeqScan(StringInfo str, const SeqScan *node)
 }
 
 static void
+_outSampleScan(StringInfo str, const SampleScan *node)
+{
+	WRITE_NODE_TYPE("SAMPLESCAN");
+
+	_outScanInfo(str, (const Scan *) node);
+
+	WRITE_NODE_FIELD(tablesample);
+}
+
+static void
 _outIndexScan(StringInfo str, const IndexScan *node)
 {
 	WRITE_NODE_TYPE("INDEXSCAN");
@@ -3661,7 +3671,18 @@ _outTableSampleClause(StringInfo str, const TableSampleClause *node)
 {
 	WRITE_NODE_TYPE("TABLESAMPLECLAUSE");
 
+#ifdef XCP
+	if (portable_output)
+	{
+		WRITE_FUNCID_FIELD(tsmhandler);
+	}
+	else
+	{
+#endif
 	WRITE_OID_FIELD(tsmhandler);
+#ifdef XCP
+	}
+#endif
 	WRITE_NODE_FIELD(args);
 	WRITE_NODE_FIELD(repeatable);
 }
@@ -4091,6 +4112,9 @@ _outNode(StringInfo str, const void *obj)
 				_outRemoteQuery(str, obj);
 				break;
 #endif
+			case T_SampleScan:
+				_outSampleScan(str, obj);
+				break;
 			case T_IndexScan:
 				_outIndexScan(str, obj);
 				break;

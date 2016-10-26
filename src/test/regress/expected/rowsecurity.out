@@ -100,15 +100,11 @@ SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
 -- try a sampled version
 SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0)
   WHERE f_leak(dtitle) ORDER BY did;
-NOTICE:  f_leak => my first manga
-NOTICE:  f_leak => great science fiction
-NOTICE:  f_leak => great manga
  did | cid | dlevel |      dauthor      |        dtitle         
 -----+-----+--------+-------------------+-----------------------
-   4 |  44 |      1 | rls_regress_user1 | my first manga
    6 |  22 |      1 | rls_regress_user2 | great science fiction
    8 |  44 |      1 | rls_regress_user2 | great manga
-(3 rows)
+(2 rows)
 
 -- viewpoint from rls_regress_user2
 SET SESSION AUTHORIZATION rls_regress_user2;
@@ -141,17 +137,11 @@ SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
 -- try a sampled version
 SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0)
   WHERE f_leak(dtitle) ORDER BY did;
-NOTICE:  f_leak => my first manga
-NOTICE:  f_leak => my second manga
-NOTICE:  f_leak => great science fiction
-NOTICE:  f_leak => great manga
  did | cid | dlevel |      dauthor      |        dtitle         
 -----+-----+--------+-------------------+-----------------------
-   4 |  44 |      1 | rls_regress_user1 | my first manga
-   5 |  44 |      2 | rls_regress_user1 | my second manga
    6 |  22 |      1 | rls_regress_user2 | great science fiction
    8 |  44 |      1 | rls_regress_user2 | great manga
-(4 rows)
+(2 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM document WHERE f_leak(dtitle);
                                QUERY PLAN                                
@@ -651,26 +641,6 @@ EXPLAIN (COSTS OFF) SELECT a, b, oid FROM t2 UNION ALL SELECT a, b, oid FROM t3;
          ->  Seq Scan on t3
 (6 rows)
 
--- union all query
-SELECT a, b, oid FROM t2 UNION ALL SELECT a, b, oid FROM t3;
- a |  b  | oid 
----+-----+-----
- 1 | abc | 201
- 3 | cde | 203
- 1 | xxx | 301
- 2 | yyy | 302
- 3 | zzz | 303
-(5 rows)
-
-EXPLAIN (COSTS OFF) SELECT a, b, oid FROM t2 UNION ALL SELECT a, b, oid FROM t3;
-          QUERY PLAN           
--------------------------------
- Append
-   ->  Seq Scan on t2
-         Filter: ((a % 2) = 1)
-   ->  Seq Scan on t3
-(4 rows)
-
 -- superuser is allowed to bypass RLS checks
 RESET SESSION AUTHORIZATION;
 SET row_security TO OFF;
@@ -809,9 +779,9 @@ CREATE VIEW rec1v WITH (security_barrier) AS SELECT * FROM rec1;
 CREATE VIEW rec2v WITH (security_barrier) AS SELECT * FROM rec2;
 SET SESSION AUTHORIZATION rls_regress_user0;
 CREATE POLICY r1 ON rec1 USING (x = (SELECT a FROM rec2v WHERE b = y));
-ERROR:  policy "r1" for table "rec1" already exists
+ERROR:  policy "r1" for relation "rec1" already exists
 CREATE POLICY r2 ON rec2 USING (a = (SELECT x FROM rec1v WHERE y = b));
-ERROR:  policy "r2" for table "rec2" already exists
+ERROR:  policy "r2" for relation "rec2" already exists
 SET SESSION AUTHORIZATION rls_regress_user1;
 SELECT * FROM rec1;    -- fail, mutual recursion via s.b. views
 ERROR:  infinite recursion detected in policy for relation "rec1"
@@ -1512,51 +1482,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
                Filter: ((a % 2) = 0)
 (5 rows)
 
-PREPARE plancache_test AS SELECT * FROM z1 WHERE f_leak(b);
-EXPLAIN (COSTS OFF) EXECUTE plancache_test;
-                     QUERY PLAN                      
------------------------------------------------------
- Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
-
-PREPARE plancache_test2 AS WITH q AS (SELECT * FROM z1 WHERE f_leak(b)) SELECT * FROM q,z2;
-EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 0)
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Seq Scan on z2
-(11 rows)
-
-PREPARE plancache_test3 AS WITH q AS (SELECT * FROM z2) SELECT * FROM q,z1 WHERE f_leak(z1.b);
-EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Seq Scan on z2
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 0)
-(11 rows)
-
 SET ROLE rls_regress_group1;
 SELECT * FROM z1 WHERE f_leak(b);
  a |  b  
@@ -1574,48 +1499,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
          ->  Seq Scan on z1 z1_1
                Filter: ((a % 2) = 0)
 (5 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test;
-                     QUERY PLAN                      
------------------------------------------------------
- Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 0)
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Seq Scan on z2
-(11 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Seq Scan on z2
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 0)
-(11 rows)
 
 SET SESSION AUTHORIZATION rls_regress_user2;
 SELECT * FROM z1 WHERE f_leak(b);
@@ -1635,48 +1518,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
                Filter: ((a % 2) = 1)
 (5 rows)
 
-EXPLAIN (COSTS OFF) EXECUTE plancache_test;
-                     QUERY PLAN                      
------------------------------------------------------
- Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 1)
-(5 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 1)
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Seq Scan on z2
-(11 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Seq Scan on z2
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 1)
-(11 rows)
-
 SET ROLE rls_regress_group2;
 SELECT * FROM z1 WHERE f_leak(b);
  a |  b  
@@ -1694,48 +1535,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
          ->  Seq Scan on z1 z1_1
                Filter: ((a % 2) = 1)
 (5 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test;
-                     QUERY PLAN                      
------------------------------------------------------
- Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 1)
-(5 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 1)
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Seq Scan on z2
-(11 rows)
-
-EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Nested Loop
-   CTE q
-     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Seq Scan on z2
-   ->  CTE Scan on q
-   ->  Materialize
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 1)
-(11 rows)
 
 --
 -- Views should follow policy for view owner.
@@ -1928,6 +1727,9 @@ DELETE FROM x1 WHERE f_leak(b) RETURNING *;
  2 | bcd_updt_updt | rls_regress_user1
  6 | fgh_updt_updt | rls_regress_user1
  8 | fgh_updt_updt | rls_regress_user2
+ 3 | cde_updt      | rls_regress_user2
+ 7 | fgh_updt      | rls_regress_user2
+ 4 | def_updt_updt | rls_regress_user2
 (6 rows)
 
 --
@@ -2130,11 +1932,13 @@ EXPLAIN (COSTS OFF) EXECUTE role_inval;
 SET ROLE rls_regress_user1;
 -- Check plan- should be back to original
 EXPLAIN (COSTS OFF) EXECUTE role_inval;
-       QUERY PLAN        
--------------------------
- Seq Scan on t1
-   Filter: ((a % 2) = 0)
-(2 rows)
+            QUERY PLAN            
+----------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Seq Scan on t1
+         Filter: ((a % 2) = 0)
+(4 rows)
 
 --
 -- CTE and RLS
@@ -2676,11 +2480,10 @@ SET SESSION AUTHORIZATION rls_regress_user0;
 ANALYZE current_check;
 -- Stats visible
 SELECT row_security_active('current_check');
- row_security_active 
----------------------
- f
-(1 row)
-
+ERROR:  function row_security_active(unknown) does not exist
+LINE 1: SELECT row_security_active('current_check');
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT attname, most_common_vals FROM pg_stats
   WHERE tablename = 'current_check'
   ORDER BY 1;
@@ -2694,17 +2497,19 @@ SELECT attname, most_common_vals FROM pg_stats
 SET SESSION AUTHORIZATION rls_regress_user1;
 -- Stats not visible
 SELECT row_security_active('current_check');
- row_security_active 
----------------------
- t
-(1 row)
-
+ERROR:  function row_security_active(unknown) does not exist
+LINE 1: SELECT row_security_active('current_check');
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 SELECT attname, most_common_vals FROM pg_stats
   WHERE tablename = 'current_check'
   ORDER BY 1;
- attname | most_common_vals 
----------+------------------
-(0 rows)
+  attname  |           most_common_vals           
+-----------+--------------------------------------
+ currentid | 
+ payload   | 
+ rlsuser   | (pg_catalog.text){rls_regress_user1}
+(3 rows)
 
 --
 -- Collation support
@@ -2715,18 +2520,15 @@ CREATE POLICY coll_p ON coll_t USING (c < ('foo'::text COLLATE "C"));
 ALTER TABLE coll_t ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON coll_t TO rls_regress_user0;
 SELECT (string_to_array(polqual, ':'))[7] AS inputcollid FROM pg_policy WHERE polrelid = 'coll_t'::regclass;
-   inputcollid    
-------------------
- inputcollid 950 
+  inputcollid   
+----------------
+ inputcollid 0 
 (1 row)
 
 SET SESSION AUTHORIZATION rls_regress_user0;
 SELECT * FROM coll_t;
-  c  
------
- bar
-(1 row)
-
+ERROR:  could not determine which collation to use for string comparison
+HINT:  Use the COLLATE clause to set the collation explicitly.
 ROLLBACK;
 --
 -- Shared Object Dependencies
@@ -2753,9 +2555,7 @@ SELECT refclassid::regclass, deptype
   AND refobjid IN ('alice'::regrole, 'bob'::regrole);
  refclassid | deptype 
 ------------+---------
- pg_authid  | r
- pg_authid  | r
-(2 rows)
+(0 rows)
 
 SAVEPOINT q;
 ERROR:  SAVEPOINT is not yet supported.
@@ -2829,7 +2629,7 @@ ROLLBACK;
 BEGIN;
 CREATE TABLE t (c) AS VALUES ('bar'::text);
 CREATE POLICY p ON t USING (max(c)); -- fails: aggregate functions are not allowed in policy expressions
-ERROR:  aggregate functions are not allowed in policy expressions
+ERROR:  aggregate functions are not allowed in WHERE
 ROLLBACK;
 --
 -- Non-target relations are only subject to SELECT policies
@@ -2908,227 +2708,6 @@ SELECT * FROM r2;
 SET SESSION AUTHORIZATION rls_regress_user0;
 DROP TABLE r1;
 DROP TABLE r2;
---
--- FORCE ROW LEVEL SECURITY applies RLS to owners but
--- only when row_security = on
---
-SET SESSION AUTHORIZATION rls_regress_user0;
-SET row_security = on;
-CREATE TABLE r1 (a int);
-INSERT INTO r1 VALUES (10), (20);
-CREATE POLICY p1 ON r1 USING (false);
-ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
--- No error, but no rows
-TABLE r1;
- a 
----
-(0 rows)
-
--- RLS error
-INSERT INTO r1 VALUES (1);
-ERROR:  new row violates row level security policy for "r1"
--- No error (unable to see any rows to update)
-UPDATE r1 SET a = 1;
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
-TABLE r1;
- a 
----
-(0 rows)
-
--- No error (unable to see any rows to delete)
-DELETE FROM r1;
-TABLE r1;
- a 
----
-(0 rows)
-
-SET row_security = off;
--- Shows all rows
-TABLE r1;
- a  
-----
- 10
- 20
-(2 rows)
-
--- Update all rows
-UPDATE r1 SET a = 1;
-ERROR:  query would be affected by row-level security policy for table "r1"
-HINT:  To disable the policy for the table's owner, use ALTER TABLE NO FORCE ROW LEVEL SECURITY.
-DELETE FROM r1;
-TABLE r1;
- a 
----
-(0 rows)
-
-DROP TABLE r1;
---
--- FORCE ROW LEVEL SECURITY does not break RI
---
-SET SESSION AUTHORIZATION rls_regress_user0;
-SET row_security = on;
-CREATE TABLE r1 (a int PRIMARY KEY);
-CREATE TABLE r2 (a int REFERENCES r1);
-INSERT INTO r1 VALUES (10), (20);
-INSERT INTO r2 VALUES (10), (20);
--- Create policies on r2 which prevent the
--- owner from seeing any rows, but RI should
--- still see them.
-CREATE POLICY p1 ON r2 USING (false);
-ALTER TABLE r2 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE r2 FORCE ROW LEVEL SECURITY;
--- Errors due to rows in r2
-DELETE FROM r1;
-ERROR:  update or delete on table "r1" violates foreign key constraint "r2_a_fkey" on table "r2"
-DETAIL:  Key (a)=(10) is still referenced from table "r2".
--- Reset r2 to no-RLS
-DROP POLICY p1 ON r2;
-ALTER TABLE r2 NO FORCE ROW LEVEL SECURITY;
-ALTER TABLE r2 DISABLE ROW LEVEL SECURITY;
--- clean out r2 for INSERT test below
-DELETE FROM r2;
--- Change r1 to not allow rows to be seen
-CREATE POLICY p1 ON r1 USING (false);
-ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
--- No rows seen
-TABLE r1;
- a 
----
-(0 rows)
-
--- No error, RI still sees that row exists in r1
-INSERT INTO r2 VALUES (10);
-DROP TABLE r2;
-DROP TABLE r1;
--- Ensure cascaded DELETE works
-CREATE TABLE r1 (a int PRIMARY KEY);
-CREATE TABLE r2 (a int REFERENCES r1 ON DELETE CASCADE);
-INSERT INTO r1 VALUES (10), (20);
-INSERT INTO r2 VALUES (10), (20);
--- Create policies on r2 which prevent the
--- owner from seeing any rows, but RI should
--- still see them.
-CREATE POLICY p1 ON r2 USING (false);
-ALTER TABLE r2 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE r2 FORCE ROW LEVEL SECURITY;
--- Deletes all records from both
-DELETE FROM r1;
--- Remove FORCE from r2
-ALTER TABLE r2 NO FORCE ROW LEVEL SECURITY;
--- As owner, we now bypass RLS
--- verify no rows in r2 now
-TABLE r2;
- a 
----
-(0 rows)
-
-DROP TABLE r2;
-DROP TABLE r1;
--- Ensure cascaded UPDATE works
-CREATE TABLE r1 (a int PRIMARY KEY);
-CREATE TABLE r2 (a int REFERENCES r1 ON UPDATE CASCADE);
-INSERT INTO r1 VALUES (10), (20);
-INSERT INTO r2 VALUES (10), (20);
--- Create policies on r2 which prevent the
--- owner from seeing any rows, but RI should
--- still see them.
-CREATE POLICY p1 ON r2 USING (false);
-ALTER TABLE r2 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE r2 FORCE ROW LEVEL SECURITY;
--- Updates records in both
-UPDATE r1 SET a = a+5;
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
--- Remove FORCE from r2
-ALTER TABLE r2 NO FORCE ROW LEVEL SECURITY;
--- As owner, we now bypass RLS
--- verify records in r2 updated
-TABLE r2;
- a  
-----
- 10
- 20
-(2 rows)
-
-DROP TABLE r2;
-DROP TABLE r1;
---
--- Test INSERT+RETURNING applies SELECT policies as
--- WithCheckOptions (meaning an error is thrown)
---
-SET SESSION AUTHORIZATION rls_regress_user0;
-SET row_security = on;
-CREATE TABLE r1 (a int);
-CREATE POLICY p1 ON r1 FOR SELECT USING (false);
-CREATE POLICY p2 ON r1 FOR INSERT WITH CHECK (true);
-ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
--- Works fine
-INSERT INTO r1 VALUES (10), (20);
--- No error, but no rows
-TABLE r1;
- a 
----
-(0 rows)
-
-SET row_security = off;
--- Rows shown now
-TABLE r1;
- a  
-----
- 10
- 20
-(2 rows)
-
-SET row_security = on;
--- Error
-INSERT INTO r1 VALUES (10), (20) RETURNING *;
-ERROR:  new row violates row level security policy for "r1"
-DROP TABLE r1;
---
--- Test UPDATE+RETURNING applies SELECT policies as
--- WithCheckOptions (meaning an error is thrown)
---
-SET SESSION AUTHORIZATION rls_regress_user0;
-SET row_security = on;
-CREATE TABLE r1 (a int);
-CREATE POLICY p1 ON r1 FOR SELECT USING (a < 20);
-CREATE POLICY p2 ON r1 FOR UPDATE USING (a < 20) WITH CHECK (true);
-INSERT INTO r1 VALUES (10);
-ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE r1 FORCE ROW LEVEL SECURITY;
--- Works fine
-UPDATE r1 SET a = 30;
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
--- Show updated rows
-SET row_security = off;
-TABLE r1;
- a  
-----
- 10
-(1 row)
-
--- reset value in r1 for test with RETURNING
-UPDATE r1 SET a = 10;
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
--- Verify row reset
-TABLE r1;
- a  
-----
- 10
-(1 row)
-
-SET row_security = on;
--- Error
-UPDATE r1 SET a = 30 RETURNING *;
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
-DROP TABLE r1;
 --
 -- Clean up objects
 --

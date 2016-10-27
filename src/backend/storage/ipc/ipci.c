@@ -4,7 +4,7 @@
  *	  POSTGRES inter-process communication initialization code.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -54,6 +54,7 @@
 #include "pgxc/squeue.h"
 #include "pgxc/pause.h"
 #endif
+#include "utils/snapmgr.h"
 
 shmem_startup_hook_type shmem_startup_hook = NULL;
 
@@ -153,6 +154,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 			size = add_size(size, ClusterLockShmemSize());
 		size = add_size(size, ClusterMonitorShmemSize());
 #endif
+		size = add_size(size, SnapMgrShmemSize());
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
 		size = add_size(size, AsyncShmemSize());
@@ -283,6 +285,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	/*
 	 * Set up other modules that need some shared memory space
 	 */
+	SnapMgrInit();
 	BTreeShmemInit();
 	SyncScanShmemInit();
 	AsyncShmemInit();

@@ -5,7 +5,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -38,6 +38,7 @@
 #ifdef XCP
 #include "executor/producerReceiver.h"
 #endif
+#include "executor/tqueue.h"
 #include "executor/tstoreReceiver.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
@@ -48,9 +49,10 @@
  *		dummy DestReceiver functions
  * ----------------
  */
-static void
+static bool
 donothingReceive(TupleTableSlot *slot, DestReceiver *self)
 {
+	return true;
 }
 
 static void
@@ -138,6 +140,9 @@ CreateDestReceiver(CommandDest dest)
 
 		case DestTransientRel:
 			return CreateTransientRelDestReceiver(InvalidOid);
+
+		case DestTupleQueue:
+			return CreateTupleQueueDestReceiver(NULL);
 	}
 
 	/* should never get here */
@@ -172,6 +177,7 @@ EndCommand(const char *commandTag, CommandDest dest)
 		case DestSQLFunction:
 		case DestProducer:
 		case DestTransientRel:
+		case DestTupleQueue:
 			break;
 	}
 }
@@ -215,6 +221,7 @@ NullCommand(CommandDest dest)
 		case DestSQLFunction:
 		case DestProducer:
 		case DestTransientRel:
+		case DestTupleQueue:
 			break;
 	}
 }
@@ -260,6 +267,7 @@ ReadyForQuery(CommandDest dest)
 		case DestSQLFunction:
 		case DestProducer:
 		case DestTransientRel:
+		case DestTupleQueue:
 			break;
 	}
 }

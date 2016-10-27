@@ -463,7 +463,7 @@ restore_command = 'copy "C:\\server\\archivedir\\%f" "%p"'  # Windows
        <para>
         It is possible that the replication delay between servers exceeds the
         value of this parameter, in which case no delay is added.
-        Note that the delay is calculated between the WAL timestamp as written
+        Note that the delay is calculated between the WAL time stamp as written
         on master and the current time on the standby. Delays in transfer
         because of network lag or cascading replication configurations
         may reduce the actual wait time significantly. If the system
@@ -479,8 +479,9 @@ restore_command = 'copy "C:\\server\\archivedir\\%f" "%p"'  # Windows
         are not visible until the corresponding commit record is applied.
        </para>
        <para>
-        The delay occurs until the standby is promoted or triggered. After that
-        the standby will end recovery without further waiting.
+        The delay occurs once the database in recovery has reached a consistent
+        state, until the standby is promoted or triggered. After that the standby
+        will end recovery without further waiting.
        </para>
        <para>
         This parameter is intended for use with streaming replication deployments;

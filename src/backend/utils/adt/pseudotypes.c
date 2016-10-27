@@ -12,7 +12,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -433,6 +433,33 @@ fdw_handler_out(PG_FUNCTION_ARGS)
 	ereport(ERROR,
 			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 			 errmsg("cannot display a value of type fdw_handler")));
+
+	PG_RETURN_VOID();			/* keep compiler quiet */
+}
+
+
+/*
+ * index_am_handler_in		- input routine for pseudo-type INDEX_AM_HANDLER.
+ */
+Datum
+index_am_handler_in(PG_FUNCTION_ARGS)
+{
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			 errmsg("cannot accept a value of type index_am_handler")));
+
+	PG_RETURN_VOID();			/* keep compiler quiet */
+}
+
+/*
+ * index_am_handler_out		- output routine for pseudo-type INDEX_AM_HANDLER.
+ */
+Datum
+index_am_handler_out(PG_FUNCTION_ARGS)
+{
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			 errmsg("cannot display a value of type index_am_handler")));
 
 	PG_RETURN_VOID();			/* keep compiler quiet */
 }

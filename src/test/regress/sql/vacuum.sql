@@ -60,5 +60,7 @@ VACUUM FULL pg_catalog.pg_database;
 VACUUM FULL vaccluster;
 VACUUM FULL vactst;
 
+VACUUM (DISABLE_PAGE_SKIPPING) vaccluster;
+
 DROP TABLE vaccluster;
 DROP TABLE vactst;

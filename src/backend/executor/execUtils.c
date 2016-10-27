@@ -4,7 +4,7 @@
  *	  miscellaneous executor utility routines
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -712,18 +712,6 @@ ExecFreeExprContext(PlanState *planstate)
  *		right for them...  -cim 6/3/91
  * ----------------------------------------------------------------
  */
-
-/* ----------------
- *		ExecGetScanType
- * ----------------
- */
-TupleDesc
-ExecGetScanType(ScanState *scanstate)
-{
-	TupleTableSlot *slot = scanstate->ss_ScanTupleSlot;
-
-	return slot->tts_tupleDescriptor;
-}
 
 /* ----------------
  *		ExecAssignScanType

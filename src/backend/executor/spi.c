@@ -3,7 +3,7 @@
  * spi.c
  *				Server Programming Interface
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -36,7 +36,7 @@
 #include "utils/typcache.h"
 
 
-uint32		SPI_processed = 0;
+uint64		SPI_processed = 0;
 Oid			SPI_lastoid = InvalidOid;
 SPITupleTable *SPI_tuptable = NULL;
 int			SPI_result;
@@ -60,12 +60,12 @@ static void _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan);
 
 static int _SPI_execute_plan(SPIPlanPtr plan, ParamListInfo paramLI,
 				  Snapshot snapshot, Snapshot crosscheck_snapshot,
-				  bool read_only, bool fire_triggers, long tcount);
+				  bool read_only, bool fire_triggers, uint64 tcount);
 
 static ParamListInfo _SPI_convert_params(int nargs, Oid *argtypes,
 					Datum *Values, const char *Nulls);
 
-static int	_SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, long tcount);
+static int	_SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, uint64 tcount);
 
 static void _SPI_error_callback(void *arg);
 
@@ -1829,7 +1829,7 @@ spi_dest_startup(DestReceiver *self, int operation, TupleDesc typeinfo)
  *		store tuple retrieved by Executor into SPITupleTable
  *		of current SPI procedure
  */
-void
+bool
 spi_printtup(TupleTableSlot *slot, DestReceiver *self)
 {
 	SPITupleTable *tuptable;
@@ -1852,9 +1852,10 @@ spi_printtup(TupleTableSlot *slot, DestReceiver *self)
 
 	if (tuptable->free == 0)
 	{
-		tuptable->free = 256;
+		/* Double the size of the pointer array */
+		tuptable->free = tuptable->alloced;
 		tuptable->alloced += tuptable->free;
-		tuptable->vals = (HeapTuple *) repalloc(tuptable->vals,
+		tuptable->vals = (HeapTuple *) repalloc_huge(tuptable->vals,
 									  tuptable->alloced * sizeof(HeapTuple));
 	}
 
@@ -1863,6 +1864,8 @@ spi_printtup(TupleTableSlot *slot, DestReceiver *self)
 	(tuptable->free)--;
 
 	MemoryContextSwitchTo(oldcxt);
+
+	return true;
 }
 
 /*
@@ -2067,10 +2070,10 @@ _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan)
 static int
 _SPI_execute_plan(SPIPlanPtr plan, ParamListInfo paramLI,
 				  Snapshot snapshot, Snapshot crosscheck_snapshot,
-				  bool read_only, bool fire_triggers, long tcount)
+				  bool read_only, bool fire_triggers, uint64 tcount)
 {
 	int			my_res = 0;
-	uint32		my_processed = 0;
+	uint64		my_processed = 0;
 	Oid			my_lastoid = InvalidOid;
 	SPITupleTable *my_tuptable = NULL;
 	int			res = 0;
@@ -2296,22 +2299,34 @@ _SPI_execute_plan(SPIPlanPtr plan, ParamListInfo paramLI,
 				 */
 				if (IsA(stmt, CreateTableAsStmt))
 				{
-					Assert(strncmp(completionTag, "SELECT ", 7) == 0);
-					_SPI_current->processed = strtoul(completionTag + 7,
-													  NULL, 10);
+					CreateTableAsStmt *ctastmt = (CreateTableAsStmt *) stmt;
+
+					if (strncmp(completionTag, "SELECT ", 7) == 0)
+						_SPI_current->processed =
+							pg_strtouint64(completionTag + 7, NULL, 10);
+					else
+					{
+						/*
+						 * Must be an IF NOT EXISTS that did nothing, or a
+						 * CREATE ... WITH NO DATA.
+						 */
+						Assert(ctastmt->if_not_exists ||
+							   ctastmt->into->skipData);
+						_SPI_current->processed = 0;
+					}
 
 					/*
 					 * For historical reasons, if CREATE TABLE AS was spelled
 					 * as SELECT INTO, return a special return code.
 					 */
-					if (((CreateTableAsStmt *) stmt)->is_select_into)
+					if (ctastmt->is_select_into)
 						res = SPI_OK_SELINTO;
 				}
 				else if (IsA(stmt, CopyStmt))
 				{
 					Assert(strncmp(completionTag, "COPY ", 5) == 0);
-					_SPI_current->processed = strtoul(completionTag + 5,
-													  NULL, 10);
+					_SPI_current->processed = pg_strtouint64(completionTag + 5,
+															 NULL, 10);
 				}
 			}
 
@@ -2409,6 +2424,7 @@ _SPI_convert_params(int nargs, Oid *argtypes,
 		paramLI->parserSetup = NULL;
 		paramLI->parserSetupArg = NULL;
 		paramLI->numParams = nargs;
+		paramLI->paramMask = NULL;
 
 		for (i = 0; i < nargs; i++)
 		{
@@ -2426,7 +2442,7 @@ _SPI_convert_params(int nargs, Oid *argtypes,
 }
 
 static int
-_SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, long tcount)
+_SPI_pquery(QueryDesc *queryDesc, bool fire_triggers, uint64 tcount)
 {
 	int			operation = queryDesc->operation;
 	int			eflags;
@@ -2538,7 +2554,7 @@ static void
 _SPI_cursor_operation(Portal portal, FetchDirection direction, long count,
 					  DestReceiver *dest)
 {
-	long		nfetched;
+	uint64		nfetched;
 
 	/* Check that the portal is valid */
 	if (!PortalIsValid(portal))
@@ -2641,7 +2657,7 @@ _SPI_end_call(bool procmem)
 static bool
 _SPI_checktuples(void)
 {
-	uint32		processed = _SPI_current->processed;
+	uint64		processed = _SPI_current->processed;
 	SPITupleTable *tuptable = _SPI_current->tuptable;
 	bool		failed = false;
 

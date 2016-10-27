@@ -4,7 +4,7 @@
  *
  * Author: Magnus Hagander <magnus@hagander.net>
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *		  src/bin/pg_basebackup/streamutil.c
@@ -30,6 +30,8 @@
 #include "pqexpbuffer.h"
 #include "common/fe_memutils.h"
 #include "datatype/timestamp.h"
+
+#define ERRCODE_DUPLICATE_OBJECT  "42710"
 
 const char *progname;
 char	   *connection_string = NULL;
@@ -62,9 +64,15 @@ GetConnection(void)
 	PQconninfoOption *conn_opt;
 	char	   *err_msg = NULL;
 
+	/* pg_recvlogical uses dbname only; others use connection_string only. */
+	Assert(dbname == NULL || connection_string == NULL);
+
 	/*
 	 * Merge the connection info inputs given in form of connection string,
 	 * options and default values (dbname=replication, replication=true, etc.)
+	 * Explicitly discard any dbname value in the connection string;
+	 * otherwise, PQconnectdbParams() would interpret that value as being
+	 * itself a connection string.
 	 */
 	i = 0;
 	if (connection_string)
@@ -78,7 +86,8 @@ GetConnection(void)
 
 		for (conn_opt = conn_opts; conn_opt->keyword != NULL; conn_opt++)
 		{
-			if (conn_opt->val != NULL && conn_opt->val[0] != '\0')
+			if (conn_opt->val != NULL && conn_opt->val[0] != '\0' &&
+				strcmp(conn_opt->keyword, "dbname") != 0)
 				argcount++;
 		}
 
@@ -87,7 +96,8 @@ GetConnection(void)
 
 		for (conn_opt = conn_opts; conn_opt->keyword != NULL; conn_opt++)
 		{
-			if (conn_opt->val != NULL && conn_opt->val[0] != '\0')
+			if (conn_opt->val != NULL && conn_opt->val[0] != '\0' &&
+				strcmp(conn_opt->keyword, "dbname") != 0)
 			{
 				keywords[i] = conn_opt->keyword;
 				values[i] = conn_opt->val;
@@ -231,10 +241,10 @@ GetConnection(void)
 /*
  * Run IDENTIFY_SYSTEM through a given connection and give back to caller
  * some result information if requested:
- * - Start LSN position
- * - Current timeline ID
  * - System identifier
- * - Plugin name
+ * - Current timeline ID
+ * - Start LSN position
+ * - Database name (NULL in servers prior to 9.4)
  */
 bool
 RunIdentifySystem(PGconn *conn, char **sysid, TimeLineID *starttli,
@@ -292,15 +302,21 @@ RunIdentifySystem(PGconn *conn, char **sysid, TimeLineID *starttli,
 	/* Get database name, only available in 9.4 and newer versions */
 	if (db_name != NULL)
 	{
-		if (PQnfields(res) < 4)
-			fprintf(stderr,
-					_("%s: could not identify system: got %d rows and %d fields, expected %d rows and %d or more fields\n"),
-					progname, PQntuples(res), PQnfields(res), 1, 4);
+		*db_name = NULL;
+		if (PQserverVersion(conn) >= 90400)
+		{
+			if (PQnfields(res) < 4)
+			{
+				fprintf(stderr,
+						_("%s: could not identify system: got %d rows and %d fields, expected %d rows and %d or more fields\n"),
+						progname, PQntuples(res), PQnfields(res), 1, 4);
 
-		if (PQgetisnull(res, 0, 3))
-			*db_name = NULL;
-		else
-			*db_name = pg_strdup(PQgetvalue(res, 0, 3));
+				PQclear(res);
+				return false;
+			}
+			if (!PQgetisnull(res, 0, 3))
+				*db_name = pg_strdup(PQgetvalue(res, 0, 3));
+		}
 	}
 
 	PQclear(res);
@@ -314,7 +330,7 @@ RunIdentifySystem(PGconn *conn, char **sysid, TimeLineID *starttli,
  */
 bool
 CreateReplicationSlot(PGconn *conn, const char *slot_name, const char *plugin,
-					  XLogRecPtr *startpos, bool is_physical)
+					  bool is_physical, bool slot_exists_ok)
 {
 	PQExpBuffer query;
 	PGresult   *res;
@@ -336,12 +352,25 @@ CreateReplicationSlot(PGconn *conn, const char *slot_name, const char *plugin,
 	res = PQexec(conn, query->data);
 	if (PQresultStatus(res) != PGRES_TUPLES_OK)
 	{
-		fprintf(stderr, _("%s: could not send replication command \"%s\": %s"),
-				progname, query->data, PQerrorMessage(conn));
+		const char *sqlstate = PQresultErrorField(res, PG_DIAG_SQLSTATE);
 
-		destroyPQExpBuffer(query);
-		PQclear(res);
-		return false;
+		if (slot_exists_ok &&
+			sqlstate &&
+			strcmp(sqlstate, ERRCODE_DUPLICATE_OBJECT) == 0)
+		{
+			destroyPQExpBuffer(query);
+			PQclear(res);
+			return true;
+		}
+		else
+		{
+			fprintf(stderr, _("%s: could not send replication command \"%s\": %s"),
+					progname, query->data, PQerrorMessage(conn));
+
+			destroyPQExpBuffer(query);
+			PQclear(res);
+			return false;
+		}
 	}
 
 	if (PQntuples(res) != 1 || PQnfields(res) != 4)
@@ -354,25 +383,6 @@ CreateReplicationSlot(PGconn *conn, const char *slot_name, const char *plugin,
 		destroyPQExpBuffer(query);
 		PQclear(res);
 		return false;
-	}
-
-	/* Get LSN start position if necessary */
-	if (startpos != NULL)
-	{
-		uint32		hi,
-					lo;
-
-		if (sscanf(PQgetvalue(res, 0, 1), "%X/%X", &hi, &lo) != 2)
-		{
-			fprintf(stderr,
-				  _("%s: could not parse transaction log location \"%s\"\n"),
-					progname, PQgetvalue(res, 0, 1));
-
-			destroyPQExpBuffer(query);
-			PQclear(res);
-			return false;
-		}
-		*startpos = ((uint64) hi) << 32 | lo;
 	}
 
 	destroyPQExpBuffer(query);
@@ -420,6 +430,7 @@ DropReplicationSlot(PGconn *conn, const char *slot_name)
 		return false;
 	}
 
+	destroyPQExpBuffer(query);
 	PQclear(res);
 	return true;
 }

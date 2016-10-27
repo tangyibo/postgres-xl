@@ -3,7 +3,7 @@
  * parse_clause.c
  *	  handle clauses in parser
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -21,12 +21,14 @@
 #include "access/tsmapi.h"
 #include "catalog/catalog.h"
 #include "catalog/heap.h"
-#include "catalog/pg_constraint.h"
+#include "catalog/pg_am.h"
+#include "catalog/pg_constraint_fn.h"
 #include "catalog/pg_type.h"
 #include "commands/defrem.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/tlist.h"
+#include "optimizer/var.h"
 #include "parser/analyze.h"
 #include "parser/parsetree.h"
 #include "parser/parser.h"
@@ -756,8 +758,8 @@ transformRangeTableSample(ParseState *pstate, RangeTableSample *rts)
 	if (get_func_rettype(handlerOid) != TSM_HANDLEROID)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("function %s must return type \"tsm_handler\"",
-						NameListToString(rts->method)),
+				 errmsg("function %s must return type %s",
+						NameListToString(rts->method), "tsm_handler"),
 				 parser_errposition(pstate, rts->location)));
 
 	/* OK, run the handler to get TsmRoutine, for argument type info */
@@ -1812,7 +1814,7 @@ findTargetlistEntrySQL99(ParseState *pstate, Node *node, List **tlist,
  * Inside a grouping set (ROLLUP, CUBE, or GROUPING SETS), we expect the
  * content to be nested no more than 2 deep: i.e. ROLLUP((a,b),(c,d)) is
  * ok, but ROLLUP((a,(b,c)),d) is flattened to ((a,b,c),d), which we then
- * normalize to ((a,b,c),(d)).
+ * (later) normalize to ((a,b,c),(d)).
  *
  * CUBE or ROLLUP can be nested inside GROUPING SETS (but not the reverse),
  * and we leave that alone if we find it. But if we see GROUPING SETS inside
@@ -1881,9 +1883,16 @@ flatten_grouping_sets(Node *expr, bool toplevel, bool *hasGroupingSets)
 
 				foreach(l2, gset->content)
 				{
-					Node	   *n2 = flatten_grouping_sets(lfirst(l2), false, NULL);
+					Node	   *n1 = lfirst(l2);
+					Node	   *n2 = flatten_grouping_sets(n1, false, NULL);
 
-					result_set = lappend(result_set, n2);
+					if (IsA(n1, GroupingSet) &&
+						((GroupingSet *) n1)->kind == GROUPING_SET_SETS)
+					{
+						result_set = list_concat(result_set, (List *) n2);
+					}
+					else
+						result_set = lappend(result_set, n2);
 				}
 
 				/*
@@ -2852,7 +2861,7 @@ transformOnConflictArbiter(ParseState *pstate,
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("ON CONFLICT DO UPDATE requires inference specification or constraint name"),
-				 errhint("For example, ON CONFLICT (<column>)."),
+				 errhint("For example, ON CONFLICT (column_name)."),
 				 parser_errposition(pstate,
 								  exprLocation((Node *) onConflictClause))));
 
@@ -2863,7 +2872,7 @@ transformOnConflictArbiter(ParseState *pstate,
 	if (IsCatalogRelation(pstate->p_target_relation))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			  errmsg("ON CONFLICT not supported with system catalog tables"),
+		   errmsg("ON CONFLICT is not supported with system catalog tables"),
 				 parser_errposition(pstate,
 								  exprLocation((Node *) onConflictClause))));
 
@@ -2871,7 +2880,7 @@ transformOnConflictArbiter(ParseState *pstate,
 	if (RelationIsUsedAsCatalogTable(pstate->p_target_relation))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("ON CONFLICT not supported on table \"%s\" used as a catalog table",
+				 errmsg("ON CONFLICT is not supported on table \"%s\" used as a catalog table",
 						RelationGetRelationName(pstate->p_target_relation)),
 				 parser_errposition(pstate,
 								  exprLocation((Node *) onConflictClause))));

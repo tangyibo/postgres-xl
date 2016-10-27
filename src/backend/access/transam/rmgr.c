@@ -11,6 +11,7 @@
 #include "access/commit_ts.h"
 #include "access/gin.h"
 #include "access/gist_private.h"
+#include "access/generic_xlog.h"
 #include "access/hash.h"
 #include "access/heapam_xlog.h"
 #include "access/brin_xlog.h"
@@ -26,6 +27,7 @@
 #ifdef PGXC
 #include "pgxc/barrier.h"
 #endif
+#include "replication/message.h"
 #include "replication/origin.h"
 #include "storage/standby.h"
 #include "utils/relmapper.h"

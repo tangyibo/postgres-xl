@@ -3,7 +3,7 @@
  * rewriteDefine.c
  *	  routines for defining a rewrite rule
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -27,6 +27,7 @@
 #include "catalog/objectaccess.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/storage.h"
+#include "commands/policy.h"
 #include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parse_utilcmd.h"
@@ -410,11 +411,12 @@ DefineQueryRewrite(char *rulename,
 		 *
 		 * If so, check that the relation is empty because the storage for the
 		 * relation is going to be deleted.  Also insist that the rel not have
-		 * any triggers, indexes, or child tables.  (Note: these tests are too
-		 * strict, because they will reject relations that once had such but
-		 * don't anymore.  But we don't really care, because this whole
-		 * business of converting relations to views is just a kluge to allow
-		 * dump/reload of views that participate in circular dependencies.)
+		 * any triggers, indexes, child tables, policies, or RLS enabled.
+		 * (Note: these tests are too strict, because they will reject
+		 * relations that once had such but don't anymore.  But we don't
+		 * really care, because this whole business of converting relations to
+		 * views is just a kluge to allow dump/reload of views that
+		 * participate in circular dependencies.)
 		 */
 		if (event_relation->rd_rel->relkind != RELKIND_VIEW &&
 			event_relation->rd_rel->relkind != RELKIND_MATVIEW)
@@ -449,6 +451,18 @@ DefineQueryRewrite(char *rulename,
 				ereport(ERROR,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 						 errmsg("could not convert table \"%s\" to a view because it has child tables",
+								RelationGetRelationName(event_relation))));
+
+			if (event_relation->rd_rel->relrowsecurity)
+				ereport(ERROR,
+						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						 errmsg("could not convert table \"%s\" to a view because it has row security enabled",
+								RelationGetRelationName(event_relation))));
+
+			if (relation_has_policies(event_relation))
+				ereport(ERROR,
+						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+						 errmsg("could not convert table \"%s\" to a view because it has row security policies",
 								RelationGetRelationName(event_relation))));
 
 			RelisBecomingView = true;
@@ -657,17 +671,29 @@ checkRuleResultList(List *targetList, TupleDesc resultDesc, bool isSelect,
 		attname = NameStr(attr->attname);
 
 		/*
-		 * Disallow dropped columns in the relation.  This won't happen in the
-		 * cases we actually care about (namely creating a view via CREATE
-		 * TABLE then CREATE RULE, or adding a RETURNING rule to a view).
-		 * Trying to cope with it is much more trouble than it's worth,
-		 * because we'd have to modify the rule to insert dummy NULLs at the
-		 * right positions.
+		 * Disallow dropped columns in the relation.  This is not really
+		 * expected to happen when creating an ON SELECT rule.  It'd be
+		 * possible if someone tried to convert a relation with dropped
+		 * columns to a view, but the only case we care about supporting
+		 * table-to-view conversion for is pg_dump, and pg_dump won't do that.
+		 *
+		 * Unfortunately, the situation is also possible when adding a rule
+		 * with RETURNING to a regular table, and rejecting that case is
+		 * altogether more annoying.  In principle we could support it by
+		 * modifying the targetlist to include dummy NULL columns
+		 * corresponding to the dropped columns in the tupdesc.  However,
+		 * places like ruleutils.c would have to be fixed to not process such
+		 * entries, and that would take an uncertain and possibly rather large
+		 * amount of work.  (Note we could not dodge that by marking the dummy
+		 * columns resjunk, since it's precisely the non-resjunk tlist columns
+		 * that are expected to correspond to table columns.)
 		 */
 		if (attr->attisdropped)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot convert relation containing dropped columns to view")));
+					 isSelect ?
+					 errmsg("cannot convert relation containing dropped columns to view") :
+					 errmsg("cannot create a RETURNING list for a relation containing dropped columns")));
 
 		/* Check name match if required; no need for two error texts here */
 		if (requireColumnNameMatch && strcmp(tle->resname, attname) != 0)

@@ -10,7 +10,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -193,7 +193,19 @@ vacuum(int options, RangeVar *relation, Oid relid, VacuumParams *params,
 	 * calls a hostile index expression that itself calls ANALYZE.
 	 */
 	if (in_vacuum)
-		elog(ERROR, "%s cannot be executed from VACUUM or ANALYZE", stmttype);
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("%s cannot be executed from VACUUM or ANALYZE",
+						stmttype)));
+
+	/*
+	 * Sanity check DISABLE_PAGE_SKIPPING option.
+	 */
+	if ((options & VACOPT_FULL) != 0 &&
+		(options & VACOPT_DISABLE_PAGE_SKIPPING) != 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("VACUUM option DISABLE_PAGE_SKIPPING cannot be used with FULL")));
 
 	/*
 	 * Send info about dead objects to the statistics collector, unless we are
@@ -499,7 +511,8 @@ vacuum_set_xid_limits(Relation rel,
 	 * working on a particular table at any time, and that each vacuum is
 	 * always an independent transaction.
 	 */
-	*oldestXmin = GetOldestXmin(rel, true);
+	*oldestXmin =
+		TransactionIdLimitedForOldSnapshots(GetOldestXmin(rel, true), rel);
 
 	Assert(TransactionIdIsNormal(*oldestXmin));
 
@@ -1067,7 +1080,7 @@ vac_truncate_clog(TransactionId frozenXID,
 				  TransactionId lastSaneFrozenXid,
 				  MultiXactId lastSaneMinMulti)
 {
-	TransactionId myXID = GetCurrentTransactionId();
+	TransactionId nextXID = ReadNewTransactionId();
 	Relation	relation;
 	HeapScanDesc scan;
 	HeapTuple	tuple;
@@ -1082,6 +1095,12 @@ vac_truncate_clog(TransactionId frozenXID,
 
 	/*
 	 * Scan pg_database to compute the minimum datfrozenxid/datminmxid
+	 *
+	 * Since vac_update_datfrozenxid updates datfrozenxid/datminmxid in-place,
+	 * the values could change while we look at them.  Fetch each one just
+	 * once to ensure sane behavior of the comparison logic.  (Here, as in
+	 * many other places, we assume that fetching or updating an XID in shared
+	 * storage is atomic.)
 	 *
 	 * Note: we need not worry about a race condition with new entries being
 	 * inserted by CREATE DATABASE.  Any such entry will have a copy of some
@@ -1098,10 +1117,12 @@ vac_truncate_clog(TransactionId frozenXID,
 
 	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
 	{
-		Form_pg_database dbform = (Form_pg_database) GETSTRUCT(tuple);
+		volatile FormData_pg_database *dbform = (Form_pg_database) GETSTRUCT(tuple);
+		TransactionId datfrozenxid = dbform->datfrozenxid;
+		TransactionId datminmxid = dbform->datminmxid;
 
-		Assert(TransactionIdIsNormal(dbform->datfrozenxid));
-		Assert(MultiXactIdIsValid(dbform->datminmxid));
+		Assert(TransactionIdIsNormal(datfrozenxid));
+		Assert(MultiXactIdIsValid(datminmxid));
 
 		/*
 		 * If things are working properly, no database should have a
@@ -1112,21 +1133,21 @@ vac_truncate_clog(TransactionId frozenXID,
 		 * databases have been scanned and cleaned up.  (We will issue the
 		 * "already wrapped" warning if appropriate, though.)
 		 */
-		if (TransactionIdPrecedes(lastSaneFrozenXid, dbform->datfrozenxid) ||
-			MultiXactIdPrecedes(lastSaneMinMulti, dbform->datminmxid))
+		if (TransactionIdPrecedes(lastSaneFrozenXid, datfrozenxid) ||
+			MultiXactIdPrecedes(lastSaneMinMulti, datminmxid))
 			bogus = true;
 
-		if (TransactionIdPrecedes(myXID, dbform->datfrozenxid))
+		if (TransactionIdPrecedes(nextXID, datfrozenxid))
 			frozenAlreadyWrapped = true;
-		else if (TransactionIdPrecedes(dbform->datfrozenxid, frozenXID))
+		else if (TransactionIdPrecedes(datfrozenxid, frozenXID))
 		{
-			frozenXID = dbform->datfrozenxid;
+			frozenXID = datfrozenxid;
 			oldestxid_datoid = HeapTupleGetOid(tuple);
 		}
 
-		if (MultiXactIdPrecedes(dbform->datminmxid, minMulti))
+		if (MultiXactIdPrecedes(datminmxid, minMulti))
 		{
-			minMulti = dbform->datminmxid;
+			minMulti = datminmxid;
 			minmulti_datoid = HeapTupleGetOid(tuple);
 		}
 	}
@@ -1157,11 +1178,11 @@ vac_truncate_clog(TransactionId frozenXID,
 		return;
 
 	/*
-	 * Truncate CLOG and CommitTs to the oldest computed value. Note we don't
-	 * truncate multixacts; that will be done by the next checkpoint.
+	 * Truncate CLOG, multixact and CommitTs to the oldest computed value.
 	 */
 	TruncateCLOG(frozenXID);
-	TruncateCommitTs(frozenXID, true);
+	TruncateCommitTs(frozenXID);
+	TruncateMultiXact(minMulti, minmulti_datoid);
 
 	/*
 	 * Update the wrap limit for GetNewTransactionId and creation of new
@@ -1171,7 +1192,7 @@ vac_truncate_clog(TransactionId frozenXID,
 	 */
 	SetTransactionIdLimit(frozenXID, oldestxid_datoid);
 	SetMultiXactIdLimit(minMulti, minmulti_datoid);
-	AdvanceOldestCommitTs(frozenXID);
+	AdvanceOldestCommitTsXid(frozenXID);
 }
 
 

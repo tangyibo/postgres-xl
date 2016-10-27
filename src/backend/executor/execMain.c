@@ -27,7 +27,7 @@
  *	which should also omit ExecutorRun.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -85,9 +85,10 @@ static void CheckValidRowMarkRel(Relation rel, RowMarkType markType);
 static void ExecPostprocessPlan(EState *estate);
 static void ExecEndPlan(PlanState *planstate, EState *estate);
 static void ExecutePlan(EState *estate, PlanState *planstate,
+			bool use_parallel_mode,
 			CmdType operation,
 			bool sendTuples,
-			long numberTuples,
+			uint64 numberTuples,
 			ScanDirection direction,
 			DestReceiver *dest);
 static bool ExecCheckRTEPerms(RangeTblEntry *rte);
@@ -324,7 +325,7 @@ standard_ExecutorStart(QueryDesc *queryDesc, int eflags)
  */
 void
 ExecutorRun(QueryDesc *queryDesc,
-			ScanDirection direction, long count)
+			ScanDirection direction, uint64 count)
 {
 	if (ExecutorRun_hook)
 		(*ExecutorRun_hook) (queryDesc, direction, count);
@@ -334,7 +335,7 @@ ExecutorRun(QueryDesc *queryDesc,
 
 void
 standard_ExecutorRun(QueryDesc *queryDesc,
-					 ScanDirection direction, long count)
+					 ScanDirection direction, uint64 count)
 {
 	EState	   *estate;
 	CmdType		operation;
@@ -383,6 +384,7 @@ standard_ExecutorRun(QueryDesc *queryDesc,
 	if (!ScanDirectionIsNoMovement(direction))
 		ExecutePlan(estate,
 					queryDesc->planstate,
+					queryDesc->plannedstmt->parallelModeNeeded,
 					operation,
 					sendTuples,
 					count,
@@ -1308,6 +1310,7 @@ InitResultRelInfo(ResultRelInfo *resultRelInfo,
 	else
 		resultRelInfo->ri_FdwRoutine = NULL;
 	resultRelInfo->ri_FdwState = NULL;
+	resultRelInfo->ri_usesFdwDirectModify = false;
 	resultRelInfo->ri_ConstraintExprs = NULL;
 	resultRelInfo->ri_junkFilter = NULL;
 	resultRelInfo->ri_projectReturning = NULL;
@@ -1581,14 +1584,15 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 static void
 ExecutePlan(EState *estate,
 			PlanState *planstate,
+			bool use_parallel_mode,
 			CmdType operation,
 			bool sendTuples,
-			long numberTuples,
+			uint64 numberTuples,
 			ScanDirection direction,
 			DestReceiver *dest)
 {
 	TupleTableSlot *slot;
-	long		current_tuple_count;
+	uint64		current_tuple_count;
 
 	/*
 	 * initialize local variables
@@ -1599,6 +1603,20 @@ ExecutePlan(EState *estate,
 	 * Set the direction.
 	 */
 	estate->es_direction = direction;
+
+	/*
+	 * If a tuple count was supplied, we must force the plan to run without
+	 * parallelism, because we might exit early.
+	 */
+	if (numberTuples)
+		use_parallel_mode = false;
+
+	/*
+	 * If a tuple count was supplied, we must force the plan to run without
+	 * parallelism, because we might exit early.
+	 */
+	if (use_parallel_mode)
+		EnterParallelMode();
 
 	/*
 	 * Loop until we've processed the proper number of tuples from the plan.
@@ -1618,7 +1636,11 @@ ExecutePlan(EState *estate,
 		 * process so we just end the loop...
 		 */
 		if (TupIsNull(slot))
+		{
+			/* Allow nodes to release or shut down resources. */
+			(void) ExecShutdownNode(planstate);
 			break;
+		}
 
 		/*
 		 * If we have a junk filter, then project a new tuple with the junk
@@ -1636,7 +1658,15 @@ ExecutePlan(EState *estate,
 		 * practice, this is probably always the case at this point.)
 		 */
 		if (sendTuples)
-			(*dest->receiveSlot) (slot, dest);
+		{
+			/*
+			 * If we are not able to send the tuple, we assume the destination
+			 * has closed and no more tuples can be sent. If that's the case,
+			 * end the loop.
+			 */
+			if (!((*dest->receiveSlot) (slot, dest)))
+				break;
+		}
 
 		/*
 		 * Count tuples processed, if this is a SELECT.  (For other operation
@@ -1655,6 +1685,9 @@ ExecutePlan(EState *estate,
 		if (numberTuples && numberTuples == current_tuple_count)
 			break;
 	}
+
+	if (use_parallel_mode)
+		ExitParallelMode();
 }
 
 
@@ -1873,7 +1906,7 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
 
 					ereport(ERROR,
 							(errcode(ERRCODE_WITH_CHECK_OPTION_VIOLATION),
-					  errmsg("new row violates WITH CHECK OPTION for \"%s\"",
+					  errmsg("new row violates check option for view \"%s\"",
 							 wco->relname),
 							 val_desc ? errdetail("Failing row contains %s.",
 												  val_desc) : 0));
@@ -1883,25 +1916,25 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
 					if (wco->polname != NULL)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("new row violates row level security policy \"%s\" for \"%s\"",
-									wco->polname, wco->relname)));
+								 errmsg("new row violates row-level security policy \"%s\" for table \"%s\"",
+										wco->polname, wco->relname)));
 					else
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("new row violates row level security policy for \"%s\"",
-									wco->relname)));
+								 errmsg("new row violates row-level security policy for table \"%s\"",
+										wco->relname)));
 					break;
 				case WCO_RLS_CONFLICT_CHECK:
 					if (wco->polname != NULL)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("new row violates row level security policy \"%s\" (USING expression) for \"%s\"",
-									wco->polname, wco->relname)));
+								 errmsg("new row violates row-level security policy \"%s\" (USING expression) for table \"%s\"",
+										wco->polname, wco->relname)));
 					else
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-							 errmsg("new row violates row level security policy (USING expression) for \"%s\"",
-									wco->relname)));
+								 errmsg("new row violates row-level security policy (USING expression) for table \"%s\"",
+										wco->relname)));
 					break;
 				default:
 					elog(ERROR, "unrecognized WCO kind: %u", wco->kind);
@@ -1951,7 +1984,7 @@ ExecBuildSlotValueDescription(Oid reloid,
 	 * then don't return anything.  Otherwise, go through normal permission
 	 * checks.
 	 */
-	if (check_enable_rls(reloid, GetUserId(), true) == RLS_ENABLED)
+	if (check_enable_rls(reloid, InvalidOid, true) == RLS_ENABLED)
 		return NULL;
 
 	initStringInfo(&buf);

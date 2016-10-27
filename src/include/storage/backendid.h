@@ -5,7 +5,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/storage/backendid.h
@@ -41,5 +41,14 @@ extern PGDLLIMPORT LocalTransactionId MyCoordLxid;
 /* BackendId of the first backend of the distributed session on the node */
 extern PGDLLIMPORT BackendId MyFirstBackendId;
 #endif
+/* backend id of our parallel session leader, or InvalidBackendId if none */
+extern PGDLLIMPORT BackendId ParallelMasterBackendId;
+
+/*
+ * The BackendId to use for our session's temp relations is normally our own,
+ * but parallel workers should use their leader's ID.
+ */
+#define BackendIdForTempRelations() \
+	(ParallelMasterBackendId == InvalidBackendId ? MyBackendId : ParallelMasterBackendId)
 
 #endif   /* BACKENDID_H */

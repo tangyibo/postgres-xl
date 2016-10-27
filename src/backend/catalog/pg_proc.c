@@ -4,7 +4,7 @@
  *	  routines to support manipulation of the pg_proc relation
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -89,6 +89,7 @@ ProcedureCreate(const char *procedureName,
 				bool isLeakProof,
 				bool isStrict,
 				char volatility,
+				char parallel,
 				oidvector *parameterTypes,
 				Datum allParameterTypes,
 				Datum parameterModes,
@@ -350,6 +351,7 @@ ProcedureCreate(const char *procedureName,
 	values[Anum_pg_proc_proisstrict - 1] = BoolGetDatum(isStrict);
 	values[Anum_pg_proc_proretset - 1] = BoolGetDatum(returnsSet);
 	values[Anum_pg_proc_provolatile - 1] = CharGetDatum(volatility);
+	values[Anum_pg_proc_proparallel - 1] = CharGetDatum(parallel);
 	values[Anum_pg_proc_pronargs - 1] = UInt16GetDatum(parameterCount);
 	values[Anum_pg_proc_pronargdefaults - 1] = UInt16GetDatum(list_length(parameterDefaults));
 	values[Anum_pg_proc_prorettype - 1] = ObjectIdGetDatum(returnType);

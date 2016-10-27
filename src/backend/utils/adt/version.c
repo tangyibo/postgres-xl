@@ -4,7 +4,7 @@
  *	 Returns the PostgreSQL version string
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Copyright (c) 1998-2015, PostgreSQL Global Development Group
+ * Copyright (c) 1998-2016, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *

@@ -4,7 +4,7 @@
  *	  Routines to support inter-object dependencies.
  *
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -56,6 +56,12 @@
  * this dependency type acts the same as an internal dependency, but it's
  * kept separate for clarity and to simplify pg_dump.
  *
+ * DEPENDENCY_AUTO_EXTENSION ('x'): the dependent object is not a member
+ * of the extension that is the referenced object (and so should not be
+ * ignored by pg_dump), but cannot function without the extension and
+ * should be dropped when the extension itself is.  The dependent object
+ * may be dropped on its own as well.
+ *
  * DEPENDENCY_PIN ('p'): there is no dependent object; this type of entry
  * is a signal that the system itself depends on the referenced object,
  * and so that object must never be deleted.  Entries of this type are
@@ -71,6 +77,7 @@ typedef enum DependencyType
 	DEPENDENCY_AUTO = 'a',
 	DEPENDENCY_INTERNAL = 'i',
 	DEPENDENCY_EXTENSION = 'e',
+	DEPENDENCY_AUTO_EXTENSION = 'x',
 	DEPENDENCY_PIN = 'p'
 } DependencyType;
 
@@ -97,6 +104,10 @@ typedef enum DependencyType
  * created for the owner of an object; hence two objects may be linked by
  * one or the other, but not both, of these dependency types.)
  *
+ * (d) a SHARED_DEPENDENCY_POLICY entry means that the referenced object is
+ * a role mentioned in a policy object.  The referenced object must be a
+ * pg_authid entry.
+ *
  * SHARED_DEPENDENCY_INVALID is a value used as a parameter in internal
  * routines, and is not valid in the catalog itself.
  */
@@ -105,6 +116,7 @@ typedef enum SharedDependencyType
 	SHARED_DEPENDENCY_PIN = 'p',
 	SHARED_DEPENDENCY_OWNER = 'o',
 	SHARED_DEPENDENCY_ACL = 'a',
+	SHARED_DEPENDENCY_POLICY = 'r',
 	SHARED_DEPENDENCY_INVALID = 0
 } SharedDependencyType;
 
@@ -113,7 +125,7 @@ typedef struct ObjectAddresses ObjectAddresses;
 
 /*
  * This enum covers all system catalogs whose OIDs can appear in
- * pg_depend.classId or pg_shdepend.classId.
+ * pg_depend.classId or pg_shdepend.classId.  Keep object_classes[] in sync.
  */
 typedef enum ObjectClass
 {
@@ -130,6 +142,7 @@ typedef enum ObjectClass
 	OCLASS_OPERATOR,			/* pg_operator */
 	OCLASS_OPCLASS,				/* pg_opclass */
 	OCLASS_OPFAMILY,			/* pg_opfamily */
+	OCLASS_AM,					/* pg_am */
 	OCLASS_AMOP,				/* pg_amop */
 	OCLASS_AMPROC,				/* pg_amproc */
 	OCLASS_REWRITE,				/* pg_rewrite */
@@ -154,9 +167,10 @@ typedef enum ObjectClass
 	OCLASS_EXTENSION,			/* pg_extension */
 	OCLASS_EVENT_TRIGGER,		/* pg_event_trigger */
 	OCLASS_POLICY,				/* pg_policy */
-	OCLASS_TRANSFORM,			/* pg_transform */
-	MAX_OCLASS					/* MUST BE LAST */
+	OCLASS_TRANSFORM			/* pg_transform */
 } ObjectClass;
+
+#define LAST_OCLASS		OCLASS_TRANSFORM
 
 
 /* in dependency.c */

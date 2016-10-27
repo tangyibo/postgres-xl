@@ -5,7 +5,7 @@
  *	  Routines for aggregate-manipulation commands
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -62,6 +62,9 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	char		aggKind = AGGKIND_NORMAL;
 	List	   *transfuncName = NIL;
 	List	   *finalfuncName = NIL;
+	List	   *combinefuncName = NIL;
+	List	   *serialfuncName = NIL;
+	List	   *deserialfuncName = NIL;
 	List	   *mtransfuncName = NIL;
 	List	   *minvtransfuncName = NIL;
 	List	   *mfinalfuncName = NIL;
@@ -82,6 +85,7 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	int32		mtransSpace = 0;
 	char	   *initval = NULL;
 	char	   *minitval = NULL;
+	char	   *parallel = NULL;
 	int			numArgs;
 	int			numDirectArgs = 0;
 	oidvector  *parameterTypes;
@@ -97,6 +101,7 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	Oid			mtransTypeId = InvalidOid;
 	char		transTypeType;
 	char		mtransTypeType = 0;
+	char		proparallel = PROPARALLEL_UNSAFE;
 	ListCell   *pl;
 
 	/* Convert list of names to a name and namespace */
@@ -135,6 +140,12 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 			transfuncName = defGetQualifiedName(defel);
 		else if (pg_strcasecmp(defel->defname, "finalfunc") == 0)
 			finalfuncName = defGetQualifiedName(defel);
+		else if (pg_strcasecmp(defel->defname, "combinefunc") == 0)
+			combinefuncName = defGetQualifiedName(defel);
+		else if (pg_strcasecmp(defel->defname, "serialfunc") == 0)
+			serialfuncName = defGetQualifiedName(defel);
+		else if (pg_strcasecmp(defel->defname, "deserialfunc") == 0)
+			deserialfuncName = defGetQualifiedName(defel);
 		else if (pg_strcasecmp(defel->defname, "msfunc") == 0)
 			mtransfuncName = defGetQualifiedName(defel);
 		else if (pg_strcasecmp(defel->defname, "minvfunc") == 0)
@@ -186,6 +197,8 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 #endif
 		else if (pg_strcasecmp(defel->defname, "minitcond") == 0)
 			minitval = defGetString(defel);
+		else if (pg_strcasecmp(defel->defname, "parallel") == 0)
+			parallel = defGetString(defel);
 		else
 			ereport(WARNING,
 					(errcode(ERRCODE_SYNTAX_ERROR),
@@ -372,6 +385,26 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	else
 		collectTypeId = InvalidOid;
 #endif
+	if (serialfuncName && deserialfuncName)
+	{
+		/*
+		 * Serialization is only needed/allowed for transtype INTERNAL.
+		 */
+		if (transTypeId != INTERNALOID)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
+					 errmsg("serialization functions may be specified only when the aggregate transition data type is %s",
+							format_type_be(INTERNALOID))));
+	}
+	else if (serialfuncName || deserialfuncName)
+	{
+		/*
+		 * Cannot specify one function without the other.
+		 */
+		ereport(ERROR,
+				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
+				 errmsg("must specify both or neither of serialization and deserialization functions")));
+	}
 
 	/*
 	 * If a moving-aggregate transtype is specified, look that up.  Same
@@ -424,6 +457,20 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 		(void) OidInputFunctionCall(typinput, minitval, typioparam, -1);
 	}
 
+	if (parallel)
+	{
+		if (pg_strcasecmp(parallel, "safe") == 0)
+			proparallel = PROPARALLEL_SAFE;
+		else if (pg_strcasecmp(parallel, "restricted") == 0)
+			proparallel = PROPARALLEL_RESTRICTED;
+		else if (pg_strcasecmp(parallel, "unsafe") == 0)
+			proparallel = PROPARALLEL_UNSAFE;
+		else
+			ereport(ERROR,
+					(errcode(ERRCODE_SYNTAX_ERROR),
+					 errmsg("parameter \"parallel\" must be SAFE, RESTRICTED, or UNSAFE")));
+	}
+
 	/*
 	 * Most of the argument-checking is done inside of AggregateCreate
 	 */
@@ -443,6 +490,9 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 						   collectfuncName,	/* collect function name */
 #endif
 						   finalfuncName,		/* final function name */
+						   combinefuncName,		/* combine function name */
+						   serialfuncName,		/* serial function name */
+						   deserialfuncName,	/* deserial function name */
 						   mtransfuncName,		/* fwd trans function name */
 						   minvtransfuncName,	/* inv trans function name */
 						   mfinalfuncName,		/* final function name */
@@ -460,5 +510,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 #ifdef PGXC
 						   initcollect,	/* initial condition for collection function */
 #endif
-						   minitval);	/* initial condition */
+						   minitval,	/* initial condition */
+						   proparallel);		/* parallel safe? */
 }

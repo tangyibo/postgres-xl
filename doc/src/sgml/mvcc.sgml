@@ -470,7 +470,8 @@ COMMIT;
     even though they are not yet committed.)  This is a stronger
     guarantee than is required by the <acronym>SQL</acronym> standard
     for this isolation level, and prevents all of the phenomena described
-    in <xref linkend="mvcc-isolevel-table">.  As mentioned above, this is
+    in <xref linkend="mvcc-isolevel-table"> except for serialization
+    anomalies.  As mentioned above, this is
     specifically allowed by the standard, which only describes the
     <emphasis>minimum</emphasis> protections each isolation level must
     provide.
@@ -653,7 +654,7 @@ ERROR:  could not serialize access due to read/write dependencies among transact
     first.  In <productname>PostgreSQL</productname> these locks do not
     cause any blocking and therefore can <emphasis>not</> play any part in
     causing a deadlock.  They are used to identify and flag dependencies
-    among concurrent serializable transactions which in certain combinations
+    among concurrent Serializable transactions which in certain combinations
     can lead to serialization anomalies.  In contrast, a Read Committed or
     Repeatable Read transaction which wants to ensure data consistency may
     need to take out a lock on an entire table, which could block other
@@ -688,12 +689,13 @@ ERROR:  could not serialize access due to read/write dependencies among transact
 
    <para>
     Consistent use of Serializable transactions can simplify development.
-    The guarantee that any set of concurrent serializable transactions will
-    have the same effect as if they were run one at a time means that if
-    you can demonstrate that a single transaction, as written, will do the
-    right thing when run by itself, you can have confidence that it will
-    do the right thing in any mix of serializable transactions, even without
-    any information about what those other transactions might do.  It is
+    The guarantee that any set of successfully committed concurrent
+    Serializable transactions will have the same effect as if they were run
+    one at a time means that if you can demonstrate that a single transaction,
+    as written, will do the right thing when run by itself, you can have
+    confidence that it will do the right thing in any mix of Serializable
+    transactions, even without any information about what those other
+    transactions might do, or it will not successfully commit.  It is
     important that an environment which uses this technique have a
     generalized way of handling serialization failures (which always return
     with a SQLSTATE value of '40001'), because it will be very hard to
@@ -705,6 +707,26 @@ ERROR:  could not serialize access due to read/write dependencies among transact
     explicit locks and <literal>SELECT FOR UPDATE</> or <literal>SELECT FOR
     SHARE</>, Serializable transactions are the best performance choice
     for some environments.
+   </para>
+
+   <para>
+    While <productname>PostgreSQL</>'s Serializable transaction isolation
+    level only allows concurrent transactions to commit if it can prove there
+    is a serial order of execution that would produce the same effect, it
+    doesn't always prevent errors from being raised that would not occur in
+    true serial execution.  In particular, it is possible to see unique
+    constraint violations caused by conflicts with overlapping Serializable
+    transactions even after explicitly checking that the key isn't present
+    before attempting to insert it.  This can be avoided by making sure
+    that <emphasis>all</> Serializable transactions that insert potentially
+    conflicting keys explicitly check if they can do so first.  For example,
+    imagine an application that asks the user for a new key and then checks
+    that it doesn't exist already by trying to select it first, or generates
+    a new key by selecting the maximum existing key and adding one.  If some
+    Serializable transactions insert new keys directly without following this
+    protocol, unique constraints violations might be reported even in cases
+    where they could not occur in a serial execution of the concurrent
+    transactions.
    </para>
 
    <para>
@@ -734,7 +756,9 @@ ERROR:  could not serialize access due to read/write dependencies among transact
      <listitem>
       <para>
        Don't leave connections dangling <quote>idle in transaction</quote>
-       longer than necessary.
+       longer than necessary.  The configuration parameter
+       <xref linkend="guc-idle-in-transaction-session-timeout"> may be used to
+       automatically disconnect lingering sessions.
       </para>
      </listitem>
      <listitem>
@@ -766,20 +790,6 @@ ERROR:  could not serialize access due to read/write dependencies among transact
      </listitem>
     </itemizedlist>
    </para>
-
-   <warning>
-    <para>
-     Support for the Serializable transaction isolation level has not yet
-     been added to Hot Standby replication targets (described in
-     <xref linkend="hot-standby">).  The strictest isolation level currently
-     supported in hot standby mode is Repeatable Read.  While performing all
-     permanent database writes within Serializable transactions on the
-     master will ensure that all standbys will eventually reach a consistent
-     state, a Repeatable Read transaction run on the standby can sometimes
-     see a transient state which is inconsistent with any serial execution
-     of serializable transactions on the master.
-    </para>
-   </warning>
   </sect2>
  </sect1>
 
@@ -1013,7 +1023,9 @@ ERROR:  could not serialize access due to read/write dependencies among transact
         <para>
          Acquired by the <command>DROP TABLE</>,
          <command>TRUNCATE</command>, <command>REINDEX</command>,
-         <command>CLUSTER</command>, and <command>VACUUM FULL</command>
+         <command>CLUSTER</command>, <command>VACUUM FULL</command>,
+         and <command>REFRESH MATERIALIZED VIEW</command> (without
+         <option>CONCURRENTLY</option>)
          commands. Many forms of <command>ALTER TABLE</> also acquire
          a lock at this level. This is also the default lock mode for
          <command>LOCK TABLE</command> statements that do not specify
@@ -1690,6 +1702,38 @@ SELECT pg_advisory_lock(q.id) FROM
      frozen.
     </para>
    </sect2>
+  </sect1>
+
+  <sect1 id="mvcc-caveats">
+   <title>Caveats</title>
+
+   <para>
+    Some DDL commands, currently only <xref linkend="sql-truncate"> and the
+    table-rewriting forms of <xref linkend="sql-altertable">, are not
+    MVCC-safe.  This means that after the truncation or rewrite commits, the
+    table will appear empty to concurrent transactions, if they are using a
+    snapshot taken before the DDL command committed.  This will only be an
+    issue for a transaction that did not access the table in question
+    before the DDL command started &mdash; any transaction that has done so
+    would hold at least an <literal>ACCESS SHARE</literal> table lock,
+    which would block the DDL command until that transaction completes.
+    So these commands will not cause any apparent inconsistency in the
+    table contents for successive queries on the target table, but they
+    could cause visible inconsistency between the contents of the target
+    table and other tables in the database.
+   </para>
+
+   <para>
+    Support for the Serializable transaction isolation level has not yet
+    been added to Hot Standby replication targets (described in
+    <xref linkend="hot-standby">).  The strictest isolation level currently
+    supported in hot standby mode is Repeatable Read.  While performing all
+    permanent database writes within Serializable transactions on the
+    master will ensure that all standbys will eventually reach a consistent
+    state, a Repeatable Read transaction run on the standby can sometimes
+    see a transient state that is inconsistent with any serial execution
+    of the transactions on the master.
+   </para>
   </sect1>
 
   <sect1 id="locking-indexes">

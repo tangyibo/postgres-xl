@@ -3,7 +3,7 @@
  * test_rls_hooks.c
  *		Code for testing RLS hooks.
  *
- * Copyright (C) 2015, PostgreSQL Global Development Group
+ * Copyright (c) 2015-2016, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *		src/test/modules/test_rls_hooks/test_rls_hooks.c
@@ -105,7 +105,7 @@ test_rls_hooks_permissive(CmdType cmdtype, Relation relation)
 	e = (Node *) makeSimpleA_Expr(AEXPR_OP, "=", (Node *) n, (Node *) c, 0);
 
 	policy->qual = (Expr *) transformWhereClause(qual_pstate, copyObject(e),
-												 EXPR_KIND_WHERE,
+												 EXPR_KIND_POLICY,
 												 "POLICY");
 
 	policy->with_check_qual = copyObject(policy->qual);
@@ -163,7 +163,7 @@ test_rls_hooks_restrictive(CmdType cmdtype, Relation relation)
 	e = (Node *) makeSimpleA_Expr(AEXPR_OP, "=", (Node *) n, (Node *) c, 0);
 
 	policy->qual = (Expr *) transformWhereClause(qual_pstate, copyObject(e),
-												 EXPR_KIND_WHERE,
+												 EXPR_KIND_POLICY,
 												 "POLICY");
 
 	policy->with_check_qual = copyObject(policy->qual);

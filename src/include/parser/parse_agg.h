@@ -4,7 +4,7 @@
  *	  handle aggregates and window functions in parser
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/parser/parse_agg.h
@@ -36,28 +36,43 @@ extern Oid resolve_aggregate_transtype(Oid aggfuncid,
 							Oid *inputTypes,
 							int numArguments);
 
-extern void build_aggregate_fnexprs(Oid *agg_input_types,
-						int agg_num_inputs,
-						int agg_num_direct_inputs,
-						int num_finalfn_inputs,
-						bool agg_variadic,
-						Oid agg_state_type,
+extern void build_aggregate_transfn_expr(Oid *agg_input_types,
+							 int agg_num_inputs,
+							 int agg_num_direct_inputs,
+							 bool agg_variadic,
+							 Oid agg_state_type,
 #ifdef XCP
 						Oid agg_collect_type,
 #endif
-						Oid agg_result_type,
-						Oid agg_input_collation,
-						Oid transfn_oid,
+							 Oid agg_input_collation,
+							 Oid transfn_oid,
 #ifdef XCP
 						Oid collectfn_oid,
 #endif
-						Oid invtransfn_oid,
-						Oid finalfn_oid,
-						Expr **transfnexpr,
-						Expr **invtransfnexpr,
+							 Oid invtransfn_oid,
+							 Expr **transfnexpr,
 #ifdef XCP
 						Expr **collectfnexpr,
 #endif
-						Expr **finalfnexpr);
+							 Expr **invtransfnexpr);
+
+extern void build_aggregate_combinefn_expr(Oid agg_state_type,
+							   Oid agg_input_collation,
+							   Oid combinefn_oid,
+							   Expr **combinefnexpr);
+
+extern void build_aggregate_serialfn_expr(Oid serialfn_oid,
+							  Expr **serialfnexpr);
+
+extern void build_aggregate_deserialfn_expr(Oid deserialfn_oid,
+								Expr **deserialfnexpr);
+
+extern void build_aggregate_finalfn_expr(Oid *agg_input_types,
+							 int num_finalfn_inputs,
+							 Oid agg_state_type,
+							 Oid agg_result_type,
+							 Oid agg_input_collation,
+							 Oid finalfn_oid,
+							 Expr **finalfnexpr);
 
 #endif   /* PARSE_AGG_H */

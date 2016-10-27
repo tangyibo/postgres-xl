@@ -6,7 +6,7 @@
  * See src/backend/access/transam/README for more information.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -58,9 +58,9 @@
 #include "miscadmin.h"
 #include "pgstat.h"
 #include "replication/logical.h"
-#include "replication/walsender.h"
-#include "replication/syncrep.h"
 #include "replication/origin.h"
+#include "replication/syncrep.h"
+#include "replication/walsender.h"
 #include "storage/fd.h"
 #include "storage/lmgr.h"
 #include "storage/predicate.h"
@@ -107,7 +107,7 @@ int			synchronous_commit = SYNCHRONOUS_COMMIT_ON;
  * When running as a parallel worker, we place only a single
  * TransactionStateData on the parallel worker's state stack, and the XID
  * reflected there will be that of the *innermost* currently-active
- * subtransaction in the backend that initiated paralllelism.  However,
+ * subtransaction in the backend that initiated parallelism.  However,
  * GetTopTransactionId() and TransactionIdIsCurrentTransactionId()
  * need to return the same answers in the parallel worker as they would have
  * in the user backend, so we need some additional bookkeeping.
@@ -619,7 +619,7 @@ AssignTransactionId(TransactionState s)
 	 * Workers synchronize transaction state at the beginning of each parallel
 	 * operation, so we can't account for new XIDs at this point.
 	 */
-	if (IsInParallelMode())
+	if (IsInParallelMode() || IsParallelWorker())
 		elog(ERROR, "cannot assign XIDs during a parallel operation");
 
 	/*
@@ -1205,7 +1205,7 @@ CommandCounterIncrement(void)
 		 * parallel operation, so we can't account for new commands after that
 		 * point.
 		 */
-		if (IsInParallelMode())
+		if (IsInParallelMode() || IsParallelWorker())
 			elog(ERROR, "cannot start commands during a parallel operation");
 
 		currentCommandId += 1;
@@ -1404,6 +1404,8 @@ AtSubStart_ResourceOwner(void)
  *
  * Returns latest XID among xact and its children, or InvalidTransactionId
  * if the xact has no XID.  (We compute that here just because it's easier.)
+ *
+ * If you change this function, see RecordTransactionCommitPrepared also.
  */
 static TransactionId
 RecordTransactionCommit(void)
@@ -1447,6 +1449,24 @@ RecordTransactionCommit(void)
 		Assert(nchildren == 0);
 
 		/*
+		 * Transactions without an assigned xid can contain invalidation
+		 * messages (e.g. explicit relcache invalidations or catcache
+		 * invalidations for inplace updates); standbys need to process those.
+		 * We can't emit a commit record without an xid, and we don't want to
+		 * force assigning an xid, because that'd be problematic for e.g.
+		 * vacuum.  Hence we emit a bespoke record for the invalidations. We
+		 * don't want to use that in case a commit record is emitted, so they
+		 * happen synchronously with commits (besides not wanting to emit more
+		 * WAL recoreds).
+		 */
+		if (nmsgs != 0)
+		{
+			LogStandbyInvalidations(nmsgs, invalMessages,
+									RelcacheInitFileInval);
+			wrote_xlog = true;	/* not strictly necessary */
+		}
+
+		/*
 		 * If we didn't create XLOG entries, we're done here; otherwise we
 		 * should trigger flushing those entries the same as a commit record
 		 * would.  This will primarily happen for HOT pruning and the like; we
@@ -1457,6 +1477,15 @@ RecordTransactionCommit(void)
 	}
 	else
 	{
+		bool		replorigin;
+
+		/*
+		 * Are we using the replication origins feature?  Or, in other words,
+		 * are we replaying remote actions?
+		 */
+		replorigin = (replorigin_session_origin != InvalidRepOriginId &&
+					  replorigin_session_origin != DoNotReplicateId);
+
 		/*
 		 * Begin commit critical section and insert the commit XLOG record.
 		 */
@@ -1491,26 +1520,27 @@ RecordTransactionCommit(void)
 							RelcacheInitFileInval, forceSyncCommit,
 							InvalidTransactionId /* plain commit */ );
 
-		/*
-		 * Record plain commit ts if not replaying remote actions, or if no
-		 * timestamp is configured.
-		 */
-		if (replorigin_sesssion_origin == InvalidRepOriginId ||
-			replorigin_sesssion_origin == DoNotReplicateId ||
-			replorigin_sesssion_origin_timestamp == 0)
-			replorigin_sesssion_origin_timestamp = xactStopTimestamp;
-		else
-			replorigin_session_advance(replorigin_sesssion_origin_lsn,
+		if (replorigin)
+			/* Move LSNs forward for this replication origin */
+			replorigin_session_advance(replorigin_session_origin_lsn,
 									   XactLastRecEnd);
 
 		/*
-		 * We don't need to WAL log origin or timestamp here, the commit
-		 * record contains all the necessary information and will redo the SET
-		 * action during replay.
+		 * Record commit timestamp.  The value comes from plain commit
+		 * timestamp if there's no replication origin; otherwise, the
+		 * timestamp was already set in replorigin_session_origin_timestamp by
+		 * replication.
+		 *
+		 * We don't need to WAL-log anything here, as the commit record
+		 * written above already contains the data.
 		 */
+
+		if (!replorigin || replorigin_session_origin_timestamp == 0)
+			replorigin_session_origin_timestamp = xactStopTimestamp;
+
 		TransactionTreeSetCommitTsData(xid, nchildren, children,
-									   replorigin_sesssion_origin_timestamp,
-									   replorigin_sesssion_origin, false);
+									   replorigin_session_origin_timestamp,
+									   replorigin_session_origin, false);
 	}
 
 	/*
@@ -1527,8 +1557,8 @@ RecordTransactionCommit(void)
 	 * this case, but we don't currently try to do that.  It would certainly
 	 * cause problems at least in Hot Standby mode, where the
 	 * KnownAssignedXids machinery requires tracking every XID assignment.  It
-	 * might be OK to skip it only when wal_level < hot_standby, but for now
-	 * we don't.)
+	 * might be OK to skip it only when wal_level < replica, but for now we
+	 * don't.)
 	 *
 	 * However, if we're doing cleanup of any non-temp rels or committing any
 	 * command that wanted to force sync commit, then we must flush XLOG
@@ -1597,7 +1627,7 @@ RecordTransactionCommit(void)
 	 * in the procarray and continue to hold locks.
 	 */
 	if (wrote_xlog && markXidCommitted)
-		SyncRepWaitForLSN(XactLastRecEnd);
+		SyncRepWaitForLSN(XactLastRecEnd, true);
 
 	/* remember end of last commit record */
 	XactLastCommitEnd = XactLastRecEnd;
@@ -2245,6 +2275,10 @@ CommitTransaction(void)
 
 	is_parallel_worker = (s->blockState == TBLOCK_PARALLEL_INPROGRESS);
 
+	/* Enforce parallel mode restrictions during parallel worker commit. */
+	if (is_parallel_worker)
+		EnterParallelMode();
+
 	ShowTransactionState("CommitTransaction");
 
 	/*
@@ -2379,10 +2413,7 @@ CommitTransaction(void)
 
 	/* If we might have parallel workers, clean them up now. */
 	if (IsInParallelMode())
-	{
 		AtEOXact_Parallel(true);
-		s->parallelModeLevel = 0;
-	}
 
 	/* Shut down the deferred-trigger manager */
 	AfterTriggerEndXact(true);
@@ -2462,6 +2493,7 @@ CommitTransaction(void)
 	 * commit processing
 	 */
 	s->state = TRANS_COMMIT;
+	s->parallelModeLevel = 0;
 
 	if (!is_parallel_worker)
 	{
@@ -3165,6 +3197,10 @@ AbortTransaction(void)
 	 * while cleaning up!
 	 */
 	LWLockReleaseAll();
+
+	/* Clear wait information and command progress indicator */
+	pgstat_report_wait_end();
+	pgstat_progress_end_command();
 
 	/* Clean up buffer I/O and buffer context locks, too */
 	AbortBufferIO();
@@ -5385,6 +5421,8 @@ AbortSubTransaction(void)
 	 */
 	LWLockReleaseAll();
 
+	pgstat_report_wait_end();
+	pgstat_progress_end_command();
 	AbortBufferIO();
 	UnlockBuffers();
 
@@ -5446,6 +5484,7 @@ AbortSubTransaction(void)
 		AfterTriggerEndSubXact(false);
 		AtSubAbort_Portals(s->subTransactionId,
 						   s->parent->subTransactionId,
+						   s->curTransactionOwner,
 						   s->parent->curTransactionOwner);
 		AtEOSubXact_LargeObject(false, s->subTransactionId,
 								s->parent->subTransactionId);
@@ -5637,8 +5676,8 @@ Size
 EstimateTransactionStateSpace(void)
 {
 	TransactionState s;
-	Size		nxids = 5;		/* iso level, deferrable, top & current XID,
-								 * XID count */
+	Size		nxids = 6;		/* iso level, deferrable, top & current XID,
+								 * command counter, XID count */
 
 	for (s = CurrentTransactionState; s != NULL; s = s->parent)
 	{
@@ -5658,12 +5697,13 @@ EstimateTransactionStateSpace(void)
  *
  * We need to save and restore XactDeferrable, XactIsoLevel, and the XIDs
  * associated with this transaction.  The first eight bytes of the result
- * contain XactDeferrable and XactIsoLevel; the next eight bytes contain the
- * XID of the top-level transaction and the XID of the current transaction
- * (or, in each case, InvalidTransactionId if none).  After that, the next 4
- * bytes contain a count of how many additional XIDs follow; this is followed
- * by all of those XIDs one after another.  We emit the XIDs in sorted order
- * for the convenience of the receiving process.
+ * contain XactDeferrable and XactIsoLevel; the next twelve bytes contain the
+ * XID of the top-level transaction, the XID of the current transaction
+ * (or, in each case, InvalidTransactionId if none), and the current command
+ * counter.  After that, the next 4 bytes contain a count of how many
+ * additional XIDs follow; this is followed by all of those XIDs one after
+ * another.  We emit the XIDs in sorted order for the convenience of the
+ * receiving process.
  */
 void
 SerializeTransactionState(Size maxsize, char *start_address)
@@ -5671,14 +5711,16 @@ SerializeTransactionState(Size maxsize, char *start_address)
 	TransactionState s;
 	Size		nxids = 0;
 	Size		i = 0;
+	Size		c = 0;
 	TransactionId *workspace;
 	TransactionId *result = (TransactionId *) start_address;
 
-	Assert(maxsize >= 5 * sizeof(TransactionId));
-	result[0] = (TransactionId) XactIsoLevel;
-	result[1] = (TransactionId) XactDeferrable;
-	result[2] = XactTopTransactionId;
-	result[3] = CurrentTransactionState->transactionId;
+	result[c++] = (TransactionId) XactIsoLevel;
+	result[c++] = (TransactionId) XactDeferrable;
+	result[c++] = XactTopTransactionId;
+	result[c++] = CurrentTransactionState->transactionId;
+	result[c++] = (TransactionId) currentCommandId;
+	Assert(maxsize >= c * sizeof(TransactionId));
 
 	/*
 	 * If we're running in a parallel worker and launching a parallel worker
@@ -5687,9 +5729,9 @@ SerializeTransactionState(Size maxsize, char *start_address)
 	 */
 	if (nParallelCurrentXids > 0)
 	{
-		Assert(maxsize > (nParallelCurrentXids + 4) * sizeof(TransactionId));
-		result[4] = nParallelCurrentXids;
-		memcpy(&result[5], ParallelCurrentXids,
+		result[c++] = nParallelCurrentXids;
+		Assert(maxsize >= (nParallelCurrentXids + c) * sizeof(TransactionId));
+		memcpy(&result[c], ParallelCurrentXids,
 			   nParallelCurrentXids * sizeof(TransactionId));
 		return;
 	}
@@ -5704,7 +5746,7 @@ SerializeTransactionState(Size maxsize, char *start_address)
 			nxids = add_size(nxids, 1);
 		nxids = add_size(nxids, s->nChildXids);
 	}
-	Assert(nxids * sizeof(TransactionId) < maxsize);
+	Assert((c + 1 + nxids) * sizeof(TransactionId) <= maxsize);
 
 	/* Copy them to our scratch space. */
 	workspace = palloc(nxids * sizeof(TransactionId));
@@ -5722,8 +5764,8 @@ SerializeTransactionState(Size maxsize, char *start_address)
 	qsort(workspace, nxids, sizeof(TransactionId), xidComparator);
 
 	/* Copy data into output area. */
-	result[4] = (TransactionId) nxids;
-	memcpy(&result[5], workspace, nxids * sizeof(TransactionId));
+	result[c++] = (TransactionId) nxids;
+	memcpy(&result[c], workspace, nxids * sizeof(TransactionId));
 }
 
 /*
@@ -5743,8 +5785,9 @@ StartParallelWorkerTransaction(char *tstatespace)
 	XactDeferrable = (bool) tstate[1];
 	XactTopTransactionId = tstate[2];
 	CurrentTransactionState->transactionId = tstate[3];
-	nParallelCurrentXids = (int) tstate[4];
-	ParallelCurrentXids = &tstate[5];
+	currentCommandId = tstate[4];
+	nParallelCurrentXids = (int) tstate[5];
+	ParallelCurrentXids = &tstate[6];
 
 	CurrentTransactionState->blockState = TBLOCK_PARALLEL_INPROGRESS;
 }
@@ -5962,6 +6005,13 @@ XactLogCommitRecord(TimestampTz commit_time,
 		xl_xinfo.xinfo |= XACT_COMPLETION_FORCE_SYNC_COMMIT;
 
 	/*
+	 * Check if the caller would like to ask standbys for immediate feedback
+	 * once this commit is applied.
+	 */
+	if (synchronous_commit >= SYNCHRONOUS_COMMIT_REMOTE_APPLY)
+		xl_xinfo.xinfo |= XACT_COMPLETION_APPLY_FEEDBACK;
+
+	/*
 	 * Relcache invalidations requires information about the current database
 	 * and so does logical decoding.
 	 */
@@ -5997,12 +6047,12 @@ XactLogCommitRecord(TimestampTz commit_time,
 	}
 
 	/* dump transaction origin information */
-	if (replorigin_sesssion_origin != InvalidRepOriginId)
+	if (replorigin_session_origin != InvalidRepOriginId)
 	{
 		xl_xinfo.xinfo |= XACT_XINFO_HAS_ORIGIN;
 
-		xl_origin.origin_lsn = replorigin_sesssion_origin_lsn;
-		xl_origin.origin_timestamp = replorigin_sesssion_origin_timestamp;
+		xl_origin.origin_lsn = replorigin_session_origin_lsn;
+		xl_origin.origin_timestamp = replorigin_session_origin_timestamp;
 	}
 
 	if (xl_xinfo.xinfo != 0)
@@ -6174,7 +6224,8 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 		LWLockRelease(XidGenLock);
 	}
 
-	Assert(!!(parsed->xinfo & XACT_XINFO_HAS_ORIGIN) == (origin_id != InvalidRepOriginId));
+	Assert(((parsed->xinfo & XACT_XINFO_HAS_ORIGIN) == 0) ==
+		   (origin_id == InvalidRepOriginId));
 
 	if (parsed->xinfo & XACT_XINFO_HAS_ORIGIN)
 		commit_time = parsed->origin_timestamp;
@@ -6183,8 +6234,7 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 
 	/* Set the transaction commit timestamp and metadata */
 	TransactionTreeSetCommitTsData(xid, parsed->nsubxacts, parsed->subxacts,
-								   commit_time, origin_id,
-								   false);
+								   commit_time, origin_id, false);
 
 	if (standbyState == STANDBY_DISABLED)
 	{
@@ -6298,6 +6348,13 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 	if (XactCompletionForceSyncCommit(parsed->xinfo))
 		XLogFlush(lsn);
 
+	/*
+	 * If asked by the primary (because someone is waiting for a synchronous
+	 * commit = remote_apply), we will need to ask walreceiver to send a reply
+	 * immediately.
+	 */
+	if (XactCompletionApplyFeedback(parsed->xinfo))
+		XLogRequestWalReceiverReply();
 }
 
 /*

@@ -7,7 +7,9 @@ use strict;
 our $config;
 
 use Cwd;
+use File::Basename;
 use File::Copy;
+use File::Find ();
 
 use Install qw(Install);
 
@@ -32,7 +34,7 @@ if (-e "src/tools/msvc/buildenv.pl")
 
 my $what = shift || "";
 if ($what =~
-/^(check|installcheck|plcheck|contribcheck|modulescheck|ecpgcheck|isolationcheck|upgradecheck)$/i
+/^(check|installcheck|plcheck|contribcheck|modulescheck|ecpgcheck|isolationcheck|upgradecheck|bincheck|recoverycheck)$/i
   )
 {
 	$what = uc $what;
@@ -50,7 +52,7 @@ copy("$Config/autoinc/autoinc.dll",               "src/test/regress");
 copy("$Config/regress/regress.dll",               "src/test/regress");
 copy("$Config/dummy_seclabel/dummy_seclabel.dll", "src/test/regress");
 
-$ENV{PATH} = "$topdir/$Config/libpq;$topdir/$Config/libpq;$ENV{PATH}";
+$ENV{PATH} = "$topdir/$Config/libpq;$ENV{PATH}";
 
 my $schedule = shift;
 unless ($schedule)
@@ -59,7 +61,14 @@ unless ($schedule)
 	$schedule = "parallel" if ($what eq 'CHECK' || $what =~ /PARALLEL/);
 }
 
-$ENV{PERL5LIB} = "$topdir/src/tools/msvc";
+if ($ENV{PERL5LIB})
+{
+	$ENV{PERL5LIB} = "$topdir/src/tools/msvc;$ENV{PERL5LIB}";
+}
+else
+{
+	$ENV{PERL5LIB} = "$topdir/src/tools/msvc";
+}
 
 my $maxconn = "";
 $maxconn = "--max_connections=$ENV{MAX_CONNECTIONS}"
@@ -79,6 +88,8 @@ my %command = (
 	CONTRIBCHECK   => \&contribcheck,
 	MODULESCHECK   => \&modulescheck,
 	ISOLATIONCHECK => \&isolationcheck,
+	BINCHECK       => \&bincheck,
+	RECOVERYCHECK  => \&recoverycheck,
 	UPGRADECHECK   => \&upgradecheck,);
 
 my $proc = $command{$what};
@@ -108,15 +119,12 @@ sub installcheck
 
 sub check
 {
-	chdir $startdir;
-
 	InstallTemp();
 	chdir "${topdir}/src/test/regress";
-
 	my @args = (
-		"${tmp_installdir}/bin/pg_regress",
+		"../../../$Config/pg_regress/pg_regress",
 		"--dlpath=.",
-		"--bindir=${tmp_installdir}/bin",
+		"--bindir=",
 		"--schedule=${schedule}_schedule",
 		"--encoding=SQL_ASCII",
 		"--no-locale",
@@ -136,14 +144,12 @@ sub ecpgcheck
 	exit $status if $status;
 	InstallTemp();
 	chdir "$topdir/src/interfaces/ecpg/test";
-
-	$ENV{PATH} = "${tmp_installdir}/bin;${tmp_installdir}/lib;$ENV{PATH}";
 	$schedule = "ecpg";
 	my @args = (
-		"${tmp_installdir}/bin/pg_regress_ecpg",
+		"../../../../$Config/pg_regress_ecpg/pg_regress_ecpg",
 		"--bindir=",
-		"--dbname=regress1,connectdb",
-		"--create-role=connectuser,connectdb",
+		"--dbname=ecpg1_regression,ecpg2_regression",
+		"--create-role=regress_ecpg_user1,regress_ecpg_user2",
 		"--schedule=${schedule}_schedule",
 		"--encoding=SQL_ASCII",
 		"--no-locale",
@@ -156,14 +162,12 @@ sub ecpgcheck
 
 sub isolationcheck
 {
-	chdir $startdir;
-
-	InstallTemp();
-	chdir "${topdir}/src/test/isolation";
-
+	chdir "../isolation";
+	copy("../../../$Config/isolationtester/isolationtester.exe",
+		"../../../$Config/pg_isolation_regress");
 	my @args = (
-		"${tmp_installdir}/bin/pg_isolation_regress",
-		"--bindir=${tmp_installdir}/bin",
+		"../../../$Config/pg_isolation_regress/pg_isolation_regress",
+		"--bindir=../../../$Config/psql",
 		"--inputdir=.",
 		"--schedule=./isolation_schedule");
 	push(@args, $maxconn) if $maxconn;
@@ -172,12 +176,51 @@ sub isolationcheck
 	exit $status if $status;
 }
 
+sub tap_check
+{
+	die "Tap tests not enabled in configuration"
+	  unless $config->{tap_tests};
+
+	my $dir = shift;
+	chdir $dir;
+
+	my @args = ("prove", "--verbose", "t/*.pl");
+
+	# adjust the environment for just this test
+	local %ENV = %ENV;
+	$ENV{PERL5LIB}   = "$topdir/src/test/perl;$ENV{PERL5LIB}";
+	$ENV{PG_REGRESS} = "$topdir/$Config/pg_regress/pg_regress";
+
+	$ENV{TESTDIR} = "$dir";
+
+	system(@args);
+	my $status = $? >> 8;
+	return $status;
+}
+
+sub bincheck
+{
+	InstallTemp();
+
+	my $mstat = 0;
+
+	# Find out all the existing TAP tests by looking for t/ directories
+	# in the tree.
+	my @bin_dirs = glob("$topdir/src/bin/*");
+
+	# Process each test
+	foreach my $dir (@bin_dirs)
+	{
+		next unless -d "$dir/t";
+		my $status = tap_check($dir);
+		$mstat ||= $status;
+	}
+	exit $mstat if $mstat;
+}
+
 sub plcheck
 {
-	chdir $startdir;
-
-	InstallTemp();
-	chdir "${topdir}/src/pl";
+	chdir "../../pl";
 
 	foreach my $pl (glob("*"))
 	{
@@ -214,8 +257,8 @@ sub plcheck
 		  "============================================================\n";
 		print "Checking $lang\n";
 		my @args = (
-			"${tmp_installdir}/bin/pg_regress",
-			"--bindir=${tmp_installdir}/bin",
+			"../../../$Config/pg_regress/pg_regress",
+			"--bindir=../../../$Config/psql",
 			"--dbname=pl_regression", @lang_args, @tests);
 		system(@args);
 		my $status = $? >> 8;
@@ -230,7 +273,6 @@ sub subdircheck
 {
 	my $subdir = shift;
 	my $module = shift;
-	my $mstat  = 0;
 
 	if (   !-d "$module/sql"
 		|| !-d "$module/expected"
@@ -277,20 +319,17 @@ sub subdircheck
 	print "============================================================\n";
 	print "Checking $module\n";
 	my @args = (
-		"${tmp_installdir}/bin/pg_regress",
-		"--bindir=${tmp_installdir}/bin",
+		"$topdir/$Config/pg_regress/pg_regress",
+		"--bindir=${topdir}/${Config}/psql",
 		"--dbname=contrib_regression", @opts, @tests);
 	system(@args);
-	my $status = $? >> 8;
-	$mstat ||= $status;
 	chdir "..";
-
-	exit $mstat if $mstat;
 }
 
 sub contribcheck
 {
-	chdir "$topdir/contrib";
+	chdir "../../../contrib";
+	my $mstat = 0;
 	foreach my $module (glob("*"))
 	{
 
@@ -304,26 +343,77 @@ sub contribcheck
 		next if ($module eq "sepgsql");
 
 		subdircheck("$topdir/contrib", $module);
+		my $status = $? >> 8;
+		$mstat ||= $status;
 	}
+	exit $mstat if $mstat;
 }
 
 sub modulescheck
 {
-	chdir "$topdir/src/test/modules";
+	chdir "../../../src/test/modules";
+	my $mstat = 0;
 	foreach my $module (glob("*"))
 	{
 		subdircheck("$topdir/src/test/modules", $module);
+		my $status = $? >> 8;
+		$mstat ||= $status;
 	}
+	exit $mstat if $mstat;
 }
 
+sub recoverycheck
+{
+	InstallTemp();
+
+	my $mstat  = 0;
+	my $dir    = "$topdir/src/test/recovery";
+	my $status = tap_check($dir);
+	exit $status if $status;
+}
 
 # Run "initdb", then reconfigure authentication.
 sub standard_initdb
 {
 	return (
-		system("${tmp_installdir}/bin/initdb", '-N') == 0 and system(
-			"${tmp_installdir}/bin/pg_regress", '--config-auth',
+		system('initdb', '-N') == 0 and system(
+			"$topdir/$Config/pg_regress/pg_regress", '--config-auth',
 			$ENV{PGDATA}) == 0);
+}
+
+# This is similar to appendShellString().  Perl system(@args) bypasses
+# cmd.exe, so omit the caret escape layer.
+sub quote_system_arg
+{
+	my $arg = shift;
+
+	# Change N >= 0 backslashes before a double quote to 2N+1 backslashes.
+	$arg =~ s/(\\*)"/${\($1 . $1)}\\"/gs;
+
+	# Change N >= 1 backslashes at end of argument to 2N backslashes.
+	$arg =~ s/(\\+)$/${\($1 . $1)}/gs;
+
+	# Wrap the whole thing in unescaped double quotes.
+	return "\"$arg\"";
+}
+
+# Generate a database with a name made of a range of ASCII characters, useful
+# for testing pg_upgrade.
+sub generate_db
+{
+	my ($prefix, $from_char, $to_char, $suffix) = @_;
+
+	my $dbname = $prefix;
+	for my $i ($from_char .. $to_char)
+	{
+		next if $i == 7 || $i == 10 || $i == 13;    # skip BEL, LF, and CR
+		$dbname = $dbname . sprintf('%c', $i);
+	}
+	$dbname .= $suffix;
+
+	system('createdb', quote_system_arg($dbname));
+	my $status = $? >> 8;
+	exit $status if $status;
 }
 
 sub upgradecheck
@@ -341,13 +431,14 @@ sub upgradecheck
 	$ENV{PGPORT} ||= 50432;
 	my $tmp_root = "$topdir/src/bin/pg_upgrade/tmp_check";
 	(mkdir $tmp_root || die $!) unless -d $tmp_root;
-
-	InstallTemp();
+	my $upg_tmp_install = "$tmp_root/install";    # unshared temp install
+	print "Setting up temp install\n\n";
+	Install($upg_tmp_install, "all", $config);
 
 	# Install does a chdir, so change back after that
 	chdir $cwd;
 	my ($bindir, $libdir, $oldsrc, $newsrc) =
-	  ("$tmp_installdir/bin", "$tmp_installdir/lib", $topdir, $topdir);
+	  ("$upg_tmp_install/bin", "$upg_tmp_install/lib", $topdir, $topdir);
 	$ENV{PATH} = "$bindir;$ENV{PATH}";
 	my $data = "$tmp_root/data";
 	$ENV{PGDATA} = "$data.old";
@@ -356,35 +447,48 @@ sub upgradecheck
 	print "\nRunning initdb on old cluster\n\n";
 	standard_initdb() or exit 1;
 	print "\nStarting old cluster\n\n";
-	system("pg_ctl start -l $logdir/postmaster1.log -w") == 0 or exit 1;
+	my @args = ('pg_ctl', 'start', '-l', "$logdir/postmaster1.log", '-w');
+	system(@args) == 0 or exit 1;
+
+	print "\nCreating databases with names covering most ASCII bytes\n\n";
+	generate_db("\\\"\\", 1,  45,  "\\\\\"\\\\\\");
+	generate_db('',       46, 90,  '');
+	generate_db('',       91, 127, '');
+
 	print "\nSetting up data for upgrading\n\n";
 	installcheck();
 
 	# now we can chdir into the source dir
 	chdir "$topdir/src/bin/pg_upgrade";
 	print "\nDumping old cluster\n\n";
-	system("pg_dumpall -f $tmp_root/dump1.sql") == 0 or exit 1;
+	@args = ('pg_dumpall', '-f', "$tmp_root/dump1.sql");
+	system(@args) == 0 or exit 1;
 	print "\nStopping old cluster\n\n";
 	system("pg_ctl -m fast stop") == 0 or exit 1;
 	$ENV{PGDATA} = "$data";
 	print "\nSetting up new cluster\n\n";
 	standard_initdb() or exit 1;
 	print "\nRunning pg_upgrade\n\n";
-	system("pg_upgrade -d $data.old -D $data -b $bindir -B $bindir") == 0
-	  or exit 1;
+	@args = (
+		'pg_upgrade', '-d', "$data.old", '-D', $data, '-b',
+		$bindir,      '-B', $bindir);
+	system(@args) == 0 or exit 1;
 	print "\nStarting new cluster\n\n";
-	system("pg_ctl -l $logdir/postmaster2.log -w start") == 0 or exit 1;
+	@args = ('pg_ctl', '-l', "$logdir/postmaster2.log", '-w', 'start');
+	system(@args) == 0 or exit 1;
 	print "\nSetting up stats on new cluster\n\n";
 	system(".\\analyze_new_cluster.bat") == 0 or exit 1;
 	print "\nDumping new cluster\n\n";
-	system("pg_dumpall -f $tmp_root/dump2.sql") == 0 or exit 1;
+	@args = ('pg_dumpall', '-f', "$tmp_root/dump2.sql");
+	system(@args) == 0 or exit 1;
 	print "\nStopping new cluster\n\n";
 	system("pg_ctl -m fast stop") == 0 or exit 1;
 	print "\nDeleting old cluster\n\n";
 	system(".\\delete_old_cluster.bat") == 0 or exit 1;
 	print "\nComparing old and new cluster dumps\n\n";
 
-	system("diff -q $tmp_root/dump1.sql $tmp_root/dump2.sql");
+	@args = ('diff', '-q', "$tmp_root/dump1.sql", "$tmp_root/dump2.sql");
+	system(@args);
 	$status = $?;
 	if (!$status)
 	{
@@ -486,12 +590,26 @@ sub InstallTemp
 {
 	print "Setting up temp install\n\n";
 	Install("$tmp_installdir", "all", $config);
+	$ENV{PATH} = "$tmp_installdir/bin;$ENV{PATH}";
 }
 
 sub usage
 {
 	print STDERR
-	  "Usage: vcregress.pl ",
-"<check|installcheck|plcheck|contribcheck|isolationcheck|ecpgcheck|upgradecheck> [schedule]\n";
+	  "Usage: vcregress.pl <mode> [ <schedule> ]\n\n",
+	  "Options for <mode>:\n",
+	  "  bincheck       run tests of utilities in src/bin/\n",
+	  "  check          deploy instance and run regression tests on it\n",
+	  "  contribcheck   run tests of modules in contrib/\n",
+	  "  ecpgcheck      run regression tests of ECPG\n",
+	  "  installcheck   run regression tests on existing instance\n",
+	  "  isolationcheck run isolation tests\n",
+	  "  modulescheck   run tests of modules in src/test/modules/\n",
+	  "  plcheck        run tests of PL languages\n",
+	  "  recoverycheck  run recovery test suite\n",
+	  "  upgradecheck   run tests of pg_upgrade\n",
+	  "\nOptions for <schedule>:\n",
+	  "  serial         serial mode\n",
+	  "  parallel       parallel mode\n";
 	exit(1);
 }

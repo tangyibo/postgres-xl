@@ -77,7 +77,7 @@ dblink_connect(text connname, text connstr) returns text
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        The name to use for this connection; if omitted, an unnamed
@@ -151,13 +151,13 @@ SELECT dblink_connect('myconn', 'dbname=postgres');
 
 CREATE SERVER fdtest FOREIGN DATA WRAPPER dblink_fdw OPTIONS (hostaddr '127.0.0.1', dbname 'contrib_regression');
 
-CREATE USER dblink_regression_test WITH PASSWORD 'secret';
-CREATE USER MAPPING FOR dblink_regression_test SERVER fdtest OPTIONS (user 'dblink_regression_test', password 'secret');
-GRANT USAGE ON FOREIGN SERVER fdtest TO dblink_regression_test;
-GRANT SELECT ON TABLE foo TO dblink_regression_test;
+CREATE USER regress_dblink_user WITH PASSWORD 'secret';
+CREATE USER MAPPING FOR regress_dblink_user SERVER fdtest OPTIONS (user 'regress_dblink_user', password 'secret');
+GRANT USAGE ON FOREIGN SERVER fdtest TO regress_dblink_user;
+GRANT SELECT ON TABLE foo TO regress_dblink_user;
 
 \set ORIGINAL_USER :USER
-\c - dblink_regression_test
+\c - regress_dblink_user
 SELECT dblink_connect('myconn', 'fdtest');
  dblink_connect 
 ----------------
@@ -181,10 +181,10 @@ SELECT * FROM dblink('myconn','SELECT * FROM foo') AS t(a int, b text, c text[])
 (11 rows)
 
 \c - :ORIGINAL_USER
-REVOKE USAGE ON FOREIGN SERVER fdtest FROM dblink_regression_test;
-REVOKE SELECT ON TABLE foo FROM dblink_regression_test;
-DROP USER MAPPING FOR dblink_regression_test SERVER fdtest;
-DROP USER dblink_regression_test;
+REVOKE USAGE ON FOREIGN SERVER fdtest FROM regress_dblink_user;
+REVOKE SELECT ON TABLE foo FROM regress_dblink_user;
+DROP USER MAPPING FOR regress_dblink_user SERVER fdtest;
+DROP USER regress_dblink_user;
 DROP SERVER fdtest;
 </screen>
   </refsect1>
@@ -284,7 +284,7 @@ dblink_disconnect(text connname) returns text
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        The name of a named connection to be closed.
@@ -367,7 +367,7 @@ dblink(text sql [, bool fail_on_error]) returns setof record
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use; omit this parameter to use the
@@ -585,7 +585,7 @@ dblink_exec(text sql [, bool fail_on_error]) returns text
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use; omit this parameter to use the
@@ -714,7 +714,7 @@ dblink_open(text connname, text cursorname, text sql [, bool fail_on_error]) ret
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use; omit this parameter to use the
@@ -837,7 +837,7 @@ dblink_fetch(text connname, text cursorname, int howmany [, bool fail_on_error])
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use; omit this parameter to use the
@@ -990,7 +990,7 @@ dblink_close(text connname, text cursorname [, bool fail_on_error]) returns text
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use; omit this parameter to use the
@@ -1145,7 +1145,7 @@ dblink_error_message(text connname) returns text
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use.
@@ -1218,7 +1218,7 @@ dblink_send_query(text connname, text sql) returns int
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use.
@@ -1289,7 +1289,7 @@ dblink_is_busy(text connname) returns int
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to check.
@@ -1358,7 +1358,7 @@ dblink_get_notify(text connname) returns setof (notify_name text, be_pid int, ex
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        The name of a named connection to get notifications on.
@@ -1437,7 +1437,7 @@ dblink_get_result(text connname [, bool fail_on_error]) returns setof record
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use.
@@ -1604,7 +1604,7 @@ dblink_cancel_query(text connname) returns text
 
    <variablelist>
     <varlistentry>
-     <term><parameter>conname</parameter></term>
+     <term><parameter>connname</parameter></term>
      <listitem>
       <para>
        Name of the connection to use.

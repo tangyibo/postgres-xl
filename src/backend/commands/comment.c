@@ -4,8 +4,8 @@
  *
  * PostgreSQL object comments utility code.
  *
- * Copyright (c) 1996-2015, PostgreSQL Global Development Group
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
+ * Copyright (c) 1996-2016, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *	  src/backend/commands/comment.c

@@ -5,7 +5,7 @@
  *	bootstrap mode is used to create the initial template database
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -28,6 +28,7 @@
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "pg_getopt.h"
+#include "pgstat.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/clustermon.h"
 #include "postmaster/startup.h"
@@ -213,7 +214,7 @@ AuxiliaryProcessMain(int argc, char *argv[])
 	 * process command arguments
 	 */
 
-	/* Set defaults, to be overriden by explicit options below */
+	/* Set defaults, to be overridden by explicit options below */
 	if (!IsUnderPostmaster)
 		InitializeGUCOptions();
 
@@ -569,6 +570,7 @@ static void
 ShutdownAuxiliaryProcess(int code, Datum arg)
 {
 	LWLockReleaseAll();
+	pgstat_report_wait_end();
 }
 
 /* ----------------------------------------------------------------

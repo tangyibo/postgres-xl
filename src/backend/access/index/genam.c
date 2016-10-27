@@ -3,7 +3,7 @@
  * genam.c
  *	  general index access method routines
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -204,7 +204,7 @@ BuildIndexValueDescription(Relation indexRelation,
 	Assert(indexrelid == idxrec->indexrelid);
 
 	/* RLS check- if RLS is enabled then we don't return anything. */
-	if (check_enable_rls(indrelid, GetUserId(), true) == RLS_ENABLED)
+	if (check_enable_rls(indrelid, InvalidOid, true) == RLS_ENABLED)
 	{
 		ReleaseSysCache(ht_idx);
 		return NULL;

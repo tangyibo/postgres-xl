@@ -13,7 +13,7 @@
  * cutoff value computed from the selection probability by BeginSampleScan.
  *
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -148,6 +148,7 @@ system_beginsamplescan(SampleScanState *node,
 {
 	SystemSamplerData *sampler = (SystemSamplerData *) node->tsm_state;
 	double		percent = DatumGetFloat4(params[0]);
+	double		dcutoff;
 
 	if (percent < 0 || percent > 100 || isnan(percent))
 		ereport(ERROR,
@@ -159,7 +160,8 @@ system_beginsamplescan(SampleScanState *node,
 	 * store that as a uint64, of course.  Note that this gives strictly
 	 * correct behavior at the limits of zero or one probability.
 	 */
-	sampler->cutoff = rint(((double) PG_UINT32_MAX + 1) * percent / 100);
+	dcutoff = rint(((double) PG_UINT32_MAX + 1) * percent / 100);
+	sampler->cutoff = (uint64) dcutoff;
 	sampler->seed = seed;
 	sampler->nextblock = 0;
 	sampler->lt = InvalidOffsetNumber;

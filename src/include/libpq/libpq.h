@@ -4,7 +4,7 @@
  *	  POSTGRES LIBPQ buffer structure definitions.
  *
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/libpq/libpq.h
@@ -19,6 +19,7 @@
 
 #include "lib/stringinfo.h"
 #include "libpq/libpq-be.h"
+#include "storage/latch.h"
 
 
 typedef struct
@@ -42,7 +43,7 @@ extern PGDLLIMPORT PQcommMethods *PqCommMethods;
 #define pq_putmessage(msgtype, s, len) \
 	(PqCommMethods->putmessage(msgtype, s, len))
 #define pq_putmessage_noblock(msgtype, s, len) \
-	(PqCommMethods->putmessage(msgtype, s, len))
+	(PqCommMethods->putmessage_noblock(msgtype, s, len))
 #define pq_startcopyout() (PqCommMethods->startcopyout())
 #define pq_endcopyout(errorAbort) (PqCommMethods->endcopyout(errorAbort))
 
@@ -59,6 +60,7 @@ extern int StreamServerPort(int family, char *hostName,
 extern int	StreamConnection(pgsocket server_fd, Port *port);
 extern void StreamClose(pgsocket sock);
 extern void TouchSocketFiles(void);
+extern void RemoveSocketFiles(void);
 extern void pq_init(void);
 extern int	pq_getbytes(char *s, size_t len);
 extern int	pq_getstring(StringInfo s);
@@ -93,6 +95,8 @@ extern ssize_t secure_raw_read(Port *port, void *ptr, size_t len);
 extern ssize_t secure_raw_write(Port *port, const void *ptr, size_t len);
 
 extern bool ssl_loaded_verify_locations;
+
+extern WaitEventSet *FeBeWaitSet;
 
 /* GUCs */
 extern char *SSLCipherSuites;

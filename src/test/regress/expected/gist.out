@@ -73,7 +73,7 @@ order by p <-> point(0.2, 0.2);
 (4 rows)
 
 select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5))
-order by p <-> point(0.2, 0.2);
+order by p <-> point(0.201, 0.201);
       p      
 -------------
  (0.2,0.2)
@@ -102,14 +102,14 @@ order by point(0.1, 0.1) <-> p;
 (4 rows)
 
 select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5))
-order by point(0.1, 0.1) <-> p;
+order by point(0.101, 0.101) <-> p;
       p      
 -------------
  (0.1,0.1)
  (0.15,0.15)
  (0.05,0.05)
- (0,0)
  (0.2,0.2)
+ (0,0)
  (0.25,0.25)
  (0.3,0.3)
  (0.35,0.35)

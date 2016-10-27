@@ -9,8 +9,8 @@ sub run_test
 {
 	my $test_mode = shift;
 
-	RewindTest::init_rewind_test('databases', $test_mode);
 	RewindTest::setup_cluster();
+	RewindTest::start_master();
 
 	# Create a database in master.
 	master_psql('CREATE DATABASE inmaster');
@@ -32,13 +32,13 @@ sub run_test
 
 	# Check that the correct databases are present after pg_rewind.
 	check_query(
-		'SELECT datname FROM pg_database',
-		qq(template1
-template0
-postgres
+		'SELECT datname FROM pg_database ORDER BY 1',
+		qq(beforepromotion
 inmaster
-beforepromotion
+postgres
 standby_afterpromotion
+template0
+template1
 ),
 		'database names');
 

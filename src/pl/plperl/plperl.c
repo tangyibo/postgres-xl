@@ -12,8 +12,9 @@
 /* system stuff */
 #include <ctype.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <limits.h>
 #include <locale.h>
+#include <unistd.h>
 
 /* postgreSQL stuff */
 #include "access/htup_details.h"
@@ -281,7 +282,7 @@ static Datum plperl_hash_to_datum(SV *src, TupleDesc td);
 static void plperl_init_shared_libs(pTHX);
 static void plperl_trusted_init(void);
 static void plperl_untrusted_init(void);
-static HV  *plperl_spi_execute_fetch_result(SPITupleTable *, int, int);
+static HV  *plperl_spi_execute_fetch_result(SPITupleTable *, uint64, int);
 static char *hek2cstr(HE *he);
 static SV **hv_store_string(HV *hv, const char *key, SV *val);
 static SV **hv_fetch_string(HV *hv, const char *key);
@@ -640,8 +641,9 @@ select_perl_context(bool trusted)
 		else
 			plperl_untrusted_init();
 #else
-		elog(ERROR,
-			 "cannot allocate multiple Perl interpreters on this platform");
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("cannot allocate multiple Perl interpreters on this platform")));
 #endif
 	}
 
@@ -660,7 +662,8 @@ select_perl_context(bool trusted)
 	eval_pv("PostgreSQL::InServer::SPI::bootstrap()", FALSE);
 	if (SvTRUE(ERRSV))
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
 		errcontext("while executing PostgreSQL::InServer::SPI::bootstrap")));
 
 	/* Fully initialized, so mark the hashtable entry valid */
@@ -834,12 +837,14 @@ plperl_init_interp(void)
 	if (perl_parse(plperl, plperl_init_shared_libs,
 				   nargs, embedding, NULL) != 0)
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
 				 errcontext("while parsing Perl initialization")));
 
 	if (perl_run(plperl) != 0)
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
 				 errcontext("while running Perl initialization")));
 
 #ifdef PLPERL_RESTORE_LOCALE
@@ -952,7 +957,8 @@ plperl_trusted_init(void)
 	eval_pv(PLC_TRUSTED, FALSE);
 	if (SvTRUE(ERRSV))
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
 				 errcontext("while executing PLC_TRUSTED")));
 
 	/*
@@ -963,7 +969,8 @@ plperl_trusted_init(void)
 	eval_pv("my $a=chr(0x100); return $a =~ /\\xa9/i", FALSE);
 	if (SvTRUE(ERRSV))
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
 				 errcontext("while executing utf8fix")));
 
 	/*
@@ -1002,11 +1009,12 @@ plperl_trusted_init(void)
 	if (plperl_on_plperl_init && *plperl_on_plperl_init)
 	{
 		eval_pv(plperl_on_plperl_init, FALSE);
+		/* XXX need to find a way to determine a better errcode here */
 		if (SvTRUE(ERRSV))
 			ereport(ERROR,
-					(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
+					(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+					 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
 					 errcontext("while executing plperl.on_plperl_init")));
-
 	}
 }
 
@@ -1025,7 +1033,8 @@ plperl_untrusted_init(void)
 		eval_pv(plperl_on_plperlu_init, FALSE);
 		if (SvTRUE(ERRSV))
 			ereport(ERROR,
-					(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
+					(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+					 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
 					 errcontext("while executing plperl.on_plperlu_init")));
 	}
 }
@@ -1382,7 +1391,9 @@ plperl_sv_to_literal(SV *sv, char *fqtypename)
 				isnull;
 
 	if (!OidIsValid(typid))
-		elog(ERROR, "lookup failed for type %s", fqtypename);
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("lookup failed for type %s", fqtypename)));
 
 	datum = plperl_sv_to_datum(sv,
 							   typid, -1,
@@ -1440,21 +1451,29 @@ plperl_ref_from_pg_array(Datum arg, Oid typid)
 	info->ndims = ARR_NDIM(ar);
 	dims = ARR_DIMS(ar);
 
-	deconstruct_array(ar, elementtype, typlen, typbyval,
-					  typalign, &info->elements, &info->nulls,
-					  &nitems);
+	/* No dimensions? Return an empty array */
+	if (info->ndims == 0)
+	{
+		av = newRV_noinc((SV *) newAV());
+	}
+	else
+	{
+		deconstruct_array(ar, elementtype, typlen, typbyval,
+						  typalign, &info->elements, &info->nulls,
+						  &nitems);
 
-	/* Get total number of elements in each dimension */
-	info->nelems = palloc(sizeof(int) * info->ndims);
-	info->nelems[0] = nitems;
-	for (i = 1; i < info->ndims; i++)
-		info->nelems[i] = info->nelems[i - 1] / dims[i - 1];
+		/* Get total number of elements in each dimension */
+		info->nelems = palloc(sizeof(int) * info->ndims);
+		info->nelems[0] = nitems;
+		for (i = 1; i < info->ndims; i++)
+			info->nelems[i] = info->nelems[i - 1] / dims[i - 1];
 
-	av = split_array(info, 0, nitems, 0);
+		av = split_array(info, 0, nitems, 0);
+	}
 
 	hv = newHV();
 	(void) hv_store(hv, "array", 5, av, 0);
-	(void) hv_store(hv, "typeoid", 7, newSViv(typid), 0);
+	(void) hv_store(hv, "typeoid", 7, newSVuv(typid), 0);
 
 	return sv_bless(newRV_noinc((SV *) hv),
 					gv_stashpv("PostgreSQL::InServer::ARRAY", 0));
@@ -1468,6 +1487,9 @@ split_array(plperl_array_info *info, int first, int last, int nest)
 {
 	int			i;
 	AV		   *result;
+
+	/* we should only be called when we have something to split */
+	Assert(info->ndims > 0);
 
 	/* since this function recurses, it could be driven to stack overflow */
 	check_stack_depth();
@@ -2059,7 +2081,8 @@ plperl_create_sub(plperl_proc_desc *prodesc, char *s, Oid fn_oid)
 
 	if (!subref)
 		ereport(ERROR,
-		(errmsg("didn't get a CODE reference from compiling function \"%s\"",
+				(errcode(ERRCODE_SYNTAX_ERROR),
+		 errmsg("didn't get a CODE reference from compiling function \"%s\"",
 				prodesc->proname)));
 
 	prodesc->reference = subref;
@@ -2100,8 +2123,10 @@ plperl_call_perl_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo)
 	PUSHMARK(SP);
 	EXTEND(sp, desc->nargs);
 
+	/* Get signature for true functions; inline blocks have no args. */
 	if (fcinfo->flinfo->fn_oid)
 		get_func_signature(fcinfo->flinfo->fn_oid, &argtypes, &nargs);
+	Assert(nargs == desc->nargs);
 
 	for (i = 0; i < desc->nargs; i++)
 	{
@@ -2147,7 +2172,9 @@ plperl_call_perl_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo)
 		PUTBACK;
 		FREETMPS;
 		LEAVE;
-		elog(ERROR, "didn't get a return item from function");
+		ereport(ERROR,
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("didn't get a return item from function")));
 	}
 
 	if (SvTRUE(ERRSV))
@@ -2156,9 +2183,10 @@ plperl_call_perl_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo)
 		PUTBACK;
 		FREETMPS;
 		LEAVE;
-		/* XXX need to find a way to assign an errcode here */
+		/* XXX need to find a way to determine a better errcode here */
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV)))));
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV)))));
 	}
 
 	retval = newSVsv(POPs);
@@ -2187,7 +2215,9 @@ plperl_call_perl_trigger_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo,
 
 	TDsv = get_sv("main::_TD", 0);
 	if (!TDsv)
-		elog(ERROR, "couldn't fetch $_TD");
+		ereport(ERROR,
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("couldn't fetch $_TD")));
 
 	save_item(TDsv);			/* local $_TD */
 	sv_setsv(TDsv, td);
@@ -2209,7 +2239,9 @@ plperl_call_perl_trigger_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo,
 		PUTBACK;
 		FREETMPS;
 		LEAVE;
-		elog(ERROR, "didn't get a return item from trigger function");
+		ereport(ERROR,
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("didn't get a return item from trigger function")));
 	}
 
 	if (SvTRUE(ERRSV))
@@ -2218,9 +2250,10 @@ plperl_call_perl_trigger_func(plperl_proc_desc *desc, FunctionCallInfo fcinfo,
 		PUTBACK;
 		FREETMPS;
 		LEAVE;
-		/* XXX need to find a way to assign an errcode here */
+		/* XXX need to find a way to determine a better errcode here */
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV)))));
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV)))));
 	}
 
 	retval = newSVsv(POPs);
@@ -2248,7 +2281,9 @@ plperl_call_perl_event_trigger_func(plperl_proc_desc *desc,
 
 	TDsv = get_sv("main::_TD", 0);
 	if (!TDsv)
-		elog(ERROR, "couldn't fetch $_TD");
+		ereport(ERROR,
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("couldn't fetch $_TD")));
 
 	save_item(TDsv);			/* local $_TD */
 	sv_setsv(TDsv, td);
@@ -2266,7 +2301,9 @@ plperl_call_perl_event_trigger_func(plperl_proc_desc *desc,
 		PUTBACK;
 		FREETMPS;
 		LEAVE;
-		elog(ERROR, "didn't get a return item from trigger function");
+		ereport(ERROR,
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("didn't get a return item from trigger function")));
 	}
 
 	if (SvTRUE(ERRSV))
@@ -2275,9 +2312,10 @@ plperl_call_perl_event_trigger_func(plperl_proc_desc *desc,
 		PUTBACK;
 		FREETMPS;
 		LEAVE;
-		/* XXX need to find a way to assign an errcode here */
+		/* XXX need to find a way to determine a better errcode here */
 		ereport(ERROR,
-				(errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV)))));
+				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
+				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV)))));
 	}
 
 	retval = newSVsv(POPs);
@@ -2969,7 +3007,7 @@ plperl_hash_from_tuple(HeapTuple tuple, TupleDesc tupdesc)
 
 
 static void
-check_spi_usage_allowed()
+check_spi_usage_allowed(void)
 {
 	/* see comment in plperl_fini() */
 	if (plperl_ending)
@@ -3042,7 +3080,7 @@ plperl_spi_exec(char *query, int limit)
 		SPI_restore_connection();
 
 		/* Punt the error to Perl */
-		croak("%s", edata->message);
+		croak_cstr(edata->message);
 
 		/* Can't get here, but keep compiler quiet */
 		return NULL;
@@ -3054,7 +3092,7 @@ plperl_spi_exec(char *query, int limit)
 
 
 static HV  *
-plperl_spi_execute_fetch_result(SPITupleTable *tuptable, int processed,
+plperl_spi_execute_fetch_result(SPITupleTable *tuptable, uint64 processed,
 								int status)
 {
 	HV		   *result;
@@ -3066,13 +3104,21 @@ plperl_spi_execute_fetch_result(SPITupleTable *tuptable, int processed,
 	hv_store_string(result, "status",
 					cstr2sv(SPI_result_code_string(status)));
 	hv_store_string(result, "processed",
-					newSViv(processed));
+					(processed > (uint64) UV_MAX) ?
+					newSVnv((NV) processed) :
+					newSVuv((UV) processed));
 
 	if (status > 0 && tuptable)
 	{
 		AV		   *rows;
 		SV		   *row;
-		int			i;
+		uint64		i;
+
+		/* Prevent overflow in call to av_extend() */
+		if (processed > (uint64) AV_SIZE_MAX)
+			ereport(ERROR,
+					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+			errmsg("query result has too many rows to fit in a Perl array")));
 
 		rows = newAV();
 		av_extend(rows, processed);
@@ -3275,7 +3321,7 @@ plperl_spi_query(char *query)
 		SPI_restore_connection();
 
 		/* Punt the error to Perl */
-		croak("%s", edata->message);
+		croak_cstr(edata->message);
 
 		/* Can't get here, but keep compiler quiet */
 		return NULL;
@@ -3361,7 +3407,7 @@ plperl_spi_fetchrow(char *cursor)
 		SPI_restore_connection();
 
 		/* Punt the error to Perl */
-		croak("%s", edata->message);
+		croak_cstr(edata->message);
 
 		/* Can't get here, but keep compiler quiet */
 		return NULL;
@@ -3536,7 +3582,7 @@ plperl_spi_prepare(char *query, int argc, SV **argv)
 		SPI_restore_connection();
 
 		/* Punt the error to Perl */
-		croak("%s", edata->message);
+		croak_cstr(edata->message);
 
 		/* Can't get here, but keep compiler quiet */
 		return NULL;
@@ -3677,7 +3723,7 @@ plperl_spi_exec_prepared(char *query, HV *attr, int argc, SV **argv)
 		SPI_restore_connection();
 
 		/* Punt the error to Perl */
-		croak("%s", edata->message);
+		croak_cstr(edata->message);
 
 		/* Can't get here, but keep compiler quiet */
 		return NULL;
@@ -3806,7 +3852,7 @@ plperl_spi_query_prepared(char *query, int argc, SV **argv)
 		SPI_restore_connection();
 
 		/* Punt the error to Perl */
-		croak("%s", edata->message);
+		croak_cstr(edata->message);
 
 		/* Can't get here, but keep compiler quiet */
 		return NULL;
@@ -3861,10 +3907,8 @@ hv_store_string(HV *hv, const char *key, SV *val)
 	hkey = pg_server_to_any(key, strlen(key), PG_UTF8);
 
 	/*
-	 * This seems nowhere documented, but under Perl 5.8.0 and up, hv_store()
-	 * recognizes a negative klen parameter as meaning a UTF-8 encoded key. It
-	 * does not appear that hashes track UTF-8-ness of keys at all in Perl
-	 * 5.6.
+	 * hv_store() recognizes a negative klen parameter as meaning a UTF-8
+	 * encoded key.
 	 */
 	hlen = -(int) strlen(hkey);
 	ret = hv_store(hv, hkey, hlen, val, 0);
@@ -3933,7 +3977,7 @@ plperl_inline_callback(void *arg)
 
 
 /*
- * Perl's own setlocal() copied from POSIX.xs
+ * Perl's own setlocale(), copied from POSIX.xs
  * (needed because of the calls to new_*())
  */
 #ifdef WIN32

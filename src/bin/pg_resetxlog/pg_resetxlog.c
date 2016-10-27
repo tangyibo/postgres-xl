@@ -20,7 +20,7 @@
  * step 2 ...
  *
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/bin/pg_resetxlog/pg_resetxlog.c
@@ -56,8 +56,6 @@
 #include "common/restricted_token.h"
 #include "storage/large_object.h"
 #include "pg_getopt.h"
-#include "replication/logical.h"
-#include "replication/origin.h"
 
 
 static ControlFileData ControlFile;		/* pg_control values */
@@ -66,8 +64,8 @@ static bool guessed = false;	/* T if we had to guess at any values */
 static const char *progname;
 static uint32 set_xid_epoch = (uint32) -1;
 static TransactionId set_xid = 0;
-static TransactionId set_oldest_commit_ts = 0;
-static TransactionId set_newest_commit_ts = 0;
+static TransactionId set_oldest_commit_ts_xid = 0;
+static TransactionId set_newest_commit_ts_xid = 0;
 static Oid	set_oid = 0;
 static MultiXactId set_mxid = 0;
 static MultiXactOffset set_mxoff = (MultiXactOffset) -1;
@@ -166,14 +164,14 @@ main(int argc, char *argv[])
 				break;
 
 			case 'c':
-				set_oldest_commit_ts = strtoul(optarg, &endptr, 0);
+				set_oldest_commit_ts_xid = strtoul(optarg, &endptr, 0);
 				if (endptr == optarg || *endptr != ',')
 				{
 					fprintf(stderr, _("%s: invalid argument for option %s\n"), progname, "-c");
 					fprintf(stderr, _("Try \"%s --help\" for more information.\n"), progname);
 					exit(1);
 				}
-				set_newest_commit_ts = strtoul(endptr + 1, &endptr2, 0);
+				set_newest_commit_ts_xid = strtoul(endptr + 1, &endptr2, 0);
 				if (endptr2 == endptr + 1 || *endptr2 != '\0')
 				{
 					fprintf(stderr, _("%s: invalid argument for option %s\n"), progname, "-c");
@@ -181,15 +179,15 @@ main(int argc, char *argv[])
 					exit(1);
 				}
 
-				if (set_oldest_commit_ts < 2 &&
-					set_oldest_commit_ts != 0)
+				if (set_oldest_commit_ts_xid < 2 &&
+					set_oldest_commit_ts_xid != 0)
 				{
 					fprintf(stderr, _("%s: transaction ID (-c) must be either 0 or greater than or equal to 2\n"), progname);
 					exit(1);
 				}
 
-				if (set_newest_commit_ts < 2 &&
-					set_newest_commit_ts != 0)
+				if (set_newest_commit_ts_xid < 2 &&
+					set_newest_commit_ts_xid != 0)
 				{
 					fprintf(stderr, _("%s: transaction ID (-c) must be either 0 or greater than or equal to 2\n"), progname);
 					exit(1);
@@ -261,7 +259,7 @@ main(int argc, char *argv[])
 				break;
 
 			case 'l':
-				if (strspn(optarg, "01234567890ABCDEFabcdef") != 24)
+				if (strspn(optarg, "01234567890ABCDEFabcdef") != XLOG_FNAME_LEN)
 				{
 					fprintf(stderr, _("%s: invalid argument for option %s\n"), progname, "-l");
 					fprintf(stderr, _("Try \"%s --help\" for more information.\n"), progname);
@@ -385,10 +383,10 @@ main(int argc, char *argv[])
 		ControlFile.checkPointCopy.oldestXidDB = InvalidOid;
 	}
 
-	if (set_oldest_commit_ts != 0)
-		ControlFile.checkPointCopy.oldestCommitTs = set_oldest_commit_ts;
-	if (set_newest_commit_ts != 0)
-		ControlFile.checkPointCopy.newestCommitTs = set_newest_commit_ts;
+	if (set_oldest_commit_ts_xid != 0)
+		ControlFile.checkPointCopy.oldestCommitTsXid = set_oldest_commit_ts_xid;
+	if (set_newest_commit_ts_xid != 0)
+		ControlFile.checkPointCopy.newestCommitTsXid = set_newest_commit_ts_xid;
 
 	if (set_oid != 0)
 		ControlFile.checkPointCopy.nextOid = set_oid;
@@ -648,7 +646,7 @@ PrintControlValues(bool guessed)
 		   ControlFile.checkPointCopy.ThisTimeLineID);
 	printf(_("Latest checkpoint's full_page_writes: %s\n"),
 		   ControlFile.checkPointCopy.fullPageWrites ? _("on") : _("off"));
-	printf(_("Latest checkpoint's NextXID:          %u/%u\n"),
+	printf(_("Latest checkpoint's NextXID:          %u:%u\n"),
 		   ControlFile.checkPointCopy.nextXidEpoch,
 		   ControlFile.checkPointCopy.nextXid);
 	printf(_("Latest checkpoint's NextOID:          %u\n"),
@@ -667,10 +665,10 @@ PrintControlValues(bool guessed)
 		   ControlFile.checkPointCopy.oldestMulti);
 	printf(_("Latest checkpoint's oldestMulti's DB: %u\n"),
 		   ControlFile.checkPointCopy.oldestMultiDB);
-	printf(_("Latest checkpoint's oldest CommitTs:  %u\n"),
-		   ControlFile.checkPointCopy.oldestCommitTs);
-	printf(_("Latest checkpoint's newest CommitTs:  %u\n"),
-		   ControlFile.checkPointCopy.newestCommitTs);
+	printf(_("Latest checkpoint's oldestCommitTsXid:%u\n"),
+		   ControlFile.checkPointCopy.oldestCommitTsXid);
+	printf(_("Latest checkpoint's newestCommitTsXid:%u\n"),
+		   ControlFile.checkPointCopy.newestCommitTsXid);
 	printf(_("Maximum data alignment:               %u\n"),
 		   ControlFile.maxAlign);
 	/* we don't print floatFormat since can't say much useful about it */
@@ -705,7 +703,7 @@ PrintControlValues(bool guessed)
  * Print the values to be changed.
  */
 static void
-PrintNewControlValues()
+PrintNewControlValues(void)
 {
 	char		fname[MAXFNAMELEN];
 
@@ -753,15 +751,15 @@ PrintNewControlValues()
 			   ControlFile.checkPointCopy.nextXidEpoch);
 	}
 
-	if (set_oldest_commit_ts != 0)
+	if (set_oldest_commit_ts_xid != 0)
 	{
-		printf(_("oldestCommitTs:                       %u\n"),
-			   ControlFile.checkPointCopy.oldestCommitTs);
+		printf(_("oldestCommitTsXid:                    %u\n"),
+			   ControlFile.checkPointCopy.oldestCommitTsXid);
 	}
-	if (set_newest_commit_ts != 0)
+	if (set_newest_commit_ts_xid != 0)
 	{
-		printf(_("newestCommitTs:                       %u\n"),
-			   ControlFile.checkPointCopy.newestCommitTs);
+		printf(_("newestCommitTsXid:                    %u\n"),
+			   ControlFile.checkPointCopy.newestCommitTsXid);
 	}
 }
 
@@ -906,7 +904,8 @@ FindEndOfXLOG(void)
 
 	while (errno = 0, (xlde = readdir(xldir)) != NULL)
 	{
-		if (IsXLogFileName(xlde->d_name))
+		if (IsXLogFileName(xlde->d_name) ||
+			IsPartialXLogFileName(xlde->d_name))
 		{
 			unsigned int tli,
 						log,
@@ -976,8 +975,8 @@ KillExistingXLOG(void)
 
 	while (errno = 0, (xlde = readdir(xldir)) != NULL)
 	{
-		if (strlen(xlde->d_name) == 24 &&
-			strspn(xlde->d_name, "0123456789ABCDEF") == 24)
+		if (IsXLogFileName(xlde->d_name) ||
+			IsPartialXLogFileName(xlde->d_name))
 		{
 			snprintf(path, MAXPGPATH, "%s/%s", XLOGDIR, xlde->d_name);
 			if (unlink(path) < 0)
@@ -1027,9 +1026,11 @@ KillExistingArchiveStatus(void)
 
 	while (errno = 0, (xlde = readdir(xldir)) != NULL)
 	{
-		if (strspn(xlde->d_name, "0123456789ABCDEF") == 24 &&
-			(strcmp(xlde->d_name + 24, ".ready") == 0 ||
-			 strcmp(xlde->d_name + 24, ".done") == 0))
+		if (strspn(xlde->d_name, "0123456789ABCDEF") == XLOG_FNAME_LEN &&
+			(strcmp(xlde->d_name + XLOG_FNAME_LEN, ".ready") == 0 ||
+			 strcmp(xlde->d_name + XLOG_FNAME_LEN, ".done") == 0 ||
+			 strcmp(xlde->d_name + XLOG_FNAME_LEN, ".partial.ready") == 0 ||
+			 strcmp(xlde->d_name + XLOG_FNAME_LEN, ".partial.done") == 0))
 		{
 			snprintf(path, MAXPGPATH, "%s/%s", ARCHSTATDIR, xlde->d_name);
 			if (unlink(path) < 0)
@@ -1164,10 +1165,11 @@ static void
 usage(void)
 {
 	printf(_("%s resets the PostgreSQL transaction log.\n\n"), progname);
-	printf(_("Usage:\n  %s [OPTION]... {[-D] DATADIR}\n\n"), progname);
+	printf(_("Usage:\n  %s [OPTION]... DATADIR\n\n"), progname);
 	printf(_("Options:\n"));
 	printf(_("  -c XID,XID       set oldest and newest transactions bearing commit timestamp\n"));
 	printf(_("                   (zero in either value means no change)\n"));
+	printf(_(" [-D] DATADIR      data directory\n"));
 	printf(_("  -e XIDEPOCH      set next transaction ID epoch\n"));
 	printf(_("  -f               force update to be done\n"));
 	printf(_("  -l XLOGFILE      force minimum WAL starting location for new transaction log\n"));

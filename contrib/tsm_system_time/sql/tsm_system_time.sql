@@ -49,7 +49,3 @@ CREATE VIEW vv AS
 EXPLAIN (COSTS OFF) SELECT * FROM vv;
 
 DROP EXTENSION tsm_system_time;  -- fail, view depends on extension
-
-DROP VIEW vv;
-DROP TABLE test_tablesample;
-DROP EXTENSION tsm_system_time;

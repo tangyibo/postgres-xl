@@ -6,7 +6,7 @@
  *	   logical replication slots via SQL.
  *
  *
- * Copyright (c) 2012-2015, PostgreSQL Global Development Group
+ * Copyright (c) 2012-2016, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *	  src/backend/replication/logicalfuncs.c
@@ -23,6 +23,7 @@
 
 #include "access/xlog_internal.h"
 #include "access/xlogutils.h"
+#include "access/xact.h"
 
 #include "catalog/pg_type.h"
 
@@ -41,6 +42,7 @@
 #include "replication/decode.h"
 #include "replication/logical.h"
 #include "replication/logicalfuncs.h"
+#include "replication/message.h"
 
 #include "storage/fd.h"
 
@@ -115,7 +117,7 @@ logical_read_local_xlog_page(XLogReaderState *state, XLogRecPtr targetPagePtr,
 	int reqLen, XLogRecPtr targetRecPtr, char *cur_page, TimeLineID *pageTLI)
 {
 	return read_local_xlog_page(state, targetPagePtr, reqLen,
-						 targetRecPtr, cur_page, pageTLI);
+								targetRecPtr, cur_page, pageTLI);
 }
 
 /*
@@ -124,24 +126,30 @@ logical_read_local_xlog_page(XLogReaderState *state, XLogRecPtr targetPagePtr,
 static Datum
 pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool binary)
 {
-	Name		name = PG_GETARG_NAME(0);
+	Name		name;
 	XLogRecPtr	upto_lsn;
 	int32		upto_nchanges;
-
 	ReturnSetInfo *rsinfo = (ReturnSetInfo *) fcinfo->resultinfo;
 	MemoryContext per_query_ctx;
 	MemoryContext oldcontext;
-
 	XLogRecPtr	end_of_wal;
 	XLogRecPtr	startptr;
-
 	LogicalDecodingContext *ctx;
-
 	ResourceOwner old_resowner = CurrentResourceOwner;
 	ArrayType  *arr;
 	Size		ndim;
 	List	   *options = NIL;
 	DecodingOutputState *p;
+
+	check_permissions();
+
+	CheckLogicalDecodingRequirements();
+
+	if (PG_ARGISNULL(0))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("slot name must not be null")));
+	name = PG_GETARG_NAME(0);
 
 	if (PG_ARGISNULL(1))
 		upto_lsn = InvalidXLogRecPtr;
@@ -152,6 +160,12 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 		upto_nchanges = InvalidXLogRecPtr;
 	else
 		upto_nchanges = PG_GETARG_INT32(2);
+
+	if (PG_ARGISNULL(3))
+		ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("options array must not be null")));
+	arr = PG_GETARG_ARRAYTYPE_P(3);
 
 	/* check to see if caller supports us returning a tuplestore */
 	if (rsinfo == NULL || !IsA(rsinfo, ReturnSetInfo))
@@ -172,16 +186,11 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 	if (get_call_result_type(fcinfo, NULL, &p->tupdesc) != TYPEFUNC_COMPOSITE)
 		elog(ERROR, "return type must be a row type");
 
-	check_permissions();
-
-	CheckLogicalDecodingRequirements();
-
-	arr = PG_GETARG_ARRAYTYPE_P(3);
-	ndim = ARR_NDIM(arr);
-
 	per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
 	oldcontext = MemoryContextSwitchTo(per_query_ctx);
 
+	/* Deconstruct options array */
+	ndim = ARR_NDIM(arr);
 	if (ndim > 1)
 	{
 		ereport(ERROR,
@@ -230,11 +239,11 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 	else
 		end_of_wal = GetXLogReplayRecPtr(NULL);
 
-	CheckLogicalDecodingRequirements();
 	ReplicationSlotAcquire(NameStr(*name));
 
 	PG_TRY();
 	{
+		/* restart at slot's confirmed_flush */
 		ctx = CreateDecodingContext(InvalidXLogRecPtr,
 									options,
 									logical_read_local_xlog_page,
@@ -251,12 +260,17 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 			ctx->options.output_type !=OUTPUT_PLUGIN_TEXTUAL_OUTPUT)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("logical decoding output plugin \"%s\" produces binary output, but \"%s\" expects textual data",
+					 errmsg("logical decoding output plugin \"%s\" produces binary output, but function \"%s\" expects textual data",
 							NameStr(MyReplicationSlot->data.plugin),
 							format_procedure(fcinfo->flinfo->fn_oid))));
 
 		ctx->output_writer_private = p;
 
+		/*
+		 * Decoding of WAL must start at restart_lsn so that the entirety of
+		 * xacts that committed after the slot's confirmed_flush can be
+		 * accumulated into reorder buffers.
+		 */
 		startptr = MyReplicationSlot->data.restart_lsn;
 
 		CurrentResourceOwner = ResourceOwnerCreate(CurrentResourceOwner, "logical decoding");
@@ -265,7 +279,7 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 		InvalidateSystemCaches();
 
 		while ((startptr != InvalidXLogRecPtr && startptr < end_of_wal) ||
-			 (ctx->reader->EndRecPtr && ctx->reader->EndRecPtr < end_of_wal))
+			   (ctx->reader->EndRecPtr != InvalidXLogRecPtr && ctx->reader->EndRecPtr < end_of_wal))
 		{
 			XLogRecord *record;
 			char	   *errm = NULL;
@@ -274,6 +288,10 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 			if (errm)
 				elog(ERROR, "%s", errm);
 
+			/*
+			 * Now that we've set up the xlog reader state, subsequent calls
+			 * pass InvalidXLogRecPtr to say "continue from last record"
+			 */
 			startptr = InvalidXLogRecPtr;
 
 			/*
@@ -292,6 +310,23 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 				break;
 			CHECK_FOR_INTERRUPTS();
 		}
+
+		tuplestore_donestoring(tupstore);
+
+		CurrentResourceOwner = old_resowner;
+
+		/*
+		 * Next time, start where we left off. (Hunting things, the family
+		 * business..)
+		 */
+		if (ctx->reader->EndRecPtr != InvalidXLogRecPtr && confirm)
+			LogicalConfirmReceivedLocation(ctx->reader->EndRecPtr);
+
+		/* free context, call shutdown callback */
+		FreeDecodingContext(ctx);
+
+		ReplicationSlotRelease();
+		InvalidateSystemCaches();
 	}
 	PG_CATCH();
 	{
@@ -302,23 +337,6 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 	}
 	PG_END_TRY();
 
-	tuplestore_donestoring(tupstore);
-
-	CurrentResourceOwner = old_resowner;
-
-	/*
-	 * Next time, start where we left off. (Hunting things, the family
-	 * business..)
-	 */
-	if (ctx->reader->EndRecPtr != InvalidXLogRecPtr && confirm)
-		LogicalConfirmReceivedLocation(ctx->reader->EndRecPtr);
-
-	/* free context, call shutdown callback */
-	FreeDecodingContext(ctx);
-
-	ReplicationSlotRelease();
-	InvalidateSystemCaches();
-
 	return (Datum) 0;
 }
 
@@ -328,9 +346,7 @@ pg_logical_slot_get_changes_guts(FunctionCallInfo fcinfo, bool confirm, bool bin
 Datum
 pg_logical_slot_get_changes(PG_FUNCTION_ARGS)
 {
-	Datum		ret = pg_logical_slot_get_changes_guts(fcinfo, true, false);
-
-	return ret;
+	return pg_logical_slot_get_changes_guts(fcinfo, true, false);
 }
 
 /*
@@ -339,9 +355,7 @@ pg_logical_slot_get_changes(PG_FUNCTION_ARGS)
 Datum
 pg_logical_slot_peek_changes(PG_FUNCTION_ARGS)
 {
-	Datum		ret = pg_logical_slot_get_changes_guts(fcinfo, false, false);
-
-	return ret;
+	return pg_logical_slot_get_changes_guts(fcinfo, false, false);
 }
 
 /*
@@ -350,9 +364,7 @@ pg_logical_slot_peek_changes(PG_FUNCTION_ARGS)
 Datum
 pg_logical_slot_get_binary_changes(PG_FUNCTION_ARGS)
 {
-	Datum		ret = pg_logical_slot_get_changes_guts(fcinfo, true, true);
-
-	return ret;
+	return pg_logical_slot_get_changes_guts(fcinfo, true, true);
 }
 
 /*
@@ -361,7 +373,29 @@ pg_logical_slot_get_binary_changes(PG_FUNCTION_ARGS)
 Datum
 pg_logical_slot_peek_binary_changes(PG_FUNCTION_ARGS)
 {
-	Datum		ret = pg_logical_slot_get_changes_guts(fcinfo, false, true);
+	return pg_logical_slot_get_changes_guts(fcinfo, false, true);
+}
 
-	return ret;
+
+/*
+ * SQL function for writing logical decoding message into WAL.
+ */
+Datum
+pg_logical_emit_message_bytea(PG_FUNCTION_ARGS)
+{
+	bool		transactional = PG_GETARG_BOOL(0);
+	char	   *prefix = text_to_cstring(PG_GETARG_TEXT_PP(1));
+	bytea	   *data = PG_GETARG_BYTEA_PP(2);
+	XLogRecPtr	lsn;
+
+	lsn = LogLogicalMessage(prefix, VARDATA_ANY(data), VARSIZE_ANY_EXHDR(data),
+							transactional);
+	PG_RETURN_LSN(lsn);
+}
+
+Datum
+pg_logical_emit_message_text(PG_FUNCTION_ARGS)
+{
+	/* bytea and text are compatible */
+	return pg_logical_emit_message_bytea(fcinfo);
 }

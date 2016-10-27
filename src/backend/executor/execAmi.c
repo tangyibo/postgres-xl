@@ -4,7 +4,7 @@
  *	  miscellaneous executor access method routines
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *	src/backend/executor/execAmi.c
@@ -13,6 +13,7 @@
  */
 #include "postgres.h"
 
+#include "access/amapi.h"
 #include "access/htup_details.h"
 #include "executor/execdebug.h"
 #include "executor/nodeAgg.h"
@@ -25,6 +26,7 @@
 #include "executor/nodeCustom.h"
 #include "executor/nodeForeignscan.h"
 #include "executor/nodeFunctionscan.h"
+#include "executor/nodeGather.h"
 #include "executor/nodeGroup.h"
 #include "executor/nodeGroup.h"
 #include "executor/nodeHash.h"
@@ -162,6 +164,10 @@ ExecReScan(PlanState *node)
 
 		case T_SampleScanState:
 			ExecReScanSampleScan((SampleScanState *) node);
+			break;
+
+		case T_GatherState:
+			ExecReScanGather((GatherState *) node);
 			break;
 
 		case T_IndexScanState:
@@ -410,17 +416,20 @@ ExecSupportsMarkRestore(Path *pathnode)
 		case T_Result:
 
 			/*
-			 * Although Result supports mark/restore if it has a child plan
-			 * that does, we presently come here only for ResultPath nodes,
-			 * which represent Result plans without a child plan.  So there is
-			 * nothing to recurse to and we can just say "false".  (This means
-			 * that Result's support for mark/restore is in fact dead code. We
-			 * keep it since it's not much code, and someday the planner might
-			 * be smart enough to use it.  That would require making this
-			 * function smarter too, of course.)
+			 * Result supports mark/restore iff it has a child plan that does.
+			 *
+			 * We have to be careful here because there is more than one Path
+			 * type that can produce a Result plan node.
 			 */
-			Assert(IsA(pathnode, ResultPath));
-			return false;
+			if (IsA(pathnode, ProjectionPath))
+				return ExecSupportsMarkRestore(((ProjectionPath *) pathnode)->subpath);
+			else if (IsA(pathnode, MinMaxAggPath))
+				return false;	/* childless Result */
+			else
+			{
+				Assert(IsA(pathnode, ResultPath));
+				return false;	/* childless Result */
+			}
 
 		default:
 			break;
@@ -441,6 +450,14 @@ bool
 ExecSupportsBackwardScan(Plan *node)
 {
 	if (node == NULL)
+		return false;
+
+	/*
+	 * Parallel-aware nodes return a subset of the tuples in each worker, and
+	 * in general we can't expect to have enough bookkeeping state to know
+	 * which ones we returned in this worker as opposed to some other worker.
+	 */
+	if (node->parallel_aware)
 		return false;
 
 	switch (nodeTag(node))
@@ -474,6 +491,9 @@ ExecSupportsBackwardScan(Plan *node)
 
 		case T_SampleScan:
 			/* Simplify life for tablesample methods by disallowing this */
+			return false;
+
+		case T_Gather:
 			return false;
 
 		case T_IndexScan:
@@ -534,9 +554,8 @@ IndexSupportsBackwardScan(Oid indexid)
 {
 	bool		result;
 	HeapTuple	ht_idxrel;
-	HeapTuple	ht_am;
 	Form_pg_class idxrelrec;
-	Form_pg_am	amrec;
+	IndexAmRoutine *amroutine;
 
 	/* Fetch the pg_class tuple of the index relation */
 	ht_idxrel = SearchSysCache1(RELOID, ObjectIdGetDatum(indexid));
@@ -544,17 +563,13 @@ IndexSupportsBackwardScan(Oid indexid)
 		elog(ERROR, "cache lookup failed for relation %u", indexid);
 	idxrelrec = (Form_pg_class) GETSTRUCT(ht_idxrel);
 
-	/* Fetch the pg_am tuple of the index' access method */
-	ht_am = SearchSysCache1(AMOID, ObjectIdGetDatum(idxrelrec->relam));
-	if (!HeapTupleIsValid(ht_am))
-		elog(ERROR, "cache lookup failed for access method %u",
-			 idxrelrec->relam);
-	amrec = (Form_pg_am) GETSTRUCT(ht_am);
+	/* Fetch the index AM's API struct */
+	amroutine = GetIndexAmRoutineByAmId(idxrelrec->relam, false);
 
-	result = amrec->amcanbackward;
+	result = amroutine->amcanbackward;
 
+	pfree(amroutine);
 	ReleaseSysCache(ht_idxrel);
-	ReleaseSysCache(ht_am);
 
 	return result;
 }

@@ -6,7 +6,7 @@
  *	  systems.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -194,8 +194,10 @@ check_xact_readonly(Node *parsetree)
 		case T_AlterFunctionStmt:
 		case T_AlterRoleStmt:
 		case T_AlterRoleSetStmt:
+		case T_AlterObjectDependsStmt:
 		case T_AlterObjectSchemaStmt:
 		case T_AlterOwnerStmt:
+		case T_AlterOperatorStmt:
 		case T_AlterSeqStmt:
 		case T_AlterTableMoveAllStmt:
 		case T_AlterTableStmt:
@@ -1310,6 +1312,19 @@ standard_ProcessUtility(Node *parsetree,
 #endif
 			break;
 
+		case T_AlterObjectDependsStmt:
+			{
+				AlterObjectDependsStmt *stmt = (AlterObjectDependsStmt *) parsetree;
+
+				if (EventTriggerSupportsObjectType(stmt->objectType))
+					ProcessUtilitySlow(parsetree, queryString,
+									   context, params,
+									   dest, completionTag);
+				else
+					ExecAlterObjectDependsStmt(stmt, NULL);
+			}
+			break;
+
 		case T_AlterObjectSchemaStmt:
 			{
 				AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *) parsetree;
@@ -2407,6 +2422,12 @@ ProcessUtilitySlow(Node *parsetree,
 				address = ExecRenameStmt((RenameStmt *) parsetree);
 				break;
 
+			case T_AlterObjectDependsStmt:
+				address =
+					ExecAlterObjectDependsStmt((AlterObjectDependsStmt *) parsetree,
+											   &secondaryObject);
+				break;
+
 			case T_AlterObjectSchemaStmt:
 				address =
 					ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree,
@@ -2415,6 +2436,10 @@ ProcessUtilitySlow(Node *parsetree,
 
 			case T_AlterOwnerStmt:
 				address = ExecAlterOwnerStmt((AlterOwnerStmt *) parsetree);
+				break;
+
+			case T_AlterOperatorStmt:
+				address = AlterOperator((AlterOperatorStmt *) parsetree);
 				break;
 
 			case T_CommentStmt:
@@ -2466,6 +2491,10 @@ ProcessUtilitySlow(Node *parsetree,
 
 			case T_SecLabelStmt:
 				address = ExecSecLabelStmt((SecLabelStmt *) parsetree);
+				break;
+
+			case T_CreateAmStmt:
+				address = CreateAccessMethod((CreateAmStmt *) parsetree);
 				break;
 
 			default:
@@ -3146,6 +3175,9 @@ CreateCommandTag(Node *parsetree)
 				case OBJECT_TRANSFORM:
 					tag = "DROP TRANSFORM";
 					break;
+				case OBJECT_ACCESS_METHOD:
+					tag = "DROP ACCESS METHOD";
+					break;
 				default:
 					tag = "???";
 			}
@@ -3169,6 +3201,10 @@ CreateCommandTag(Node *parsetree)
 
 		case T_RenameStmt:
 			tag = AlterObjectTypeCommandTag(((RenameStmt *) parsetree)->renameType);
+			break;
+
+		case T_AlterObjectDependsStmt:
+			tag = AlterObjectTypeCommandTag(((AlterObjectDependsStmt *) parsetree)->objectType);
 			break;
 
 		case T_AlterObjectSchemaStmt:
@@ -3241,6 +3277,9 @@ CreateCommandTag(Node *parsetree)
 					break;
 				case OBJECT_COLLATION:
 					tag = "CREATE COLLATION";
+					break;
+				case OBJECT_ACCESS_METHOD:
+					tag = "CREATE ACCESS METHOD";
 					break;
 				default:
 					tag = "???";
@@ -3524,6 +3563,10 @@ CreateCommandTag(Node *parsetree)
 			tag = "ALTER OPERATOR FAMILY";
 			break;
 
+		case T_AlterOperatorStmt:
+			tag = "ALTER OPERATOR";
+			break;
+
 		case T_AlterTSDictionaryStmt:
 			tag = "ALTER TEXT SEARCH DICTIONARY";
 			break;
@@ -3538,6 +3581,10 @@ CreateCommandTag(Node *parsetree)
 
 		case T_AlterPolicyStmt:
 			tag = "ALTER POLICY";
+			break;
+
+		case T_CreateAmStmt:
+			tag = "CREATE ACCESS METHOD";
 			break;
 
 		case T_PrepareStmt:
@@ -3829,6 +3876,10 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
+		case T_AlterObjectDependsStmt:
+			lev = LOGSTMT_DDL;
+			break;
+
 		case T_AlterObjectSchemaStmt:
 			lev = LOGSTMT_DDL;
 			break;
@@ -4094,6 +4145,10 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_AlterTSConfigurationStmt:
+			lev = LOGSTMT_DDL;
+			break;
+
+		case T_CreateAmStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

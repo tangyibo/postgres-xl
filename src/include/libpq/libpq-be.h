@@ -8,7 +8,7 @@
  *	  Structs that need to be client-visible are in pqcomm.h.
  *
  *
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/libpq/libpq-be.h
@@ -90,11 +90,6 @@ typedef struct
 #endif
 } pg_gssinfo;
 #endif
-
-/*
- * SSL renegotiations
- */
-extern int	ssl_renegotiation_limit;
 
 /*
  * This is used by the postmaster in its communication with frontends.  It

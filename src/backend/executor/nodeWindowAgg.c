@@ -24,7 +24,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2015, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -2276,6 +2276,13 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 
 	if (OidIsValid(finalfn_oid))
 	{
+		build_aggregate_finalfn_expr(inputTypes,
+									 peraggstate->numFinalArgs,
+									 aggtranstype,
+									 wfunc->wintype,
+									 wfunc->inputcollid,
+									 finalfn_oid,
+									 &finalfnexpr);
 		fmgr_info(finalfn_oid, &peraggstate->finalfn);
 		fmgr_info_set_expr((Node *) finalfnexpr, &peraggstate->finalfn);
 	}

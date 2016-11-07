@@ -62,6 +62,8 @@
 #include "catalog/pg_user_mapping.h"
 #ifdef PGXC
 #include "catalog/pgxc_class.h"
+#include "catalog/pgxc_node.h"
+#include "catalog/pgxc_group.h"
 #include "pgxc/execRemote.h"
 #include "pgxc/pgxc.h"
 #include "commands/sequence.h"
@@ -174,12 +176,13 @@ static const Oid object_classes[] = {
 	ExtensionRelationId,		/* OCLASS_EXTENSION */
 #ifdef PGXC
 	PgxcClassRelationId,		/* OCLASS_PGXCCLASS */
+	PgxcNodeRelationId,			/* OCLASS_PGXC_NODE */
+	PgxcGroupRelationId,		/* OCLASS_PGXC_GROUP */
 #endif
 	EventTriggerRelationId,		/* OCLASS_EVENT_TRIGGER */
 	PolicyRelationId,			/* OCLASS_POLICY */
 	TransformRelationId			/* OCLASS_TRANSFORM */
 };
-
 
 static void findDependentObjects(const ObjectAddress *object,
 					 int flags,

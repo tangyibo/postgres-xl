@@ -1876,6 +1876,7 @@ build_aggregate_transfn_expr(Oid *agg_input_types,
 							 Expr **invtransfnexpr,
 							 Expr **collectfnexpr)
 {
+	Param	   *argp;
 	List	   *args;
 	FuncExpr   *fexpr;
 	int			i;
@@ -1954,11 +1955,14 @@ build_aggregate_transfn_expr(Oid *agg_input_types,
 #endif
 
 	/* see if we have a final function */
+	/*
+	 * FIXME commented out to make the code compilable after 9.6 merge
 	if (!OidIsValid(finalfn_oid))
 	{
 		*finalfnexpr = NULL;
 		return;
 	}
+	*/
 }
 
 /*
@@ -2057,9 +2061,11 @@ build_aggregate_finalfn_expr(Oid *agg_input_types,
 	 * Build expr tree for final function
 	 */
 #ifdef XCP
+	/* FIXME commented out to make the code compilable after 9.6 merge
 	if (OidIsValid(agg_collect_type))
 		argp->paramtype = agg_collect_type;
 	else
+	*/
 #endif
 	args = list_make1(make_agg_arg(agg_state_type, agg_input_collation));
 

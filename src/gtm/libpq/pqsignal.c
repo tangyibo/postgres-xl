@@ -46,17 +46,9 @@
 
 #include "gtm/pqsignal.h"
 
-
-#ifdef HAVE_SIGPROCMASK
 sigset_t	UnBlockSig,
 			BlockSig,
 			AuthBlockSig;
-#else
-int			UnBlockSig,
-			BlockSig,
-			AuthBlockSig;
-#endif
-
 
 /*
  * Initialize BlockSig, UnBlockSig, and AuthBlockSig.
@@ -74,8 +66,6 @@ int			UnBlockSig,
 void
 pqinitmask(void)
 {
-#ifdef HAVE_SIGPROCMASK
-
 	sigemptyset(&UnBlockSig);
 
 	/* First set all signals, then clear some. */
@@ -129,21 +119,6 @@ pqinitmask(void)
 #endif
 #ifdef SIGALRM
 	sigdelset(&AuthBlockSig, SIGALRM);
-#endif
-#else
-	/* Set the signals we want. */
-	UnBlockSig = 0;
-	BlockSig = sigmask(SIGQUIT) |
-		sigmask(SIGTERM) | sigmask(SIGALRM) |
-	/* common signals between two */
-		sigmask(SIGHUP) |
-		sigmask(SIGINT) | sigmask(SIGUSR1) |
-		sigmask(SIGUSR2) | sigmask(SIGCHLD) |
-		sigmask(SIGWINCH) | sigmask(SIGFPE);
-	AuthBlockSig = sigmask(SIGHUP) |
-		sigmask(SIGINT) | sigmask(SIGUSR1) |
-		sigmask(SIGUSR2) | sigmask(SIGCHLD) |
-		sigmask(SIGWINCH) | sigmask(SIGFPE);
 #endif
 }
 

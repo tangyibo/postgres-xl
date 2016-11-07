@@ -217,11 +217,7 @@ PoolManagerInit()
 	/* TODO other signal handlers */
 
 	/* We allow SIGQUIT (quickdie) at all times */
-#ifdef HAVE_SIGPROCMASK
 	sigdelset(&BlockSig, SIGQUIT);
-#else
-	BlockSig &= ~(sigmask(SIGQUIT));
-#endif
 
 	/*
 	 * Unblock signals (they were blocked when the postmaster forked us)

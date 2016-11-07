@@ -21,24 +21,18 @@
 
 #include <signal.h>
 
-#ifdef HAVE_SIGPROCMASK
-extern sigset_t UnBlockSig,
-			BlockSig,
-			AuthBlockSig;
-
+#ifndef WIN32
 #define PG_SETMASK(mask)	sigprocmask(SIG_SETMASK, mask, NULL)
 #else
-extern int	UnBlockSig,
-			BlockSig,
-			AuthBlockSig;
-
-#ifndef WIN32
-#define PG_SETMASK(mask)	sigsetmask(*((int*)(mask)))
-#else
+/* Emulate POSIX sigset_t APIs on Windows */
+typedef int sigset_t;
 #define PG_SETMASK(mask)		pqsigsetmask(*((int*)(mask)))
 int			pqsigsetmask(int mask);
 #endif
-#endif
+
+extern sigset_t UnBlockSig,
+			BlockSig,
+			AuthBlockSig;
 
 extern void pqinitmask(void);
 

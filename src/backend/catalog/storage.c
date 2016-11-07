@@ -86,16 +86,12 @@ RelationCreateStorage(RelFileNode rnode, char relpersistence)
 	switch (relpersistence)
 	{
 		case RELPERSISTENCE_TEMP:
-<<<<<<< HEAD
 #ifdef XCP
 			if (OidIsValid(MyCoordId))
 				backend = MyFirstBackendId;
 			else
 #endif
-			backend = MyBackendId;
-=======
 			backend = BackendIdForTempRelations();
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 			needs_wal = false;
 			break;
 		case RELPERSISTENCE_UNLOGGED:

@@ -4972,17 +4972,14 @@ outNode(StringInfo str, const void *obj)
 			case T_XmlSerialize:
 				_outXmlSerialize(str, obj);
 				break;
-<<<<<<< HEAD
+			case T_ForeignKeyCacheInfo:
+				_outForeignKeyCacheInfo(str, obj);
+				break;
 #ifdef PGXC
 			case T_ExecNodes:
 				_outExecNodes(str, obj);
 				break;
 #endif
-=======
-			case T_ForeignKeyCacheInfo:
-				_outForeignKeyCacheInfo(str, obj);
-				break;
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 
 			default:
 

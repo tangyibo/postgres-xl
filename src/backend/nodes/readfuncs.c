@@ -101,20 +101,13 @@ set_portable_input(bool value)
 	token = pg_strtok(&length);		/* get field value */ \
 	local_node->fldname = atoui(token)
 
-<<<<<<< HEAD
 #ifdef XCP
 /* Read a long integer field (anything written as ":fldname %ld") */
-=======
-/* Read an long integer field (anything written as ":fldname %ld") */
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 #define READ_LONG_FIELD(fldname) \
 	token = pg_strtok(&length);		/* skip :fldname */ \
 	token = pg_strtok(&length);		/* get field value */ \
 	local_node->fldname = atol(token)
-<<<<<<< HEAD
 #endif
-=======
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 
 /* Read an OID field (don't hard-wire assumption that OID is same as uint) */
 #ifdef XCP
@@ -181,7 +174,6 @@ set_portable_input(bool value)
 	(void) token;				/* in case not used elsewhere */ \
 	local_node->fldname = _readBitmapset()
 
-<<<<<<< HEAD
 #ifdef XCP
 /* Read fields of a Plan node */
 #define READ_PLAN_FIELDS(nodeTypeName) \
@@ -419,7 +411,7 @@ set_portable_input(bool value)
 			local_node->fldname = InvalidOid; \
 	} while (0)
 #endif
-=======
+
 /* Read an attribute number array */
 #define READ_ATTRNUMBER_ARRAY(fldname, len) \
 	token = pg_strtok(&length);		/* skip :fldname */ \
@@ -439,7 +431,6 @@ set_portable_input(bool value)
 #define READ_BOOL_ARRAY(fldname, len) \
 	token = pg_strtok(&length);		/* skip :fldname */ \
 	local_node->fldname = readBoolCols(len);
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 
 /* Routine exit */
 #define READ_DONE() \
@@ -461,15 +452,10 @@ set_portable_input(bool value)
 #define nullable_string(token,length)  \
 	((length) == 0 ? NULL : debackslash(token, length))
 
-
-<<<<<<< HEAD
-static Datum readDatum(bool typbyval);
 #ifdef XCP
 static Datum scanDatum(Oid typid, int typmod);
 #endif
 
-=======
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 /*
  * _readBitmapset
  */
@@ -1100,15 +1086,11 @@ _readOpExpr(void)
 	else
 #endif
 	READ_OID_FIELD(opfuncid);
-<<<<<<< HEAD
-
 #ifdef XCP
 	if (portable_input)
 		READ_TYPID_FIELD(opresulttype);
 	else
 #endif
-=======
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 	READ_OID_FIELD(opresulttype);
 	READ_BOOL_FIELD(opretset);
 #ifdef XCP
@@ -1149,15 +1131,11 @@ _readDistinctExpr(void)
 	else
 #endif
 	READ_OID_FIELD(opfuncid);
-<<<<<<< HEAD
-
 #ifdef XCP
 	if (portable_input)
 		READ_TYPID_FIELD(opresulttype);
 	else
 #endif
-=======
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 	READ_OID_FIELD(opresulttype);
 	READ_BOOL_FIELD(opretset);
 #ifdef XCP
@@ -1198,7 +1176,6 @@ _readNullIfExpr(void)
 	else
 #endif
 	READ_OID_FIELD(opfuncid);
-<<<<<<< HEAD
 
 	/*
 	 * The opfuncid is stored in the textual format primarily for debugging
@@ -1219,8 +1196,6 @@ _readNullIfExpr(void)
 		READ_TYPID_FIELD(opresulttype);
 	else
 #endif
-=======
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 	READ_OID_FIELD(opresulttype);
 	READ_BOOL_FIELD(opretset);
 #ifdef XCP
@@ -1317,41 +1292,6 @@ _readSubLink(void)
 
 	READ_DONE();
 }
-
-#ifdef XCP
-/*
- * _readSubPlan is not needed since it doesn't appear in stored rules.
- */
-static SubPlan *
-_readSubPlan(void)
-{
-	READ_LOCALS(SubPlan);
-
-	READ_ENUM_FIELD(subLinkType, SubLinkType);
-	READ_NODE_FIELD(testexpr);
-	READ_NODE_FIELD(paramIds);
-	READ_INT_FIELD(plan_id);
-	READ_STRING_FIELD(plan_name);
-	if (portable_input)
-		READ_TYPID_FIELD(firstColType);
-	else
-		READ_OID_FIELD(firstColType);
-	READ_INT_FIELD(firstColTypmod);
-	if (portable_input)
-		READ_COLLID_FIELD(firstColCollation);
-	else
-		READ_OID_FIELD(firstColCollation);
-	READ_BOOL_FIELD(useHashTable);
-	READ_BOOL_FIELD(unknownEqFalse);
-	READ_NODE_FIELD(setParam);
-	READ_NODE_FIELD(parParam);
-	READ_NODE_FIELD(args);
-	READ_FLOAT_FIELD(startup_cost);
-	READ_FLOAT_FIELD(per_call_cost);
-
-	READ_DONE();
-}
-#endif
 
 /*
  * _readFieldSelect
@@ -2105,22 +2045,12 @@ _readTableSampleClause(void)
 {
 	READ_LOCALS(TableSampleClause);
 
-<<<<<<< HEAD
 #ifdef XCP
 	if (portable_input)
-	{
 		READ_FUNCID_FIELD(tsmhandler);
-	}
 	else
-	{
 #endif
 	READ_OID_FIELD(tsmhandler);
-#ifdef XCP
-	}
-#endif
-=======
-	READ_OID_FIELD(tsmhandler);
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 	READ_NODE_FIELD(args);
 	READ_NODE_FIELD(repeatable);
 
@@ -2128,1573 +2058,31 @@ _readTableSampleClause(void)
 }
 
 
-#ifdef XCP
 /*
-<<<<<<< HEAD
- * _readPlan
+ * ReadCommonPlan
+ *	Assign the basic stuff of all nodes that inherit from Plan
  */
-static Plan *
-_readPlan(void)
+static void
+ReadCommonPlan(Plan *local_node)
 {
-	READ_PLAN_FIELDS(Plan);
-
-	READ_DONE();
-}
-
-
-
-/*
- * _readResult
- */
-static Result *
-_readResult(void)
-{
-	READ_PLAN_FIELDS(Result);
-
-	READ_NODE_FIELD(resconstantqual);
-
-	READ_DONE();
-}
-
-
-/*
- * _readModifyTable
- */
-static ModifyTable *
-_readModifyTable(void)
-{
-	READ_PLAN_FIELDS(ModifyTable);
-
-	READ_ENUM_FIELD(operation, CmdType);
-	READ_BOOL_FIELD(canSetTag);
-	READ_UINT_FIELD(nominalRelation);
-	READ_NODE_FIELD(resultRelations);
-	READ_INT_FIELD(resultRelIndex);
-	READ_NODE_FIELD(plans);
-	READ_NODE_FIELD(withCheckOptionLists);
-	READ_NODE_FIELD(returningLists);
-	READ_NODE_FIELD(fdwPrivLists);
-	READ_NODE_FIELD(rowMarks);
-	READ_INT_FIELD(epqParam);
-	READ_ENUM_FIELD(onConflictAction, OnConflictAction);
-#ifdef XCP
-	if (portable_input)
-		READ_RELID_LIST_FIELD(arbiterIndexes);
-	else
-#endif
-	READ_NODE_FIELD(arbiterIndexes);
-	READ_NODE_FIELD(onConflictSet);
-	READ_NODE_FIELD(onConflictWhere);
-	READ_INT_FIELD(exclRelRTI);
-	READ_NODE_FIELD(exclRelTlist);
-
-	READ_DONE();
-}
-
-
-/*
- * _readAppend
- */
-static Append *
-_readAppend(void)
-{
-	READ_PLAN_FIELDS(Append);
-
-	READ_NODE_FIELD(appendplans);
-
-	READ_DONE();
-}
-
-
-/*
- * _readMergeAppend
- */
-static MergeAppend *
-_readMergeAppend(void)
-{
-	int i;
-	READ_PLAN_FIELDS(MergeAppend);
-
-	READ_NODE_FIELD(mergeplans);
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :sortColIdx */
-	local_node->sortColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->sortColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :sortOperators */
-	local_node->sortOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->sortOperators[i] = get_operid(oprname,
- 													  oprleft,
-													  oprright,
-													  NSP_OID(nspname));
-		}
-		else
-		local_node->sortOperators[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :collations */
-	local_node->collations = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *collname; /* collation name */
-			int 		collencoding; /* collation encoding */
-			/* the token is already read */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get collname */
-			collname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get nargs */
-			collencoding = atoi(token);
-			if (collname)
-				local_node->collations[i] = get_collid(collname,
-													   collencoding,
-													   NSP_OID(nspname));
-			else
-				local_node->collations[i] = InvalidOid;
-		}
-		else
-		local_node->collations[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :nullsFirst */
-	local_node->nullsFirst = (bool *) palloc(local_node->numCols * sizeof(bool));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->nullsFirst[i] = strtobool(token);
-	}
-
-	READ_DONE();
-}
-
-
-/*
- * _readRecursiveUnion
- */
-static RecursiveUnion *
-_readRecursiveUnion(void)
-{
-	int i;
-	READ_PLAN_FIELDS(RecursiveUnion);
-
-	READ_INT_FIELD(wtParam);
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :dupColIdx */
-	local_node->dupColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->dupColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :dupOperators */
-	local_node->dupOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->dupOperators[i] = atooid(token);
-	}
-
-	READ_LONG_FIELD(numGroups);
-
-	READ_DONE();
-}
-
-
-/*
- * _readBitmapAnd
- */
-static BitmapAnd *
-_readBitmapAnd(void)
-{
-	READ_PLAN_FIELDS(BitmapAnd);
-
-	READ_NODE_FIELD(bitmapplans);
-
-	READ_DONE();
-}
-
-
-/*
- * _readBitmapOr
- */
-static BitmapOr *
-_readBitmapOr(void)
-{
-	READ_PLAN_FIELDS(BitmapOr);
-
-	READ_NODE_FIELD(bitmapplans);
-
-	READ_DONE();
-}
-
-
-/*
- * _readScan
- */
-static Scan *
-_readScan(void)
-{
-	READ_SCAN_FIELDS(Scan);
-
-	READ_DONE();
-}
-
-
-/*
- * _readSeqScan
- */
-static SeqScan *
-_readSeqScan(void)
-{
-	READ_SCAN_FIELDS(SeqScan);
-
-	READ_DONE();
-}
-
-/*
- * _readSampleScan
- */
-static SampleScan *
-_readSampleScan(void)
-{
-	READ_SCAN_FIELDS(SampleScan);
-	READ_NODE_FIELD(tablesample);
-
-	READ_DONE();
-}
-
-/*
- * _readIndexScan
- */
-static IndexScan *
-_readIndexScan(void)
-{
-	READ_SCAN_FIELDS(IndexScan);
-
-	if (portable_input)
-		READ_RELID_FIELD(indexid);
-	else
-		READ_OID_FIELD(indexid);
-	READ_NODE_FIELD(indexqual);
-	READ_NODE_FIELD(indexqualorig);
-	READ_NODE_FIELD(indexorderby);
-	READ_NODE_FIELD(indexorderbyorig);
-	READ_NODE_FIELD(indexorderbyops);
-	READ_ENUM_FIELD(indexorderdir, ScanDirection);
-
-	READ_DONE();
-}
-
-
-/*
- * _readIndexOnlyScan
- */
-static IndexOnlyScan *
-_readIndexOnlyScan(void)
-{
-	READ_SCAN_FIELDS(IndexOnlyScan);
-
-	if (portable_input)
-		READ_RELID_FIELD(indexid);
-	else
-		READ_OID_FIELD(indexid);
-	READ_NODE_FIELD(indexqual);
-	READ_NODE_FIELD(indexorderby);
-	READ_NODE_FIELD(indextlist);
-	READ_ENUM_FIELD(indexorderdir, ScanDirection);
-
-	READ_DONE();
-}
-
-
-/*
- * _readBitmapIndexScan
- */
-static BitmapIndexScan *
-_readBitmapIndexScan(void)
-{
-	READ_SCAN_FIELDS(BitmapIndexScan);
-
-	if (portable_input)
-		READ_RELID_FIELD(indexid);
-	else
-		READ_OID_FIELD(indexid);
-	READ_NODE_FIELD(indexqual);
-	READ_NODE_FIELD(indexqualorig);
-
-	READ_DONE();
-}
-
-
-/*
- * _readBitmapHeapScan
- */
-static BitmapHeapScan *
-_readBitmapHeapScan(void)
-{
-	READ_SCAN_FIELDS(BitmapHeapScan);
-
-	READ_NODE_FIELD(bitmapqualorig);
-
-	READ_DONE();
-}
-
-
-/*
- * _readTidScan
- */
-static TidScan *
-_readTidScan(void)
-{
-	READ_SCAN_FIELDS(TidScan);
-
-	READ_NODE_FIELD(tidquals);
-
-	READ_DONE();
-}
-
-
-/*
- * _readSubqueryScan
- */
-static SubqueryScan *
-_readSubqueryScan(void)
-{
-	READ_SCAN_FIELDS(SubqueryScan);
-
-	READ_NODE_FIELD(subplan);
-
-	READ_DONE();
-}
-
-
-/*
- * _readFunctionScan
- */
-static FunctionScan *
-_readFunctionScan(void)
-{
-	READ_SCAN_FIELDS(FunctionScan);
-
-	READ_NODE_FIELD(functions);
-	READ_BOOL_FIELD(funcordinality);
-
-	READ_DONE();
-}
-
-
-/*
- * _readValuesScan
- */
-static ValuesScan *
-_readValuesScan(void)
-{
-	READ_SCAN_FIELDS(ValuesScan);
-
-	READ_NODE_FIELD(values_lists);
-
-	READ_DONE();
-}
-
-
-/*
- * _readCteScan
- */
-static CteScan *
-_readCteScan(void)
-{
-	READ_SCAN_FIELDS(CteScan);
-
-	READ_INT_FIELD(ctePlanId);
-	READ_INT_FIELD(cteParam);
-
-	READ_DONE();
-}
-
-
-/*
- * _readWorkTableScan
- */
-static WorkTableScan *
-_readWorkTableScan(void)
-{
-	READ_SCAN_FIELDS(WorkTableScan);
-
-	READ_INT_FIELD(wtParam);
-
-	READ_DONE();
-}
-
-
-/*
- * _readJoin
- */
-static Join *
-_readJoin(void)
-{
-	READ_JOIN_FIELDS(Join);
-
-	READ_DONE();
-}
-
-
-/*
- * _readNestLoop
- */
-static NestLoop *
-_readNestLoop(void)
-{
-	READ_JOIN_FIELDS(NestLoop);
-
-	READ_NODE_FIELD(nestParams);
-
-	READ_DONE();
-}
-
-
-/*
- * _readMergeJoin
- */
-static MergeJoin *
-_readMergeJoin(void)
-{
-	int			numCols;
-	int			i;
-	READ_JOIN_FIELDS(MergeJoin);
-
-	READ_NODE_FIELD(mergeclauses);
-	numCols = list_length(local_node->mergeclauses);
-
-
-	token = pg_strtok(&length);		/* skip :mergeFamilies */
-	local_node->mergeFamilies = (Oid *) palloc(numCols * sizeof(Oid));
-	for (i = 0; i < numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->mergeFamilies[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :mergeCollations */
-	local_node->mergeCollations = (Oid *) palloc(numCols * sizeof(Oid));
-	for (i = 0; i < numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *collname; /* collation name */
-			int 		collencoding; /* collation encoding */
-			/* the token is already read */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get collname */
-			collname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get nargs */
-			collencoding = atoi(token);
-			if (collname)
-				local_node->mergeCollations[i] = get_collid(collname,
-															collencoding,
-															NSP_OID(nspname));
-			else
-				local_node->mergeCollations[i] = InvalidOid;
-		}
-		else
-		local_node->mergeCollations[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :mergeStrategies */
-	local_node->mergeStrategies = (int *) palloc(numCols * sizeof(int));
-	for (i = 0; i < numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->mergeStrategies[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :mergeNullsFirst */
-	local_node->mergeNullsFirst = (bool *) palloc(numCols * sizeof(bool));
-	for (i = 0; i < numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->mergeNullsFirst[i] = strtobool(token);
-	}
-
-	READ_DONE();
-}
-
-
-/*
- * _readHashJoin
- */
-static HashJoin *
-_readHashJoin(void)
-{
-	READ_JOIN_FIELDS(HashJoin);
-
-	READ_NODE_FIELD(hashclauses);
-
-	READ_DONE();
-}
-
-
-/*
- * _readMaterial
- */
-static Material *
-_readMaterial(void)
-{
-	READ_PLAN_FIELDS(Material);
-
-	READ_DONE();
-}
-
-
-/*
- * _readSort
- */
-static Sort *
-_readSort(void)
-{
-	int i;
-	READ_PLAN_FIELDS(Sort);
-
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :sortColIdx */
-	local_node->sortColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->sortColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :sortOperators */
-	local_node->sortOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->sortOperators[i] = get_operid(oprname,
- 													  oprleft,
-													  oprright,
-													  NSP_OID(nspname));
-		}
-		else
-		local_node->sortOperators[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :collations */
-	local_node->collations = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *collname; /* collation name */
-			int 		collencoding; /* collation encoding */
-			/* the token is already read */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get collname */
-			collname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get nargs */
-			collencoding = atoi(token);
-			if (collname)
-				local_node->collations[i] = get_collid(collname,
-													   collencoding,
-													   NSP_OID(nspname));
-			else
-				local_node->collations[i] = InvalidOid;
-		}
-		else
-		local_node->collations[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :nullsFirst */
-	local_node->nullsFirst = (bool *) palloc(local_node->numCols * sizeof(bool));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->nullsFirst[i] = strtobool(token);
-	}
-
-	READ_DONE();
-}
-
-
-/*
- * _readGroup
- */
-static Group *
-_readGroup(void)
-{
-	int i;
-	READ_PLAN_FIELDS(Group);
-
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :grpColIdx */
-	local_node->grpColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->grpColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :grpOperators */
-	local_node->grpOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->grpOperators[i] = get_operid(oprname,
-													 oprleft,
-													 oprright,
-													 NSP_OID(nspname));
-		}
-		else
-			local_node->grpOperators[i] = atooid(token);
-	}
-
-	READ_DONE();
-}
-
-
-/*
- * _readAgg
- */
-static Agg *
-_readAgg(void)
-{
-	int i;
-	READ_PLAN_FIELDS(Agg);
-
-	READ_ENUM_FIELD(aggstrategy, AggStrategy);
-	READ_ENUM_FIELD(aggdistribution, AggDistribution);
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :grpColIdx */
-	local_node->grpColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->grpColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :grpOperators */
-	local_node->grpOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->grpOperators[i] = get_operid(oprname,
-													 oprleft,
-													 oprright,
-													 NSP_OID(nspname));
-		}
-		else
-			local_node->grpOperators[i] = atooid(token);
-	}
-
-	READ_LONG_FIELD(numGroups);
-
-	READ_NODE_FIELD(groupingSets);
-	READ_NODE_FIELD(chain);
-
-	READ_DONE();
-}
-
-
-/*
- * _readWindowAgg
- */
-static WindowAgg *
-_readWindowAgg(void)
-{
-	int i;
-	READ_PLAN_FIELDS(WindowAgg);
-
-	READ_INT_FIELD(winref);
-	READ_INT_FIELD(partNumCols);
-
-	token = pg_strtok(&length);		/* skip :partColIdx */
-	local_node->partColIdx = (AttrNumber *) palloc(local_node->partNumCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->partNumCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->partColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :partOperators */
-	local_node->partOperators = (Oid *) palloc(local_node->partNumCols * sizeof(Oid));
-	for (i = 0; i < local_node->partNumCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->partOperators[i] = get_operid(oprname,
-													  oprleft,
-													  oprright,
-													  NSP_OID(nspname));
-		}
-		else
-			local_node->partOperators[i] = atooid(token);
-	}
-
-	READ_INT_FIELD(ordNumCols);
-
-	token = pg_strtok(&length);		/* skip :ordColIdx */
-	local_node->ordColIdx = (AttrNumber *) palloc(local_node->ordNumCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->ordNumCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->ordColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :ordOperators */
-	local_node->ordOperators = (Oid *) palloc(local_node->ordNumCols * sizeof(Oid));
-	for (i = 0; i < local_node->ordNumCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->ordOperators[i] = get_operid(oprname,
-													 oprleft,
-													 oprright,
-													 NSP_OID(nspname));
-		}
-		else
-			local_node->ordOperators[i] = atooid(token);
-	}
-
-	READ_INT_FIELD(frameOptions);
-	READ_NODE_FIELD(startOffset);
-	READ_NODE_FIELD(endOffset);
-
-	READ_DONE();
-}
-
-
-/*
- * _readUnique
- */
-static Unique *
-_readUnique(void)
-{
-	int i;
-	READ_PLAN_FIELDS(Unique);
-
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :uniqColIdx */
-	local_node->uniqColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->uniqColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :uniqOperators */
-	local_node->uniqOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->uniqOperators[i] = get_operid(oprname,
-													  oprleft,
-													  oprright,
-													  NSP_OID(nspname));
-		}
-		else
-			local_node->uniqOperators[i] = atooid(token);
-	}
-
-	READ_DONE();
-}
-
-
-/*
- * _readHash
- */
-static Hash *
-_readHash(void)
-{
-	READ_PLAN_FIELDS(Hash);
-
-	if (portable_input)
-		READ_RELID_FIELD(skewTable);
-	else
-		READ_OID_FIELD(skewTable);
-	READ_INT_FIELD(skewColumn);
-	READ_BOOL_FIELD(skewInherit);
-	if (portable_input)
-		READ_TYPID_FIELD(skewColType);
-	else
-		READ_OID_FIELD(skewColType);
-	READ_INT_FIELD(skewColTypmod);
-
-	READ_DONE();
-}
-
-
-/*
- * _readSetOp
- */
-static SetOp *
-_readSetOp(void)
-{
-	int i;
-	READ_PLAN_FIELDS(SetOp);
-
-	READ_ENUM_FIELD(cmd, SetOpCmd);
-	READ_ENUM_FIELD(strategy, SetOpStrategy);
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :dupColIdx */
-	local_node->dupColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->dupColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :dupOperators */
-	local_node->dupOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->dupOperators[i] = atooid(token);
-	}
-
-	READ_INT_FIELD(flagColIdx);
-	READ_INT_FIELD(firstFlag);
-	READ_LONG_FIELD(numGroups);
-
-	READ_DONE();
-}
-
-
-/*
- * _readLimit
- */
-static Limit *
-_readLimit(void)
-{
-	READ_PLAN_FIELDS(Limit);
-
-	READ_NODE_FIELD(limitOffset);
-	READ_NODE_FIELD(limitCount);
-
-	READ_DONE();
-}
-
-
-/*
- * _readRemoteSubplan
- */
-static RemoteSubplan *
-_readRemoteSubplan(void)
-{
-	READ_SCAN_FIELDS(RemoteSubplan);
-
-	READ_CHAR_FIELD(distributionType);
-	READ_INT_FIELD(distributionKey);
-	READ_NODE_FIELD(distributionNodes);
-	READ_NODE_FIELD(distributionRestrict);
-	READ_NODE_FIELD(nodeList);
-	READ_BOOL_FIELD(execOnAll);
-	READ_NODE_FIELD(sort);
-	READ_STRING_FIELD(cursor);
-	READ_INT_FIELD(unique);
-
-	READ_DONE();
-}
-
-
-/*
- * _readRemoteStmt
- */
-static RemoteStmt *
-_readRemoteStmt(void)
-{
-	int i;
-	READ_LOCALS(RemoteStmt);
-
-	READ_ENUM_FIELD(commandType, CmdType);
-	READ_BOOL_FIELD(hasReturning);
-	READ_NODE_FIELD(planTree);
-	READ_NODE_FIELD(rtable);
-	READ_NODE_FIELD(resultRelations);
-	READ_NODE_FIELD(subplans);
-	READ_INT_FIELD(nParamExec);
-	READ_INT_FIELD(nParamRemote);
-	if (local_node->nParamRemote > 0)
-	{
-		local_node->remoteparams = (RemoteParam *) palloc(
-				local_node->nParamRemote * sizeof(RemoteParam));
-		for (i = 0; i < local_node->nParamRemote; i++)
-		{
-			RemoteParam *rparam = &(local_node->remoteparams[i]);
-			token = pg_strtok(&length); /* skip  :paramkind */
-			token = pg_strtok(&length);
-			rparam->paramkind = (ParamKind) atoi(token);
-
-			token = pg_strtok(&length); /* skip  :paramid */
-			token = pg_strtok(&length);
-			rparam->paramid = atoi(token);
-
-			token = pg_strtok(&length); /* skip  :paramused */
-			token = pg_strtok(&length);
-			rparam->paramused = atoi(token);
-
-			token = pg_strtok(&length); /* skip  :paramtype */
-			if (portable_input)
-			{
-				char	   *nspname; /* namespace name */
-				char	   *typname; /* data type name */
-				token = pg_strtok(&length); /* get nspname */
-				nspname = nullable_string(token, length);
-				token = pg_strtok(&length); /* get typname */
-				typname = nullable_string(token, length);
-				if (typname)
-					rparam->paramtype = get_typname_typid(typname,
-														  NSP_OID(nspname));
-				else
-					rparam->paramtype = InvalidOid;
-			}
-			else
-			{
-				token = pg_strtok(&length);
-				rparam->paramtype = atooid(token);
-			}
-		}
-	}
-	else
-		local_node->remoteparams = NULL;
-
-	READ_NODE_FIELD(rowMarks);
-	READ_CHAR_FIELD(distributionType);
-	READ_INT_FIELD(distributionKey);
-	READ_NODE_FIELD(distributionNodes);
-	READ_NODE_FIELD(distributionRestrict);
-
-	READ_DONE();
-}
-
-
-/*
- * _readSimpleSort
- */
-static SimpleSort *
-_readSimpleSort(void)
-{
-	int i;
-	READ_LOCALS(SimpleSort);
-
-	READ_INT_FIELD(numCols);
-
-	token = pg_strtok(&length);		/* skip :sortColIdx */
-	local_node->sortColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->sortColIdx[i] = atoi(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :sortOperators */
-	local_node->sortOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *oprname; /* operator name */
-			char	   *leftnspname; /* left type namespace */
-			char	   *leftname; /* left type name */
-			Oid			oprleft; /* left type */
-			char	   *rightnspname; /* right type namespace */
-			char	   *rightname; /* right type name */
-			Oid			oprright; /* right type */
-			/* token is already set to nspname */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get operator name */
-			oprname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type namespace */
-			leftnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* left type name */
-			leftname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type namespace */
-			rightnspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* right type name */
-			rightname = nullable_string(token, length);
-			if (leftname)
-				oprleft = get_typname_typid(leftname,
-											NSP_OID(leftnspname));
-			else
-				oprleft = InvalidOid;
-			if (rightname)
-				oprright = get_typname_typid(rightname,
-											 NSP_OID(rightnspname));
-			else
-				oprright = InvalidOid;
-			local_node->sortOperators[i] = get_operid(oprname,
- 													  oprleft,
-													  oprright,
-													  NSP_OID(nspname));
-		}
-		else
-			local_node->sortOperators[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :sortCollations */
-	local_node->sortCollations = (Oid *) palloc(local_node->numCols * sizeof(Oid));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		if (portable_input)
-		{
-			char       *nspname; /* namespace name */
-			char       *collname; /* collation name */
-			int 		collencoding; /* collation encoding */
-			/* the token is already read */
-			nspname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get collname */
-			collname = nullable_string(token, length);
-			token = pg_strtok(&length); /* get nargs */
-			collencoding = atoi(token);
-			if (collname)
-				local_node->sortCollations[i] = get_collid(collname,
-													   collencoding,
-													   NSP_OID(nspname));
-			else
-				local_node->sortCollations[i] = InvalidOid;
-		}
-		else
-			local_node->sortCollations[i] = atooid(token);
-	}
-
-	token = pg_strtok(&length);		/* skip :nullsFirst */
-	local_node->nullsFirst = (bool *) palloc(local_node->numCols * sizeof(bool));
-	for (i = 0; i < local_node->numCols; i++)
-	{
-		token = pg_strtok(&length);
-		local_node->nullsFirst[i] = strtobool(token);
-	}
-
-	READ_DONE();
-}
-
-
-/*
- * _readNestLoopParam
- */
-static NestLoopParam *
-_readNestLoopParam(void)
-{
-	READ_LOCALS(NestLoopParam);
-
-	READ_INT_FIELD(paramno);
-	READ_NODE_FIELD(paramval);
-
-	READ_DONE();
-}
-
-
-/*
- * _readPlanRowMark
- */
-static PlanRowMark *
-_readPlanRowMark(void)
-{
-	READ_LOCALS(PlanRowMark);
-
-	READ_UINT_FIELD(rti);
-	READ_UINT_FIELD(prti);
-	READ_UINT_FIELD(rowmarkId);
-	READ_ENUM_FIELD(markType, RowMarkType);
-	READ_INT_FIELD(allMarkTypes);
-	READ_ENUM_FIELD(strength, LockClauseStrength);
-	READ_ENUM_FIELD(waitPolicy, LockWaitPolicy);
-	READ_BOOL_FIELD(isParent);
-
-	READ_DONE();
-}
-
-/*
- * _readLockRows
- */
-static LockRows *
-_readLockRows(void)
-{
-	READ_PLAN_FIELDS(LockRows);
-
-	READ_NODE_FIELD(rowMarks);
-	READ_INT_FIELD(epqParam);
-
-	READ_DONE();
-}
-
-#endif /* XCP */
-
-
-/*
- * parseNodeString
- *
- * Given a character string representing a node tree, parseNodeString creates
- * the internal node structure.
- *
- * The string to be read must already have been loaded into pg_strtok().
- */
-Node *
-parseNodeString(void)
-{
-	void	   *return_value;
-
 	READ_TEMP_LOCALS();
 
-	token = pg_strtok(&length);
+	READ_FLOAT_FIELD(startup_cost);
+	READ_FLOAT_FIELD(total_cost);
+	READ_FLOAT_FIELD(plan_rows);
+	READ_INT_FIELD(plan_width);
+	READ_BOOL_FIELD(parallel_aware);
+	READ_INT_FIELD(plan_node_id);
+	READ_NODE_FIELD(targetlist);
+	READ_NODE_FIELD(qual);
+	READ_NODE_FIELD(lefttree);
+	READ_NODE_FIELD(righttree);
+	READ_NODE_FIELD(initPlan);
+	READ_BITMAPSET_FIELD(extParam);
+	READ_BITMAPSET_FIELD(allParam);
+}
 
-#define MATCH(tokname, namelen) \
-	(length == namelen && memcmp(token, tokname, namelen) == 0)
-
-	if (MATCH("QUERY", 5))
-		return_value = _readQuery();
-	else if (MATCH("WITHCHECKOPTION", 15))
-		return_value = _readWithCheckOption();
-	else if (MATCH("SORTGROUPCLAUSE", 15))
-		return_value = _readSortGroupClause();
-	else if (MATCH("GROUPINGSET", 11))
-		return_value = _readGroupingSet();
-	else if (MATCH("WINDOWCLAUSE", 12))
-		return_value = _readWindowClause();
-	else if (MATCH("ROWMARKCLAUSE", 13))
-		return_value = _readRowMarkClause();
-	else if (MATCH("COMMONTABLEEXPR", 15))
-		return_value = _readCommonTableExpr();
-	else if (MATCH("SETOPERATIONSTMT", 16))
-		return_value = _readSetOperationStmt();
-	else if (MATCH("ALIAS", 5))
-		return_value = _readAlias();
-	else if (MATCH("RANGEVAR", 8))
-		return_value = _readRangeVar();
-	else if (MATCH("INTOCLAUSE", 10))
-		return_value = _readIntoClause();
-	else if (MATCH("VAR", 3))
-		return_value = _readVar();
-	else if (MATCH("CONST", 5))
-		return_value = _readConst();
-	else if (MATCH("PARAM", 5))
-		return_value = _readParam();
-	else if (MATCH("AGGREF", 6))
-		return_value = _readAggref();
-	else if (MATCH("GROUPINGFUNC", 12))
-		return_value = _readGroupingFunc();
-	else if (MATCH("WINDOWFUNC", 10))
-		return_value = _readWindowFunc();
-	else if (MATCH("ARRAYREF", 8))
-		return_value = _readArrayRef();
-	else if (MATCH("FUNCEXPR", 8))
-		return_value = _readFuncExpr();
-	else if (MATCH("NAMEDARGEXPR", 12))
-		return_value = _readNamedArgExpr();
-	else if (MATCH("OPEXPR", 6))
-		return_value = _readOpExpr();
-	else if (MATCH("DISTINCTEXPR", 12))
-		return_value = _readDistinctExpr();
-	else if (MATCH("NULLIFEXPR", 10))
-		return_value = _readNullIfExpr();
-	else if (MATCH("SCALARARRAYOPEXPR", 17))
-		return_value = _readScalarArrayOpExpr();
-	else if (MATCH("BOOLEXPR", 8))
-		return_value = _readBoolExpr();
-	else if (MATCH("SUBLINK", 7))
-		return_value = _readSubLink();
-#ifdef XCP
-	else if (MATCH("SUBPLAN", 7))
-		return_value = _readSubPlan();
-#endif
-	else if (MATCH("FIELDSELECT", 11))
-		return_value = _readFieldSelect();
-	else if (MATCH("FIELDSTORE", 10))
-		return_value = _readFieldStore();
-	else if (MATCH("RELABELTYPE", 11))
-		return_value = _readRelabelType();
-	else if (MATCH("COERCEVIAIO", 11))
-		return_value = _readCoerceViaIO();
-	else if (MATCH("ARRAYCOERCEEXPR", 15))
-		return_value = _readArrayCoerceExpr();
-	else if (MATCH("CONVERTROWTYPEEXPR", 18))
-		return_value = _readConvertRowtypeExpr();
-	else if (MATCH("COLLATE", 7))
-		return_value = _readCollateExpr();
-	else if (MATCH("CASE", 4))
-		return_value = _readCaseExpr();
-	else if (MATCH("WHEN", 4))
-		return_value = _readCaseWhen();
-	else if (MATCH("CASETESTEXPR", 12))
-		return_value = _readCaseTestExpr();
-	else if (MATCH("ARRAY", 5))
-		return_value = _readArrayExpr();
-	else if (MATCH("ROW", 3))
-		return_value = _readRowExpr();
-	else if (MATCH("ROWCOMPARE", 10))
-		return_value = _readRowCompareExpr();
-	else if (MATCH("COALESCE", 8))
-		return_value = _readCoalesceExpr();
-	else if (MATCH("MINMAX", 6))
-		return_value = _readMinMaxExpr();
-	else if (MATCH("XMLEXPR", 7))
-		return_value = _readXmlExpr();
-	else if (MATCH("NULLTEST", 8))
-		return_value = _readNullTest();
-	else if (MATCH("BOOLEANTEST", 11))
-		return_value = _readBooleanTest();
-	else if (MATCH("COERCETODOMAIN", 14))
-		return_value = _readCoerceToDomain();
-	else if (MATCH("COERCETODOMAINVALUE", 19))
-		return_value = _readCoerceToDomainValue();
-	else if (MATCH("SETTODEFAULT", 12))
-		return_value = _readSetToDefault();
-	else if (MATCH("CURRENTOFEXPR", 13))
-		return_value = _readCurrentOfExpr();
-	else if (MATCH("INFERENCEELEM", 13))
-		return_value = _readInferenceElem();
-	else if (MATCH("TARGETENTRY", 11))
-		return_value = _readTargetEntry();
-	else if (MATCH("RANGETBLREF", 11))
-		return_value = _readRangeTblRef();
-	else if (MATCH("JOINEXPR", 8))
-		return_value = _readJoinExpr();
-	else if (MATCH("FROMEXPR", 8))
-		return_value = _readFromExpr();
-	else if (MATCH("ONCONFLICTEXPR", 14))
-		return_value = _readOnConflictExpr();
-	else if (MATCH("RTE", 3))
-		return_value = _readRangeTblEntry();
-	else if (MATCH("RANGETBLFUNCTION", 16))
-		return_value = _readRangeTblFunction();
-	else if (MATCH("TABLESAMPLECLAUSE", 17))
-		return_value = _readTableSampleClause();
-	else if (MATCH("NOTIFY", 6))
-		return_value = _readNotifyStmt();
-	else if (MATCH("DECLARECURSOR", 13))
-		return_value = _readDeclareCursorStmt();
-#ifdef XCP
-	else if (MATCH("PLAN", 4))
-		return_value = _readPlan();
-	else if (MATCH("RESULT", 6))
-		return_value = _readResult();
-	else if (MATCH("MODIFYTABLE", 11))
-		return_value = _readModifyTable();
-	else if (MATCH("APPEND", 6))
-		return_value = _readAppend();
-	else if (MATCH("MERGEAPPEND", 11))
-		return_value = _readMergeAppend();
-	else if (MATCH("RECURSIVEUNION", 14))
-		return_value = _readRecursiveUnion();
-	else if (MATCH("BITMAPAND", 9))
-		return_value = _readBitmapAnd();
-	else if (MATCH("BITMAPOR", 8))
-		return_value = _readBitmapOr();
-	else if (MATCH("SCAN", 4))
-		return_value = _readScan();
-	else if (MATCH("SEQSCAN", 7))
-		return_value = _readSeqScan();
-	else if (MATCH("SAMPLESCAN", 10))
-		return_value = _readSampleScan();
-	else if (MATCH("INDEXSCAN", 9))
-		return_value = _readIndexScan();
-	else if (MATCH("INDEXONLYSCAN", 13))
-		return_value = _readIndexOnlyScan();
-	else if (MATCH("BITMAPINDEXSCAN", 15))
-		return_value = _readBitmapIndexScan();
-	else if (MATCH("BITMAPHEAPSCAN", 14))
-		return_value = _readBitmapHeapScan();
-	else if (MATCH("TIDSCAN", 7))
-		return_value = _readTidScan();
-	else if (MATCH("SUBQUERYSCAN", 12))
-		return_value = _readSubqueryScan();
-	else if (MATCH("FUNCTIONSCAN", 12))
-		return_value = _readFunctionScan();
-	else if (MATCH("VALUESSCAN", 10))
-		return_value = _readValuesScan();
-	else if (MATCH("CTESCAN", 7))
-		return_value = _readCteScan();
-	else if (MATCH("WORKTABLESCAN", 13))
-		return_value = _readWorkTableScan();
-	else if (MATCH("JOIN", 4))
-		return_value = _readJoin();
-	else if (MATCH("NESTLOOP", 8))
-		return_value = _readNestLoop();
-	else if (MATCH("MERGEJOIN", 9))
-		return_value = _readMergeJoin();
-	else if (MATCH("HASHJOIN", 8))
-		return_value = _readHashJoin();
-	else if (MATCH("MATERIAL", 8))
-		return_value = _readMaterial();
-	else if (MATCH("SORT", 4))
-		return_value = _readSort();
-	else if (MATCH("GROUP", 5))
-		return_value = _readGroup();
-	else if (MATCH("AGG", 3))
-		return_value = _readAgg();
-	else if (MATCH("WINDOWAGG", 9))
-		return_value = _readWindowAgg();
-	else if (MATCH("UNIQUE", 6))
-		return_value = _readUnique();
-	else if (MATCH("HASH", 4))
-		return_value = _readHash();
-	else if (MATCH("SETOP", 5))
-		return_value = _readSetOp();
-	else if (MATCH("LIMIT", 5))
-		return_value = _readLimit();
-	else if (MATCH("REMOTESUBPLAN", 13))
-		return_value = _readRemoteSubplan();
-	else if (MATCH("REMOTESTMT", 10))
-		return_value = _readRemoteStmt();
-	else if (MATCH("SIMPLESORT", 10))
-		return_value = _readSimpleSort();
-	else if (MATCH("NESTLOOPPARAM", 13))
-		return_value = _readNestLoopParam();
-	else if (MATCH("PLANROWMARK", 11))
-		return_value = _readPlanRowMark();
-	else if (MATCH("LOCKROWS", 8))
-		return_value = _readLockRows();
-#endif
-	else
-	{
-		elog(ERROR, "badly formatted node string \"%.32s\"...", token);
-		return_value = NULL;	/* keep compiler quiet */
-	}
-=======
+/*
  * _readDefElem
  */
 static DefElem *
@@ -3706,6 +2094,19 @@ _readDefElem(void)
 	READ_STRING_FIELD(defname);
 	READ_NODE_FIELD(arg);
 	READ_ENUM_FIELD(defaction, DefElemAction);
+
+	READ_DONE();
+}
+
+/*
+ * _readPlan
+ */
+static Plan *
+_readPlan(void)
+{
+	READ_LOCALS_NO_FIELDS(Plan);
+
+	ReadCommonPlan(local_node);
 
 	READ_DONE();
 }
@@ -3736,44 +2137,6 @@ _readPlannedStmt(void)
 	READ_NODE_FIELD(relationOids);
 	READ_NODE_FIELD(invalItems);
 	READ_INT_FIELD(nParamExec);
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
-
-	READ_DONE();
-}
-
-/*
- * ReadCommonPlan
- *	Assign the basic stuff of all nodes that inherit from Plan
- */
-static void
-ReadCommonPlan(Plan *local_node)
-{
-	READ_TEMP_LOCALS();
-
-	READ_FLOAT_FIELD(startup_cost);
-	READ_FLOAT_FIELD(total_cost);
-	READ_FLOAT_FIELD(plan_rows);
-	READ_INT_FIELD(plan_width);
-	READ_BOOL_FIELD(parallel_aware);
-	READ_INT_FIELD(plan_node_id);
-	READ_NODE_FIELD(targetlist);
-	READ_NODE_FIELD(qual);
-	READ_NODE_FIELD(lefttree);
-	READ_NODE_FIELD(righttree);
-	READ_NODE_FIELD(initPlan);
-	READ_BITMAPSET_FIELD(extParam);
-	READ_BITMAPSET_FIELD(allParam);
-}
-
-/*
- * _readPlan
- */
-static Plan *
-_readPlan(void)
-{
-	READ_LOCALS_NO_FIELDS(Plan);
-
-	ReadCommonPlan(local_node);
 
 	READ_DONE();
 }
@@ -3816,7 +2179,10 @@ _readModifyTable(void)
 	READ_NODE_FIELD(rowMarks);
 	READ_INT_FIELD(epqParam);
 	READ_ENUM_FIELD(onConflictAction, OnConflictAction);
-	READ_NODE_FIELD(arbiterIndexes);
+	if (portable_input)
+		READ_RELID_LIST_FIELD(arbiterIndexes);
+	else
+		READ_NODE_FIELD(arbiterIndexes);
 	READ_NODE_FIELD(onConflictSet);
 	READ_NODE_FIELD(onConflictWhere);
 	READ_UINT_FIELD(exclRelRTI);
@@ -3974,7 +2340,10 @@ _readIndexScan(void)
 
 	ReadCommonScan(&local_node->scan);
 
-	READ_OID_FIELD(indexid);
+	if (portable_input)
+		READ_RELID_FIELD(indexid);
+	else
+		READ_OID_FIELD(indexid);
 	READ_NODE_FIELD(indexqual);
 	READ_NODE_FIELD(indexqualorig);
 	READ_NODE_FIELD(indexorderby);
@@ -3995,7 +2364,10 @@ _readIndexOnlyScan(void)
 
 	ReadCommonScan(&local_node->scan);
 
-	READ_OID_FIELD(indexid);
+	if (portable_input)
+		READ_RELID_FIELD(indexid);
+	else
+		READ_OID_FIELD(indexid);
 	READ_NODE_FIELD(indexqual);
 	READ_NODE_FIELD(indexorderby);
 	READ_NODE_FIELD(indextlist);
@@ -4014,7 +2386,10 @@ _readBitmapIndexScan(void)
 
 	ReadCommonScan(&local_node->scan);
 
-	READ_OID_FIELD(indexid);
+	if (portable_input)
+		READ_RELID_FIELD(indexid);
+	else
+		READ_OID_FIELD(indexid);
 	READ_NODE_FIELD(indexqual);
 	READ_NODE_FIELD(indexqualorig);
 
@@ -4400,10 +2775,16 @@ _readHash(void)
 
 	ReadCommonPlan(&local_node->plan);
 
-	READ_OID_FIELD(skewTable);
+	if (portable_input)
+		READ_RELID_FIELD(skewTable);
+	else
+		READ_OID_FIELD(skewTable);
 	READ_INT_FIELD(skewColumn);
 	READ_BOOL_FIELD(skewInherit);
-	READ_OID_FIELD(skewColType);
+	if (portable_input)
+		READ_TYPID_FIELD(skewColType);
+	else
+		READ_OID_FIELD(skewColType);
 	READ_INT_FIELD(skewColTypmod);
 
 	READ_DONE();
@@ -4524,9 +2905,15 @@ _readSubPlan(void)
 	READ_NODE_FIELD(paramIds);
 	READ_INT_FIELD(plan_id);
 	READ_STRING_FIELD(plan_name);
-	READ_OID_FIELD(firstColType);
+	if (portable_input)
+		READ_TYPID_FIELD(firstColType);
+	else
+		READ_OID_FIELD(firstColType);
 	READ_INT_FIELD(firstColTypmod);
-	READ_OID_FIELD(firstColCollation);
+	if (portable_input)
+		READ_COLLID_FIELD(firstColCollation);
+	else
+		READ_OID_FIELD(firstColCollation);
 	READ_BOOL_FIELD(useHashTable);
 	READ_BOOL_FIELD(unknownEqFalse);
 	READ_NODE_FIELD(setParam);
@@ -4882,7 +3269,6 @@ readDatum(bool typbyval)
 	return res;
 }
 
-<<<<<<< HEAD
 #ifdef XCP
 /*
  * scanDatum
@@ -4928,7 +3314,7 @@ scanDatum(Oid typid, int typmod)
 	return res;
 }
 #endif
-=======
+
 /*
  * readAttrNumberCols
  */
@@ -5024,4 +3410,3 @@ readBoolCols(int numCols)
 
 	return bool_vals;
 }
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365

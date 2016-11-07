@@ -4693,7 +4693,7 @@ ExecRemoteQuery(RemoteQueryState *node)
 	if (combiner->tuplesortstate)
 	{
 		if (tuplesort_gettupleslot((Tuplesortstate *) combiner->tuplesortstate,
-									  true, resultslot))
+									  true, resultslot, NULL))
 			return resultslot;
 		else
 			ExecClearTuple(resultslot);
@@ -6027,7 +6027,7 @@ primary_mode_phase_two:
 	if (combiner->tuplesortstate)
 	{
 		if (tuplesort_gettupleslot((Tuplesortstate *) combiner->tuplesortstate,
-								   true, resultslot))
+								   true, resultslot, NULL))
 		{
 			if (log_remotesubplan_stats)
 				ShowUsageCommon("ExecRemoteSubplan", &start_r, &start_t);

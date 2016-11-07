@@ -1661,6 +1661,7 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	Relids		required_outer;
 	pushdown_safety_info safetyInfo;
 	double		tuple_fraction;
+	PlannerInfo *subroot;
 #ifdef XCP
 	Distribution *distribution;
 #endif
@@ -1785,6 +1786,26 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	rel->subplan_params = root->plan_params;
 	root->plan_params = NIL;
 
+	/* For convenience. */
+	subroot = rel->subroot;
+
+	/* 
+	 * Temporarily block ORDER BY in subqueries until we can add support 
+	 * it in Postgres-XL without outputting incorrect results. Should
+	 * do this only in normal processing mode though!
+     *
+     * The extra conditions below try to handle cases where an ORDER BY
+     * appears in a simple VIEW or INSERT SELECT.
+     */
+	if (IsUnderPostmaster &&
+		list_length(subquery->sortClause) > 1
+				&& (subroot->parent_root != root
+				|| (subroot->parent_root == root 
+					&& (root->parse->commandType != CMD_SELECT
+						|| (root->parse->commandType == CMD_SELECT
+							&& root->parse->hasWindowFuncs)))))
+		elog(ERROR, "Postgres-XL does not currently support ORDER BY in subqueries");
+
 	/*
 	 * It's possible that constraint exclusion proved the subquery empty. If
 	 * so, it's desirable to produce an unadorned dummy path so that we will
@@ -1805,53 +1826,6 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	 */
 	set_subquery_size_estimates(root, rel);
 
-	/* Generate appropriate path */
-#ifdef XCP
-	if (subroot->distribution && subroot->distribution->distributionExpr)
-	{
-		ListCell *lc;
-		/*
-		 * The distribution expression from the subplan's tlist, but it should
-		 * be from the rel, need conversion.
-		 */
-		distribution = makeNode(Distribution);
-		distribution->distributionType = subroot->distribution->distributionType;
-		distribution->nodes = bms_copy(subroot->distribution->nodes);
-		distribution->restrictNodes = bms_copy(subroot->distribution->restrictNodes);
-		foreach(lc, rel->subplan->targetlist)
-		{
-			TargetEntry *tle = (TargetEntry *) lfirst(lc);
-			if (equal(tle->expr, subroot->distribution->distributionExpr))
-			{
-				distribution->distributionExpr = (Node *)
-						makeVarFromTargetEntry(rel->relid, tle);
-				break;
-			}
-		}
-	}
-	else
-		distribution = subroot->distribution;
-	add_path(rel, create_subqueryscan_path(root, rel, pathkeys, required_outer,
-			 distribution));
-
-	/* 
-	 * Temporarily block ORDER BY in subqueries until we can add support 
-	 * it in Postgres-XL without outputting incorrect results. Should
-	 * do this only in normal processing mode though!
-     *
-     * The extra conditions below try to handle cases where an ORDER BY
-     * appears in a simple VIEW or INSERT SELECT.
-     */
-	if (IsUnderPostmaster &&
-		list_length(subquery->sortClause) > 1
-				&& (subroot->parent_root != root
-				|| (subroot->parent_root == root 
-					&& (root->parse->commandType != CMD_SELECT
-						|| (root->parse->commandType == CMD_SELECT
-							&& root->parse->hasWindowFuncs)))))
-		elog(ERROR, "Postgres-XL does not currently support ORDER BY in subqueries");
-#else
-
 	/*
 	 * For each Path that subquery_planner produced, make a SubqueryScanPath
 	 * in the outer query.
@@ -1867,12 +1841,42 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 											 subpath->pathkeys,
 							make_tlist_from_pathtarget(subpath->pathtarget));
 
+		if (subroot->distribution && subroot->distribution->distributionExpr)
+		{
+			ListCell *lc;
+
+			/* FIXME Could we use pathtarget directly? */
+			List *targetlist = make_tlist_from_pathtarget(subpath->pathtarget);
+
+			/*
+			 * The distribution expression from the subplan's tlist, but it should
+			 * be from the rel, need conversion.
+			 */
+			distribution = makeNode(Distribution);
+			distribution->distributionType = subroot->distribution->distributionType;
+			distribution->nodes = bms_copy(subroot->distribution->nodes);
+			distribution->restrictNodes = bms_copy(subroot->distribution->restrictNodes);
+
+			foreach(lc, targetlist)
+			{
+				TargetEntry *tle = (TargetEntry *) lfirst(lc);
+				if (equal(tle->expr, subroot->distribution->distributionExpr))
+				{
+					distribution->distributionExpr = (Node *)
+							makeVarFromTargetEntry(rel->relid, tle);
+					break;
+				}
+			}
+		}
+		else
+			distribution = subroot->distribution;
+
 		/* Generate outer path using this subpath */
 		add_path(rel, (Path *)
 				 create_subqueryscan_path(root, rel, subpath,
-										  pathkeys, required_outer));
+										  pathkeys, required_outer,
+										  distribution));
 	}
-#endif
 }
 
 /*

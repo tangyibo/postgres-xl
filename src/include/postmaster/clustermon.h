@@ -16,6 +16,7 @@
 #ifndef CLUSTERMON_H
 #define CLUSTERMON_H
 
+#include "storage/s_lock.h"
 #include "gtm/gtm_c.h"
 
 typedef struct

@@ -79,8 +79,8 @@ extern GatherPath *create_gather_path(PlannerInfo *root,
 				   Relids required_outer, double *rows);
 #ifdef XCP
 extern SubqueryScanPath *create_subqueryscan_path(PlannerInfo *root,
-						 RelOptInfo *rel, Path *subpathList *pathkeys, Relids required_outer,
-						 Distribution *distribution);
+						 RelOptInfo *rel, Path *subpath, List *pathkeys,
+						 Relids required_outer, Distribution *distribution);
 #else
 extern SubqueryScanPath *create_subqueryscan_path(PlannerInfo *root,
 						 RelOptInfo *rel, Path *subpath,

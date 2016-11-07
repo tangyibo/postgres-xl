@@ -33,17 +33,21 @@
  *
  *-------------------------------------------------------------------------
  */
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <poll.h>
 
 #include "postgres.h"
 
-#include <signal.h>
-#include "libpq/pqsignal.h"
-#include "miscadmin.h"
 #include "access/xact.h"
 #include "catalog/pgxc_node.h"
 #include "commands/dbcommands.h"
+#include "libpq/pqsignal.h"
+#include "miscadmin.h"
 #include "nodes/nodes.h"
-#include "pgxc/poolmgr.h"
 #include "utils/builtins.h"
 #include "utils/guc.h"
 #include "utils/memutils.h"
@@ -52,19 +56,16 @@
 #include "lib/stringinfo.h"
 #include "libpq/pqformat.h"
 #include "pgxc/locator.h"
-#include "pgxc/pgxc.h"
 #include "pgxc/nodemgr.h"
+#include "pgxc/pause.h"
+#include "pgxc/pgxc.h"
+#include "pgxc/poolmgr.h"
 #include "pgxc/poolutils.h"
+#include "postmaster/postmaster.h"		/* For UnixSocketDir */
+#include "storage/procarray.h"
+
 #include "../interfaces/libpq/libpq-fe.h"
 #include "../interfaces/libpq/libpq-int.h"
-#include "postmaster/postmaster.h"		/* For UnixSocketDir */
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <poll.h>
-#include "pgxc/pause.h"
-#include "storage/procarray.h"
 
 /* Configuration options */
 int			PoolConnKeepAlive = 600;

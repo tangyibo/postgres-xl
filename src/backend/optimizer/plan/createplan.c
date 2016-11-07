@@ -141,7 +141,7 @@ static LockRows *create_lockrows_plan(PlannerInfo *root, LockRowsPath *best_path
 					 int flags);
 static ModifyTable *create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path);
 static Limit *create_limit_plan(PlannerInfo *root, LimitPath *best_path,
-				  int flags);
+				  int flags, int64 offset_est, int64 count_est);
 static SeqScan *create_seqscan_plan(PlannerInfo *root, Path *best_path,
 					List *tlist, List *scan_clauses);
 static SampleScan *create_samplescan_plan(PlannerInfo *root, Path *best_path,
@@ -223,7 +223,8 @@ static CteScan *make_ctescan(List *qptlist, List *qpqual,
 static WorkTableScan *make_worktablescan(List *qptlist, List *qpqual,
 				   Index scanrelid, int wtParam);
 static Append *make_append(List *appendplans, List *tlist);
-static RecursiveUnion *make_recursive_union(List *tlist,
+static RecursiveUnion *make_recursive_union(PlannerInfo *root,
+					 List *tlist,
 					 Plan *lefttree,
 					 Plan *righttree,
 					 int wtParam,
@@ -506,7 +507,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_Limit:
 			plan = (Plan *) create_limit_plan(root,
 											  (LimitPath *) best_path,
-											  flags);
+											  flags, 0, 1);
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d",
@@ -1899,7 +1900,8 @@ create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path)
 
 		plan = (Plan *) make_limit(plan,
 								   subparse->limitOffset,
-								   subparse->limitCount);
+								   subparse->limitCount,
+								   0, 1);
 
 		/* Must apply correct cost/width data to Limit node */
 		plan->startup_cost = mminfo->path->startup_cost;
@@ -2182,7 +2184,8 @@ create_recursiveunion_plan(PlannerInfo *root, RecursiveUnionPath *best_path)
 	/* Convert numGroups to long int --- but 'ware overflow! */
 	numGroups = (long) Min(best_path->numGroups, (double) LONG_MAX);
 
-	plan = make_recursive_union(tlist,
+	plan = make_recursive_union(root,
+								tlist,
 								leftplan,
 								rightplan,
 								best_path->wtParam,
@@ -2282,7 +2285,8 @@ create_modifytable_plan(PlannerInfo *root, ModifyTablePath *best_path)
  *	  for its subpaths.
  */
 static Limit *
-create_limit_plan(PlannerInfo *root, LimitPath *best_path, int flags)
+create_limit_plan(PlannerInfo *root, LimitPath *best_path, int flags,
+				  int64 offset_est, int64 count_est)
 {
 	Limit	   *plan;
 	Plan	   *subplan;
@@ -2292,7 +2296,8 @@ create_limit_plan(PlannerInfo *root, LimitPath *best_path, int flags)
 
 	plan = make_limit(subplan,
 					  best_path->limitOffset,
-					  best_path->limitCount);
+					  best_path->limitCount,
+					  offset_est, count_est);
 
 	copy_generic_path_info(&plan->plan, (Path *) best_path);
 
@@ -2397,17 +2402,15 @@ create_remotescan_plan(PlannerInfo *root,
 	adjust_subplan_distribution(root, best_path->path.distribution,
 							  best_path->subpath->distribution);
 
-	subplan = create_plan_recurse(root, best_path->subpath);
-
 	/* We don't want any excess columns in the remote tuples */
-	disuse_physical_tlist(root, subplan, best_path->subpath);
+	subplan = create_plan_recurse(root, best_path->subpath, CP_SMALL_TLIST);
 
 	plan = make_remotesubplan(root, subplan,
 							  best_path->path.distribution,
 							  best_path->subpath->distribution,
 							  best_path->path.pathkeys);
 
-	copy_path_costsize(&plan->scan.plan, (Path *) best_path);
+	copy_generic_path_info(&plan->scan.plan, (Path *) best_path);
 
 	/* restore current restrict */
 	bms_free(root->curOuterRestrict);
@@ -2443,23 +2446,14 @@ find_push_down_plan_int(PlannerInfo *root, Plan *plan, bool force, bool delete, 
 	{
 		Plan *subplan = ((SubqueryScan *)plan)->subplan;
 		RemoteSubplan *remote_plan = find_push_down_plan_int(root,
-				((SubqueryScan *)plan)->subplan, force, delete,
-				&((SubqueryScan *)plan)->subplan);
+				subplan, force, delete, &subplan);
 
 		/*
-		 * If caller has asked for removing the RemoteSubplan and if its a
-		 * subquery plan, then we must also update the link stored in the
-		 * RelOptInfo corresponding to this subquery
+		 * XXX This used to update rel->subplan, but thanks to upper-planner
+		 * pathification the field was removed. But maybe this needs to tweak
+		 * subroot instead?
 		 */
-		if ((((Plan *)remote_plan) == subplan) && parent)
-		{
-			RelOptInfo *rel = NULL;
 
-			Assert(root);
-
-			rel = find_base_rel(root, ((SubqueryScan *)plan)->scan.scanrelid);
-			rel->subplan = ((SubqueryScan *)plan)->subplan;
-		}
 		return remote_plan;
 	}
 	return NULL;
@@ -5230,7 +5224,7 @@ make_remotesubplan(PlannerInfo *root,
 					/* Use Result node to calculate expression */
 					List *newtlist = list_copy(lefttree->targetlist);
 					newtlist = lappend(newtlist, newtle);
-					lefttree = (Plan *) make_result(root, newtlist, NULL, lefttree);
+					lefttree = (Plan *) make_result(newtlist, NULL, lefttree);
 				}
 
 				node->distributionKey = newtle->resno;
@@ -5421,7 +5415,7 @@ make_remotesubplan(PlannerInfo *root,
 							continue;
 						sortexpr = em->em_expr;
 						exprvars = pull_var_clause((Node *) sortexpr,
-												   PVC_INCLUDE_AGGREGATES,
+												   PVC_INCLUDE_AGGREGATES |
 												   PVC_INCLUDE_PLACEHOLDERS);
 						foreach(k, exprvars)
 						{
@@ -5445,8 +5439,7 @@ make_remotesubplan(PlannerInfo *root,
 					{
 						/* copy needed so we don't modify input's tlist below */
 						tlist = copyObject(tlist);
-						lefttree = (Plan *) make_result(root, tlist, NULL,
-														lefttree);
+						lefttree = (Plan *) make_result(tlist, NULL, lefttree);
 					}
 
 					/*
@@ -5562,10 +5555,7 @@ make_append(List *appendplans, List *tlist)
 }
 
 static RecursiveUnion *
-make_recursive_union(
-#ifdef XCP
-					 PlannerInfo *root,
-#endif					 
+make_recursive_union(PlannerInfo *root,
 					 List *tlist,
 					 Plan *lefttree,
 					 Plan *righttree,
@@ -7080,7 +7070,8 @@ make_lockrows(Plan *lefttree, List *rowMarks, int epqParam)
  *	  Build a Limit plan node
  */
 Limit *
-make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount)
+make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
+		   int64 offset_est, int64 count_est)
 {
 	Limit	   *node = makeNode(Limit);
 	Plan	   *plan = &node->plan;
@@ -7098,7 +7089,7 @@ make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount)
 
 #ifdef XCP
 	/*
-	 * We want to push down LIMTI clause to the remote side in order to limit
+	 * We want to push down LIMIT clause to the remote side in order to limit
 	 * the number of rows that get shipped from the remote side. This can be
 	 * done even if there is an ORDER BY clause, as long as we fetch minimum
 	 * number of rows from all the nodes and then do a local sort and apply the

@@ -1182,7 +1182,7 @@ retry_pools:
 			ListCell   *lc;
 
 			/* Look if the Var is already in the target list */
-			foreach (lc, rel->reltargetlist)
+			foreach (lc, rel->reltarget->exprs)
 			{
 				var = (Var *) lfirst(lc);
 				if (IsA(var, Var) && var->varno == rel->relid &&
@@ -1261,7 +1261,7 @@ redistribute_path(Path *subpath, char distributionType,
 		mpath->path.distribution = (Distribution *) copyObject(distribution);
 		/* (re)calculate costs */
 		cost_remote_subplan((Path *) pathnode, subpath->startup_cost,
-							subpath->total_cost, subpath->rows, rel->width,
+							subpath->total_cost, subpath->rows, rel->reltarget->width,
 							IsLocatorReplicated(distributionType) ?
 									bms_num_members(nodes) : 1);
 		mpath->subpath = (Path *) pathnode;
@@ -1269,7 +1269,7 @@ redistribute_path(Path *subpath, char distributionType,
 					  pathnode->path.startup_cost,
 					  pathnode->path.total_cost,
 					  pathnode->path.rows,
-					  rel->width);
+					  rel->reltarget->width);
 		return (Path *) mpath;
 	}
 	else
@@ -1282,7 +1282,7 @@ redistribute_path(Path *subpath, char distributionType,
 		pathnode->subpath = subpath;
 		pathnode->path.distribution = distribution;
 		cost_remote_subplan((Path *) pathnode, subpath->startup_cost,
-							subpath->total_cost, subpath->rows, rel->width,
+							subpath->total_cost, subpath->rows, rel->reltarget->width,
 							IsLocatorReplicated(distributionType) ?
 									bms_num_members(nodes) : 1);
 		return (Path *) pathnode;
@@ -1482,7 +1482,7 @@ set_joinpath_distribution(PlannerInfo *root, JoinPath *pathnode)
 					 * distribution expression, but we prefer some from the
 					 * target list.
 					 */
-					foreach(tlc, pathnode->path.parent->reltargetlist)
+					foreach(tlc, pathnode->path.parent->reltarget->exprs)
 					{
 						Expr *var = (Expr *) lfirst(tlc);
 						foreach(emc, ri->left_ec->ec_members)

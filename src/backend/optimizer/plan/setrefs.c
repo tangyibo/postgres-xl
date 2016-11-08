@@ -140,20 +140,12 @@ static List *fix_join_expr(PlannerInfo *root,
 			  Index acceptable_rel, int rtoffset);
 static Node *fix_join_expr_mutator(Node *node,
 					  fix_join_expr_context *context);
-#ifdef XCP
 static Node *fix_upper_expr(PlannerInfo *root,
 			   Node *node,
 			   indexed_tlist *subplan_itlist,
 			   Index newvarno,
 			   int rtoffset,
 			   bool agg_master);
-#else
-static Node *fix_upper_expr(PlannerInfo *root,
-			   Node *node,
-			   indexed_tlist *subplan_itlist,
-			   Index newvarno,
-			   int rtoffset);
-#endif
 static Node *fix_upper_expr_mutator(Node *node,
 					   fix_upper_expr_context *context);
 static List *set_returning_clause_references(PlannerInfo *root,
@@ -1017,7 +1009,7 @@ set_indexonlyscan_references(PlannerInfo *root,
 	index_itlist = build_tlist_index(plan->indextlist);
 
 	plan->scan.scanrelid += rtoffset;
-#ifdef XCP
+
 	plan->scan.plan.targetlist = (List *)
 		fix_upper_expr(root,
 					   (Node *) plan->scan.plan.targetlist,
@@ -1032,20 +1024,7 @@ set_indexonlyscan_references(PlannerInfo *root,
 					   INDEX_VAR,
 					   rtoffset,
 					   false);
-#else
-	plan->scan.plan.targetlist = (List *)
-		fix_upper_expr(root,
-					   (Node *) plan->scan.plan.targetlist,
-					   index_itlist,
-					   INDEX_VAR,
-					   rtoffset);
-	plan->scan.plan.qual = (List *)
-		fix_upper_expr(root,
-					   (Node *) plan->scan.plan.qual,
-					   index_itlist,
-					   INDEX_VAR,
-					   rtoffset);
-#endif
+
 	/* indexqual is already transformed to reference index columns */
 	plan->indexqual = fix_scan_list(root, plan->indexqual, rtoffset);
 	/* indexorderby is already transformed to reference index columns */
@@ -1209,7 +1188,6 @@ set_foreignscan_references(PlannerInfo *root,
 		 */
 		indexed_tlist *itlist = build_tlist_index(fscan->fdw_scan_tlist);
 
-#ifdef XCP
 		fscan->scan.plan.targetlist = (List *)
 			fix_upper_expr(root,
 						   (Node *) fscan->scan.plan.targetlist,
@@ -1231,32 +1209,13 @@ set_foreignscan_references(PlannerInfo *root,
 						   INDEX_VAR,
 						   rtoffset,
 						   false);
-#else		
-		fscan->scan.plan.targetlist = (List *)
-			fix_upper_expr(root,
-						   (Node *) fscan->scan.plan.targetlist,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset);
-		fscan->scan.plan.qual = (List *)
-			fix_upper_expr(root,
-						   (Node *) fscan->scan.plan.qual,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset);
-		fscan->fdw_exprs = (List *)
-			fix_upper_expr(root,
-						   (Node *) fscan->fdw_exprs,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset);
-#endif
 		fscan->fdw_recheck_quals = (List *)
 			fix_upper_expr(root,
 						   (Node *) fscan->fdw_recheck_quals,
 						   itlist,
 						   INDEX_VAR,
-						   rtoffset);
+						   rtoffset,
+						   false);
 		pfree(itlist);
 		/* fdw_scan_tlist itself just needs fix_scan_list() adjustments */
 		fscan->fdw_scan_tlist =
@@ -1310,7 +1269,6 @@ set_customscan_references(PlannerInfo *root,
 		/* Adjust tlist, qual, custom_exprs to reference custom scan tuple */
 		indexed_tlist *itlist = build_tlist_index(cscan->custom_scan_tlist);
 
-#ifdef XCP		
 		cscan->scan.plan.targetlist = (List *)
 			fix_upper_expr(root,
 						   (Node *) cscan->scan.plan.targetlist,
@@ -1332,26 +1290,7 @@ set_customscan_references(PlannerInfo *root,
 						   INDEX_VAR,
 						   rtoffset,
 						   false);
-#else
-		cscan->scan.plan.targetlist = (List *)
-			fix_upper_expr(root,
-						   (Node *) cscan->scan.plan.targetlist,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset);
-		cscan->scan.plan.qual = (List *)
-			fix_upper_expr(root,
-						   (Node *) cscan->scan.plan.qual,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset);
-		cscan->custom_exprs = (List *)
-			fix_upper_expr(root,
-						   (Node *) cscan->custom_exprs,
-						   itlist,
-						   INDEX_VAR,
-						   rtoffset);
-#endif
+
 		pfree(itlist);
 		/* custom_scan_tlist itself just needs fix_scan_list() adjustments */
 		cscan->custom_scan_tlist =
@@ -1694,20 +1633,13 @@ set_join_references(PlannerInfo *root, Join *join, int rtoffset)
 		{
 			NestLoopParam *nlp = (NestLoopParam *) lfirst(lc);
 
-#ifdef XCP
 			nlp->paramval = (Var *) fix_upper_expr(root,
 												   (Node *) nlp->paramval,
 												   outer_itlist,
 												   OUTER_VAR,
 												   rtoffset,
 												   false);
-#else
-			nlp->paramval = (Var *) fix_upper_expr(root,
-												   (Node *) nlp->paramval,
-												   outer_itlist,
-												   OUTER_VAR,
-												   rtoffset);
-#endif
+
 			/* Check we replaced any PlaceHolderVar with simple Var */
 			if (!(IsA(nlp->paramval, Var) &&
 				  nlp->paramval->varno == OUTER_VAR))
@@ -1833,36 +1765,21 @@ set_upper_references(PlannerInfo *root, Plan *plan, int rtoffset)
 													  subplan_itlist,
 													  OUTER_VAR);
 			if (!newexpr)
-#ifdef XCP
 				newexpr = fix_upper_expr(root,
 										 (Node *) tle->expr,
 										 subplan_itlist,
 										 OUTER_VAR,
 										 rtoffset,
 										 agg_master);
-#else
-				newexpr = fix_upper_expr(root,
-										 (Node *) tle->expr,
-										 subplan_itlist,
-										 OUTER_VAR,
-										 rtoffset);
-#endif
 		}
 		else
-#ifdef XCP
 			newexpr = fix_upper_expr(root,
 									 (Node *) tle->expr,
 									 subplan_itlist,
 									 OUTER_VAR,
 									 rtoffset,
 									 agg_master);
-#else
-			newexpr = fix_upper_expr(root,
-									 (Node *) tle->expr,
-									 subplan_itlist,
-									 OUTER_VAR,
-									 rtoffset);
-#endif
+
 		tle = flatCopyTargetEntry(tle);
 		tle->expr = (Expr *) newexpr;
 		output_targetlist = lappend(output_targetlist, tle);
@@ -1870,20 +1787,12 @@ set_upper_references(PlannerInfo *root, Plan *plan, int rtoffset)
 	plan->targetlist = output_targetlist;
 
 	plan->qual = (List *)
-#ifdef XCP
 		fix_upper_expr(root,
 					   (Node *) plan->qual,
 					   subplan_itlist,
 					   OUTER_VAR,
 					   rtoffset,
 					   agg_master);
-#else
-		fix_upper_expr(root,
-					   (Node *) plan->qual,
-					   subplan_itlist,
-					   OUTER_VAR,
-					   rtoffset);
-#endif
 	pfree(subplan_itlist);
 }
 
@@ -2406,7 +2315,6 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
  * varno = newvarno, varattno = resno of corresponding targetlist element.
  * The original tree is not modified.
  */
-#ifdef XCP
 static Node *
 fix_upper_expr(PlannerInfo *root,
 			   Node *node,
@@ -2414,14 +2322,6 @@ fix_upper_expr(PlannerInfo *root,
 			   Index newvarno,
 			   int rtoffset,
 			   bool agg_master)
-#else
-static Node *
-fix_upper_expr(PlannerInfo *root,
-			   Node *node,
-			   indexed_tlist *subplan_itlist,
-			   Index newvarno,
-			   int rtoffset)
-#endif
 {
 	fix_upper_expr_context context;
 
@@ -2429,9 +2329,7 @@ fix_upper_expr(PlannerInfo *root,
 	context.subplan_itlist = subplan_itlist;
 	context.newvarno = newvarno;
 	context.rtoffset = rtoffset;
-#ifdef XCP
 	context.agg_master = agg_master;
-#endif
 	return fix_upper_expr_mutator(node, &context);
 }
 

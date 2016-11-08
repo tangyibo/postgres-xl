@@ -286,16 +286,16 @@ recurse_set_operations(Node *setOp, PlannerInfo *root,
 #ifdef XCP
 		if (subroot->distribution)
 		{
-			subplan = (Plan *) make_remotesubplan(subroot,
-												  subplan,
-												  NULL,
-												  subroot->distribution,
-												  subroot->query_pathkeys);
+			/*
+			 * FIXME this probably needs needs to add RemoteSubPath using
+			 * redistribute_path() or something like that. Although maybe
+			 * subquery planner should do that instead?
+			 */
+			elog(ERROR, "FIXME missing redistribute_path in recurse_set_operations (9.6 merge)");
 		}
 #endif
 
 		/* Save subroot and subplan in RelOptInfo for setrefs.c */
-		rel->subplan = subplan;
 		rel->subroot = subroot;
 
 		if (root->recursiveOk)	
@@ -333,7 +333,7 @@ recurse_set_operations(Node *setOp, PlannerInfo *root,
 		 * soon too, likely.)
 		 */
 		path = (Path *) create_subqueryscan_path(root, rel, subpath,
-												 NIL, NULL);
+												 NIL, NULL, subroot->distribution);
 
 		/*
 		 * Figure out the appropriate target list, and update the

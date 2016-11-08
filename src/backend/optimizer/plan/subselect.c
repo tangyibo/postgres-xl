@@ -536,7 +536,22 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 	subroot = subquery_planner(root->glob, subquery,
 							   root,
 							   false, tuple_fraction);
+
+	/* Isolate the params needed by this specific subplan */
+	plan_params = root->plan_params;
+	root->plan_params = NIL;
+
+	/*
+	 * Select best Path and turn it into a Plan.  At least for now, there
+	 * seems no reason to postpone doing that.
+	 */
+	final_rel = fetch_upper_rel(subroot, UPPERREL_FINAL, NULL);
+	best_path = get_cheapest_fractional_path(final_rel, tuple_fraction);
+
+	plan = create_plan(subroot, best_path);
+
 #ifdef XCP
+	/* Add a custom remote subplan if a re-distribution is needed. */
 	if (subroot->distribution)
 	{
 		plan = (Plan *) make_remotesubplan(subroot,
@@ -552,19 +567,6 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 		plan->allParam = bms_copy(plan->lefttree->allParam);
 	}
 #endif
-
-	/* Isolate the params needed by this specific subplan */
-	plan_params = root->plan_params;
-	root->plan_params = NIL;
-
-	/*
-	 * Select best Path and turn it into a Plan.  At least for now, there
-	 * seems no reason to postpone doing that.
-	 */
-	final_rel = fetch_upper_rel(subroot, UPPERREL_FINAL, NULL);
-	best_path = get_cheapest_fractional_path(final_rel, tuple_fraction);
-
-	plan = create_plan(subroot, best_path);
 
 	/* And convert to SubPlan or InitPlan format. */
 	result = build_subplan(root, plan, subroot, plan_params,
@@ -1204,22 +1206,6 @@ SS_process_ctes(PlannerInfo *root)
 		subroot = subquery_planner(root->glob, subquery,
 								   root,
 								   cte->cterecursive, 0.0);
-#ifdef XCP
-		if (subroot->distribution)
-		{
-			plan = (Plan *) make_remotesubplan(subroot,
-											   plan,
-											   NULL,
-											   subroot->distribution,
-											   subroot->query_pathkeys);
-			/*
-			 * SS_finalize_plan has already been run on the subplan,
-			 * so we have to copy parameter info to wrapper plan node.
-			 */
-			plan->extParam = bms_copy(plan->lefttree->extParam);
-			plan->allParam = bms_copy(plan->lefttree->allParam);
-		}
-#endif
 
 		/*
 		 * Since the current query level doesn't yet contain any RTEs, it
@@ -1237,6 +1223,24 @@ SS_process_ctes(PlannerInfo *root)
 		best_path = final_rel->cheapest_total_path;
 
 		plan = create_plan(subroot, best_path);
+
+#ifdef XCP
+		/* Add a remote subplan, if redistribution is needed. */
+		if (subroot->distribution)
+		{
+			plan = (Plan *) make_remotesubplan(subroot,
+											   plan,
+											   NULL,
+											   subroot->distribution,
+											   subroot->query_pathkeys);
+			/*
+			 * SS_finalize_plan has already been run on the subplan,
+			 * so we have to copy parameter info to wrapper plan node.
+			 */
+			plan->extParam = bms_copy(plan->lefttree->extParam);
+			plan->allParam = bms_copy(plan->lefttree->allParam);
+		}
+#endif
 
 		/*
 		 * Make a SubPlan node for it.  This is just enough unlike

@@ -831,18 +831,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 				 errmsg("INSERT/UPDATE/DELETE is not supported in subquery")));
 #endif
 
-	plan = (Plan *) make_modifytable(root,
-			parse->commandType,
-			parse->canSetTag,
-			parse->resultRelation,
-			list_make1_int(parse->resultRelation),
-			list_make1(plan),
-			withCheckOptionLists,
-			returningLists,
-			rowMarks,
-			parse->onConflict,
-			SS_assign_special_param(root));
-
 	/*
 	 * If any initPlans were created in this query level, increment the
 	 * surviving Paths' costs to account for them.  They won't actually get
@@ -1375,10 +1363,10 @@ inheritance_planner(PlannerInfo *root)
 		 * value will force proper RemoteSubplan node on top of it.
 		 */
 		if (root->distribution == NULL)
-			root->distribution = subroot.distribution;
+			root->distribution = subroot->distribution;
 		else if (!bms_is_empty(root->distribution->restrictNodes))
 		{
-			if (bms_is_empty(subroot.distribution->restrictNodes))
+			if (bms_is_empty(subroot->distribution->restrictNodes))
 			{
 				bms_free(root->distribution->restrictNodes);
 				root->distribution->restrictNodes = NULL;
@@ -1387,8 +1375,8 @@ inheritance_planner(PlannerInfo *root)
 			{
 				root->distribution->restrictNodes = bms_join(
 						root->distribution->restrictNodes,
-						subroot.distribution->restrictNodes);
-				subroot.distribution->restrictNodes = NULL;
+						subroot->distribution->restrictNodes);
+				subroot->distribution->restrictNodes = NULL;
 			}
 		}
 #endif
@@ -1579,15 +1567,15 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 	int64		offset_est = 0;
 	int64		count_est = 0;
 	double		limit_tuples = -1.0;
-#ifdef XCP
-	Distribution *distribution = NULL; /* distribution of the result_plan */
-#endif
 	bool		have_postponed_srfs = false;
 	double		tlist_rows;
 	PathTarget *final_target;
 	RelOptInfo *current_rel;
 	RelOptInfo *final_rel;
 	ListCell   *lc;
+
+	/* distribution of the result_plan */
+	Distribution *distribution = NULL;
 
 	/* Tweak caller-supplied tuple_fraction if have LIMIT/OFFSET */
 	if (parse->limitCount || parse->limitOffset)
@@ -2039,9 +2027,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 											  activeWindows);
 		}
 
-#ifdef XCP
-		distribution = best_path->distribution;
-#endif
 		/*
 		 * If there is a DISTINCT clause, consider ways to implement that. We
 		 * build a new upperrel representing the output of this phase.
@@ -2054,239 +2039,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 
 	}							/* end of if (setOperations) */
 
-<<<<<<< HEAD
-				/*
-				 * Always override create_plan's tlist, so that we don't sort
-				 * useless data from a "physical" tlist.
-				 */
-				need_tlist_eval = true;
-			}
-
-			/*
-			 * create_plan returns a plan with just a "flat" tlist of required
-			 * Vars.  Usually we need to insert the sub_tlist as the tlist of
-			 * the top plan node.  However, we can skip that if we determined
-			 * that whatever create_plan chose to return will be good enough.
-			 */
-			if (need_tlist_eval)
-			{
-				/*
-				 * If the top-level plan node is one that cannot do expression
-				 * evaluation and its existing target list isn't already what
-				 * we need, we must insert a Result node to project the
-				 * desired tlist.
-				 */
-				if (!is_projection_capable_plan(result_plan) &&
-					!tlist_same_exprs(sub_tlist, result_plan->targetlist))
-				{
-					result_plan = (Plan *) make_result(root,
-													   sub_tlist,
-													   NULL,
-													   result_plan);
-				}
-				else
-				{
-					/*
-					 * Otherwise, just replace the subplan's flat tlist with
-					 * the desired tlist.
-					 */
-					result_plan->targetlist = sub_tlist;
-				}
-#ifdef XCP
-				/*
-				 * RemoteSubplan is conditionally projection capable - it is
-				 * pushing projection to the data nodes
-				 */
-				if (IsA(result_plan, RemoteSubplan))
-					result_plan->lefttree->targetlist = sub_tlist;
-#endif
-
-				/*
-				 * Also, account for the cost of evaluation of the sub_tlist.
-				 * See comments for add_tlist_costs_to_plan() for more info.
-				 */
-				add_tlist_costs_to_plan(root, result_plan, sub_tlist);
-			}
-			else
-			{
-				/*
-				 * Since we're using create_plan's tlist and not the one
-				 * make_subplanTargetList calculated, we have to refigure any
-				 * grouping-column indexes make_subplanTargetList computed.
-				 */
-				locate_grouping_columns(root, tlist, result_plan->targetlist,
-										groupColIdx);
-			}
-
-			/*
-			 * groupColIdx is now cast in stone, so record a mapping from
-			 * tleSortGroupRef to column index. setrefs.c needs this to
-			 * finalize GROUPING() operations.
-			 */
-
-			if (parse->groupingSets)
-			{
-				AttrNumber *grouping_map = palloc0(sizeof(AttrNumber) * (maxref + 1));
-				ListCell   *lc;
-				int			i = 0;
-
-				foreach(lc, parse->groupClause)
-				{
-					SortGroupClause *gc = lfirst(lc);
-
-					grouping_map[gc->tleSortGroupRef] = groupColIdx[i++];
-				}
-
-				root->grouping_map = grouping_map;
-			}
-
-			/*
-			 * Insert AGG or GROUP node if needed, plus an explicit sort step
-			 * if necessary.
-			 *
-			 * HAVING clause, if any, becomes qual of the Agg or Group node.
-			 */
-			if (use_hashed_grouping)
-			{
-#ifdef XCP
-				result_plan = grouping_distribution(root, result_plan,
-													numGroupCols, groupColIdx,
-													current_pathkeys,
-													&distribution);
-#endif
-				/* Hashed aggregate plan --- no sort needed */
-				result_plan = (Plan *) make_agg(root,
-												tlist,
-												(List *) parse->havingQual,
-												AGG_HASHED,
-												&agg_costs,
-												numGroupCols,
-												groupColIdx,
-									extract_grouping_ops(parse->groupClause),
-												NIL,
-												numGroups,
-												result_plan);
-				/* Hashed aggregation produces randomly-ordered results */
-				current_pathkeys = NIL;
-			}
-			else if (parse->hasAggs || (parse->groupingSets && parse->groupClause))
-			{
-				/*
-				 * Output is in sorted order by group_pathkeys if, and only
-				 * if, there is a single rollup operation on a non-empty list
-				 * of grouping expressions.
-				 */
-				if (list_length(rollup_groupclauses) == 1
-					&& list_length(linitial(rollup_groupclauses)) > 0)
-					current_pathkeys = root->group_pathkeys;
-				else
-					current_pathkeys = NIL;
-
-#ifdef XCP
-				result_plan = grouping_distribution(root, result_plan,
-													numGroupCols, groupColIdx,
-													current_pathkeys,
-													&distribution);
-#endif
-				result_plan = build_grouping_chain(root,
-												   parse,
-												   tlist,
-												   need_sort_for_grouping,
-												   rollup_groupclauses,
-												   rollup_lists,
-												   groupColIdx,
-												   &agg_costs,
-												   numGroups,
-												   result_plan);
-
-				/*
-				 * these are destroyed by build_grouping_chain, so make sure
-				 * we don't try and touch them again
-				 */
-				rollup_groupclauses = NIL;
-				rollup_lists = NIL;
-			}
-			else if (parse->groupClause)
-			{
-				/*
-				 * GROUP BY without aggregation, so insert a group node (plus
-				 * the appropriate sort node, if necessary).
-				 *
-				 * Add an explicit sort if we couldn't make the path come out
-				 * the way the GROUP node needs it.
-				 */
-				if (need_sort_for_grouping)
-				{
-					result_plan = (Plan *)
-						make_sort_from_groupcols(root,
-												 parse->groupClause,
-												 groupColIdx,
-												 result_plan);
-					current_pathkeys = root->group_pathkeys;
-				}
-
-#ifdef XCP
-				result_plan = grouping_distribution(root, result_plan,
-													numGroupCols, groupColIdx,
-													current_pathkeys,
-													&distribution);
-#endif
-				result_plan = (Plan *) make_group(root,
-												  tlist,
-												  (List *) parse->havingQual,
-												  numGroupCols,
-												  groupColIdx,
-									extract_grouping_ops(parse->groupClause),
-												  dNumGroups,
-												  result_plan);
-			}
-			else if (root->hasHavingQual || parse->groupingSets)
-			{
-				int			nrows = list_length(parse->groupingSets);
-
-				/*
-				 * No aggregates, and no GROUP BY, but we have a HAVING qual
-				 * or grouping sets (which by elimination of cases above must
-				 * consist solely of empty grouping sets, since otherwise
-				 * groupClause will be non-empty).
-				 *
-				 * This is a degenerate case in which we are supposed to emit
-				 * either 0 or 1 row for each grouping set depending on
-				 * whether HAVING succeeds.  Furthermore, there cannot be any
-				 * variables in either HAVING or the targetlist, so we
-				 * actually do not need the FROM table at all!	We can just
-				 * throw away the plan-so-far and generate a Result node. This
-				 * is a sufficiently unusual corner case that it's not worth
-				 * contorting the structure of this routine to avoid having to
-				 * generate the plan in the first place.
-				 */
-#ifdef XCP
-				result_plan = grouping_distribution(root, result_plan, 0, NULL,
-													current_pathkeys,
-													&distribution);
-#endif
-				result_plan = (Plan *) make_result(root,
-												   tlist,
-												   parse->havingQual,
-												   NULL);
-
-				/*
-				 * Doesn't seem worthwhile writing code to cons up a
-				 * generate_series or a values scan to emit multiple rows.
-				 * Instead just clone the result in an Append.
-				 */
-				if (nrows > 1)
-				{
-					List	   *plans = list_make1(result_plan);
-
-					while (--nrows > 0)
-						plans = lappend(plans, copyObject(result_plan));
-
-					result_plan = (Plan *) make_append(plans, tlist);
-				}
-			}
-		}						/* end of non-minmax-aggregate case */
-=======
 	/*
 	 * If ORDER BY was given, consider ways to implement that, and generate a
 	 * new upperrel containing only paths that emit the correct ordering and
@@ -2302,7 +2054,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 										   have_postponed_srfs ? -1.0 :
 										   limit_tuples);
 	}
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 
 	/*
 	 * If there are set-returning functions in the tlist, scale up the output
@@ -2329,116 +2080,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 			path->total_cost += path->rows * (tlist_rows - 1) *
 				cpu_tuple_cost / 2;
 
-<<<<<<< HEAD
-			/*
-			 * The copyObject steps here are needed to ensure that each plan
-			 * node has a separately modifiable tlist.  (XXX wouldn't a
-			 * shallow list copy do for that?)
-			 */
-			result_plan->targetlist = (List *) copyObject(window_tlist);
-#ifdef XCP
-			/*
-			 * We can not guarantee correct result of windowing function
-			 * if aggregation is pushed down to Datanodes. So if current plan
-			 * produces a distributed result set we should bring it to
-			 * coordinator.
-			 */
-			if (distribution)
-			{
-				result_plan = (Plan *)
-						make_remotesubplan(root, result_plan, NULL,
-										   distribution, current_pathkeys);
-				distribution = NULL;
-			}
-#endif
-
-			foreach(l, activeWindows)
-			{
-				WindowClause *wc = (WindowClause *) lfirst(l);
-				List	   *window_pathkeys;
-				int			partNumCols;
-				AttrNumber *partColIdx;
-				Oid		   *partOperators;
-				int			ordNumCols;
-				AttrNumber *ordColIdx;
-				Oid		   *ordOperators;
-
-				window_pathkeys = make_pathkeys_for_window(root,
-														   wc,
-														   tlist);
-
-				/*
-				 * This is a bit tricky: we build a sort node even if we don't
-				 * really have to sort.  Even when no explicit sort is needed,
-				 * we need to have suitable resjunk items added to the input
-				 * plan's tlist for any partitioning or ordering columns that
-				 * aren't plain Vars.  (In theory, make_windowInputTargetList
-				 * should have provided all such columns, but let's not assume
-				 * that here.)	Furthermore, this way we can use existing
-				 * infrastructure to identify which input columns are the
-				 * interesting ones.
-				 */
-				if (window_pathkeys)
-				{
-					Sort	   *sort_plan;
-
-					sort_plan = make_sort_from_pathkeys(root,
-														result_plan,
-														window_pathkeys,
-														-1.0);
-					if (!pathkeys_contained_in(window_pathkeys,
-											   current_pathkeys))
-					{
-						/* we do indeed need to sort */
-						result_plan = (Plan *) sort_plan;
-						current_pathkeys = window_pathkeys;
-					}
-#ifdef XCP
-					/*
-					 * In our code, Sort may be pushed down to the Datanodes,
-					 * and therefore we may get the sort_plan is not really a
-					 * Sort node. In this case we should get sort columns from
-					 * the top RemoteSubplan
-					 */
-					if (!IsA(sort_plan, Sort))
-					{
-						RemoteSubplan *pushdown;
-						pushdown = find_push_down_plan((Plan *)sort_plan, true);
-						Assert(pushdown && pushdown->sort);
-						get_column_info_for_window(root, wc, tlist,
-												   pushdown->sort->numCols,
-												   pushdown->sort->sortColIdx,
-												   &partNumCols,
-												   &partColIdx,
-												   &partOperators,
-												   &ordNumCols,
-												   &ordColIdx,
-												   &ordOperators);
-					}
-					else
-#endif
-					/* In either case, extract the per-column information */
-					get_column_info_for_window(root, wc, tlist,
-											   sort_plan->numCols,
-											   sort_plan->sortColIdx,
-											   &partNumCols,
-											   &partColIdx,
-											   &partOperators,
-											   &ordNumCols,
-											   &ordColIdx,
-											   &ordOperators);
-				}
-				else
-				{
-					/* empty window specification, nothing to sort */
-					partNumCols = 0;
-					partColIdx = NULL;
-					partOperators = NULL;
-					ordNumCols = 0;
-					ordColIdx = NULL;
-					ordOperators = NULL;
-				}
-=======
 			path->rows *= tlist_rows;
 		}
 		/* No need to run set_cheapest; we're keeping all paths anyway. */
@@ -2448,7 +2089,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 	 * Now we are prepared to build the final-output upperrel.
 	 */
 	final_rel = fetch_upper_rel(root, UPPERREL_FINAL, NULL);
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 
 	/*
 	 * If the input rel is marked consider_parallel and there's nothing that's
@@ -2497,36 +2137,10 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 		 */
 		if (limit_needed(parse))
 		{
-<<<<<<< HEAD
-#ifdef XCP
-			result_plan = grouping_distribution(root, result_plan,
-											list_length(parse->distinctClause),
-								   extract_grouping_cols(parse->distinctClause,
-													  result_plan->targetlist),
-												current_pathkeys,
-												&distribution);
-#endif
-			/* Hashed aggregate plan --- no sort needed */
-			result_plan = (Plan *) make_agg(root,
-											result_plan->targetlist,
-											NIL,
-											AGG_HASHED,
-											NULL,
-										  list_length(parse->distinctClause),
-								 extract_grouping_cols(parse->distinctClause,
-													result_plan->targetlist),
-								 extract_grouping_ops(parse->distinctClause),
-											NIL,
-											numDistinctRows,
-											result_plan);
-			/* Hashed aggregation produces randomly-ordered results */
-			current_pathkeys = NIL;
-=======
 			path = (Path *) create_limit_path(root, final_rel, path,
 											  parse->limitOffset,
 											  parse->limitCount,
 											  offset_est, count_est);
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 		}
 
 		/*
@@ -2553,22 +2167,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 			else
 				returningLists = NIL;
 
-<<<<<<< HEAD
-#ifdef XCP
-			result_plan = grouping_distribution(root, result_plan,
-											list_length(parse->distinctClause),
-								   extract_grouping_cols(parse->distinctClause,
-													  result_plan->targetlist),
-												current_pathkeys,
-												&distribution);
-#endif
-			result_plan = (Plan *) make_unique(result_plan,
-											   parse->distinctClause);
-			result_plan->plan_rows = dNumDistinctRows;
-			/* The Unique node won't change sort ordering */
-		}
-	}
-=======
 			/*
 			 * If there was a FOR [KEY] UPDATE/SHARE clause, the LockRows node
 			 * will have dealt with fetching non-locked marked rows, else we
@@ -2578,7 +2176,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 				rowMarks = NIL;
 			else
 				rowMarks = root->rowMarks;
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 
 			path = (Path *)
 				create_modifytable_path(root, final_rel,
@@ -2603,196 +2200,17 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 	 * If there is an FDW that's responsible for all baserels of the query,
 	 * let it consider adding ForeignPaths.
 	 */
-<<<<<<< HEAD
-	if (limit_needed(parse))
-	{
-#ifdef XCP
-		/* We should put Limit on top of distributed results */
-		if (distribution)
-		{
-			result_plan = (Plan *)
-					make_remotesubplan(root, result_plan, NULL,
-									   distribution, current_pathkeys);
-			distribution = NULL;
-		}
-#endif
-		result_plan = (Plan *) make_limit(result_plan,
-										  parse->limitOffset,
-										  parse->limitCount,
-										  offset_est,
-										  count_est);
-	}
-=======
 	if (final_rel->fdwroutine &&
 		final_rel->fdwroutine->GetForeignUpperPaths)
 		final_rel->fdwroutine->GetForeignUpperPaths(root, UPPERREL_FINAL,
 													current_rel, final_rel);
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 
 	/* Let extensions possibly add some more paths */
 	if (create_upper_paths_hook)
 		(*create_upper_paths_hook) (root, UPPERREL_FINAL,
 									current_rel, final_rel);
 
-<<<<<<< HEAD
-#ifdef XCP
-	/*
-	 * Adjust query distribution if requested
-	 */
-	if (root->distribution)
-	{
-		if (equal_distributions(root, root->distribution, distribution))
-		{
-			if (IsLocatorReplicated(distribution->distributionType) &&
-					contain_volatile_functions((Node *) result_plan->targetlist))
-				ereport(ERROR,
-						(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-						 errmsg("can not update replicated table with result of volatile function")));
-			/*
-			 * Source tuple will be consumed on the same node where it is
-			 * produced, so if it is known that some node does not yield tuples
-			 * we do not want to send subquery for execution on these nodes
-			 * at all.
-			 * So copy the restriction to the external distribution.
-			 * XXX Is that ever possible if external restriction is already
-			 * defined? If yes we probably should use intersection of the sets,
-			 * and if resulting set is empty create dummy plan and set it as
-			 * the result_plan. Need to think this over
-			 */
-			root->distribution->restrictNodes =
-					bms_copy(distribution->restrictNodes);
-		}
-		else
-		{
-			RemoteSubplan *distributePlan;
-			/*
-			 * If the planned statement is either UPDATE or DELETE different
-			 * distributions here mean the ModifyTable node will be placed on
-			 * top of RemoteSubquery. UPDATE and DELETE versions of ModifyTable
-			 * use TID of incoming tuple to apply the changes, but the
-			 * RemoteSubquery node supplies RemoteTuples, without such field.
-			 * Therefore we can not execute such plan.
-			 * Most common case is when UPDATE statement modifies the
-			 * distribution column. Also incorrect distributed plan is possible
-			 * if planning a complex UPDATE or DELETE statement involving table
-			 * join.
-			 * We output different error messages in UPDATE and DELETE cases
-			 * mostly for compatibility with PostgresXC. It is hard to determine
-			 * here, if such plan is because updated partitioning key or poorly
-			 * planned join, so in case of UPDATE we assume the first case as
-			 * more probable, for DELETE the second case is only possible.
-			 * The error message may be misleading, if that is UPDATE and join,
-			 * but hope we will target distributed update problem soon.
-			 * There are two ways of fixing that:
-			 * 1. Improve distribution planner to never consider to redistribute
-			 * target table. So if planner finds that it has no choice, it would
-			 * throw error somewhere else. So here we only be catching cases of
-			 * updating distribution columns.
-			 * 2. Modify executor and allow distribution column updates. However
-			 * there are a lot of issues behind the scene when implementing that
-			 * approach.
-			 */
-			if (parse->commandType == CMD_UPDATE)
-				ereport(ERROR,
-						(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-						 errmsg("could not plan this distributed update"),
-						 errdetail("correlated UPDATE or updating distribution column currently not supported in Postgres-XL.")));
-			if (parse->commandType == CMD_DELETE)
-				ereport(ERROR,
-						(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-						 errmsg("could not plan this distributed delete"),
-						 errdetail("correlated or complex DELETE is currently not supported in Postgres-XL.")));
-
-			/*
-			 * Redistribute result according to requested distribution.
-			 */
-			if ((distributePlan = find_push_down_plan(result_plan, true)))
-			{
-				Bitmapset  *tmpset;
-				int			nodenum;
-
-				distributePlan->distributionType = root->distribution->distributionType;
-				distributePlan->distributionKey = InvalidAttrNumber;
-				if (root->distribution->distributionExpr)
-				{
-					ListCell   *lc;
-
-					/* Find distribution expression in the target list */
-					foreach(lc, distributePlan->scan.plan.targetlist)
-					{
-						TargetEntry *tle = (TargetEntry *) lfirst(lc);
-
-						if (equal(tle->expr, root->distribution->distributionExpr))
-						{
-							distributePlan->distributionKey = tle->resno;
-							break;
-						}
-					}
-
-					if (distributePlan->distributionKey == InvalidAttrNumber)
-					{
-						Plan 	   *lefttree = distributePlan->scan.plan.lefttree;
-						Plan 	   *plan;
-						TargetEntry *newtle;
-
-						/* The expression is not found, need to add junk */
-						newtle = makeTargetEntry((Expr *) root->distribution->distributionExpr,
-												 list_length(lefttree->targetlist) + 1,
-												 NULL,
-												 true);
-
-						if (is_projection_capable_plan(lefttree))
-						{
-							/* Ok to modify subplan's target list */
-							lefttree->targetlist = lappend(lefttree->targetlist,
-														   newtle);
-						}
-						else
-						{
-							/* Use Result node to calculate expression */
-							List *newtlist = list_copy(lefttree->targetlist);
-							newtlist = lappend(newtlist, newtle);
-							lefttree = (Plan *) make_result(root, newtlist, NULL, lefttree);
-							distributePlan->scan.plan.lefttree = lefttree;
-						}
-						/* Update all the hierarchy */
-						for (plan = result_plan; plan != lefttree; plan = plan->lefttree)
-							plan->targetlist = lefttree->targetlist;
-					}
-				}
-				tmpset = bms_copy(root->distribution->nodes);
-				distributePlan->distributionNodes = NIL;
-				while ((nodenum = bms_first_member(tmpset)) >= 0)
-					distributePlan->distributionNodes = lappend_int(
-							distributePlan->distributionNodes, nodenum);
-				bms_free(tmpset);
-			}
-			else if (!(IsA(result_plan, Result) && result_plan->lefttree ==
-						NULL &&
-						((root->distribution->distributionType == 'H' &&
-						 bms_num_members(root->distribution->restrictNodes) == 1) ||
-						 (root->distribution->distributionType == 'R' &&
-						  !contain_mutable_functions((Node *)result_plan->targetlist)))))
-				result_plan = (Plan *) make_remotesubplan(root,
-														  result_plan,
-														  root->distribution,
-														  distribution,
-														  NULL);
-		}
-	}
-	else
-	{
-		/*
-		 * Inform caller about distribution of the subplan
-		 */
-		root->distribution = distribution;
-	}
-#endif
-
-	return result_plan;
-=======
 	/* Note: currently, we leave it to callers to do set_cheapest() */
->>>>>>> b5bce6c1ec6061c8a4f730d927e162db7e2ce365
 }
 
 

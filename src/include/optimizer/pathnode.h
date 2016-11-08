@@ -77,15 +77,9 @@ extern UniquePath *create_unique_path(PlannerInfo *root, RelOptInfo *rel,
 extern GatherPath *create_gather_path(PlannerInfo *root,
 				   RelOptInfo *rel, Path *subpath, PathTarget *target,
 				   Relids required_outer, double *rows);
-#ifdef XCP
 extern SubqueryScanPath *create_subqueryscan_path(PlannerInfo *root,
 						 RelOptInfo *rel, Path *subpath, List *pathkeys,
 						 Relids required_outer, Distribution *distribution);
-#else
-extern SubqueryScanPath *create_subqueryscan_path(PlannerInfo *root,
-						 RelOptInfo *rel, Path *subpath,
-						 List *pathkeys, Relids required_outer);
-#endif
 extern Path *create_functionscan_path(PlannerInfo *root, RelOptInfo *rel,
 						 List *pathkeys, Relids required_outer);
 extern Path *create_valuesscan_path(PlannerInfo *root, RelOptInfo *rel,

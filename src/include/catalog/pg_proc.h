@@ -5238,37 +5238,37 @@ DATA(insert OID = 3993 ( dense_rank_final	PGNSP PGUID 12 1 0 2276 0 f f f f f f 
 DESCR("aggregate final function");
 
 #ifdef PGXC
-DATA(insert OID = 7007 ( pgxc_pool_check	PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pgxc_pool_check _null_ _null_ _null_ ));
+DATA(insert OID = 7007 ( pgxc_pool_check	PGNSP PGUID 12 1 0 0 0 f f f f t f v u 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pgxc_pool_check _null_ _null_ _null_ ));
 DESCR("check connection information consistency in pooler");
-DATA(insert OID = 7008 ( pgxc_pool_reload	PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pgxc_pool_reload _null_ _null_ _null_ ));
+DATA(insert OID = 7008 ( pgxc_pool_reload	PGNSP PGUID 12 1 0 0 0 f f f f t f v u 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pgxc_pool_reload _null_ _null_ _null_ ));
 DESCR("reload connection information in pooler and reload server sessions");
-DATA(insert OID = 7009 ( pgxc_node_str		PGNSP PGUID 12 1 0 0 0 f f f f t f s 0 0 19 "" _null_ _null_ _null_ _null_ _null_ pgxc_node_str _null_ _null_ _null_ ));
+DATA(insert OID = 7009 ( pgxc_node_str		PGNSP PGUID 12 1 0 0 0 f f f f t f s u 0 0 19 "" _null_ _null_ _null_ _null_ _null_ pgxc_node_str _null_ _null_ _null_ ));
 DESCR("get the name of the node");
-DATA(insert OID = 7010 (  pgxc_is_committed	PGNSP PGUID 12 1 1 0 0 f f f f t t s 1 0 16 "28" _null_ _null_ _null_ _null_ _null_ pgxc_is_committed _null_ _null_ _null_ ));
+DATA(insert OID = 7010 (  pgxc_is_committed	PGNSP PGUID 12 1 1 0 0 f f f f t t s u 1 0 16 "28" _null_ _null_ _null_ _null_ _null_ pgxc_is_committed _null_ _null_ _null_ ));
 DESCR("is given GXID committed or aborted?");
-DATA(insert OID = 7024 (  pgxc_is_inprogress	PGNSP PGUID 12 1 1 0 0 f f f f t t s 1 0 16 "28" _null_ _null_ _null_ _null_ _null_ pgxc_is_inprogress _null_ _null_ _null_ ));
+DATA(insert OID = 7024 (  pgxc_is_inprogress	PGNSP PGUID 12 1 1 0 0 f f f f t t s u 1 0 16 "28" _null_ _null_ _null_ _null_ _null_ pgxc_is_inprogress _null_ _null_ _null_ ));
 DESCR("is given GXID in progress?");
-DATA(insert OID = 7011 ( pgxc_lock_for_backup PGNSP PGUID 12 1 0 0 0 f f f f t f v 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pgxc_lock_for_backup _null_ _null_ _null_ ));
+DATA(insert OID = 7011 ( pgxc_lock_for_backup PGNSP PGUID 12 1 0 0 0 f f f f t f v u 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pgxc_lock_for_backup _null_ _null_ _null_ ));
 DESCR("lock the cluster for taking backup");
-DATA(insert OID = 7014 ( numeric_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 7018 "2275" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_in _null_ _null_ _null_ ));
+DATA(insert OID = 7014 ( numeric_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7018 "2275" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_in _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7015 ( numeric_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 2275 "7018" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_out _null_ _null_ _null_ ));
+DATA(insert OID = 7015 ( numeric_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "7018" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_out _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7016 (  numeric_agg_state_recv		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 7018 "2281" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_recv _null_ _null_ _null_ ));
+DATA(insert OID = 7016 (  numeric_agg_state_recv		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7018 "2281" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_recv _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7017 (  numeric_agg_state_send		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 17 "7018" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_send _null_ _null_ _null_ ));
+DATA(insert OID = 7017 (  numeric_agg_state_send		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 17 "7018" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_send _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7020 ( numeric_poly_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 7019 "2275" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_in _null_ _null_ _null_ ));
+DATA(insert OID = 7020 ( numeric_poly_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7019 "2275" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_in _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7021 ( numeric_poly_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 2275 "7019" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_out _null_ _null_ _null_ ));
+DATA(insert OID = 7021 ( numeric_poly_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "7019" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_out _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7022 (  numeric_poly_agg_state_recv		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 7019 "2281" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_recv _null_ _null_ _null_ ));
+DATA(insert OID = 7022 (  numeric_poly_agg_state_recv		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7019 "2281" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_recv _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7023 (  numeric_poly_agg_state_send		   PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 17 "7019" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_send _null_ _null_ _null_ ));
+DATA(insert OID = 7023 (  numeric_poly_agg_state_send		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 17 "7019" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_send _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7030 ( json_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 7028 "2275" _null_ _null_ _null_ _null_ _null_ json_agg_state_in _null_ _null_ _null_ ));
+DATA(insert OID = 7030 ( json_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7028 "2275" _null_ _null_ _null_ _null_ _null_ json_agg_state_in _null_ _null_ _null_ ));
 DESCR("I/O");
-DATA(insert OID = 7025 ( json_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i 1 0 2275 "7028" _null_ _null_ _null_ _null_ _null_ json_agg_state_out _null_ _null_ _null_ ));
+DATA(insert OID = 7025 ( json_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "7028" _null_ _null_ _null_ _null_ _null_ json_agg_state_out _null_ _null_ _null_ ));
 DESCR("I/O");
 #endif
 /* pg_upgrade support */

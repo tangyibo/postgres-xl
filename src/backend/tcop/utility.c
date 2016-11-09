@@ -112,9 +112,7 @@ static void ProcessUtilitySlow(Node *parsetree,
 				   ProcessUtilityContext context,
 				   ParamListInfo params,
 				   DestReceiver *dest,
-#ifdef PGXC
 				   bool	sentToRemote,
-#endif /* PGXC */
 				   char *completionTag);
 
 #ifdef PGXC
@@ -1175,9 +1173,7 @@ standard_ProcessUtility(Node *parsetree,
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef XCP
 									   sentToRemote,
-#endif
 									   completionTag);
 				else
 					ExecuteGrantStmt((GrantStmt *) parsetree);
@@ -1242,16 +1238,10 @@ standard_ProcessUtility(Node *parsetree,
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef PGXC
 									   sentToRemote,
-#endif				
 									   completionTag);
 				else
-#ifdef PGXC
 					ExecDropStmt(stmt, queryString, sentToRemote, isTopLevel);
-#else
-					ExecDropStmt(stmt, isTopLevel);
-#endif	
 			}
 			break;
 
@@ -1263,9 +1253,7 @@ standard_ProcessUtility(Node *parsetree,
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef PGXC
 									   sentToRemote,
-#endif				
 									   completionTag);
 				else
 					ExecRenameStmt(stmt);
@@ -1319,7 +1307,9 @@ standard_ProcessUtility(Node *parsetree,
 				if (EventTriggerSupportsObjectType(stmt->objectType))
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
-									   dest, completionTag);
+									   dest,
+									   sentToRemote,
+									   completionTag);
 				else
 					ExecAlterObjectDependsStmt(stmt, NULL);
 			}
@@ -1333,9 +1323,7 @@ standard_ProcessUtility(Node *parsetree,
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef PGXC
 									   sentToRemote,
-#endif				
 									   completionTag);
 				else
 					ExecAlterObjectSchemaStmt(stmt, NULL);
@@ -1390,9 +1378,7 @@ standard_ProcessUtility(Node *parsetree,
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef PGXC
 									   sentToRemote,
-#endif				
 									   completionTag);
 				else
 					ExecAlterOwnerStmt(stmt);
@@ -1434,9 +1420,7 @@ standard_ProcessUtility(Node *parsetree,
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef XCP
 									   sentToRemote,
-#endif
 									   completionTag);
 				else
 					CommentObject((CommentStmt *) parsetree);
@@ -1463,9 +1447,7 @@ standard_ProcessUtility(Node *parsetree,
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef XCP
 									   sentToRemote,
-#endif
 									   completionTag);
 				else
 					ExecSecLabelStmt(stmt);
@@ -1477,9 +1459,7 @@ standard_ProcessUtility(Node *parsetree,
 			ProcessUtilitySlow(parsetree, queryString,
 							   context, params,
 							   dest,
-#ifdef PGXC
 							   sentToRemote,
-#endif				
 							   completionTag);
 			break;
 	}
@@ -1496,9 +1476,7 @@ ProcessUtilitySlow(Node *parsetree,
 				   ProcessUtilityContext context,
 				   ParamListInfo params,
 				   DestReceiver *dest,
-#ifdef PGXC
 				   bool sentToRemote,
-#endif				
 				   char *completionTag)
 {
 	bool		isTopLevel = (context == PROCESS_UTILITY_TOPLEVEL);

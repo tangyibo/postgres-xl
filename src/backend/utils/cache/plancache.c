@@ -290,8 +290,6 @@ CreateOneShotCachedPlan(Node *raw_parse_tree,
 	plansource->generic_cost = -1;
 	plansource->total_custom_cost = 0;
 	plansource->num_custom_plans = 0;
-	plansource->planUserId = InvalidOid;
-	plansource->row_security_env = false;
 
 	return plansource;
 }
@@ -433,12 +431,7 @@ CompleteCachedPlan(CachedPlanSource *plansource,
 	plansource->parserSetupArg = parserSetupArg;
 	plansource->cursor_options = cursor_options;
 	plansource->fixed_result = fixed_result;
-#ifdef PGXC
-	//plansource->stmt_name = NULL;
-#endif
 	plansource->resultDesc = PlanCacheComputeResultDesc(querytree_list);
-	plansource->planUserId = GetUserId();
-	plansource->row_security_env = row_security;
 
 	MemoryContextSwitchTo(oldcxt);
 
@@ -691,14 +684,6 @@ RevalidateCachedQuery(CachedPlanSource *plansource)
 	plansource->relationOids = NIL;
 	plansource->invalItems = NIL;
 	plansource->search_path = NULL;
-
-	/*
-	 * The plan is invalid, possibly due to row security, so we need to reset
-	 * row_security_env and planUserId as we're about to re-plan with the
-	 * current settings.
-	 */
-	plansource->row_security_env = row_security;
-	plansource->planUserId = GetUserId();
 
 	/*
 	 * Free the query_context.  We don't really expect MemoryContextDelete to
@@ -1508,14 +1493,6 @@ CopyCachedPlan(CachedPlanSource *plansource)
 	newsource->generic_cost = plansource->generic_cost;
 	newsource->total_custom_cost = plansource->total_custom_cost;
 	newsource->num_custom_plans = plansource->num_custom_plans;
-
-	/*
-	 * Copy over the user the query was planned as, and under what RLS
-	 * environment.  We will check during RevalidateCachedQuery() if the user
-	 * or environment has changed and, if so, will force a re-plan.
-	 */
-	newsource->planUserId = plansource->planUserId;
-	newsource->row_security_env = plansource->row_security_env;
 
 	MemoryContextSwitchTo(oldcxt);
 

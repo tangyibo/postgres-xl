@@ -372,11 +372,6 @@ NumLWLocksByNamedTranches(void)
 	int			numLocks = 0;
 	int			i;
 
-#ifdef XCP
-	/* squeue.c needs one per consumer node in each shared queue.
-	 * Max number of consumers is MaxDataNodes-1 */
-	numLocks += NUM_SQUEUES * (MaxDataNodes-1);
-#endif
 	for (i = 0; i < NamedLWLockTrancheRequests; i++)
 		numLocks += NamedLWLockTrancheRequestArray[i].num_lwlocks;
 

@@ -3022,6 +3022,7 @@ ri_PlanCheck(const char *querystr, int nargs, Oid *argtypes,
 	GetUserIdAndSecContext(&save_userid, &save_sec_context);
 	SetUserIdAndSecContext(RelationGetForm(query_rel)->relowner,
 						   save_sec_context | SECURITY_LOCAL_USERID_CHANGE |
+						   SECURITY_NOFORCE_RLS);
 
 	/* Create the plan */
 	qplan = SPI_prepare(querystr, nargs, argtypes);

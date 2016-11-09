@@ -22,18 +22,12 @@
 #include "catalog/pg_index.h"
 #include "fmgr.h"
 #include "nodes/bitmapset.h"
-#ifdef PGXC
 #include "pgxc/locator.h"
-#endif
 #include "rewrite/prs2lock.h"
 #include "storage/block.h"
-#ifdef XCP
-#include "storage/proc.h"
-#endif
 #include "storage/relfilenode.h"
 #include "utils/relcache.h"
 #include "utils/reltrigger.h"
-
 
 /*
  * LockRelId and LockInfo really belong to lmgr.h, but it's more convenient

@@ -825,7 +825,6 @@ static const SchemaQuery Query_for_list_of_matviews = {
 "   FROM pg_catalog.pg_prepared_statements "\
 "  WHERE substring(pg_catalog.quote_ident(name),1,%d)='%s'"
 
-#ifdef PGXC
 #define Query_for_list_of_available_nodenames \
 " SELECT NODE_NAME "\
 "  FROM PGXC_NODE"
@@ -840,7 +839,7 @@ static const SchemaQuery Query_for_list_of_matviews = {
 #define Query_for_list_of_available_nodegroup_names \
 " SELECT GROUP_NAME "\
 "  FROM PGXC_GROUP"
-#endif
+
 #define Query_for_list_of_event_triggers \
 " SELECT pg_catalog.quote_ident(evtname) "\
 "   FROM pg_catalog.pg_event_trigger "\
@@ -895,9 +894,7 @@ typedef struct
 static const pgsql_thing_t words_after_create[] = {
 	{"ACCESS METHOD", NULL, NULL},
 	{"AGGREGATE", NULL, &Query_for_list_of_aggregates},
-#ifdef PGXC
 	{"BARRIER", NULL, NULL},	/* Comes barrier name next, so skip it */
-#endif
 	{"CAST", NULL, NULL},		/* Casts have complex structures for names, so
 								 * skip it */
 	{"COLLATION", "SELECT pg_catalog.quote_ident(collname) FROM pg_catalog.pg_collation WHERE collencoding IN (-1, pg_catalog.pg_char_to_encoding(pg_catalog.getdatabaseencoding())) AND substring(pg_catalog.quote_ident(collname),1,%d)='%s'"},
@@ -913,18 +910,12 @@ static const pgsql_thing_t words_after_create[] = {
 	{"DOMAIN", NULL, &Query_for_list_of_domains},
 	{"EVENT TRIGGER", NULL, NULL},
 	{"EXTENSION", Query_for_list_of_extensions},
-#ifndef PGXC
-	{"FOREIGN DATA WRAPPER", NULL, NULL},
-	{"FOREIGN TABLE", NULL, NULL},
-#endif
 	{"FUNCTION", NULL, &Query_for_list_of_functions},
 	{"GROUP", Query_for_list_of_roles},
 	{"LANGUAGE", Query_for_list_of_languages},
 	{"INDEX", NULL, &Query_for_list_of_indexes},
-#ifdef PGXC
 	{"NODE", Query_for_list_of_available_nodenames},
 	{"NODE GROUP", Query_for_list_of_available_nodegroup_names},
-#endif
 	{"MATERIALIZED VIEW", NULL, &Query_for_list_of_matviews},
 	{"OPERATOR", NULL, NULL},	/* Querying for this is probably not such a
 								 * good idea. */
@@ -935,28 +926,16 @@ static const pgsql_thing_t words_after_create[] = {
 	{"RULE", "SELECT pg_catalog.quote_ident(rulename) FROM pg_catalog.pg_rules WHERE substring(pg_catalog.quote_ident(rulename),1,%d)='%s'"},
 	{"SCHEMA", Query_for_list_of_schemas},
 	{"SEQUENCE", NULL, &Query_for_list_of_sequences},
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once SERVER is supported */
-	{"SERVER", Query_for_list_of_servers},
-#endif
 	{"TABLE", NULL, &Query_for_list_of_tables},
 	{"TABLESPACE", Query_for_list_of_tablespaces},
 	{"TEMP", NULL, NULL, THING_NO_DROP},		/* for CREATE TEMP TABLE ... */
 	{"TEMPLATE", Query_for_list_of_ts_templates, NULL, THING_NO_SHOW},
 	{"TEXT SEARCH", NULL, NULL},
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once TRIGGER is supported */
-	{"TRIGGER", "SELECT pg_catalog.quote_ident(tgname) FROM pg_catalog.pg_trigger WHERE substring(pg_catalog.quote_ident(tgname),1,%d)='%s' AND NOT tgisinternal"},
-#endif
 	{"TYPE", NULL, &Query_for_list_of_datatypes},
 	{"UNIQUE", NULL, NULL, THING_NO_DROP},		/* for CREATE UNIQUE INDEX ... */
 	{"UNLOGGED", NULL, NULL, THING_NO_DROP},	/* for CREATE UNLOGGED TABLE
 												 * ... */
 	{"USER", Query_for_list_of_roles},
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once USER MAPPING is supported */
-	{"USER MAPPING FOR", NULL, NULL},
-#endif
 	{"VIEW", NULL, &Query_for_list_of_views},
 	{NULL}						/* end of list */
 };
@@ -1384,26 +1363,12 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches1("ALTER"))
 	{
 		static const char *const list_ALTER[] =
-#ifdef PGXC
-		/*
-		 * Added: "NODE" (NODE NAME cannot be altered).
-		 * Removed: "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "LARGE OBJECT",
-		 *          "SERVER", "TRIGGER", "USER MAPPING FOR".
-		 */
 		{"AGGREGATE", "COLLATION", "CONVERSION", "DATABASE", "DEFAULT PRIVILEGES", "DOMAIN",
-			"EXTENSION",                                          "FUNCTION",
-		 "GROUP", "INDEX", "LANGUAGE", "NODE", "NODE GROUP", "OPERATOR",
-			"ROLE", "SCHEMA",           "SEQUENCE",  "TABLE",
-			"TABLESPACE", "TEXT SEARCH",           "TYPE",
-		"USER",                     "VIEW", NULL};
-#else
-		{"AGGREGATE", "COLLATION", "CONVERSION", "DATABASE", "DEFAULT PRIVILEGES", "DOMAIN",
-			"EVENT TRIGGER", "EXTENSION", "FOREIGN DATA WRAPPER", "FOREIGN TABLE", "FUNCTION",
-			"GROUP", "INDEX", "LANGUAGE", "LARGE OBJECT", "MATERIALIZED VIEW", "OPERATOR",
-			"POLICY", "ROLE", "RULE", "SCHEMA", "SERVER", "SEQUENCE", "SYSTEM", "TABLE",
-			"TABLESPACE", "TEXT SEARCH", "TRIGGER", "TYPE",
-		"USER", "USER MAPPING FOR", "VIEW", NULL};
-#endif
+			"EVENT TRIGGER", "EXTENSION", "FUNCTION",
+			"GROUP", "INDEX", "LANGUAGE", "MATERIALIZED VIEW", "NODE", "NODE GROUP", "OPERATOR",
+			"POLICY", "ROLE", "RULE", "SCHEMA", "SEQUENCE", "SYSTEM", "TABLE",
+			"TABLESPACE", "TEXT SEARCH", "TYPE",
+		"USER", "VIEW", NULL};
 
 		COMPLETE_WITH_LIST(list_ALTER);
 	}
@@ -1427,7 +1392,7 @@ psql_completion(const char *text, int start, int end)
 		else
 			COMPLETE_WITH_FUNCTION_ARG(prev2_wd);
 	}
-#ifdef PGXC
+
 	/* ALTER NODE */
 	else if (Matches2("ALTER", "NODE"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_available_nodenames);
@@ -1438,7 +1403,7 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches3("ALTER", "NODE", "WITH"))
 
 		COMPLETE_WITH_LIST5("TYPE", "HOST", "PORT", "PRIMARY", "PREFERRED");
-#endif
+
 	/* ALTER SCHEMA <name> */
 	else if (Matches3("ALTER", "SCHEMA", MatchAny))
 		COMPLETE_WITH_LIST2("OWNER TO", "RENAME TO");
@@ -1472,28 +1437,6 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER EXTENSION <name> */
 	else if (Matches3("ALTER", "EXTENSION", MatchAny))
 		COMPLETE_WITH_LIST4("ADD", "DROP", "UPDATE", "SET SCHEMA");
-
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once FOREIGN DATA WRAPPER is supported */
-	/* ALTER FOREIGN */
-	else if (Matches2("ALTER", "FOREIGN"))
-		COMPLETE_WITH_LIST2("DATA WRAPPER", "TABLE");
-
-	/* ALTER FOREIGN DATA WRAPPER <name> */
-	else if (Matches5("ALTER", "FOREIGN", "DATA", "WRAPPER", MatchAny))
-		COMPLETE_WITH_LIST5("HANDLER", "VALIDATOR", "OPTIONS", "OWNER TO", "RENAME TO");
-
-	/* ALTER FOREIGN TABLE <name> */
-	else if (Matches4("ALTER", "FOREIGN", "TABLE", MatchAny))
-	{
-		static const char *const list_ALTER_FOREIGN_TABLE[] =
-		{"ADD", "ALTER", "DISABLE TRIGGER", "DROP", "ENABLE", "INHERIT",
-			"NO INHERIT", "OPTIONS", "OWNER TO", "RENAME", "SET",
-		"VALIDATE CONSTRAINT", NULL};
-
-		COMPLETE_WITH_LIST(list_ALTER_FOREIGN_TABLE);
-	}
-#endif
 
 	/* ALTER INDEX */
 	else if (Matches2("ALTER", "INDEX"))
@@ -1606,15 +1549,7 @@ psql_completion(const char *text, int start, int end)
 	}
 	else if (Matches4("ALTER", "SEQUENCE", MatchAny, "NO"))
 		COMPLETE_WITH_LIST3("MINVALUE", "MAXVALUE", "CYCLE");
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once SERVER is supported */
-	/* ALTER SERVER <name> */
-	else if (Matches3("ALTER", "SERVER", MatchAny))
-		COMPLETE_WITH_LIST4("VERSION", "OPTIONS", "OWNER TO", "RENAME TO");
-	/* ALTER SERVER <name> VERSION <version> */
-	else if (Matches5("ALTER", "SERVER", MatchAny, "VERSION", MatchAny))
-		COMPLETE_WITH_CONST("OPTIONS");
-#endif
+
 	/* ALTER SYSTEM SET, RESET, RESET ALL */
 	else if (Matches2("ALTER", "SYSTEM"))
 		COMPLETE_WITH_LIST2("SET", "RESET");
@@ -1669,29 +1604,6 @@ psql_completion(const char *text, int start, int end)
 	/* ALTER RULE <name> ON <name> */
 	else if (Matches5("ALTER", "RULE", MatchAny, "ON", MatchAny))
 		COMPLETE_WITH_CONST("RENAME TO");
-
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once TRIGGER is supported */
-	/* ALTER TRIGGER <name>, add ON */
-	else if (Matches3("ALTER", "TRIGGER", MatchAny))
-		COMPLETE_WITH_CONST("ON");
-
-	else if (Matches4("ALTER", "TRIGGER", MatchAny, MatchAny))
-	{
-		completion_info_charp = prev2_wd;
-		COMPLETE_WITH_QUERY(Query_for_list_of_tables_for_trigger);
-	}
-
-	/*
-	 * If we have ALTER TRIGGER <sth> ON, then add the correct tablename
-	 */
-	else if (Matches4("ALTER", "TRIGGER", MatchAny, "ON"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
-
-	/* ALTER TRIGGER <name> ON <name> */
-	else if (Matches5("ALTER", "TRIGGER", MatchAny, "ON", MatchAny))
-		COMPLETE_WITH_CONST("RENAME TO");
-#endif
 
 	/*
 	 * If we detect ALTER TABLE <name>, suggest sub commands
@@ -1949,7 +1861,7 @@ psql_completion(const char *text, int start, int end)
 /* RELEASE SAVEPOINT */
 	else if (Matches1("RELEASE"))
 		COMPLETE_WITH_CONST("SAVEPOINT");
-#ifdef PGXC
+
 /* CLEAN CONNECTION */
 	else if (Matches2("CLEAN", "CONNECTION"))
 		COMPLETE_WITH_CONST("TO");
@@ -1966,7 +1878,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
 	else if (Matches2("FOR", "DATABASE"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_databases);
-#endif
+
 /* ROLLBACK */
 	else if (Matches1("ROLLBACK"))
 		COMPLETE_WITH_LIST4("WORK", "TRANSACTION", "TO SAVEPOINT", "PREPARED");
@@ -2163,7 +2075,7 @@ psql_completion(const char *text, int start, int end)
 			 !TailMatches6("POLICY", MatchAny, MatchAny, MatchAny, MatchAny, MatchAny) &&
 			 !TailMatches4("FOR", MatchAny, MatchAny, MatchAny))
 		COMPLETE_WITH_CONST("(");
-#ifdef PGXC
+
 /* CREATE NODE */
 	else if (Matches2("CREATE", "NODE"))
 		COMPLETE_WITH_CONST("WITH");
@@ -2171,10 +2083,11 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_CONST("(");
 	else if (Matches4("CREATE", "NODE", "WITH", "("))
 		COMPLETE_WITH_LIST5("TYPE", "HOST", "PORT", "PRIMARY", "PREFERRED");
+
 /* CREATE NODEGROUP */
 	else if (Matches3("CREATE", "NODE", "GROUP"))
 		COMPLETE_WITH_CONST("WITH");
-#endif
+
 	/* CREATE POLICY */
 	/* Complete "CREATE POLICY <name> ON" */
 	else if (Matches3("CREATE", "POLICY", MatchAny))
@@ -2255,35 +2168,6 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches5("CREATE", "TEXT", "SEARCH", "CONFIGURATION", MatchAny))
 		COMPLETE_WITH_CONST("(");
 
-/* CREATE TRIGGER --- is allowed inside CREATE SCHEMA, so use TailMatches */
-	/* complete CREATE TRIGGER <name> with BEFORE,AFTER,INSTEAD OF */
-	else if (TailMatches3("CREATE", "TRIGGER", MatchAny))
-		COMPLETE_WITH_LIST3("BEFORE", "AFTER", "INSTEAD OF");
-	/* complete CREATE TRIGGER <name> BEFORE,AFTER with an event */
-	else if (TailMatches4("CREATE", "TRIGGER", MatchAny, "BEFORE|AFTER"))
-		COMPLETE_WITH_LIST4("INSERT", "DELETE", "UPDATE", "TRUNCATE");
-	/* complete CREATE TRIGGER <name> INSTEAD OF with an event */
-	else if (TailMatches5("CREATE", "TRIGGER", MatchAny, "INSTEAD", "OF"))
-		COMPLETE_WITH_LIST3("INSERT", "DELETE", "UPDATE");
-	/* complete CREATE TRIGGER <name> BEFORE,AFTER sth with OR,ON */
-	else if (TailMatches5("CREATE", "TRIGGER", MatchAny, "BEFORE|AFTER", MatchAny) ||
-	  TailMatches6("CREATE", "TRIGGER", MatchAny, "INSTEAD", "OF", MatchAny))
-		COMPLETE_WITH_LIST2("ON", "OR");
-
-	/*
-	 * complete CREATE TRIGGER <name> BEFORE,AFTER event ON with a list of
-	 * tables
-	 */
-	else if (TailMatches6("CREATE", "TRIGGER", MatchAny, "BEFORE|AFTER", MatchAny, "ON"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tables, NULL);
-	/* complete CREATE TRIGGER ... INSTEAD OF event ON with a list of views */
-	else if (TailMatches7("CREATE", "TRIGGER", MatchAny, "INSTEAD", "OF", MatchAny, "ON"))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_views, NULL);
-	/* complete CREATE TRIGGER ... EXECUTE with PROCEDURE */
-	else if (HeadMatches2("CREATE", "TRIGGER") && TailMatches1("EXECUTE"))
-		COMPLETE_WITH_CONST("PROCEDURE");
-
-#endif
 /* CREATE ROLE,USER,GROUP <name> */
 	else if (Matches3("CREATE", "ROLE|GROUP|USER", MatchAny) &&
 			 !TailMatches2("USER", "MAPPING"))
@@ -2424,19 +2308,20 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches3("DROP", "OWNED", "BY"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_roles);
 
-#ifdef PGXC
 	/* DROP NODE */
 	else if (Matches2("DROP", "NODE"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_available_nodenames);	/* Should test this code if complesion is not confused with DROP NODE GROUP */
+
 	/* DROP NODE GROUP */
 	else if (Matches3("DROP", "NODE", "GROUP"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_available_nodegroup_names);
-/* EXECUTE DIRECT */
+
+	/* EXECUTE DIRECT */
 	else if (Matches2("EXECUTE", "DIRECT"))
 		COMPLETE_WITH_CONST("ON");
 	else if (Matches3("EXECUTE", "DIRECT", "ON"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_available_nodenames);
-#endif
+
 	else if (Matches3("DROP", "TEXT", "SEARCH"))
 		COMPLETE_WITH_LIST4("CONFIGURATION", "DICTIONARY", "PARSER", "TEMPLATE");
 
@@ -2522,25 +2407,7 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches3("FETCH|MOVE", MatchAny, MatchAny))
 		COMPLETE_WITH_LIST2("FROM", "IN");
 
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once FOREIGN DATA WRAPPER is supported */
-/* FOREIGN DATA WRAPPER */
-	/* applies in ALTER/DROP FDW and in CREATE SERVER */
-	else if (TailMatches3("FOREIGN", "DATA", "WRAPPER") &&
-			 !TailMatches4("CREATE", MatchAny, MatchAny, MatchAny))
-		COMPLETE_WITH_QUERY(Query_for_list_of_fdws);
-	/* applies in CREATE SERVER */
-	else if (TailMatches4("FOREIGN", "DATA", "WRAPPER", MatchAny) &&
-			 HeadMatches2("CREATE", "SERVER"))
-		COMPLETE_WITH_CONST("OPTIONS");
-
-/* FOREIGN TABLE */
-	else if (TailMatches2("FOREIGN", "TABLE") &&
-			 !TailMatches3("CREATE", MatchAny, MatchAny))
-		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_foreign_tables, NULL);
-#endif
-
-/* FOREIGN SERVER */
+	/* FOREIGN SERVER */
 	else if (TailMatches2("FOREIGN", "SERVER"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_servers);
 
@@ -2971,23 +2838,6 @@ psql_completion(const char *text, int start, int end)
 	/* UPDATE <table> SET <attr> = */
 	else if (TailMatches4("UPDATE", MatchAny, "SET", MatchAny))
 		COMPLETE_WITH_CONST("=");
-
-#ifndef PGXC
-	/* PGXCTODO: This should be re-enabled once USER MAPPING is supported */
-/* USER MAPPING */
-	else if (Matches3("ALTER|CREATE|DROP", "USER", "MAPPING"))
-		COMPLETE_WITH_CONST("FOR");
-	else if (Matches4("CREATE", "USER", "MAPPING", "FOR"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_roles
-							" UNION SELECT 'CURRENT_USER'"
-							" UNION SELECT 'PUBLIC'"
-							" UNION SELECT 'USER'");
-	else if (Matches4("ALTER|DROP", "USER", "MAPPING", "FOR"))
-		COMPLETE_WITH_QUERY(Query_for_list_of_user_mappings);
-	else if (Matches5("CREATE|ALTER|DROP", "USER", "MAPPING", "FOR", MatchAny))
-		COMPLETE_WITH_CONST("SERVER");
-	else if (Matches7("CREATE|ALTER", "USER", "MAPPING", "FOR", MatchAny, "SERVER", MatchAny))
-		COMPLETE_WITH_CONST("OPTIONS");
 
 /*
  * VACUUM [ FULL | FREEZE ] [ VERBOSE ] [ table ]

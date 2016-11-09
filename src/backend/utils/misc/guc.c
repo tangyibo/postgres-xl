@@ -5429,7 +5429,6 @@ AtEOXact_GUC(bool isCommit, int nestLevel)
 			bool		restorePrior = false;
 			bool		restoreMasked = false;
 			bool		changed;
-			const char		*newvalStr = NULL;
 
 			/*
 			 * In this next bit, if we don't set either restorePrior or
@@ -5646,7 +5645,11 @@ AtEOXact_GUC(bool isCommit, int nestLevel)
 
 			if (changed)
 			{
-				newvalStr = GetConfigOptionByName(gconf->name, NULL);
+				const char		*newvalStr = NULL;
+
+				/* XXX perhaps this should use is_missing=false, not sure */
+				newvalStr = GetConfigOptionByName(gconf->name, NULL, true);
+
 				/*
 				 * Quote value if it is including memory or time units
 				 */

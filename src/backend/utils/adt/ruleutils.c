@@ -4706,13 +4706,13 @@ get_query_def_from_valuesList(Query *query, StringInfo buf)
 		if (values_cell)
 		{
 			/* we discard the stripped expression in this case */
-			processIndirection((Node *) lfirst(values_cell), &context, true);
+			processIndirection((Node *) lfirst(values_cell), &context);
 			values_cell = lnext(values_cell);
 		}
 		else
 		{
 			/* we keep a list of the stripped expressions in this case */
-			strippedexprs = lappend(strippedexprs, processIndirection((Node *) tle->expr, &context, true));
+			strippedexprs = lappend(strippedexprs, processIndirection((Node *) tle->expr, &context));
 		}
 	}
 	appendStringInfo(buf, ") ");

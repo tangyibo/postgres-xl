@@ -1213,7 +1213,7 @@ tuplesort_begin_merge(TupleDesc tupDesc,
 		state->tp_runs[i] = 1;
 		state->tp_tapenum[i] = i;
 	}
-	beginmerge(state);
+	beginmerge(state, true);	/* finalMergeBatch=true */
 	state->status = TSS_FINALMERGE;
 
 	MemoryContextSwitchTo(oldcontext);

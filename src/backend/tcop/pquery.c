@@ -833,7 +833,6 @@ PortalStart(Portal portal, ParamListInfo params,
 				portal->atStart = true;
 				portal->atEnd = false;	/* allow fetches */
 				portal->portalPos = 0;
-				portal->posOverflow = false;
 
 				PopActiveSnapshot();
 				break;
@@ -1177,8 +1176,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 
 				if (portal->queryDesc->myindex == -1)
 				{
-					long		oldPos;
-
 					if (portal->queryDesc->squeue)
 					{
 						/* Make sure the producer is advancing */
@@ -1212,11 +1209,7 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 							portal->atStart = false; /* OK to go backward now */
 						portal->atEnd = portal->queryDesc->estate->es_finished &&
 							tuplestore_ateof(portal->holdStore);
-						oldPos = portal->portalPos;
 						portal->portalPos += nprocessed;
-						/* portalPos doesn't advance when we fall off the end */
-						if (portal->portalPos < oldPos)
-							portal->posOverflow = true;
 					}
 					else
 					{
@@ -1240,7 +1233,6 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 					SharedQueue		squeue = queryDesc->squeue;
 					int 			myindex = queryDesc->myindex;
 					TupleTableSlot *slot;
-					long			oldPos;
 
 					/*
 					 * We are the consumer.
@@ -1326,11 +1318,7 @@ PortalRun(Portal portal, long count, bool isTopLevel,
 					if (count == 0 ||
 						(unsigned long) nprocessed < (unsigned long) count)
 						portal->atEnd = true;	/* we retrieved 'em all */
-					oldPos = portal->portalPos;
 					portal->portalPos += nprocessed;
-					/* portalPos doesn't advance when we fall off the end */
-					if (portal->portalPos < oldPos)
-						portal->posOverflow = true;
 				}
 				/* Mark portal not active */
 				portal->status = PORTAL_READY;

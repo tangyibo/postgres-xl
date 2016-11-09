@@ -1346,6 +1346,7 @@ LockCheckConflicts(LockMethod lockMethodTable,
 {
 	int			numLockModes = lockMethodTable->numLockModes;
 	LOCKMASK	myLocks;
+	LOCKMASK	otherLocks;
 	int			conflictMask = lockMethodTable->conflictTab[lockmode];
 	int			conflictsRemaining[MAX_LOCKMODES];
 	int			totalConflictsRemaining = 0;

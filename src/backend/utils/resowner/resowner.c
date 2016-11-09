@@ -680,16 +680,15 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 			FileClose(res);
 		}
 
-#ifdef XCP
 		/* Ditto for prepared statements */
-		while (owner->nstmts > 0)
+		while (ResourceArrayGetAny(&(owner->prepstmts), &foundres))
 		{
-			char *stmt = owner->stmts + ((owner->nstmts - 1) * CNAME_MAXLEN);
+			char *stmt = (char *) DatumGetPointer(foundres);
+
 			if (isCommit)
 				PrintPreparedStmtLeakWarning(stmt);
 			DropPreparedStatement(stmt, false);
 		}
-#endif
 
 		/* Clean up index scans too */
 		ReleaseResources_hash();
@@ -1249,7 +1248,6 @@ PrintFileLeakWarning(File file)
 		 file);
 }
 
-#ifdef XCP
 /*
  * Make sure there is room for at least one more entry in a ResourceOwner's
  * prepared statements reference array.
@@ -1260,25 +1258,7 @@ PrintFileLeakWarning(File file)
 void
 ResourceOwnerEnlargePreparedStmts(ResourceOwner owner)
 {
-	int			newmax;
-
-	if (owner->nstmts < owner->maxstmts)
-		return;					/* nothing to do */
-
-	if (owner->stmts == NULL)
-	{
-		newmax = 16;
-		owner->stmts = (char *)
-			MemoryContextAlloc(TopMemoryContext, newmax * CNAME_MAXLEN);
-		owner->maxstmts = newmax;
-	}
-	else
-	{
-		newmax = owner->maxstmts * 2;
-		owner->stmts = (char *)
-			repalloc(owner->stmts, newmax * CNAME_MAXLEN);
-		owner->maxstmts = newmax;
-	}
+	ResourceArrayEnlarge(&(owner->prepstmts));
 }
 
 /*
@@ -1289,9 +1269,7 @@ ResourceOwnerEnlargePreparedStmts(ResourceOwner owner)
 void
 ResourceOwnerRememberPreparedStmt(ResourceOwner owner, char *stmt)
 {
-	Assert(owner->nstmts < owner->maxstmts);
-	strncpy(owner->stmts + (owner->nstmts * CNAME_MAXLEN), stmt, CNAME_MAXLEN);
-	owner->nstmts++;
+	ResourceArrayAdd(&(owner->prepstmts), PointerGetDatum(stmt));
 }
 
 /*
@@ -1300,29 +1278,10 @@ ResourceOwnerRememberPreparedStmt(ResourceOwner owner, char *stmt)
 void
 ResourceOwnerForgetPreparedStmt(ResourceOwner owner, char *stmt)
 {
-	char	   *stmts = owner->stmts;
-	int			ns1 = owner->nstmts - 1;
-	int			i;
-
-	for (i = ns1; i >= 0; i--)
-	{
-		if (strncmp(stmts + (i * CNAME_MAXLEN), stmt, CNAME_MAXLEN) == 0)
-		{
-			while (i < ns1)
-			{
-				strncpy(stmts + (i * CNAME_MAXLEN),
-						stmts + ((i + 1) * CNAME_MAXLEN),
-						CNAME_MAXLEN);
-				i++;
-			}
-			owner->nstmts = ns1;
-			return;
-		}
-	}
-	elog(ERROR, "prepared statement %s is not owned by resource owner %s",
-		 stmt, owner->name);
+	if (!ResourceArrayRemove(&(owner->prepstmts), PointerGetDatum(stmt)))
+		elog(ERROR, "prepared statement %p is not owned by resource owner %s",
+			 stmt, owner->name);
 }
-
 
 /*
  * Debugging subroutine
@@ -1334,7 +1293,6 @@ PrintPreparedStmtLeakWarning(char *stmt)
 		 "prepared statement leak: Statement %s still referenced",
 		 stmt);
 }
-#endif
 
 
 /*

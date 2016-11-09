@@ -51,13 +51,14 @@ MemoryContext CurTransactionContext = NULL;
 /* This is a transient link to the active portal's memory context: */
 MemoryContext PortalContext = NULL;
 
-static void MemoryContextStatsInternal(MemoryContext context, int level);
-#ifdef PGXC
-void *allocTopCxt(size_t s);
-#endif
+static void MemoryContextCallResetCallbacks(MemoryContext context);
 static void MemoryContextStatsInternal(MemoryContext context, int level,
 						   bool print, int max_children,
 						   MemoryContextCounters *totals);
+
+#ifdef PGXC
+void *allocTopCxt(size_t s);
+#endif
 
 /*
  * You should not do memory allocations within a critical section, because

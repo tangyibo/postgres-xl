@@ -2240,29 +2240,21 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 											   numArguments);
 
 	/* build expression trees using actual argument & result types */
-	build_aggregate_fnexprs(inputTypes,
-							numArguments,
-							0,	/* no ordered-set window functions yet */
-							peraggstate->numFinalArgs,
-							false,		/* no variadic window functions yet */
-							aggtranstype,
-#ifdef XCP
-							aggcollecttype,
-#endif
-							wfunc->wintype,
-							wfunc->inputcollid,
-							transfn_oid,
-#ifdef XCP
-							collectfn_oid,
-#endif
-							invtransfn_oid,
-							finalfn_oid,
-							&transfnexpr,
-							&invtransfnexpr,
-#ifdef XCP
-							&collectfnexpr,
-#endif
-							&finalfnexpr);
+
+	/* build expression trees using actual argument & result types */
+	build_aggregate_transfn_expr(inputTypes,
+								 numArguments,
+								 0,		/* no ordered-set window functions yet */
+								 false, /* no variadic window functions yet */
+								 aggtranstype,
+								 aggcollecttype,
+								 wfunc->inputcollid,
+								 transfn_oid,
+								 collectfn_oid,
+								 invtransfn_oid,
+								 &transfnexpr,
+								 &invtransfnexpr,
+								 &collectfnexpr);
 
 	/* set up infrastructure for calling the transfn(s) and finalfn */
 	fmgr_info(transfn_oid, &peraggstate->transfn);

@@ -227,7 +227,7 @@ _PG_init(void)
 	EmitWarningsOnPlaceholders("storm_stats");
 
 	RequestAddinShmemSpace(hash_memsize());
-	RequestAddinLWLocks(1);
+	RequestNamedLWLockTranche("storm_stats", 1);
 
 	prev_shmem_startup_hook = shmem_startup_hook;
 	shmem_startup_hook = sp_shmem_startup;
@@ -276,9 +276,7 @@ static void sp_shmem_startup(void)
 		elog(ERROR, "out of shared memory");
 
 	if (!found)
-	{
-		shared_state->lock = LWLockAssign();
-	}
+		shared_state->lock = &(GetNamedLWLockTranche("storm_stats"))->lock;
 
 	memset(&event_ctl, 0, sizeof(event_ctl));
 

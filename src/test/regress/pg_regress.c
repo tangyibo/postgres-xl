@@ -824,6 +824,7 @@ set_node_config_file(PGXCNodeTypeNum node)
 	const char *data_folder = find_data_folder(node);
 	FILE	   *pg_conf;
 	char		buf[MAXPGPATH * 4];
+	_stringlist *sl;
 
 	snprintf(buf, sizeof(buf), "%s/%s/postgresql.conf", temp_instance, data_folder);
 	pg_conf = fopen(buf, "a");
@@ -855,8 +856,9 @@ set_node_config_file(PGXCNodeTypeNum node)
 	snprintf(buf, sizeof(buf), "pooler_port = %d\n", get_pooler_port(node));
 	fputs(buf, pg_conf);
 
-	if (temp_config != NULL)
+	for (sl = temp_configs; sl != NULL; sl = sl->next)
 	{
+		char	   *temp_config = sl->str;
 		FILE	   *extra_conf;
 		char		line_buf[1024];
 

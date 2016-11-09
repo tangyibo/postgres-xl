@@ -1294,29 +1294,15 @@ psql_completion(const char *text, int start, int end)
 
 	/* Known command-starting keywords. */
 	static const char *const sql_commands[] = {
-#ifdef PGXC
-		/* 
-		 * Added "CLEAN" and "EXECUTE DIRECT"
-		 * Removed LISTEN, NOTIFY, RELEASE, SAVEPOINT and UNLISTEN
-		 */
 		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CHECKPOINT", "CLEAN CONNECTION", "CLOSE", "CLUSTER",
 		"COMMENT", "COMMIT", "COPY", "CREATE", "DEALLOCATE", "DECLARE",
-		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXECUTE DIRECT", "EXPLAIN", "FETCH",
-		"GRANT", "INSERT",           "LOAD", "LOCK", "MOVE",           "PREPARE",
-		"REASSIGN", "REINDEX",            "RESET", "REVOKE", "ROLLBACK",
-		             "SECURITY LABEL", "SELECT", "SET", "SHOW", "START",
-		"TABLE", "TRUNCATE",             "UPDATE", "VACUUM", "VALUES", "WITH",
-#else
-		"ABORT", "ALTER", "ANALYZE", "BEGIN", "CHECKPOINT", "CLOSE", "CLUSTER",
-		"COMMENT", "COMMIT", "COPY", "CREATE", "DEALLOCATE", "DECLARE",
-		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXPLAIN",
-		"FETCH", "GRANT", "IMPORT", "INSERT", "LISTEN", "LOAD", "LOCK",
-		"MOVE", "NOTIFY", "PREPARE",
-		"REASSIGN", "REFRESH MATERIALIZED VIEW", "REINDEX", "RELEASE",
+		"DELETE FROM", "DISCARD", "DO", "DROP", "END", "EXECUTE", "EXECUTE DIRECT", "EXPLAIN",
+		"FETCH", "GRANT", "INSERT", "LOAD", "LOCK",
+		"MOVE", "PREPARE",
+		"REASSIGN", "REINDEX",
 		"RESET", "REVOKE", "ROLLBACK",
-		"SAVEPOINT", "SECURITY LABEL", "SELECT", "SET", "SHOW", "START",
-		"TABLE", "TRUNCATE", "UNLISTEN", "UPDATE", "VACUUM", "VALUES", "WITH",
-#endif
+		"SECURITY LABEL", "SELECT", "SET", "SHOW", "START",
+		"TABLE", "TRUNCATE", "UPDATE", "VACUUM", "VALUES", "WITH",
 		NULL
 	};
 

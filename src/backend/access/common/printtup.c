@@ -354,10 +354,9 @@ printtup(TupleTableSlot *slot, DestReceiver *self)
 	if (slot->tts_datarow && !binary)
 	{
 		pq_putmessage('D', slot->tts_datarow->msg, slot->tts_datarow->msglen);
-		return;
+		return true;
 	}
 #endif
-
 
 	/* Make sure the tuple is fully deconstructed */
 	slot_getallattrs(slot);

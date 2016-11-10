@@ -630,8 +630,6 @@ RevalidateCachedQuery(CachedPlanSource *plansource)
 	 */
 	if (plansource->is_valid)
 	{
-		Assert(OidIsValid(plansource->planUserId));
-
 		Assert(plansource->search_path != NULL);
 		if (!OverrideSearchPathMatchesCurrent(plansource->search_path))
 		{

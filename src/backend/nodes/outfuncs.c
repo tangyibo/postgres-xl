@@ -1054,9 +1054,6 @@ _outAgg(StringInfo str, const Agg *node)
 	_outPlanInfo(str, (const Plan *) node);
 
 	WRITE_ENUM_FIELD(aggstrategy, AggStrategy);
-#ifdef XCP
-	WRITE_ENUM_FIELD(aggdistribution, AggDistribution);
-#endif
 	WRITE_ENUM_FIELD(aggsplit, AggSplit);
 	WRITE_INT_FIELD(numCols);
 

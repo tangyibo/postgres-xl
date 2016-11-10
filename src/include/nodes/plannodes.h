@@ -706,16 +706,6 @@ typedef struct Group
 	Oid		   *grpOperators;	/* equality operators to compare with */
 } Group;
 
-#ifdef XCP
-typedef enum AggDistribution
-{
-	AGG_ONENODE,				/* not distributed aggregation */
-	AGG_SLAVE,					/* execute only transient function */
-	AGG_MASTER					/* execute collection function as transient
-								 * and final finction */
-} AggDistribution;
-#endif
-
 /* ---------------
  *		aggregate node
  *
@@ -734,9 +724,6 @@ typedef struct Agg
 {
 	Plan		plan;
 	AggStrategy aggstrategy;	/* basic strategy, see nodes.h */
-#ifdef XCP
-	AggDistribution aggdistribution;
-#endif
 	AggSplit	aggsplit;		/* agg-splitting mode, see nodes.h */
 	int			numCols;		/* number of grouping columns */
 	AttrNumber *grpColIdx;		/* their indexes in the target list */

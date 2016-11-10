@@ -1020,21 +1020,6 @@ ExplainNode(PlanState *planstate, List *ancestors,
 				else
 					partialmode = "Simple";
 			}
-#ifdef XCP
-			switch (((Agg *) plan)->aggstrategy)
-			{
-				case AGG_SLAVE:
-					operation = "Transition";
-					break;
-				case AGG_MASTER:
-					operation = "Collection";
-					break;
-				default:
-					operation = NULL;
-					break;
-			}
-#endif
-
 			break;
 		case T_WindowAgg:
 			pname = sname = "WindowAgg";

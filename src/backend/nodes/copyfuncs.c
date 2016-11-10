@@ -888,9 +888,6 @@ _copyAgg(const Agg *from)
 	CopyPlanFields((const Plan *) from, (Plan *) newnode);
 
 	COPY_SCALAR_FIELD(aggstrategy);
-#ifdef XCP
-	COPY_SCALAR_FIELD(aggdistribution);
-#endif
 	COPY_SCALAR_FIELD(aggsplit);
 	COPY_SCALAR_FIELD(numCols);
 	if (from->numCols > 0)

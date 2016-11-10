@@ -222,9 +222,6 @@ typedef struct AggStatePerTransData
 	/* Oid of the state transition or combine function */
 	Oid			transfn_oid;
 	Oid			finalfn_oid;	/* may be InvalidOid */
-#ifdef PGXC
-	Oid			collectfn_oid;	/* may be InvalidOid */
-#endif /* PGXC */
 
 	/* Oid of the serialization function or InvalidOid */
 	Oid			serialfn_oid;
@@ -246,9 +243,6 @@ typedef struct AggStatePerTransData
 	 */
 	FmgrInfo	transfn;
 	FmgrInfo	finalfn;
-#ifdef PGXC
-	FmgrInfo	collectfn;
-#endif /* PGXC */
 
 	/* fmgr lookup data for serialization function */
 	FmgrInfo	serialfn;
@@ -284,10 +278,6 @@ typedef struct AggStatePerTransData
 	 */
 	Datum		initValue;
 	bool		initValueIsNull;
-#ifdef PGXC
-	Datum		initCollectValue;
-	bool		initCollectValueIsNull;
-#endif /* PGXC */
 
 	/*
 	 * We need the len and byval info for the agg's input and transition data
@@ -298,15 +288,10 @@ typedef struct AggStatePerTransData
 	 */
 	int16		inputtypeLen,
 				resulttypeLen,
-#ifdef XCP
-				collecttypeLen,
-#endif
 				transtypeLen;
+
 	bool		inputtypeByVal,
 				resulttypeByVal,
-#ifdef XCP
-				collecttypeByVal,
-#endif
 				transtypeByVal;
 
 	/*
@@ -433,17 +418,6 @@ typedef struct AggStatePerGroupData
 	 * NULL and not auto-replace it with a later input value. Only the first
 	 * non-NULL input will be auto-substituted.
 	 */
-#ifdef PGXC
-	/*
-	 * PGXCTODO: we should be able to reuse the fields above, rather than having
-	 * separate fields here, that can be done once we get rid of different
-	 * collection and transition result types in pg_aggregate.h. Collection at
-	 * Coordinator is equivalent to the transition at non-XC PG.
-	 */
-	Datum		collectValue;		/* current collection value */
-	bool		collectValueIsNull;
-	bool		noCollectValue;		/* true if the collectValue not set yet */
-#endif /* PGXC */
 } AggStatePerGroupData;
 
 /*
@@ -709,43 +683,6 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 	 * aggregates like max() and min().) The noTransValue flag signals that we
 	 * still need to do this.
 	 */
-	pergroupstate->noTransValue = pertrans->initValueIsNull;
-
-#ifdef PGXC
-	/*
-	 * (Re)set collectValue to the initial value.
-	 *
-	 * Note that when the initial value is pass-by-ref, we must copy it
-	 * (into the aggcontext) since we will pfree the collectValue later.
-	 * collection type is same as transition type.
-	 */
-	if (OidIsValid(pertrans->collectfn_oid))
-	{
-		if (pertrans->initCollectValueIsNull)
-			pergroupstate->collectValue = pertrans->initCollectValue;
-		else
-		{
-			MemoryContext oldContext;
-
-			oldContext = MemoryContextSwitchTo(
-					aggstate->aggcontexts[aggstate->current_set]->ecxt_per_tuple_memory);
-			pergroupstate->collectValue = datumCopy(pertrans->initCollectValue,
-					pertrans->transtypeByVal,
-					pertrans->transtypeLen);
-			MemoryContextSwitchTo(oldContext);
-		}
-		pergroupstate->collectValueIsNull = pertrans->initCollectValueIsNull;
-
-		/*
-		 * If the initial value for the transition state doesn't exist in the
-		 * pg_aggregate table then we will let the first non-NULL value
-		 * returned from the outer procNode become the initial value. (This is
-		 * useful for aggregates like max() and min().) The noTransValue flag
-		 * signals that we still need to do this.
-		 */
-		pergroupstate->noCollectValue = pertrans->initCollectValueIsNull;
-	}
-#endif /* PGXC */
 	pergroupstate->noTransValue = pertrans->initValueIsNull;
 }
 
@@ -1376,59 +1313,11 @@ finalize_aggregate(AggState *aggstate,
 	FunctionCallInfoData fcinfo;
 	bool		anynull = false;
 	MemoryContext oldContext;
-#ifdef XCP
-	Datum value;
-	bool  isnull;
-#endif
 	int			i;
 	ListCell   *lc;
 	AggStatePerTrans pertrans = &aggstate->pertrans[peragg->transno];
 
 	oldContext = MemoryContextSwitchTo(aggstate->ss.ps.ps_ExprContext->ecxt_per_tuple_memory);
-#ifdef XCP
-	if (OidIsValid(pertrans->collectfn_oid))
-	{
-		FunctionCallInfoData fcinfo;
-		InitFunctionCallInfoData(fcinfo, &(pertrans->collectfn), 2,
-									pertrans->aggCollation,
-									(void *) aggstate, NULL);
-		fcinfo.arg[1] = pergroupstate->transValue;
-		fcinfo.argnull[1] = pergroupstate->transValueIsNull;
-		if (fcinfo.flinfo->fn_strict &&
-				(pertrans->initCollectValueIsNull || pergroupstate->transValueIsNull))
-		{
-			/*
-			 * We have already checked the collection and transition types are
-			 * binary compatible, so we can just copy the value.
-			 */
-			value = pergroupstate->transValue;
-			isnull = pergroupstate->transValueIsNull;
-		}
-		else
-		{
-			/*
-			 * copy the initial datum since it might get changed inside the
-			 * collection function
-			 */
-			fcinfo.argnull[0] = pertrans->initCollectValueIsNull;
-			fcinfo.arg[0] = (Datum) NULL;
-			if (!fcinfo.argnull[0])
-			{
-				fcinfo.arg[0] = datumCopy(pertrans->initCollectValue,
-								pertrans->collecttypeByVal,
-								pertrans->collecttypeLen);
-			}
-			value = FunctionCallInvoke(&fcinfo);
-			isnull = fcinfo.isnull;
-		}
-	}
-	else
-	{
-		/* No collect function, just use transition values to finalize */
-		value = pergroupstate->transValue;
-		isnull = pergroupstate->transValueIsNull;
-	}
-#endif /* XCP */
 
 	/*
 	 * Evaluate any direct arguments.  We do this even if there's no finalfn
@@ -1463,13 +1352,8 @@ finalize_aggregate(AggState *aggstate,
 								 numFinalArgs,
 								 pertrans->aggCollation,
 								 (void *) aggstate, NULL);
-#ifdef XCP
-		fcinfo.arg[0] = value;
-		fcinfo.argnull[0] = isnull;
-#else
 		fcinfo.arg[0] = pergroupstate->transValue;
 		fcinfo.argnull[0] = pergroupstate->transValueIsNull;
-#endif /* XCP */
 
 		anynull |= pergroupstate->transValueIsNull;
 
@@ -1496,13 +1380,8 @@ finalize_aggregate(AggState *aggstate,
 	}
 	else
 	{
-#ifdef XCP
-		*resultVal = value;
-		*resultIsNull = isnull;
-#else
 		*resultVal = pergroupstate->transValue;
 		*resultIsNull = pergroupstate->transValueIsNull;
-#endif /* XCP */
 	}
 
 	/*
@@ -2772,16 +2651,9 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		HeapTuple	aggTuple;
 		Form_pg_aggregate aggform;
 		Oid			aggtranstype;
-#ifdef XCP
-		Oid			aggcollecttype;
-#endif /* XCP */
 		AclResult	aclresult;
 		Oid			transfn_oid,
 					finalfn_oid;
-#ifdef PGXC
-		Oid			collectfn_oid;
-		Expr	   *collectfnexpr;
-#endif /* PGXC */
 		Expr	   *transfnexpr,
 				   *finalfnexpr;
 		Oid			serialfn_oid,
@@ -2831,34 +2703,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 
 		pertrans->transfn_oid = transfn_oid = aggform->aggtransfn;
 		pertrans->finalfn_oid = finalfn_oid = aggform->aggfinalfn;
-#ifdef PGXC
-		pertrans->collectfn_oid = collectfn_oid = aggform->aggcollectfn;
-		/*
-		 * If preparing PHASE1 skip finalization step and return transmission
-		 * value to be collected and finalized on master node.
-		 * If preparing PHASE2 move collection function into transition slot,
-		 * so master node collected transition values and finalithed them.
-		 * Otherwise (one-node aggregation) do all steps locally, the collection
-		 * function will just convert transient value for finalization function.
-		 */
-		if (node->aggdistribution == AGG_SLAVE)
-		{
-			pertrans->collectfn_oid = collectfn_oid = InvalidOid;
-			pertrans->finalfn_oid = finalfn_oid = InvalidOid;
-		}
-		else if (node->aggdistribution == AGG_MASTER)
-		{
-			pertrans->transfn_oid = transfn_oid = collectfn_oid;
-			pertrans->collectfn_oid = collectfn_oid = InvalidOid;
-			
-			/*
-			 * Tuples should only be filtered on the datanodes when coordinator
-			 * is doing collection and finalisation
-			 */			
-			aggref->aggfilter = NULL;
-			pertrans->aggfilter = NULL;
-		}
-#endif /* PGXC */
+
 		/* planner recorded transition state type in the Aggref itself */
 		aggtranstype = aggref->aggtranstype;
 		Assert(OidIsValid(aggtranstype));
@@ -2949,16 +2794,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 				InvokeFunctionExecuteHook(finalfn_oid);
 			}
 
-#ifdef PGXC
-			if (OidIsValid(collectfn_oid))
-			{
-				aclresult = pg_proc_aclcheck(collectfn_oid, aggOwner,
-												ACL_EXECUTE);
-				if (aclresult != ACLCHECK_OK)
-					aclcheck_error(aclresult, ACL_KIND_PROC,
-								   get_func_name(collectfn_oid));
-			}
-#endif /* PGXC */
 			if (OidIsValid(serialfn_oid))
 			{
 				aclresult = pg_proc_aclcheck(serialfn_oid, aggOwner,
@@ -2996,45 +2831,21 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			peragg->numFinalArgs = numDirectArgs + 1;
 
 		/* resolve actual type of transition state, if polymorphic */
-#ifdef XCP
-		/*
-		 * We substitute function for PHASE2 and should take collection type
-		 * as transient
-		 */
-		if (node->aggdistribution == AGG_MASTER)
-			aggtranstype = aggform->aggcollecttype;
-		else
-#endif /* XCP */
 		aggtranstype = resolve_aggregate_transtype(aggref->aggfnoid,
 												   aggform->aggtranstype,
 												   inputTypes,
 												   numArguments);
-#ifdef XCP
-		/* get type of collection state, if defined */
-		if (OidIsValid(collectfn_oid))
-			aggcollecttype = aggform->aggcollecttype;
-		else
-			aggcollecttype = InvalidOid;
-#endif
+
 		/* build expression trees using actual argument & result types */
 		build_aggregate_transfn_expr(inputTypes,
 								numArguments,
 								numDirectArgs,
 								aggref->aggvariadic,
 								aggtranstype,
-#ifdef XCP
-								aggcollecttype,
-#endif
 								aggref->inputcollid,
 								transfn_oid,
-#ifdef XCP
-								collectfn_oid,
-#endif
 								InvalidOid,		/* invtrans is not needed here */
 								&transfnexpr,
-#ifdef XCP
-								&collectfnexpr,
-#endif
 								NULL);
 
 		/* set up infrastructure for calling the transfn and finalfn */
@@ -3058,13 +2869,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			fmgr_info_set_expr((Node *) finalfnexpr, &peragg->finalfn);
 		}
 
-#ifdef PGXC
-		if (OidIsValid(collectfn_oid))
-		{
-			fmgr_info(collectfn_oid, &pertrans->collectfn);
-			pertrans->collectfn.fn_expr = (Node *)collectfnexpr;
-		}
-#endif /* PGXC */
 		pertrans->aggCollation = aggref->inputcollid;
 
 		InitFunctionCallInfoData(pertrans->transfn_fcinfo,
@@ -3080,12 +2884,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		get_typlenbyval(aggtranstype,
 						&pertrans->transtypeLen,
 						&pertrans->transtypeByVal);
-#ifdef XCP
-		if (OidIsValid(aggcollecttype))
-			get_typlenbyval(aggcollecttype,
-							&pertrans->collecttypeLen,
-							&pertrans->collecttypeByVal);
-#endif /* XCP */
+
 		/* get info about the output value's datatype */
 		get_typlenbyval(aggref->aggtype,
 						&peragg->resulttypeLen,
@@ -3095,16 +2894,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		 * initval is potentially null, so don't try to access it as a struct
 		 * field. Must do it the hard way with SysCacheGetAttr.
 		 */
-#ifdef XCP
-		/*
-		 * If this is Phase2 get collect initial value instead
-		 */
-		if (node->aggdistribution == AGG_MASTER)
-			textInitVal = SysCacheGetAttr(AGGFNOID, aggTuple,
-										  Anum_pg_aggregate_agginitcollect,
-										  &pertrans->initValueIsNull);
-		else
-#endif /* XCP */
 		textInitVal = SysCacheGetAttr(AGGFNOID, aggTuple,
 									  Anum_pg_aggregate_agginitval,
 									  &initValueIsNull);
@@ -3187,10 +2976,6 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 	int			naggs;
 	int			i;
 
-	/* FIXME added to make the code to compile */
-	HeapTuple	aggTuple;
-	Datum		textInitVal;
-
 	/* Begin filling in the pertrans data */
 	pertrans->aggref = aggref;
 	pertrans->aggCollation = aggref->inputcollid;
@@ -3261,14 +3046,11 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 									 numDirectArgs,
 									 aggref->aggvariadic,
 									 aggtranstype,
-									 InvalidOid,	/* FIXME aggcollecttype */
 									 aggref->inputcollid,
 									 aggtransfn,
-									 InvalidOid,	/* FIXME aggcollectfn */
 									 InvalidOid,	/* no inverse transfn */
 									 &transfnexpr,
-									 NULL,
-									 NULL);			/* FIXME collectfnexpr*/
+									 NULL);
 		fmgr_info(aggtransfn, &pertrans->transfn);
 		fmgr_info_set_expr((Node *) transfnexpr, &pertrans->transfn);
 
@@ -3277,43 +3059,6 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 								 pertrans->numTransInputs + 1,
 								 pertrans->aggCollation,
 								 (void *) aggstate, NULL);
-
-#ifdef PGXC
-		/*
-		 * initval for collection function is potentially null, so don't try to
-		 * access it as a struct field. Must do it the hard way with
-		 * SysCacheGetAttr.
-		 *
-		 * FIXME commented out (using InvalidOid instead of aggcollecttype) to
-		 * get the code to compile.
-		 */
-		if (OidIsValid(InvalidOid))
-		{
-			textInitVal = SysCacheGetAttr(AGGFNOID, aggTuple,
-										  Anum_pg_aggregate_agginitcollect,
-										  &pertrans->initCollectValueIsNull);
-			if (pertrans->initCollectValueIsNull)
-				pertrans->initCollectValue = (Datum) 0;
-			else
-				pertrans->initCollectValue = GetAggInitVal(textInitVal,
-														   InvalidOid);	/* FIXME aggcollecttype */
-			/*
-			 * If the collectfn is strict and the initval is NULL, make sure
-			 * transtype and collecttype are the same (or at least
-			 * binary-compatible), so that it's OK to use the transition value
-			 * as the initial collectValue.	This should have been checked at agg
-			 * definition time, but just in case...
-			 */
-			if (pertrans->collectfn.fn_strict && pertrans->initValueIsNull)
-			{
-				if (!IsBinaryCoercible(aggtranstype, InvalidOid))	/* FIXME aggcollecttype */
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-							 errmsg("aggregate %u needs to have compatible transition type and collection type",
-									aggref->aggfnoid)));
-			}
-		}
-#endif /* PGXC */
 
 		/*
 		 * If the transfn is strict and the initval is NULL, make sure input

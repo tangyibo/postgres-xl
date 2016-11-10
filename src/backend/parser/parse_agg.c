@@ -1867,16 +1867,12 @@ build_aggregate_transfn_expr(Oid *agg_input_types,
 							 int agg_num_direct_inputs,
 							 bool agg_variadic,
 							 Oid agg_state_type,
-							 Oid agg_collect_type,
 							 Oid agg_input_collation,
 							 Oid transfn_oid,
-							 Oid collectfn_oid,
 							 Oid invtransfn_oid,
 							 Expr **transfnexpr,
-							 Expr **invtransfnexpr,
-							 Expr **collectfnexpr)
+							 Expr **invtransfnexpr)
 {
-	Param	   *argp;
 	List	   *args;
 	FuncExpr   *fexpr;
 	int			i;
@@ -1920,49 +1916,6 @@ build_aggregate_transfn_expr(Oid *agg_input_types,
 		else
 			*invtransfnexpr = NULL;
 	}
-#ifdef XCP
-	/* see if we have a collect function */
-	if (OidIsValid(collectfn_oid))
-	{
-		Param	   *argp2;
-		/*
-		 * Build expr tree for collect function
-		 */
-		argp = makeNode(Param);
-		argp->paramkind = PARAM_EXEC;
-		argp->paramid = -1;
-		argp->paramtype = agg_collect_type;
-		argp->paramtypmod = -1;
-		argp->location = -1;
-
-		argp2 = makeNode(Param);
-		argp2->paramkind = PARAM_EXEC;
-		argp2->paramid = -1;
-		argp2->paramtype = agg_state_type;
-		argp2->paramtypmod = -1;
-		argp2->location = -1;
-		args = list_make2(argp, argp2);
-
-		*collectfnexpr = (Expr *) makeFuncExpr(collectfn_oid,
-											 agg_collect_type,
-											 args,
-											 InvalidOid,
-											 agg_input_collation,
-											 COERCE_EXPLICIT_CALL);
-	}
-	else
-		*collectfnexpr = NULL;
-#endif
-
-	/* see if we have a final function */
-	/*
-	 * FIXME commented out to make the code compilable after 9.6 merge
-	if (!OidIsValid(finalfn_oid))
-	{
-		*finalfnexpr = NULL;
-		return;
-	}
-	*/
 }
 
 /*

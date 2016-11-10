@@ -2553,22 +2553,6 @@ DESCR("aggregate final function");
 
 DATA(insert OID = 3535 (  string_agg_transfn		PGNSP PGUID 12 1 0 0 0 f f f f f f i s 3 0 2281 "2281 25 25" _null_ _null_ _null_ _null_ _null_ string_agg_transfn _null_ _null_ _null_ ));
 DESCR("aggregate transition function");
-#ifdef PGXC
-DATA(insert OID = 7000 (  float8_collect			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 1022 "1022 1022" _null_ _null_ _null_ _null_ _null_ float8_collect _null_ _null_ _null_ ));
-DESCR("aggregate collection function");
-DATA(insert OID = 7002 (  numeric_collect			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 7018 "7018 7018" _null_ _null_ _null_ _null_ _null_ numeric_collect _null_ _null_ _null_ ));
-DESCR("aggregate collection function");
-DATA(insert OID = 7013 (  numeric_poly_collect			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 7019 "7019 7019" _null_ _null_ _null_ _null_ _null_ numeric_poly_collect _null_ _null_ _null_ ));
-DESCR("aggregate poly_collection function");
-DATA(insert OID = 7003 (  interval_collect			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 1187 "1187 1187" _null_ _null_ _null_ _null_ _null_ interval_collect _null_ _null_ _null_ ));
-DESCR("aggregate transition function");
-DATA(insert OID = 7004 (  int8_avg_collect			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 1016 "1016 1016" _null_ _null_ _null_ _null_ _null_ int8_avg_collect _null_ _null_ _null_ ));
-DESCR("AVG(int) collection function");
-DATA(insert OID = 7005 (  int8_sum_to_int8			PGNSP PGUID 12 1 0 0 0 f f f f f f i s 2 0 20 "20 20" _null_ _null_ _null_ _null_ _null_ int8_sum_to_int8 _null_ _null_ _null_ ));
-DESCR("SUM(int) collection function");
-DATA(insert OID = 7006 (  float8_regr_collect		PGNSP PGUID 12 1 0 0 0 f f f f t f i s 2 0 1022 "1022 1022" _null_ _null_ _null_ _null_ _null_ float8_regr_collect _null_ _null_ _null_ ));
-DESCR("REGR_...(double, double) collection function");
-#endif
 DATA(insert OID = 3536 (  string_agg_finalfn		PGNSP PGUID 12 1 0 0 0 f f f f f f i s 1 0 25 "2281" _null_ _null_ _null_ _null_ _null_ string_agg_finalfn _null_ _null_ _null_ ));
 DESCR("aggregate final function");
 DATA(insert OID = 3538 (  string_agg				PGNSP PGUID 12 1 0 0 0 t f f f f f i s 2 0 25 "25 25" _null_ _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
@@ -4356,8 +4340,6 @@ DATA(insert OID = 3156 (  row_to_json	   PGNSP PGUID 12 1 0 0 0 f f f f t f s s 
 DESCR("map row to json with optional pretty printing");
 DATA(insert OID = 3173 (  json_agg_transfn	 PGNSP PGUID 12 1 0 0 0 f f f f f f s s 2 0 7028 "7028 2283" _null_ _null_ _null_ _null_ _null_ json_agg_transfn _null_ _null_ _null_ ));
 DESCR("json aggregate transition function");
-DATA(insert OID = 7029 (  json_agg_collectfn	 PGNSP PGUID 12 1 0 0 0 f f f f f f s s 2 0 7028 "7028 7028" _null_ _null_ _null_ _null_ _null_ json_agg_collectfn _null_ _null_ _null_ ));
-DESCR("json aggregate collection function");
 DATA(insert OID = 3174 (  json_agg_finalfn	 PGNSP PGUID 12 1 0 0 0 f f f f f f i s 1 0 114 "7028" _null_ _null_ _null_ _null_ _null_ json_agg_finalfn _null_ _null_ _null_ ));
 DESCR("json aggregate final function");
 DATA(insert OID = 3175 (  json_agg		   PGNSP PGUID 12 1 0 0 0 t f f f f f s s 1 0 114 "2283" _null_ _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
@@ -5250,27 +5232,8 @@ DATA(insert OID = 7024 (  pgxc_is_inprogress	PGNSP PGUID 12 1 1 0 0 f f f f t t 
 DESCR("is given GXID in progress?");
 DATA(insert OID = 7011 ( pgxc_lock_for_backup PGNSP PGUID 12 1 0 0 0 f f f f t f v u 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pgxc_lock_for_backup _null_ _null_ _null_ ));
 DESCR("lock the cluster for taking backup");
-DATA(insert OID = 7014 ( numeric_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7018 "2275" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_in _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7015 ( numeric_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "7018" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_out _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7016 (  numeric_agg_state_recv		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7018 "2281" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_recv _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7017 (  numeric_agg_state_send		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 17 "7018" _null_ _null_ _null_ _null_ _null_ numeric_agg_state_send _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7020 ( numeric_poly_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7019 "2275" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_in _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7021 ( numeric_poly_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "7019" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_out _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7022 (  numeric_poly_agg_state_recv		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7019 "2281" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_recv _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7023 (  numeric_poly_agg_state_send		   PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 17 "7019" _null_ _null_ _null_ _null_ _null_ numeric_poly_agg_state_send _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7030 ( json_agg_state_in				PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 7028 "2275" _null_ _null_ _null_ _null_ _null_ json_agg_state_in _null_ _null_ _null_ ));
-DESCR("I/O");
-DATA(insert OID = 7025 ( json_agg_state_out			PGNSP PGUID 12 1 0 0 0 f f f f t f i s 1 0 2275 "7028" _null_ _null_ _null_ _null_ _null_ json_agg_state_out _null_ _null_ _null_ ));
-DESCR("I/O");
 #endif
+
 /* pg_upgrade support */
 DATA(insert OID = 3582 ( binary_upgrade_set_next_pg_type_oid PGNSP PGUID  12 1 0 0 0 f f f f t f v r 1 0 2278 "26" _null_ _null_ _null_ _null_ _null_ binary_upgrade_set_next_pg_type_oid _null_ _null_ _null_ ));
 DESCR("for use by pg_upgrade");

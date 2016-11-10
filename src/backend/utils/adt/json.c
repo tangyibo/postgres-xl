@@ -284,45 +284,6 @@ json_recv(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(cstring_to_text_with_len(str, nbytes));
 }
 
-#ifdef XCP
-Datum
-json_agg_state_in(PG_FUNCTION_ARGS)
-{
-	char	   *str = pstrdup(PG_GETARG_CSTRING(0));
-	JsonAggState *state;
-	char *token, *freestr;
-
-	state = (JsonAggState *) palloc0(sizeof (JsonAggState));
-	state->str = makeStringInfo();
-
-	freestr = str;
-
-	token = strsep(&str, ":");
-	state->val_category = atoi(token);
-	appendStringInfoString(state->str, str);
-
-	pfree(freestr);
-
-	PG_RETURN_POINTER(state);
-}
-
-/*
- * json_agg_collectfn only needs the 'val_category' for formatting purposes. So
- * only output that along with the json string
- */
-Datum
-json_agg_state_out(PG_FUNCTION_ARGS)
-{
-	JsonAggState *state = (JsonAggState *) PG_GETARG_POINTER(0);
-	char *result;
-	int len = 15 + strlen(state->str->data);
-
-	result = (char *) palloc0(len);
-	sprintf(result, "%d:%s", state->val_category, state->str->data);
-
-	PG_RETURN_CSTRING(result);
-}
-#endif
 /*
  * makeJsonLexContext
  *

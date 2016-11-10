@@ -41,19 +41,10 @@ extern void build_aggregate_transfn_expr(Oid *agg_input_types,
 							 int agg_num_direct_inputs,
 							 bool agg_variadic,
 							 Oid agg_state_type,
-#ifdef XCP
-						Oid agg_collect_type,
-#endif
 							 Oid agg_input_collation,
 							 Oid transfn_oid,
-#ifdef XCP
-						Oid collectfn_oid,
-#endif
 							 Oid invtransfn_oid,
 							 Expr **transfnexpr,
-#ifdef XCP
-						Expr **collectfnexpr,
-#endif
 							 Expr **invtransfnexpr);
 
 extern void build_aggregate_combinefn_expr(Oid agg_state_type,

@@ -3,7 +3,6 @@
  * pg_aggregate.c
  *	  routines to support manipulation of the pg_aggregate relation
  *
- * Portions Copyright (c) 2012-2014, TransLattice, Inc.
  * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -57,9 +56,6 @@ AggregateCreate(const char *aggName,
 				List *parameterDefaults,
 				Oid variadicArgType,
 				List *aggtransfnName,
-#ifdef PGXC
-				List *aggcollectfnName,
-#endif
 				List *aggfinalfnName,
 				List *aggcombinefnName,
 				List *aggserialfnName,
@@ -71,16 +67,10 @@ AggregateCreate(const char *aggName,
 				bool mfinalfnExtraArgs,
 				List *aggsortopName,
 				Oid aggTransType,
-#ifdef XCP
-				Oid aggCollectType,
-#endif
 				int32 aggTransSpace,
 				Oid aggmTransType,
 				int32 aggmTransSpace,
 				const char *agginitval,
-#ifdef PGXC
-				const char *agginitcollect,
-#endif
 				const char *aggminitval,
 				char proparallel)
 {
@@ -90,9 +80,6 @@ AggregateCreate(const char *aggName,
 	Datum		values[Natts_pg_aggregate];
 	Form_pg_proc proc;
 	Oid			transfn;
-#ifdef PGXC
-	Oid			collectfn = InvalidOid;	/* can be omitted */
-#endif
 	Oid			finalfn = InvalidOid;	/* can be omitted */
 	Oid			combinefn = InvalidOid; /* can be omitted */
 	Oid			serialfn = InvalidOid;	/* can be omitted */
@@ -280,28 +267,6 @@ AggregateCreate(const char *aggName,
 
 	ReleaseSysCache(tup);
 
-#ifdef PGXC
-	if (aggcollectfnName)
-	{
-		/*
-		 * Collection function must be of two arguments
-		 * First must be of aggCollectType, second must be of aggTransType
-		 * Return value must be of aggCollectType
-		 */
-		fnArgs[0] = aggCollectType;
-		fnArgs[1] = aggTransType;
-		collectfn = lookup_agg_function(aggcollectfnName, 2, fnArgs, variadicArgType,
-										  &rettype);
-		if (rettype != aggCollectType)
-			ereport(ERROR,
-					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("return type of collection function %s is not %s",
-							NameListToString(aggcollectfnName),
-							format_type_be(aggCollectType)
-						   )));
-	}
-#endif
-
 	/* handle moving-aggregate transfn, if supplied */
 	if (aggmtransfnName)
 	{
@@ -434,11 +399,6 @@ AggregateCreate(const char *aggName,
 		/*
 		 * If no finalfn, aggregate result type is type of the state value
 		 */
-#ifdef XCP
-		if (OidIsValid(aggCollectType))
-			finaltype = aggCollectType;
-		else
-#endif
 		finaltype = aggTransType;
 	}
 	Assert(OidIsValid(finaltype));
@@ -698,12 +658,6 @@ AggregateCreate(const char *aggName,
 	values[Anum_pg_aggregate_aggmfinalextra - 1] = BoolGetDatum(mfinalfnExtraArgs);
 	values[Anum_pg_aggregate_aggsortop - 1] = ObjectIdGetDatum(sortop);
 	values[Anum_pg_aggregate_aggtranstype - 1] = ObjectIdGetDatum(aggTransType);
-#ifdef PGXC
-	values[Anum_pg_aggregate_aggcollectfn - 1] = ObjectIdGetDatum(collectfn);
-#endif
-#ifdef XCP
-	values[Anum_pg_aggregate_aggcollecttype - 1] = ObjectIdGetDatum(aggCollectType);
-#endif
 	values[Anum_pg_aggregate_aggtransspace - 1] = Int32GetDatum(aggTransSpace);
 	values[Anum_pg_aggregate_aggmtranstype - 1] = ObjectIdGetDatum(aggmTransType);
 	values[Anum_pg_aggregate_aggmtransspace - 1] = Int32GetDatum(aggmTransSpace);
@@ -711,12 +665,6 @@ AggregateCreate(const char *aggName,
 		values[Anum_pg_aggregate_agginitval - 1] = CStringGetTextDatum(agginitval);
 	else
 		nulls[Anum_pg_aggregate_agginitval - 1] = true;
-#ifdef PGXC
-	if (agginitcollect)
-		values[Anum_pg_aggregate_agginitcollect - 1] = CStringGetTextDatum(agginitcollect);
-	else
-		nulls[Anum_pg_aggregate_agginitcollect - 1] = true;
-#endif
 	if (aggminitval)
 		values[Anum_pg_aggregate_aggminitval - 1] = CStringGetTextDatum(aggminitval);
 	else
@@ -745,17 +693,6 @@ AggregateCreate(const char *aggName,
 	referenced.objectSubId = 0;
 	recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
 
-#ifdef PGXC
-	if (OidIsValid(collectfn))
-	{
-		/* Depends on collection function */
-		referenced.classId = ProcedureRelationId;
-		referenced.objectId = collectfn;
-		referenced.objectSubId = 0;
-		recordDependencyOn(&myself, &referenced, DEPENDENCY_NORMAL);
-	}
-
-#endif
 	/* Depends on final function, if any */
 	if (OidIsValid(finalfn))
 	{

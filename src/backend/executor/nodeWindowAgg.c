@@ -106,9 +106,6 @@ typedef struct WindowStatePerAggData
 	/* Oids of transition functions */
 	Oid			transfn_oid;
 	Oid			invtransfn_oid; /* may be InvalidOid */
-#ifdef PGXC
-	Oid			collectfn_oid;
-#endif	
 	Oid			finalfn_oid;	/* may be InvalidOid */
 
 	/*
@@ -2105,22 +2102,13 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 	HeapTuple	aggTuple;
 	Form_pg_aggregate aggform;
 	Oid			aggtranstype;
-#ifdef XCP
-	Oid			aggcollecttype;
-#endif
 	AttrNumber	initvalAttNo;
 	AclResult	aclresult;
 	Oid			transfn_oid,
-#ifdef XCP
-				collectfn_oid,
-#endif
 				invtransfn_oid,
 				finalfn_oid;
 	bool		finalextra;
 	Expr	   *transfnexpr,
-#ifdef XCP
-			   *collectfnexpr,
-#endif
 			   *invtransfnexpr,
 			   *finalfnexpr;
 	Datum		textInitVal;
@@ -2156,9 +2144,6 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 		!contain_volatile_functions((Node *) wfunc))
 	{
 		peraggstate->transfn_oid = transfn_oid = aggform->aggmtransfn;
-#ifdef XCP
-		peraggstate->collectfn_oid = collectfn_oid = InvalidOid;
-#endif
 		peraggstate->invtransfn_oid = invtransfn_oid = aggform->aggminvtransfn;
 		peraggstate->finalfn_oid = finalfn_oid = aggform->aggmfinalfn;
 		finalextra = aggform->aggmfinalextra;
@@ -2168,9 +2153,6 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 	else
 	{
 		peraggstate->transfn_oid = transfn_oid = aggform->aggtransfn;
-#ifdef XCP
-		peraggstate->collectfn_oid = collectfn_oid = aggform->aggcollectfn;
-#endif
 		peraggstate->invtransfn_oid = invtransfn_oid = InvalidOid;
 		peraggstate->finalfn_oid = finalfn_oid = aggform->aggfinalfn;
 		finalextra = aggform->aggfinalextra;
@@ -2230,9 +2212,6 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 	else
 		peraggstate->numFinalArgs = 1;
 
-#ifdef XCP
-	aggcollecttype = aggform->aggcollecttype;
-#endif
 	/* resolve actual type of transition state, if polymorphic */
 	aggtranstype = resolve_aggregate_transtype(wfunc->winfnoid,
 											   aggtranstype,
@@ -2240,21 +2219,16 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 											   numArguments);
 
 	/* build expression trees using actual argument & result types */
-
-	/* build expression trees using actual argument & result types */
 	build_aggregate_transfn_expr(inputTypes,
 								 numArguments,
 								 0,		/* no ordered-set window functions yet */
 								 false, /* no variadic window functions yet */
-								 aggtranstype,
-								 aggcollecttype,
+								 wfunc->wintype,
 								 wfunc->inputcollid,
 								 transfn_oid,
-								 collectfn_oid,
 								 invtransfn_oid,
 								 &transfnexpr,
-								 &invtransfnexpr,
-								 &collectfnexpr);
+								 &invtransfnexpr);
 
 	/* set up infrastructure for calling the transfn(s) and finalfn */
 	fmgr_info(transfn_oid, &peraggstate->transfn);

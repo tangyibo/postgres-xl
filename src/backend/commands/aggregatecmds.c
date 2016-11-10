@@ -4,7 +4,6 @@
  *
  *	  Routines for aggregate-manipulation commands
  *
- * Portions Copyright (c) 2012-2014, TransLattice, Inc.
  * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
@@ -73,13 +72,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	List	   *sortoperatorName = NIL;
 	TypeName   *baseType = NULL;
 	TypeName   *transType = NULL;
-#ifdef XCP
-	TypeName   *collectType = NULL;
-#endif
-#ifdef PGXC
-	List	   *collectfuncName = NIL;
-	char	   *initcollect = NULL;
-#endif
 	TypeName   *mtransType = NULL;
 	int32		transSpace = 0;
 	int32		mtransSpace = 0;
@@ -95,9 +87,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 	List	   *parameterDefaults;
 	Oid			variadicArgType;
 	Oid			transTypeId;
-#ifdef XCP
-	Oid			collectTypeId;
-#endif
 	Oid			mtransTypeId = InvalidOid;
 	char		transTypeType;
 	char		mtransTypeType = 0;
@@ -175,10 +164,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 			transType = defGetTypeName(defel);
 		else if (pg_strcasecmp(defel->defname, "stype1") == 0)
 			transType = defGetTypeName(defel);
-#ifdef XCP
-		else if (pg_strcasecmp(defel->defname, "ctype") == 0)
-			collectType = defGetTypeName(defel);
-#endif
 		else if (pg_strcasecmp(defel->defname, "sspace") == 0)
 			transSpace = defGetInt32(defel);
 		else if (pg_strcasecmp(defel->defname, "mstype") == 0)
@@ -189,12 +174,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 			initval = defGetString(defel);
 		else if (pg_strcasecmp(defel->defname, "initcond1") == 0)
 			initval = defGetString(defel);
-#ifdef PGXC
-		else if (pg_strcasecmp(defel->defname, "cfunc") == 0)
-			collectfuncName = defGetQualifiedName(defel);
-		else if (pg_strcasecmp(defel->defname, "initcollect") == 0)
-			initcollect = defGetString(defel);
-#endif
 		else if (pg_strcasecmp(defel->defname, "minitcond") == 0)
 			minitval = defGetString(defel);
 		else if (pg_strcasecmp(defel->defname, "parallel") == 0)
@@ -217,17 +196,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 				 errmsg("aggregate sfunc must be specified")));
-
-#ifdef XCP
-	if (collectfuncName && collectType == NULL)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-				 errmsg("if aggregate cfunc is defined aggregate ctype must be specified")));
-	if (collectType && collectfuncName == NIL)
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-				 errmsg("if aggregate ctype is defined aggregate cfunc must be specified")));
-#endif
 
 	/*
 	 * if mtransType is given, mtransfuncName and minvtransfuncName must be as
@@ -361,30 +329,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 							format_type_be(transTypeId))));
 	}
 
-#ifdef XCP
-	/*
-	 * look up the aggregate's collecttype.
-	 *
-	 * to the collecttype applied all the limitations as to the transtype.
-	 */
-	if (collectType)
-	{
-		collectTypeId = typenameTypeId(NULL, collectType);
-		if (get_typtype(collectTypeId) == TYPTYPE_PSEUDO &&
-			!IsPolymorphicType(collectTypeId))
-		{
-			if (collectTypeId == INTERNALOID && superuser())
-				 /* okay */ ;
-			else
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-						 errmsg("aggregate collection data type cannot be %s",
-								format_type_be(collectTypeId))));
-		}
-	}
-	else
-		collectTypeId = InvalidOid;
-#endif
 	if (serialfuncName && deserialfuncName)
 	{
 		/*
@@ -486,9 +430,6 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 						   parameterDefaults,
 						   variadicArgType,
 						   transfuncName,		/* step function name */
-#ifdef PGXC
-						   collectfuncName,	/* collect function name */
-#endif
 						   finalfuncName,		/* final function name */
 						   combinefuncName,		/* combine function name */
 						   serialfuncName,		/* serial function name */
@@ -500,16 +441,10 @@ DefineAggregate(List *name, List *args, bool oldstyle, List *parameters,
 						   mfinalfuncExtraArgs,
 						   sortoperatorName,	/* sort operator name */
 						   transTypeId, /* transition data type */
-#ifdef XCP
-						   collectTypeId,	/* collection data type */
-#endif
 						   transSpace,	/* transition space */
 						   mtransTypeId,		/* transition data type */
 						   mtransSpace, /* transition space */
 						   initval,		/* initial condition */
-#ifdef PGXC
-						   initcollect,	/* initial condition for collection function */
-#endif
 						   minitval,	/* initial condition */
 						   proparallel);		/* parallel safe? */
 }

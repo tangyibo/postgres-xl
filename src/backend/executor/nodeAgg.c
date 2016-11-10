@@ -163,7 +163,6 @@
 #include "optimizer/tlist.h"
 #include "parser/parse_agg.h"
 #include "parser/parse_coerce.h"
-#include "pgxc/pgxc.h"
 #include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
@@ -221,7 +220,6 @@ typedef struct AggStatePerTransData
 
 	/* Oid of the state transition or combine function */
 	Oid			transfn_oid;
-	Oid			finalfn_oid;	/* may be InvalidOid */
 
 	/* Oid of the serialization function or InvalidOid */
 	Oid			serialfn_oid;
@@ -242,7 +240,6 @@ typedef struct AggStatePerTransData
 	 * particular that the fn_strict flag is kept here.
 	 */
 	FmgrInfo	transfn;
-	FmgrInfo	finalfn;
 
 	/* fmgr lookup data for serialization function */
 	FmgrInfo	serialfn;
@@ -287,11 +284,8 @@ typedef struct AggStatePerTransData
 	 * DISTINCT aggs with just one argument, so there is only one input type.
 	 */
 	int16		inputtypeLen,
-				resulttypeLen,
 				transtypeLen;
-
 	bool		inputtypeByVal,
-				resulttypeByVal,
 				transtypeByVal;
 
 	/*
@@ -1352,9 +1346,10 @@ finalize_aggregate(AggState *aggstate,
 								 numFinalArgs,
 								 pertrans->aggCollation,
 								 (void *) aggstate, NULL);
+
+		/* Fill in the transition state value */
 		fcinfo.arg[0] = pergroupstate->transValue;
 		fcinfo.argnull[0] = pergroupstate->transValueIsNull;
-
 		anynull |= pergroupstate->transValueIsNull;
 
 		/* Fill any remaining argument positions with nulls */
@@ -2296,7 +2291,6 @@ agg_retrieve_hash_table(AggState *aggstate)
 	return NULL;
 }
 
-
 /* -----------------
  * ExecInitAgg
  *
@@ -2650,14 +2644,13 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		int			numDirectArgs;
 		HeapTuple	aggTuple;
 		Form_pg_aggregate aggform;
-		Oid			aggtranstype;
 		AclResult	aclresult;
 		Oid			transfn_oid,
 					finalfn_oid;
-		Expr	   *transfnexpr,
-				   *finalfnexpr;
 		Oid			serialfn_oid,
 					deserialfn_oid;
+		Expr	   *finalfnexpr;
+		Oid			aggtranstype;
 		Datum		textInitVal;
 		Datum		initValue;
 		bool		initValueIsNull;
@@ -2700,9 +2693,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			aclcheck_error(aclresult, ACL_KIND_PROC,
 						   get_func_name(aggref->aggfnoid));
 		InvokeFunctionExecuteHook(aggref->aggfnoid);
-
-		pertrans->transfn_oid = transfn_oid = aggform->aggtransfn;
-		pertrans->finalfn_oid = finalfn_oid = aggform->aggfinalfn;
 
 		/* planner recorded transition state type in the Aggref itself */
 		aggtranstype = aggref->aggtranstype;
@@ -2793,7 +2783,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 								   get_func_name(finalfn_oid));
 				InvokeFunctionExecuteHook(finalfn_oid);
 			}
-
 			if (OidIsValid(serialfn_oid))
 			{
 				aclresult = pg_proc_aclcheck(serialfn_oid, aggOwner,
@@ -2830,28 +2819,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		else
 			peragg->numFinalArgs = numDirectArgs + 1;
 
-		/* resolve actual type of transition state, if polymorphic */
-		aggtranstype = resolve_aggregate_transtype(aggref->aggfnoid,
-												   aggform->aggtranstype,
-												   inputTypes,
-												   numArguments);
-
-		/* build expression trees using actual argument & result types */
-		build_aggregate_transfn_expr(inputTypes,
-								numArguments,
-								numDirectArgs,
-								aggref->aggvariadic,
-								aggtranstype,
-								aggref->inputcollid,
-								transfn_oid,
-								InvalidOid,		/* invtrans is not needed here */
-								&transfnexpr,
-								NULL);
-
-		/* set up infrastructure for calling the transfn and finalfn */
-		fmgr_info(transfn_oid, &pertrans->transfn);
-		fmgr_info_set_expr((Node *) transfnexpr, &pertrans->transfn);
-
 		/*
 		 * build expression trees using actual argument & result types for the
 		 * finalfn, if it exists and is required.
@@ -2868,22 +2835,6 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 			fmgr_info(finalfn_oid, &peragg->finalfn);
 			fmgr_info_set_expr((Node *) finalfnexpr, &peragg->finalfn);
 		}
-
-		pertrans->aggCollation = aggref->inputcollid;
-
-		InitFunctionCallInfoData(pertrans->transfn_fcinfo,
-								 &pertrans->transfn,
-								 pertrans->numTransInputs + 1,
-								 pertrans->aggCollation,
-								 (void *) aggstate, NULL);
-
-		/* get info about relevant datatypes */
-		get_typlenbyval(aggref->aggtype,
-						&pertrans->resulttypeLen,
-						&pertrans->resulttypeByVal);
-		get_typlenbyval(aggtranstype,
-						&pertrans->transtypeLen,
-						&pertrans->transtypeByVal);
 
 		/* get info about the output value's datatype */
 		get_typlenbyval(aggref->aggtype,
@@ -3048,7 +2999,7 @@ build_pertrans_for_aggref(AggStatePerTrans pertrans,
 									 aggtranstype,
 									 aggref->inputcollid,
 									 aggtransfn,
-									 InvalidOid,	/* no inverse transfn */
+									 InvalidOid,
 									 &transfnexpr,
 									 NULL);
 		fmgr_info(aggtransfn, &pertrans->transfn);

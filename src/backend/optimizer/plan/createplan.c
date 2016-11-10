@@ -6474,7 +6474,6 @@ find_referenced_cols_walker(Node *node, find_referenced_cols_context *context)
 			HeapTuple	aggTuple;
 			Form_pg_aggregate aggform;
 			Oid 	aggtranstype;
-			Oid 	aggcollecttype;
 
 			aggTuple = SearchSysCache1(AGGFNOID,
 									   ObjectIdGetDatum(aggref->aggfnoid));

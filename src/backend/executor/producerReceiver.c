@@ -72,7 +72,7 @@ producerStartupReceiver(DestReceiver *self, int operation, TupleDesc typeinfo)
 /*
  * Receive a tuple from the executor and dispatch it to the proper consumer
  */
-static void
+static bool
 producerReceiveSlot(TupleTableSlot *slot, DestReceiver *self)
 {
 	ProducerState *myState = (ProducerState *) self;
@@ -122,6 +122,8 @@ producerReceiveSlot(TupleTableSlot *slot, DestReceiver *self)
 			myState->othercount++;
 		}
 	}
+
+	return true;
 }
 
 

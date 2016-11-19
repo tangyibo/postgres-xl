@@ -28,7 +28,6 @@
 #include "nodes/nodeFuncs.h"
 #include "nodes/relation.h"
 #include "optimizer/clauses.h"
-#include "optimizer/pgxcplan.h"
 #include "optimizer/pgxcship.h"
 #include "optimizer/tlist.h"
 #include "parser/parsetree.h"
@@ -125,6 +124,10 @@ static void pgxc_reset_shippability_reason(Shippability_context *context,
 /* Evaluation of shippability */
 static bool pgxc_shippability_walker(Node *node, Shippability_context *sc_context);
 static void pgxc_set_exprtype_shippability(Oid exprtype, Shippability_context *sc_context);
+
+static ExecNodes *pgxc_is_join_shippable(ExecNodes *inner_en, ExecNodes *outer_en,
+						Relids in_relids, Relids out_relids, JoinType jointype,
+						List *join_quals, List *rtables);
 
 /* Fast-query shipping (FQS) functions */
 static ExecNodes *pgxc_FQS_get_relation_nodes(RangeTblEntry *rte,
@@ -1713,7 +1716,7 @@ pgxc_merge_exec_nodes(ExecNodes *en1, ExecNodes *en2)
  *
  * The first step is to be applied by the caller of this function.
  */
-ExecNodes *
+static ExecNodes *
 pgxc_is_join_shippable(ExecNodes *inner_en, ExecNodes *outer_en, Relids in_relids,
 						Relids out_relids, JoinType jointype, List *join_quals,
 						List *rtables)

@@ -5650,13 +5650,9 @@ AtEOXact_GUC(bool isCommit, int nestLevel)
 				/* XXX perhaps this should use is_missing=false, not sure */
 				newvalStr = GetConfigOptionByName(gconf->name, NULL, true);
 
-				/*
-				 * Quote value if it is including memory or time units
-				 */
-				if (newvalStr && (gconf->flags & (GUC_UNIT_MEMORY | GUC_UNIT_TIME)))
-					newvalStr = quote_identifier(newvalStr);
 				if (newvalStr)
-					PGXCNodeSetParam((stack->state == GUC_LOCAL), gconf->name, newvalStr);
+					PGXCNodeSetParam((stack->state == GUC_LOCAL), gconf->name,
+							newvalStr, gconf->flags);
 			}
 
 			/* Finish popping the state stack */
@@ -6981,38 +6977,24 @@ set_config_option(const char *name, const char *value,
 		initStringInfo(&poolcmd);
 
 		/*
-		 * We are getting parse error when sending down
-		 * SET transaction_isolation TO read committed;
-		 * XXX generic solution?
-		 */
-		if (value && strcmp("transaction_isolation", name) == 0)
-			value = quote_identifier(value);
-
-		if (value && strcmp("default_transaction_isolation", name) == 0)
-			value = quote_identifier(value);
-
-		/*
-		 * Quote value if it is including memory or time units
-		 */
-		if (value && (record->flags & (GUC_UNIT_MEMORY | GUC_UNIT_TIME)))
-			value = quote_identifier(value);
-
-		/*
 		 * Save new parameter value with the node manager.
 		 * XXX here we may check: if value equals to configuration default
 		 * just reset parameter instead. Minus one table entry, shorter SET
 		 * command sent downn... Sounds like optimization.
 		 */
+
 		if (action == GUC_ACTION_LOCAL)
 		{
 			if (IsTransactionBlock())
-				PGXCNodeSetParam(true, name, value);
+				PGXCNodeSetParam(true, name, value, record->flags);
+			value = quote_guc_value(value, record->flags);
 			appendStringInfo(&poolcmd, "SET LOCAL %s TO %s", name,
 					(value ? value : "DEFAULT"));
 		}
 		else
 		{
-			PGXCNodeSetParam(false, name, value);
+			PGXCNodeSetParam(false, name, value, record->flags);
+			value = quote_guc_value(value, record->flags);
 			appendStringInfo(&poolcmd, "SET %s TO %s", name,
 					(value ? value : "DEFAULT"));
 		}
@@ -10938,6 +10920,33 @@ check_storm_catalog_remap_string(char **newval, void **extra, GucSource source)
 
 	pfree(buf.data);
 	return true;
+}
+#endif
+
+#ifdef XCP
+/*
+ * Return a quoted GUC value, when necessary
+ */
+char *
+quote_guc_value(const char *value, int flags)
+{
+	if (value == NULL)
+		return value;
+
+	/*
+	 * If the GUC rceives list input, then the individual elements in the list
+	 * must be already quoted correctly by flatten_set_variable_args(). We must
+	 * not quote the entire value again
+	 */
+	if (flags & GUC_LIST_INPUT)
+	   return value;
+
+	/*
+	 * Otherwise quote the value. quote_identifier() takes care of correctly
+	 * quoting the value when needed, including GUC_UNIT_MEMORY and
+	 * GUC_UNIT_TIME values.
+	 */
+	return quote_identifier(value);
 }
 #endif
 #include "guc-file.c"

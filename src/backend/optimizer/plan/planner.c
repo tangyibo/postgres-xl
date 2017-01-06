@@ -904,6 +904,10 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 		}
 	}
 
+	/*
+	 * XXX This is a bit strange. root->recursiveOk is set to true explicitly,
+	 * and now we check it. Harmless, but confusing.
+	 */
 	if (root->recursiveOk)
 		root->recursiveOk = recursiveOk;
 

@@ -503,6 +503,14 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	ListCell   *l;
 	bool recursiveOk = true;
 
+#ifdef XCP
+	/* XL currently does not support DML in subqueries. */
+	if ((parse->commandType != CMD_SELECT) && (parent_root->query_level > 0))
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("INSERT/UPDATE/DELETE is not supported in subquery")));
+#endif
+
 	/* Create a PlannerInfo data structure for this subquery */
 	root = makeNode(PlannerInfo);
 	root->parse = parse;
@@ -823,13 +831,6 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	 * extParam/allParam calculations later.
 	 */
 	SS_identify_outer_params(root);
-
-#ifdef XCP
-	if (root->query_level > 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("INSERT/UPDATE/DELETE is not supported in subquery")));
-#endif
 
 	/*
 	 * If any initPlans were created in this query level, increment the

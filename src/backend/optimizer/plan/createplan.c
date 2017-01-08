@@ -307,6 +307,10 @@ static int add_sort_column(AttrNumber colIdx, Oid sortOp, Oid coll,
 				Oid *sortOperators, Oid *collations, bool *nullsFirst);
 #endif
 
+static RemoteSubplan *find_push_down_plan(Plan *plan, bool force);
+static RemoteSubplan *find_delete_push_down_plan(PlannerInfo *root, Plan *plan,
+		bool force, Plan **parent);
+
 /*
  * create_plan
  *	  Creates the access plan for a query by recursively processing the
@@ -2459,13 +2463,13 @@ find_push_down_plan_int(PlannerInfo *root, Plan *plan, bool force, bool delete, 
 	return NULL;
 }
 
-RemoteSubplan *
+static RemoteSubplan *
 find_push_down_plan(Plan *plan, bool force)
 {
 	return find_push_down_plan_int(NULL, plan, force, false, NULL);
 }
 
-RemoteSubplan *
+static RemoteSubplan *
 find_delete_push_down_plan(PlannerInfo *root,
 		Plan *plan,
 		bool force,

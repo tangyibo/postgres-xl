@@ -69,6 +69,11 @@ extern Agg *make_agg(List *tlist, List *qual,
 		 double dNumGroups, Plan *lefttree);
 extern Limit *make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
 						 int64 offset_est, int64 count_est);
+extern RemoteSubplan *make_remotesubplan(PlannerInfo *root,
+				   Plan *lefttree,
+				   Distribution *resultDistribution,
+				   Distribution *execDistribution,
+				   List *pathkeys);
 
 /*
  * prototypes for plan/initsplan.c
@@ -118,16 +123,5 @@ extern void extract_query_dependencies(Node *query,
 						   List **relationOids,
 						   List **invalItems,
 						   bool *hasRowSecurity);
-
-#ifdef PGXC
-extern RemoteSubplan *find_push_down_plan(Plan *plan, bool force);
-extern RemoteSubplan *find_delete_push_down_plan(PlannerInfo *root, Plan *plan,
-		bool force, Plan **parent);
-extern RemoteSubplan *make_remotesubplan(PlannerInfo *root,
-				   Plan *lefttree,
-				   Distribution *resultDistribution,
-				   Distribution *execDistribution,
-				   List *pathkeys);
-#endif /* PGXC */
 
 #endif   /* PLANMAIN_H */

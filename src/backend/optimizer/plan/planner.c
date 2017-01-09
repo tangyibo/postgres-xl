@@ -505,7 +505,8 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 
 #ifdef XCP
 	/* XL currently does not support DML in subqueries. */
-	if ((parse->commandType != CMD_SELECT) && (parent_root->query_level > 0))
+	if ((parse->commandType != CMD_SELECT) &&
+		((parent_root ? parent_root->query_level + 1 : 1) > 1))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("INSERT/UPDATE/DELETE is not supported in subquery")));

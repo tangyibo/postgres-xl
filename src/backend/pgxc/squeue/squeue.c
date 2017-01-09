@@ -120,6 +120,7 @@ typedef struct SQueueHeader
  */
 static HTAB *SharedQueues = NULL;
 static LWLockPadded *SQueueLocks = NULL;
+static LWLockTranche SharedQueueLocksTranche;
 
 /*
  * Pool of synchronization items
@@ -224,19 +225,21 @@ SharedQueuesInit(void)
 	{
 		int	i, l;
 		int	nlocks = (NUM_SQUEUES * (MaxDataNodes-1));
-		LWLockTranche	tranche;
+		bool	foundLocks;
 
 		/* Initialize LWLocks for queues */
-		SQueueLocks = (LWLockPadded *) ShmemAlloc(sizeof(LWLockPadded) * nlocks);
+		SQueueLocks = (LWLockPadded *) ShmemInitStruct("Shared Queue Locks",
+						sizeof(LWLockPadded) * nlocks, &foundLocks);
 
-		tranche.name = "Shared Queue Locks";
-		tranche.array_base = SQueueLocks;
-		tranche.array_stride = sizeof(LWLockPadded);
+		/* either both syncs and locks, or none of them */
+		Assert(! foundLocks);
+
+		SharedQueueLocksTranche.name = "Shared Queue Locks";
+		SharedQueueLocksTranche.array_base = SQueueLocks;
+		SharedQueueLocksTranche.array_stride = sizeof(LWLockPadded);
 
 		/* Register the trannche tranche in the main tranches array */
-		LWLockRegisterTranche(LWTRANCHE_SHARED_QUEUES, &tranche);
-
-		Assert(SQueueLocks == GetNamedLWLockTranche("Shared Queue Locks"));
+		LWLockRegisterTranche(LWTRANCHE_SHARED_QUEUES, &SharedQueueLocksTranche);
 
 		l = 0;
 		for (i = 0; i < NUM_SQUEUES; i++)
@@ -249,6 +252,10 @@ SharedQueuesInit(void)
 			for (j = 0; j < MaxDataNodes-1; j++)
 			{
 				InitSharedLatch(&sqs->sqs_consumer_sync[j].cs_latch);
+
+				LWLockInitialize(&(SQueueLocks[l]).lock,
+								 LWTRANCHE_SHARED_QUEUES);
+
 				sqs->sqs_consumer_sync[j].cs_lwlock = &(SQueueLocks[l++]).lock;
 			}
 		}

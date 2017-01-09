@@ -269,7 +269,7 @@ static void get_set_pwd(FILE *cmdfd);
 static void setup_depend(FILE *cmdfd);
 static void setup_sysviews(FILE *cmdfd);
 #ifdef PGXC
-static void setup_nodeself(void);
+static void setup_nodeself(FILE *cmdfd);
 #endif
 static void setup_description(FILE *cmdfd);
 static void setup_collation(FILE *cmdfd);
@@ -1747,26 +1747,13 @@ setup_sysviews(FILE *cmdfd)
  * which is the node currently initialized.
  */
 static void
-setup_nodeself(void)
+setup_nodeself(FILE *cmdfd)
 {
-	PG_CMD_DECL;
-
 	fputs(_("creating cluster information ... "), stdout);
 	fflush(stdout);
 
-	snprintf(cmd, sizeof(cmd),
-			 "\"%s\" %s template1 >%s",
-			 backend_exec, backend_options,
-			 DEVNULL);
-
-	PG_CMD_OPEN;
-
 	PG_CMD_PRINTF1("CREATE NODE %s WITH (type = 'coordinator');\n",
 				   nodename);
-
-	PG_CMD_CLOSE;
-
-	check_ok();
 }
 #endif
 
@@ -2345,11 +2332,8 @@ make_template0(FILE *cmdfd)
 		/*
 		 * Finally vacuum to clean up dead rows in pg_database
 		 */
-#ifdef XCP
-		"VACUUM pg_catalog.pg_database;\n",
-#else
-		"VACUUM pg_database;\n\n",
-#endif
+		"VACUUM pg_catalog.pg_database;\n\n",
+
 		NULL
 	};
 
@@ -3394,7 +3378,7 @@ initialize_data_directory(void)
 
 #ifdef PGXC
 	/* Initialize catalog information about the node self */
-	setup_nodeself();
+	setup_nodeself(cmdfd);
 #endif
 	setup_description(cmdfd);
 

@@ -4393,6 +4393,8 @@ create_limit_path(PlannerInfo *root, RelOptInfo *rel,
 	pathnode->limitOffset = limitOffset;
 	pathnode->limitCount = limitCount;
 
+	pathnode->path.distribution = copyObject(subpath->distribution);
+
 	/*
 	 * Adjust the output rows count and costs according to the offset/limit.
 	 * This is only a cosmetic issue if we are at top level, but if we are

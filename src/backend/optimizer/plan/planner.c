@@ -2142,9 +2142,42 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 		 */
 		if (limit_needed(parse))
 		{
-			/* Put Limit on top of a RemoteSubplan, if needed. */
+			/* If needed, add a LimitPath on top of a RemoteSubplan. */
 			if (path->distribution)
+			{
+				/*
+				 * Try to push down LIMIT clause to the remote node, in order
+				 * to limit the number of rows that get shipped over network.
+				 * This can be done even if there is an ORDER BY clause, as
+				 * long as we fetch at least (limit + offset) rows from all the
+				 * nodes and then do a local sort and apply the original limit.
+				 *
+				 * We can only push down the LIMIT clause when it's a constant.
+				 * Similarly, if the OFFSET is specified, then it must be constant
+				 * too.
+				 *
+				 * Simple expressions get folded into constants by the time we come
+				 * here. So this works well in case of constant expressions such as
+				 *
+				 *     SELECT .. LIMIT (1024 * 1024);
+				 */
+				if (parse->limitCount && IsA(parse->limitCount, Const) &&
+					((parse->limitOffset == NULL) || IsA(parse->limitOffset, Const)))
+				{
+					Node *limitCount = (Node *) makeConst(INT8OID, -1,
+												   InvalidOid,
+												   sizeof(int64),
+									   Int64GetDatum(offset_est + count_est),
+												   false, FLOAT8PASSBYVAL);
+
+					path = (Path *) create_limit_path(root, final_rel, path,
+											  NULL,
+											  limitCount, /* LIMIT + OFFSET */
+											  0, offset_est + count_est);
+				}
+
 				path = create_remotesubplan_path(root, path, NULL);
+			}
 
 			path = (Path *) create_limit_path(root, final_rel, path,
 											  parse->limitOffset,

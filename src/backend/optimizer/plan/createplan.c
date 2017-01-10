@@ -6804,9 +6804,6 @@ make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
 {
 	Limit	   *node = makeNode(Limit);
 	Plan	   *plan = &node->plan;
-#ifdef XCP
-	RemoteSubplan *pushdown;
-#endif
 
 	plan->targetlist = lefttree->targetlist;
 	plan->qual = NIL;
@@ -6815,51 +6812,6 @@ make_limit(Plan *lefttree, Node *limitOffset, Node *limitCount,
 
 	node->limitOffset = limitOffset;
 	node->limitCount = limitCount;
-
-#ifdef XCP
-	/*
-	 * We want to push down LIMIT clause to the remote side in order to limit
-	 * the number of rows that get shipped from the remote side. This can be
-	 * done even if there is an ORDER BY clause, as long as we fetch minimum
-	 * number of rows from all the nodes and then do a local sort and apply the
-	 * final limit.
-	 *
-	 * We can't push down limit clause unless its a constant. Similarly, if the
-	 * OFFSET is specified then it must be a constant too.
-	 *
-	 * Simple expressions get folded into constants by the time we come here.
-	 * So this works well in case of constant expressions such as
-	 * 	SELECT .. LIMIT (1024 * 1024);
-	 */
-	if (limitCount && IsA(limitCount, Const) &&
-		((limitOffset == NULL) || IsA(limitOffset, Const)))
-	{
-		/*
-		 * We may reduce amount of rows sent over the network and do not send more
-		 * rows then necessary
-		 */
-		pushdown = find_push_down_plan(lefttree, true);
-		if (pushdown)
-		{
-			Limit	   *node1 = makeNode(Limit);
-			Plan	   *plan1 = &node1->plan;
-
-			copy_plan_costsize(plan1, pushdown->scan.plan.lefttree);
-			plan1->targetlist = pushdown->scan.plan.lefttree->targetlist;
-			plan1->qual = NIL;
-			plan1->lefttree = pushdown->scan.plan.lefttree;
-			pushdown->scan.plan.lefttree = plan1;
-			plan1->righttree = NULL;
-
-			node1->limitOffset = NULL;
-			node1->limitCount = (Node *) makeConst(INT8OID, -1,
-												   InvalidOid,
-												   sizeof(int64),
-									   Int64GetDatum(offset_est + count_est),
-												   false, FLOAT8PASSBYVAL);
-		}
-	}
-#endif
 
 	return node;
 }

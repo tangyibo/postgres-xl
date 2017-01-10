@@ -231,6 +231,9 @@ extern Path *reparameterize_path(PlannerInfo *root, Path *path,
 					Relids required_outer,
 					double loop_count);
 
+extern Path *create_remotesubplan_path(PlannerInfo *root, Path *subpath,
+									   Distribution *distribution);
+
 /*
  * prototypes for relnode.c
  */

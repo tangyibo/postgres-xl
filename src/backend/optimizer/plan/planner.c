@@ -2140,6 +2140,10 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 		 */
 		if (limit_needed(parse))
 		{
+			/* Put Limit on top of a RemoteSubplan, if needed. */
+			if (path->distribution)
+				path = create_remotesubplan_path(root, path, NULL);
+
 			path = (Path *) create_limit_path(root, final_rel, path,
 											  parse->limitOffset,
 											  parse->limitCount,

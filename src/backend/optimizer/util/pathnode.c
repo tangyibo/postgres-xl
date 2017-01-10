@@ -1212,6 +1212,43 @@ retry_pools:
 }
 
 
+
+
+/*
+ * create_remotesubplan_path
+ *	Redistribute the data to match the distribution.
+ *
+ * Creates a RemoteSubPath on top of the path, redistributing the data
+ * according to the specified distribution.
+ */
+Path *
+create_remotesubplan_path(PlannerInfo *root, Path *subpath,
+						  Distribution *distribution)
+{
+	RelOptInfo	   *rel = subpath->parent;
+	RemoteSubPath  *pathnode;
+	Distribution   *subdistribution = subpath->distribution;
+
+	Assert(subdistribution != NULL);
+
+	pathnode = makeNode(RemoteSubPath);
+	pathnode->path.pathtype = T_RemoteSubplan;
+	pathnode->path.parent = rel;
+	pathnode->path.param_info = subpath->param_info;
+	pathnode->path.pathkeys = subpath->pathkeys;
+	pathnode->subpath = subpath;
+	pathnode->path.distribution = (Distribution *) copyObject(distribution);
+
+	pathnode->path.pathtarget = subpath->pathtarget;
+
+	cost_remote_subplan((Path *) pathnode, subpath->startup_cost,
+						subpath->total_cost, subpath->rows, rel->reltarget->width,
+						IsLocatorReplicated(subdistribution->distributionType) ?
+						bms_num_members(subdistribution->nodes) : 1);
+
+	return (Path *) pathnode;
+}
+
 /*
  * Set a RemoteSubPath on top of the specified node and set specified
  * distribution to it

@@ -161,6 +161,8 @@ static Plan *grouping_distribution(PlannerInfo *root, Plan *plan,
 					  List *current_pathkeys, Distribution **distribution);
 static bool equal_distributions(PlannerInfo *root, Distribution *dst1,
 					Distribution *dst2);
+static bool grouping_distribution_match(PlannerInfo *root, Path *path,
+					  Query *parse);
 #endif
 static PathTarget *make_sort_input_target(PlannerInfo *root,
 					   PathTarget *final_target,
@@ -4341,6 +4343,12 @@ create_distinct_paths(PlannerInfo *root,
 											 needed_pathkeys,
 											 -1.0);
 
+		/* In case of grouping / distribution mismatch, inject remote scan. */
+		if (! grouping_distribution_match(root, path, parse))
+			path = create_remotesubplan_path(root, path, NULL);
+
+		/* XXX Maybe we need another sort here? */
+
 		add_path(distinct_rel, (Path *)
 				 create_upper_unique_path(root, distinct_rel,
 										  path,
@@ -4381,12 +4389,20 @@ create_distinct_paths(PlannerInfo *root,
 
 	if (allow_hash && grouping_is_hashable(parse->distinctClause))
 	{
+		Path *input_path = cheapest_input_path;
+
+		/* If needed, inject RemoteSubplan redistributing the data. */
+		if (!grouping_distribution_match(root, input_path, parse))
+			input_path = create_remotesubplan_path(root, input_path, NULL);
+
+		/* XXX Maybe we can make this a 2-phase aggregate too? */
+
 		/* Generate hashed aggregate path --- no sort needed */
 		add_path(distinct_rel, (Path *)
 				 create_agg_path(root,
 								 distinct_rel,
-								 cheapest_input_path,
-								 cheapest_input_path->pathtarget,
+								 input_path,
+								 input_path->pathtarget,
 								 AGG_HASHED,
 								 AGGSPLIT_SIMPLE,
 								 parse->distinctClause,
@@ -5465,6 +5481,50 @@ plan_cluster_use_sort(Oid tableOid, Oid indexOid)
 
 
 #ifdef XCP
+static bool
+grouping_distribution_match(PlannerInfo *root, Path *path, Query *parse)
+{
+	int		i;
+	bool	matches_key = false;
+	Distribution *distribution = path->distribution;
+
+	int numGroupCols = list_length(parse->distinctClause);
+	AttrNumber *groupColIdx = extract_grouping_cols(parse->distinctClause,
+													parse->targetList);
+
+	/*
+	 * With no explicit data distribution or replicated tables, we can simply
+	 * push down the whole aggregation to the remote node, without any sort
+	 * of redistribution. So consider this to be a match.
+	 */
+	if ((distribution == NULL) ||
+		IsLocatorReplicated(distribution->distributionType))
+		return true;
+
+	/* But no distribution expression means 'no match'. */
+	if (distribution->distributionExpr == NULL)
+		return false;
+
+	/*
+	 * With distributed data and table distributed using an expression, we
+	 * need to check if the distribution expression matches one of the
+	 * grouping keys (arbitrary one).
+	 */
+	for (i = 0; i < numGroupCols; i++)
+	{
+		TargetEntry *te = (TargetEntry *)list_nth(parse->targetList,
+												  groupColIdx[i]-1);
+
+		if (equal(te->expr, distribution->distributionExpr))
+		{
+			matches_key = true;
+			break;
+		}
+	}
+
+	return matches_key;
+}
+
 /*
  * Grouping preserves distribution if distribution key is the
  * first grouping key or if distribution is replicated.

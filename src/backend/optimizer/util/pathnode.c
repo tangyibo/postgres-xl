@@ -3664,6 +3664,8 @@ create_sort_path(PlannerInfo *root,
 	pathnode->path.parallel_workers = subpath->parallel_workers;
 	pathnode->path.pathkeys = pathkeys;
 
+	pathnode->path.distribution = copyObject(subpath->distribution);
+
 	pathnode->subpath = subpath;
 
 	cost_sort(&pathnode->path, root, pathkeys,

@@ -2968,6 +2968,99 @@ _readExtensibleNode(void)
 	READ_DONE();
 }
 
+
+/*
+ * _readRemoteSubplan
+ */
+static RemoteSubplan *
+_readRemoteSubplan(void)
+{
+	READ_SCAN_FIELDS(RemoteSubplan);
+
+	READ_CHAR_FIELD(distributionType);
+	READ_INT_FIELD(distributionKey);
+	READ_NODE_FIELD(distributionNodes);
+	READ_NODE_FIELD(distributionRestrict);
+	READ_NODE_FIELD(nodeList);
+	READ_BOOL_FIELD(execOnAll);
+	READ_NODE_FIELD(sort);
+	READ_STRING_FIELD(cursor);
+	READ_INT_FIELD(unique);
+
+	READ_DONE();
+}
+
+
+/*
+ * _readRemoteStmt
+ */
+static RemoteStmt *
+_readRemoteStmt(void)
+{
+	int i;
+	READ_LOCALS(RemoteStmt);
+
+	READ_ENUM_FIELD(commandType, CmdType);
+	READ_BOOL_FIELD(hasReturning);
+	READ_NODE_FIELD(planTree);
+	READ_NODE_FIELD(rtable);
+	READ_NODE_FIELD(resultRelations);
+	READ_NODE_FIELD(subplans);
+	READ_INT_FIELD(nParamExec);
+	READ_INT_FIELD(nParamRemote);
+	if (local_node->nParamRemote > 0)
+	{
+		local_node->remoteparams = (RemoteParam *) palloc(
+				local_node->nParamRemote * sizeof(RemoteParam));
+		for (i = 0; i < local_node->nParamRemote; i++)
+		{
+			RemoteParam *rparam = &(local_node->remoteparams[i]);
+			token = pg_strtok(&length); /* skip  :paramkind */
+			token = pg_strtok(&length);
+			rparam->paramkind = (ParamKind) atoi(token);
+
+			token = pg_strtok(&length); /* skip  :paramid */
+			token = pg_strtok(&length);
+			rparam->paramid = atoi(token);
+
+			token = pg_strtok(&length); /* skip  :paramused */
+			token = pg_strtok(&length);
+			rparam->paramused = atoi(token);
+
+			token = pg_strtok(&length); /* skip  :paramtype */
+			if (portable_input)
+			{
+				char	   *nspname; /* namespace name */
+				char	   *typname; /* data type name */
+				token = pg_strtok(&length); /* get nspname */
+				nspname = nullable_string(token, length);
+				token = pg_strtok(&length); /* get typname */
+				typname = nullable_string(token, length);
+				if (typname)
+					rparam->paramtype = get_typname_typid(typname,
+														  NSP_OID(nspname));
+				else
+					rparam->paramtype = InvalidOid;
+			}
+			else
+			{
+				token = pg_strtok(&length);
+				rparam->paramtype = atooid(token);
+			}
+		}
+	}
+	else
+		local_node->remoteparams = NULL;
+
+	READ_NODE_FIELD(rowMarks);
+	READ_CHAR_FIELD(distributionType);
+	READ_INT_FIELD(distributionKey);
+	READ_NODE_FIELD(distributionNodes);
+	READ_NODE_FIELD(distributionRestrict);
+
+	READ_DONE();
+}
+
 /*
  * parseNodeString
  *
@@ -3198,6 +3291,10 @@ parseNodeString(void)
 		return_value = _readAlternativeSubPlan();
 	else if (MATCH("EXTENSIBLENODE", 14))
 		return_value = _readExtensibleNode();
+	else if (MATCH("REMOTESUBPLAN", 13))
+		return_value = _readRemoteSubplan();
+	else if (MATCH("REMOTESTMT", 10))
+		return_value = _readRemoteStmt();
 	else
 	{
 		elog(ERROR, "badly formatted node string \"%.32s\"...", token);

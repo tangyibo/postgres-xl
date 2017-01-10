@@ -1580,9 +1580,6 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 	RelOptInfo *final_rel;
 	ListCell   *lc;
 
-	/* distribution of the result_plan */
-	Distribution *distribution = NULL;
-
 	/* Tweak caller-supplied tuple_fraction if have LIMIT/OFFSET */
 	if (parse->limitCount || parse->limitOffset)
 	{

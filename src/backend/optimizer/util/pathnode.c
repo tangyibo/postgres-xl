@@ -1229,8 +1229,6 @@ create_remotesubplan_path(PlannerInfo *root, Path *subpath,
 	RemoteSubPath  *pathnode;
 	Distribution   *subdistribution = subpath->distribution;
 
-	Assert(subdistribution != NULL);
-
 	pathnode = makeNode(RemoteSubPath);
 	pathnode->path.pathtype = T_RemoteSubplan;
 	pathnode->path.parent = rel;
@@ -1243,7 +1241,7 @@ create_remotesubplan_path(PlannerInfo *root, Path *subpath,
 
 	cost_remote_subplan((Path *) pathnode, subpath->startup_cost,
 						subpath->total_cost, subpath->rows, rel->reltarget->width,
-						IsLocatorReplicated(subdistribution->distributionType) ?
+						(subdistribution && IsLocatorReplicated(subdistribution->distributionType)) ?
 						bms_num_members(subdistribution->nodes) : 1);
 
 	return (Path *) pathnode;

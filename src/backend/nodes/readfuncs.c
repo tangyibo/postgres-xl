@@ -192,6 +192,12 @@ set_portable_input(bool value)
 	token = pg_strtok(&length);		/* skip :plan_width */ \
 	token = pg_strtok(&length);		/* get field value */ \
 	plan_node->plan_width = atoi(token); \
+	token = pg_strtok(&length);		/* skip :parallel_aware */ \
+	token = pg_strtok(&length);		/* get field value */ \
+	plan_node->parallel_aware = strtobool(token); \
+	token = pg_strtok(&length);		/* skip :plan_node_id */ \
+	token = pg_strtok(&length);		/* get field value */ \
+	plan_node->plan_node_id = atoi(token); \
 	token = pg_strtok(&length);		/* skip :targetlist */ \
 	plan_node->targetlist = nodeRead(NULL, 0); \
 	token = pg_strtok(&length);		/* skip :qual */ \

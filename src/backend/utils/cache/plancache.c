@@ -2065,6 +2065,7 @@ SetRemoteSubplan(CachedPlanSource *plansource, const char *plan_string)
 	plan->saved_xmin = InvalidTransactionId;
 	plan->refcount = 1; /* will be referenced by plansource */
 	plan->context = plan_context;
+	plan->dependsOnRole = false;
 	if (plansource->is_saved)
 	{
 		MemoryContextSetParent(plan_context, CacheMemoryContext);

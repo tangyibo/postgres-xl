@@ -155,18 +155,13 @@ static PathTarget *make_window_input_target(PlannerInfo *root,
 						 List *activeWindows);
 static List *make_pathkeys_for_window(PlannerInfo *root, WindowClause *wc,
 						 List *tlist);
-#ifdef XCP
-static Plan *grouping_distribution(PlannerInfo *root, Plan *plan,
-					  int numGroupCols, AttrNumber *groupColIdx,
-					  List *current_pathkeys, Distribution **distribution);
+static PathTarget *make_sort_input_target(PlannerInfo *root,
+					   PathTarget *final_target,
+					   bool *have_postponed_srfs);
 static bool equal_distributions(PlannerInfo *root, Distribution *dst1,
 					Distribution *dst2);
 static bool grouping_distribution_match(PlannerInfo *root, Path *path,
 					  Query *parse);
-#endif
-static PathTarget *make_sort_input_target(PlannerInfo *root,
-					   PathTarget *final_target,
-					   bool *have_postponed_srfs);
 
 
 /*****************************************************************************
@@ -5618,7 +5613,6 @@ plan_cluster_use_sort(Oid tableOid, Oid indexOid)
 }
 
 
-#ifdef XCP
 static bool
 grouping_distribution_match(PlannerInfo *root, Path *path, Query *parse)
 {
@@ -5664,43 +5658,6 @@ grouping_distribution_match(PlannerInfo *root, Path *path, Query *parse)
 }
 
 /*
- * Grouping preserves distribution if distribution key is the
- * first grouping key or if distribution is replicated.
- * In these cases aggregation is fully pushed down to nodes.
- * Otherwise we need 2-phase aggregation so put remote subplan
- * on top of the result_plan. When adding result agg on top of
- * RemoteSubplan first aggregation phase will be pushed down
- * automatically.
- */
-static Plan *
-grouping_distribution(PlannerInfo *root, Plan *plan,
-					  int numGroupCols, AttrNumber *groupColIdx,
-					  List *current_pathkeys, Distribution **distribution)
-{
-	if (*distribution &&
-			!IsLocatorReplicated((*distribution)->distributionType) &&
-			(numGroupCols == 0 ||
-					(*distribution)->distributionExpr == NULL ||
-					!equal(((TargetEntry *)list_nth(plan->targetlist, groupColIdx[0]-1))->expr,
-						   (*distribution)->distributionExpr)))
-	{
-		Plan *result_plan;
-		result_plan = (Plan *) make_remotesubplan(root, plan, NULL,
-												  *distribution,
-												  current_pathkeys);
-		*distribution = NULL;
-		return result_plan;
-	}
-	return plan;
-}
-
-
-/*
- * Check if two distributions are equal.
- * Distributions are considered equal if they are of the same type, on the same
- * nodes and if they have distribution expressions defined they are equal
- * (either the same expressions or they are member of the same equivalence
- * class)
  */
 static bool
 equal_distributions(PlannerInfo *root, Distribution *dst1,
@@ -5741,4 +5698,3 @@ equal_distributions(PlannerInfo *root, Distribution *dst1,
 	/* The restrictNodes field does not matter for distribution equality */
 	return false;
 }
-#endif

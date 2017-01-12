@@ -5613,6 +5613,23 @@ plan_cluster_use_sort(Oid tableOid, Oid indexOid)
 }
 
 
+/*
+ * grouping_distribution_match
+ * 	Check if the path distribution matches grouping distribution.
+ *
+ * Grouping preserves distribution if the distribution key is on of the
+ * grouping keys (arbitrary one). In that case it's guaranteed that groups
+ * on different nodes do not overlap, and we can push the aggregation to
+ * remote nodes as a whole.
+ *
+ * Otherwise we need to either fetch all the data to the coordinator and
+ * perform the aggregation there, or use two-phase aggregation, with the
+ * first phase (partial aggregation) pushed down, and the second phase
+ * (combining and finalizing the results) executed on the coordinator.
+ *
+ * XXX This is used not only for plain aggregation, but also for various
+ * other paths, relying on grouping infrastructure (DISTINCT ON, UNIQUE).
+ */
 static bool
 grouping_distribution_match(PlannerInfo *root, Path *path, Query *parse)
 {
@@ -5658,6 +5675,12 @@ grouping_distribution_match(PlannerInfo *root, Path *path, Query *parse)
 }
 
 /*
+ * equal_distributions
+ * 	Check that two distributions are equal.
+ *
+ * Distributions are considered equal if they are of the same type, on the
+ * same set of nodes, and if the distribution expressions are known to be equal
+ * (either the same expressions or members of the same equivalence class).
  */
 static bool
 equal_distributions(PlannerInfo *root, Distribution *dst1,
@@ -5666,10 +5689,11 @@ equal_distributions(PlannerInfo *root, Distribution *dst1,
 	/* fast path */
 	if (dst1 == dst2)
 		return true;
+
 	if (dst1 == NULL || dst2 == NULL)
 		return false;
 
-	/* Conditions that easier to check go first */
+	/* conditions easier to check go first */
 	if (dst1->distributionType != dst2->distributionType)
 		return false;
 
@@ -5690,7 +5714,7 @@ equal_distributions(PlannerInfo *root, Distribution *dst1,
 	 * More thorough check, but allows some important cases, like if
 	 * distribution column is not updated (implicit set distcol=distcol) or
 	 * set distcol = CONST, ... WHERE distcol = CONST - pattern used by many
-	 * applications
+	 * applications.
 	 */
 	if (exprs_known_equal(root, dst1->distributionExpr, dst2->distributionExpr))
 		return true;

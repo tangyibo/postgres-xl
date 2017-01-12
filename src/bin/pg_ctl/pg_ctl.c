@@ -463,7 +463,7 @@ start_postmaster(void)
 	 */
 	if (log_file != NULL)
 #ifdef PGXC
-		snprintf(cmd, MAXPGPATH, "exec \"%s\" %s %s%s < \"%s\" >> \"%s\" 2>&1 &",
+		snprintf(cmd, MAXPGPATH, "exec \"%s\" %s %s%s < \"%s\" >> \"%s\" 2>&1",
 				exec_path, pgxcCommand, pgdata_opt, post_opts,
 				DEVNULL, log_file);
 #else
@@ -473,7 +473,7 @@ start_postmaster(void)
 #endif
 	else
 #ifdef PGXC
-		snprintf(cmd, MAXPGPATH, "exec \"%s\" %s %s%s < \"%s\" 2>&1 &",
+		snprintf(cmd, MAXPGPATH, "exec \"%s\" %s %s%s < \"%s\" 2>&1",
 				exec_path, pgxcCommand, pgdata_opt, post_opts, DEVNULL);
 #else
 		snprintf(cmd, MAXPGPATH, "exec \"%s\" %s%s < \"%s\" 2>&1",

@@ -1176,6 +1176,7 @@ tuplesort_begin_merge(TupleDesc tupDesc,
 	state->writetup = NULL;
 	state->readtup = readtup_datanode;
 	state->getlen = getlen_datanode;
+	state->movetup = movetup_heap;
 
 	state->tupDesc = tupDesc;	/* assume we need not copy tupDesc */
 	state->sortKeys = (SortSupport) palloc0(nkeys * sizeof(SortSupportData));
@@ -1207,6 +1208,11 @@ tuplesort_begin_merge(TupleDesc tupDesc,
 	state->mergeavailslots = (int *) palloc0(combiner->conn_count * sizeof(int));
 	state->mergeavailmem = (int64 *) palloc0(combiner->conn_count * sizeof(int64));
 
+	state->mergetuples = (char **) palloc0(combiner->conn_count * sizeof(char *));
+	state->mergecurrent = (char **) palloc0(combiner->conn_count * sizeof(char *));
+	state->mergetail = (char **) palloc0(combiner->conn_count * sizeof(char *));
+	state->mergeoverflow = (char **) palloc0(combiner->conn_count * sizeof(char *));
+
 	state->tp_runs = (int *) palloc0(combiner->conn_count * sizeof(int));
 	state->tp_dummy = (int *) palloc0(combiner->conn_count * sizeof(int));
 	state->tp_tapenum = (int *) palloc0(combiner->conn_count * sizeof(int));
@@ -1216,7 +1222,7 @@ tuplesort_begin_merge(TupleDesc tupDesc,
 		state->tp_runs[i] = 1;
 		state->tp_tapenum[i] = i;
 	}
-	beginmerge(state, true);	/* finalMergeBatch=true */
+	beginmerge(state, state->tuples);
 	state->status = TSS_FINALMERGE;
 
 	MemoryContextSwitchTo(oldcontext);

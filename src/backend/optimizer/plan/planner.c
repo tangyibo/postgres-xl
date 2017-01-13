@@ -164,6 +164,7 @@ static bool grouping_distribution_match(PlannerInfo *root, Query *parse,
 					  Path *path, List *clauses);
 static Path *adjust_path_distribution(PlannerInfo *root, Query *parse,
 					  Path *path);
+static bool can_push_down_grouping(PlannerInfo *root, Query *parse, Path *path);
 
 
 /*****************************************************************************
@@ -3837,6 +3838,32 @@ create_grouping_paths(PlannerInfo *root,
 		}
 	}
 
+	/*
+	 * XL: To minimize the code complexity in general (and diff compared to
+	 * PostgreSQL code base), XL generates the paths in two phases.
+	 *
+	 * First, we generate the "regular" aggregate paths, and either push them
+	 * down as a whole, if possible, or inject a RemoteSubplan below them if.
+	 * We may produce 2-phase aggregate paths (partial+finalize), but only if
+	 * PostgreSQL itself generates them, and if we can push down the whole
+	 * aggregation to datanodes (we don't want to run parallel aggregate on
+	 * coordinators). That is, we don't generate paths with 2-phase distributed
+	 * aggregate like 'FinalizeAgg -> RemoteSubplan -> PartialAgg' here.
+	 *
+	 * This block is intentionally keps as close to core PostgreSQL as possible,
+	 * and is guaranteed to generate at least one valid aggregate path (plain
+	 * aggregate on top of RemoteSubplan). Unless even stock PostgreSQL fail
+	 * to generate any paths.
+	 *
+	 * Then, in the second phase, we generage custom XL paths, with distributed
+	 * 2-phase aggregation. We don't do this if we've been able to push the
+	 * whole aggregation down, as we assume the full push down is the best
+	 * possible plan.
+	 *
+	 * Note: The grouping set variants are currently disabled by a check in
+	 * transformGroupClause. Perhaps we could lift that restriction now.
+	 */
+
 	/* Build final grouping paths */
 	if (can_sort)
 	{
@@ -3851,6 +3878,15 @@ create_grouping_paths(PlannerInfo *root,
 
 			is_sorted = pathkeys_contained_in(root->group_pathkeys,
 											  path->pathkeys);
+
+			/*
+			 * XL: Can it happen that the cheapest path can't be pushed down,
+			 * while some other path could be? Perhaps we should move the check
+			 * if a path can be pushed down up, and add another OR condition
+			 * to consider all paths that can be pushed down?
+			 *
+			 * if (path == cheapest_path || is_sorted || can_push_down)
+			 */
 			if (path == cheapest_path || is_sorted)
 			{
 				/* Sort the cheapest-total path if it isn't already sorted */
@@ -3860,6 +3896,13 @@ create_grouping_paths(PlannerInfo *root,
 													 path,
 													 root->group_pathkeys,
 													 -1.0);
+
+				/*
+				 * If the grouping can't be fully pushed down, redistribute the
+				 * path on top of the (sorted) path.
+				 */
+				if (! can_push_down_grouping(root, parse, path))
+					path = create_remotesubplan_path(root, path, NULL);
 
 				/* Now decide what to stick atop it */
 				if (parse->groupingSets)
@@ -3949,6 +3992,16 @@ create_grouping_paths(PlannerInfo *root,
 												 root->group_pathkeys,
 												 -1.0);
 
+			/*
+			 * If the grouping can't be fully pushed down, we'll push down the
+			 * first phase of the aggregate, and redistribute only the partial
+			 * results.
+			 *
+			 * XXX Keep this after the Sort node, to make the path sorted.
+			 */
+			if (! can_push_down_grouping(root, parse, path))
+				path = create_remotesubplan_path(root, path, NULL);
+
 			if (parse->hasAggs)
 				add_path(grouped_rel, (Path *)
 						 create_agg_path(root,
@@ -3988,13 +4041,24 @@ create_grouping_paths(PlannerInfo *root,
 		if (hashaggtablesize < work_mem * 1024L ||
 			grouped_rel->pathlist == NIL)
 		{
+			/* Don't mess with the cheapest path directly. */
+			Path *path = cheapest_path;
+
+			/*
+			 * If the grouping can't be fully pushed down, we'll push down the
+			 * first phase of the aggregate, and redistribute only the partial
+			 * results.
+			 */
+			if (! can_push_down_grouping(root, parse, path))
+				path = create_remotesubplan_path(root, path, NULL);
+
 			/*
 			 * We just need an Agg over the cheapest-total input path, since
 			 * input order won't matter.
 			 */
 			add_path(grouped_rel, (Path *)
 					 create_agg_path(root, grouped_rel,
-									 cheapest_path,
+									 path,
 									 target,
 									 AGG_HASHED,
 									 AGGSPLIT_SIMPLE,
@@ -4028,6 +4092,14 @@ create_grouping_paths(PlannerInfo *root,
 												   NULL,
 												   &total_groups);
 
+				/*
+				* If the grouping can't be fully pushed down, we'll push down the
+				* first phase of the aggregate, and redistribute only the partial
+				* results.
+				*/
+				if (! can_push_down_grouping(root, parse, path))
+					path = create_remotesubplan_path(root, path, NULL);
+
 				add_path(grouped_rel, (Path *)
 						 create_agg_path(root,
 										 grouped_rel,
@@ -4042,6 +4114,8 @@ create_grouping_paths(PlannerInfo *root,
 			}
 		}
 	}
+
+	/* TODO Generate XL aggregate paths, with distributed 2-phase aggs. */
 
 	/* Give a helpful error if we failed to find any implementation */
 	if (grouped_rel->pathlist == NIL)
@@ -5728,4 +5802,17 @@ adjust_path_distribution(PlannerInfo *root, Query *parse, Path *path)
 	}
 
 	return path;
+}
+
+static bool
+can_push_down_grouping(PlannerInfo *root, Query *parse, Path *path)
+{
+	/* only called when constructing grouping paths */
+	Assert(parse->groupingSets || parse->hasAggs || parse->groupClause);
+
+	/* grouping sets are currently disabled */
+	if (parse->groupingSets)
+		return false;
+
+	return grouping_distribution_match(root, parse, path, parse->groupClause);
 }

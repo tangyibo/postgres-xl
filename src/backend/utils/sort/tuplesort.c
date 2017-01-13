@@ -868,6 +868,9 @@ tuplesort_begin_cluster(TupleDesc tupDesc,
 	state->copytup = copytup_cluster;
 	state->writetup = writetup_cluster;
 	state->readtup = readtup_cluster;
+#ifdef PGXC
+	state->getlen = getlen;
+#endif
 	state->movetup = movetup_cluster;
 	state->abbrevNext = 10;
 

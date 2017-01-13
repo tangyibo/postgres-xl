@@ -162,6 +162,8 @@ static bool equal_distributions(PlannerInfo *root, Distribution *dst1,
 					Distribution *dst2);
 static bool grouping_distribution_match(PlannerInfo *root, Query *parse,
 					  Path *path, List *clauses);
+static Path *adjust_path_distribution(PlannerInfo *root, Query *parse,
+					  Path *path);
 
 
 /*****************************************************************************
@@ -2215,109 +2217,10 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 				rowMarks = root->rowMarks;
 
 			/*
-			 * Adjust query distribution if requested.
+			 * Adjust path by injecting a remote subplan, if appropriate, so
+			 * that the ModifyTablePath gets properly distributed data.
 			 */
-			if (root->distribution)
-			{
-				Distribution *distribution = path->distribution;
-
-				if (equal_distributions(root, root->distribution, distribution))
-				{
-					if (IsLocatorReplicated(distribution->distributionType) &&
-						contain_volatile_functions((Node *) parse->targetList))
-						ereport(ERROR,
-								(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-								errmsg("can not update replicated table with result of volatile function")));
-
-					/*
-					 * Source tuple will be consumed on the same node where it is
-					 * produced, so if it is known that some node does not yield tuples
-					 * we do not want to send subquery for execution on these nodes
-					 * at all.
-					 * So copy the restriction to the external distribution.
-					 * XXX Is that ever possible if external restriction is already
-					 * defined? If yes we probably should use intersection of the sets,
-					 * and if resulting set is empty create dummy plan and set it as
-					 * the result_plan. Need to think this over
-					 */
-					root->distribution->restrictNodes =
-							bms_copy(distribution->restrictNodes);
-				}
-				else
-				{
-					/*
-					 * If the planned statement is either UPDATE or DELETE, different
-					 * distributions here mean the ModifyTable node will be placed on
-					 * top of RemoteSubquery.
-					 *
-					 * UPDATE and DELETE versions of ModifyTable use TID of incoming
-					 * tuple to apply the changes, but the RemoteSubquery plan supplies
-					 * RemoteTuples, without such field. Therefore we can't execute
-					 * such plan and error-out.
-					 *
-					 * Most common example is when the UPDATE statement modifies the
-					 * distribution column, or when a complex UPDATE or DELETE statement
-					 * involves a join. It's difficult to determine the exact reason,
-					 * but we assume the first one (correlated UPDATE) is more likely.
-					 *
-					 * There are two ways of fixing the UPDATE ambiguity:
-					 *
-					 * 1. Modify the planner to never consider redistribution of the
-					 * target table. In this case the planner would find there's no way
-					 * to plan the query, and it would throw error somewhere else, and
-					 * we'd only be dealing with updates of distribution columns.
-					 *
-					 * 2. Modify executor to allow distribution column updates. However
-					 * there are a lot of issues behind the scene when implementing that
-					 * approach, and so it's unlikely to happen soon.
-					 *
-					 * DELETE statements may only fail because of complex joins.
-					 */
-
-					if (parse->commandType == CMD_UPDATE)
-						ereport(ERROR,
-								(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-								 errmsg("could not plan this distributed update"),
-								 errdetail("correlated UPDATE or updating distribution column currently not supported in Postgres-XL.")));
-
-					if (parse->commandType == CMD_DELETE)
-						ereport(ERROR,
-								(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
-								 errmsg("could not plan this distributed delete"),
-								 errdetail("correlated or complex DELETE is currently not supported in Postgres-XL.")));
-
-					/*
-					 * Redistribute result according to requested distribution.
-					 *
-					 * XXX In XL 9.5 there's a block of code (lines 2670-2730) that
-					 * finds pushed-down plan, and builds a distribution based on the
-					 * targetlist, and does a few other things (e.g. inserts Result
-					 * plan if needed, etc.). I have no idea how to rewrite that at
-					 * this point :-(
-					 */
-
-					/*
-					 * We already know the distributions are not equal, but let's
-					 * see if the redistribution is actually necessary. We can skip
-					 * it if we already have Result path, and if the distribution is
-					 *
-					 * 1) 'hash' restricted to a single node
-					 *
-					 * or
-					 *
-					 * 2) 'replicate' without volatile functions in the target list
-					 *
-					 * In such cases we don't need the RemoteSubplan.
-					 *
-					 * XXX Not sure what the (result_plan->lefttree == NULL) does.
-					 * See planner.c:2730 in 9.5.
-					 */
-					if (!(IsA(path, ResultPath) &&
-						((root->distribution->distributionType == 'H' && bms_num_members(root->distribution->restrictNodes) == 1) ||
-						 (root->distribution->distributionType == 'R' && !contain_mutable_functions((Node *)parse->targetList)))))
-						path = create_remotesubplan_path(root, path, root->distribution);
-				}
-			}
+			path = adjust_path_distribution(root, parse, path);
 
 			path = (Path *)
 				create_modifytable_path(root, final_rel,
@@ -2333,6 +2236,9 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 										parse->onConflict,
 										SS_assign_special_param(root));
 		}
+		else
+			/* Adjust path by injecting a remote subplan, if appropriate. */
+			path = adjust_path_distribution(root, parse, path);
 
 		/* And shove it into final_rel */
 		add_path(final_rel, path);
@@ -5722,4 +5628,104 @@ equal_distributions(PlannerInfo *root, Distribution *dst1,
 
 	/* The restrictNodes field does not matter for distribution equality */
 	return false;
+}
+
+static Path *
+adjust_path_distribution(PlannerInfo *root, Query *parse, Path *path)
+{
+	if (!root->distribution)
+	{
+		/*
+		 * Inform caller about distribution of the subplan
+		 */
+		root->distribution = path->distribution;
+		return path;
+	}
+
+	if (equal_distributions(root, root->distribution, path->distribution))
+	{
+		if (IsLocatorReplicated(path->distribution->distributionType) &&
+			contain_volatile_functions((Node *) parse->targetList))
+			ereport(ERROR,
+					(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+					errmsg("can not update replicated table with result of volatile function")));
+
+		/*
+		 * Source tuple will be consumed on the same node where it is
+		 * produced, so if it is known that some node does not yield tuples
+		 * we do not want to send subquery for execution on these nodes
+		 * at all. So copy the restriction to the external distribution.
+		 *
+		 * XXX Is that ever possible if external restriction is already
+		 * defined? If yes we probably should use intersection of the sets,
+		 * and if resulting set is empty create dummy plan and set it as
+		 * the result_plan. Need to think this over
+		 */
+		root->distribution->restrictNodes =
+				bms_copy(path->distribution->restrictNodes);
+	}
+	else
+	{
+		/*
+		 * If the planned statement is either UPDATE or DELETE, different
+		 * distributions here mean the ModifyTable node will be placed on
+		 * top of RemoteSubquery.
+		 *
+		 * UPDATE and DELETE versions of ModifyTable use TID of incoming
+		 * tuple to apply the changes, but the RemoteSubquery plan supplies
+		 * RemoteTuples, without such field. Therefore we can't execute
+		 * such plan and error-out.
+		 *
+		 * Most common example is when the UPDATE statement modifies the
+		 * distribution column, or when a complex UPDATE or DELETE statement
+		 * involves a join. It's difficult to determine the exact reason,
+		 * but we assume the first one (correlated UPDATE) is more likely.
+		 *
+		 * There are two ways of fixing the UPDATE ambiguity:
+		 *
+		 * 1. Modify the planner to never consider redistribution of the
+		 * target table. In this case the planner would find there's no way
+		 * to plan the query, and it would throw error somewhere else, and
+		 * we'd only be dealing with updates of distribution columns.
+		 *
+		 * 2. Modify executor to allow distribution column updates. However
+		 * there are a lot of issues behind the scene when implementing that
+		 * approach, and so it's unlikely to happen soon.
+		 *
+		 * DELETE statements may only fail because of complex joins.
+		 */
+
+		if (parse->commandType == CMD_UPDATE)
+			ereport(ERROR,
+					(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+					 errmsg("could not plan this distributed update"),
+					 errdetail("correlated UPDATE or updating distribution column currently not supported in Postgres-XL.")));
+
+		if (parse->commandType == CMD_DELETE)
+			ereport(ERROR,
+					(errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+					 errmsg("could not plan this distributed delete"),
+					 errdetail("correlated or complex DELETE is currently not supported in Postgres-XL.")));
+
+		/*
+		 * We already know the distributions are not equal, but let's see if
+		 * the redistribution is actually necessary. We can skip it if we
+		 * already have Result path, and if the distribution is one of
+		 *
+		 * a) 'hash' restricted to a single node
+		 * b) 'replicate' without volatile functions in the target list
+		 *
+		 * In those cases we don't need the RemoteSubplan.
+		 *
+		 * XXX Not sure what the (result_plan->lefttree == NULL) does.
+		 * See planner.c:2730 in 9.5.
+		 */
+		if (!(IsA(path, ResultPath) && /* FIXME missing (result_plan->lefttree == NULL) condition */
+			((root->distribution->distributionType == 'H' && bms_num_members(root->distribution->restrictNodes) == 1) ||
+			 (root->distribution->distributionType == 'R' && !contain_mutable_functions((Node *)parse->targetList)))))
+
+			path = create_remotesubplan_path(root, path, root->distribution);
+	}
+
+	return path;
 }

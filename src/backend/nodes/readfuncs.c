@@ -2661,15 +2661,99 @@ _readMaterial(void)
 static Sort *
 _readSort(void)
 {
-	READ_LOCALS(Sort);
-
-	ReadCommonPlan(&local_node->plan);
+	int i;
+	READ_PLAN_FIELDS(Sort);
 
 	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(sortColIdx, local_node->numCols);
-	READ_OID_ARRAY(sortOperators, local_node->numCols);
-	READ_OID_ARRAY(collations, local_node->numCols);
-	READ_BOOL_ARRAY(nullsFirst, local_node->numCols);
+
+	token = pg_strtok(&length);		/* skip :sortColIdx */
+	local_node->sortColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		local_node->sortColIdx[i] = atoi(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :sortOperators */
+	local_node->sortOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+			/* token is already set to nspname */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+			local_node->sortOperators[i] = get_operid(oprname,
+													  oprleft,
+													  oprright,
+													  NSP_OID(nspname));
+		}
+		else
+		local_node->sortOperators[i] = atooid(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :collations */
+	local_node->collations = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *collname; /* collation name */
+			int 		collencoding; /* collation encoding */
+			/* the token is already read */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get collname */
+			collname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get nargs */
+			collencoding = atoi(token);
+			if (collname)
+				local_node->collations[i] = get_collid(collname,
+													   collencoding,
+													   NSP_OID(nspname));
+			else
+				local_node->collations[i] = InvalidOid;
+		}
+		else
+		local_node->collations[i] = atooid(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :nullsFirst */
+	local_node->nullsFirst = (bool *) palloc(local_node->numCols * sizeof(bool));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		local_node->nullsFirst[i] = strtobool(token);
+	}
 
 	READ_DONE();
 }

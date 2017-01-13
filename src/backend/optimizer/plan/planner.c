@@ -160,8 +160,8 @@ static PathTarget *make_sort_input_target(PlannerInfo *root,
 					   bool *have_postponed_srfs);
 static bool equal_distributions(PlannerInfo *root, Distribution *dst1,
 					Distribution *dst2);
-static bool grouping_distribution_match(PlannerInfo *root, Path *path,
-					  Query *parse);
+static bool grouping_distribution_match(PlannerInfo *root, Query *parse,
+					  Path *path, List *clauses);
 
 
 /*****************************************************************************
@@ -4477,7 +4477,7 @@ create_distinct_paths(PlannerInfo *root,
 											 -1.0);
 
 		/* In case of grouping / distribution mismatch, inject remote scan. */
-		if (! grouping_distribution_match(root, path, parse))
+		if (!grouping_distribution_match(root, parse, path, parse->distinctClause))
 			path = create_remotesubplan_path(root, path, NULL);
 
 		/* XXX Maybe we need another sort here? */
@@ -4525,7 +4525,7 @@ create_distinct_paths(PlannerInfo *root,
 		Path *input_path = cheapest_input_path;
 
 		/* If needed, inject RemoteSubplan redistributing the data. */
-		if (!grouping_distribution_match(root, input_path, parse))
+		if (!grouping_distribution_match(root, parse, input_path, parse->distinctClause))
 			input_path = create_remotesubplan_path(root, input_path, NULL);
 
 		/* XXX Maybe we can make this a 2-phase aggregate too? */
@@ -5631,14 +5631,15 @@ plan_cluster_use_sort(Oid tableOid, Oid indexOid)
  * other paths, relying on grouping infrastructure (DISTINCT ON, UNIQUE).
  */
 static bool
-grouping_distribution_match(PlannerInfo *root, Path *path, Query *parse)
+grouping_distribution_match(PlannerInfo *root, Query *parse, Path *path,
+							List *clauses)
 {
 	int		i;
 	bool	matches_key = false;
 	Distribution *distribution = path->distribution;
 
-	int numGroupCols = list_length(parse->distinctClause);
-	AttrNumber *groupColIdx = extract_grouping_cols(parse->distinctClause,
+	int numGroupCols = list_length(clauses);
+	AttrNumber *groupColIdx = extract_grouping_cols(clauses,
 													parse->targetList);
 
 	/*

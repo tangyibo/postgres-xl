@@ -1237,6 +1237,10 @@ create_remotesubplan_path(PlannerInfo *root, Path *subpath,
 	pathnode->subpath = subpath;
 	pathnode->path.distribution = (Distribution *) copyObject(distribution);
 
+	/* We don't want to run subplains in parallel workers */
+	pathnode->path.parallel_aware = false;
+	pathnode->path.parallel_safe = false;
+
 	pathnode->path.pathtarget = subpath->pathtarget;
 
 	cost_remote_subplan((Path *) pathnode, subpath->startup_cost,

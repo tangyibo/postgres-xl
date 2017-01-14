@@ -4132,6 +4132,12 @@ create_grouping_paths(PlannerInfo *root,
 	 * instead of the partial ones. Underestimates often have more severe
 	 * consequences (e.g. OOM with HashAggregate) than overestimates, so this
 	 * seems like a more defensive approach.
+	 *
+	 * XXX After thinking a bit more about the estimation, it may depend on
+	 * pushdown - if the aggregate is fully pushed down (as above, we can
+	 * probably use dNumGroups/numberOfNodes as a cardinality estimate, as
+	 * we know the per-node groupings won't overlap. But here we need to be
+	 * more careful.
 	 */
 	if (! try_parallel_aggregation)
 	{

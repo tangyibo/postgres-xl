@@ -4307,6 +4307,25 @@ create_grouping_paths(PlannerInfo *root,
 				}
 			}
 		}
+
+		/*
+		 * TODO So far we've only constructed simple paths combining partial
+		 * and distributed aggregate paths, i.e.
+		 *
+		 *     Finalize -> RemoteSubplan -> Gather -> Partial
+		 *
+		 * It may however be more efficient to reduce the amount of data
+		 * transferred over the network by generating paths like this:
+		 *
+		 *     Finalize -> RemoteSubplan -> Combine -> Gather -> Partial
+		 *
+		 * where Combine deserialized the aggstates, combines them and then
+		 * serializes them again. This AggSplit case is not defined yet, but
+		 * should not be hard to add.
+		 *
+		 * We only want to do this for partial paths with RemoteSubplan on
+		 * top of them, i.e. when the whole aggregate was not pushed down.
+		 */
 	}
 
 	if (can_hash && !(agg_costs->hasNonPartial || agg_costs->hasNonSerial))
@@ -4370,6 +4389,8 @@ create_grouping_paths(PlannerInfo *root,
 											 dNumGroups));
 			}
 		}
+
+		/* TODO Generate the additional paths with extra combine phase here. */
 	}
 
 	/* Give a helpful error if we failed to find any implementation */

@@ -4115,7 +4115,256 @@ create_grouping_paths(PlannerInfo *root,
 		}
 	}
 
-	/* TODO Generate XL aggregate paths, with distributed 2-phase aggs. */
+	/* Generate XL aggregate paths, with distributed 2-phase aggregation. */
+
+	/*
+	 * If there were no partial paths, we did not initialize any of the
+	 * partial paths above. If that's the case, initialize here.
+	 *
+	 * XXX The reason why the initialization block at the beginning is not
+	 * simply performed unconditionally is that we may skip it if we've been
+	 * successful in fully pushing down any of the aggregates, and entirely
+	 * skip generating the XL paths.
+	 *
+	 * XXX Can we simply use the same estimates as regular partial aggregates,
+	 * or do we need to invent something else? It might be a better idea to
+	 * use estimates for the whole result here (e.g. total number of groups)
+	 * instead of the partial ones. Underestimates often have more severe
+	 * consequences (e.g. OOM with HashAggregate) than overestimates, so this
+	 * seems like a more defensive approach.
+	 */
+	if (! try_parallel_aggregation)
+	{
+		partial_grouping_target = make_partial_grouping_target(root, target);
+
+		/* Estimate number of partial groups. */
+		dNumPartialGroups = get_number_of_groups(root,
+												 cheapest_path->rows,
+												 NIL,
+												 NIL);
+
+		/*
+		 * Collect statistics about aggregates for estimating costs of
+		 * performing aggregation in parallel.
+		 */
+		MemSet(&agg_partial_costs, 0, sizeof(AggClauseCosts));
+		MemSet(&agg_final_costs, 0, sizeof(AggClauseCosts));
+		if (parse->hasAggs)
+		{
+			/* partial phase */
+			get_agg_clause_costs(root, (Node *) partial_grouping_target->exprs,
+								 AGGSPLIT_INITIAL_SERIAL,
+								 &agg_partial_costs);
+
+			/* final phase */
+			get_agg_clause_costs(root, (Node *) target->exprs,
+								 AGGSPLIT_FINAL_DESERIAL,
+								 &agg_final_costs);
+			get_agg_clause_costs(root, parse->havingQual,
+								 AGGSPLIT_FINAL_DESERIAL,
+								 &agg_final_costs);
+		}
+	}
+
+	/* Build final XL grouping paths */
+	if (can_sort && !(agg_costs->hasNonPartial || agg_costs->hasNonSerial))
+	{
+		/*
+		 * Use any available suitably-sorted path as input, and also consider
+		 * sorting the cheapest-total path.
+		 */
+		foreach(lc, input_rel->pathlist)
+		{
+			Path	   *path = (Path *) lfirst(lc);
+			bool		is_sorted;
+
+			is_sorted = pathkeys_contained_in(root->group_pathkeys,
+											  path->pathkeys);
+
+			/*
+			 * XL: Can it happen that the cheapest path can't be pushed down,
+			 * while some other path could be? Perhaps we should move the check
+			 * if a path can be pushed down up, and add another OR condition
+			 * to consider all paths that can be pushed down?
+			 *
+			 * if (path == cheapest_path || is_sorted || can_push_down)
+			 */
+			if (path == cheapest_path || is_sorted)
+			{
+				/*
+				 * We can't really beat paths that we managed to fully push
+				 * down above, so we can skip them entirely.
+				 *
+				 * XXX Not constructing any paths, so we can do this before
+				 * adding the Sort path.
+				 */
+				if (can_push_down_grouping(root, parse, path))
+					continue;
+
+				/* Sort the cheapest-total path if it isn't already sorted */
+				if (!is_sorted)
+					path = (Path *) create_sort_path(root,
+													 grouped_rel,
+													 path,
+													 root->group_pathkeys,
+													 -1.0);
+
+				/* Now decide what to stick atop it */
+				if (parse->groupingSets)
+				{
+					/*
+					 * TODO 2-phase aggregation for grouping sets paths not
+					 * supported yet, but this the place where such paths
+					 * should be constructed.
+					 */
+				}
+				else if (parse->hasAggs)
+				{
+					/*
+					 * We have aggregation, possibly with plain GROUP BY. Make
+					 * an AggPath.
+					 */
+
+					path = (Path *) create_agg_path(root,
+													grouped_rel,
+													path,
+													partial_grouping_target,
+									parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+													AGGSPLIT_INITIAL_SERIAL,
+													parse->groupClause,
+													NIL,
+													&agg_partial_costs,
+													dNumPartialGroups);
+
+					path = create_remotesubplan_path(root, path, NULL);
+
+					/*
+					 * We generate two paths, differing in the second phase
+					 * implementation (sort and hash).
+					 */
+
+					add_path(grouped_rel, (Path *)
+							 create_agg_path(root,
+											 grouped_rel,
+											 path,
+											 target,
+									 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+											 AGGSPLIT_FINAL_DESERIAL,
+											 parse->groupClause,
+											 (List *) parse->havingQual,
+											 &agg_final_costs,
+											 dNumGroups));
+
+					if (can_hash)
+						add_path(grouped_rel, (Path *)
+								 create_agg_path(root,
+												 grouped_rel,
+												 path,
+												 target,
+												 AGG_HASHED,
+												 AGGSPLIT_FINAL_DESERIAL,
+												 parse->groupClause,
+												 (List *) parse->havingQual,
+												 &agg_final_costs,
+												 dNumGroups));
+				}
+				else if (parse->groupClause)
+				{
+					/*
+					 * We have GROUP BY without aggregation or grouping sets.
+					 * Make a GroupPath.
+					 */
+					path = (Path *) create_group_path(root,
+													  grouped_rel,
+													  path,
+													  partial_grouping_target,
+													  parse->groupClause,
+													  NIL,
+													  dNumPartialGroups);
+
+					path = create_remotesubplan_path(root, path, NULL);
+
+					add_path(grouped_rel, (Path *)
+							 create_group_path(root,
+											   grouped_rel,
+											   path,
+											   target,
+											   parse->groupClause,
+											   (List *) parse->havingQual,
+											   dNumGroups));
+
+				}
+				else
+				{
+					/* Other cases should have been handled above */
+					Assert(false);
+				}
+			}
+		}
+	}
+
+	if (can_hash && !(agg_costs->hasNonPartial || agg_costs->hasNonSerial))
+	{
+		hashaggtablesize = estimate_hashagg_tablesize(cheapest_path,
+													  agg_costs,
+													  dNumGroups);
+
+		/*
+		 * Provided that the estimated size of the hashtable does not exceed
+		 * work_mem, we'll generate a HashAgg Path, although if we were unable
+		 * to sort above, then we'd better generate a Path, so that we at
+		 * least have one.
+		 */
+		if (hashaggtablesize < work_mem * 1024L ||
+			grouped_rel->pathlist == NIL)
+		{
+			/* If the whole aggregate was pushed down, we're done. */
+			if (! can_push_down_grouping(root, parse, cheapest_path))
+			{
+				Path *path;
+
+				path = (Path *) create_agg_path(root,
+									   grouped_rel,
+									   cheapest_path,
+									   partial_grouping_target,
+									   AGG_HASHED,
+									   AGGSPLIT_INITIAL_SERIAL,
+									   parse->groupClause,
+									   NIL,
+									   &agg_partial_costs,
+									   dNumPartialGroups);
+
+				path = create_remotesubplan_path(root, path, NULL);
+
+				/* Generate paths with both hash and sort second phase. */
+
+				add_path(grouped_rel, (Path *)
+						 create_agg_path(root,
+										 grouped_rel,
+										 path,
+										 target,
+										 AGG_HASHED,
+										 AGGSPLIT_FINAL_DESERIAL,
+										 parse->groupClause,
+										 (List *) parse->havingQual,
+										 &agg_final_costs,
+										 dNumGroups));
+
+				if (can_sort)
+					add_path(grouped_rel, (Path *)
+							 create_agg_path(root,
+											 grouped_rel,
+											 path,
+											 target,
+									 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+											 AGGSPLIT_FINAL_DESERIAL,
+											 parse->groupClause,
+											 (List *) parse->havingQual,
+											 &agg_final_costs,
+											 dNumGroups));
+			}
+		}
+	}
 
 	/* Give a helpful error if we failed to find any implementation */
 	if (grouped_rel->pathlist == NIL)

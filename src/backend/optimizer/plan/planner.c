@@ -6059,7 +6059,7 @@ can_push_down_grouping(PlannerInfo *root, Query *parse, Path *path)
 	/* only called when constructing grouping paths */
 	Assert(parse->groupingSets || parse->hasAggs || parse->groupClause);
 
-	/* grouping sets are currently disabled */
+	/* push-down of grouping sets is not supported yet */
 	if (parse->groupingSets)
 		return false;
 

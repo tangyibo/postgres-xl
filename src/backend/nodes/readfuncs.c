@@ -904,6 +904,11 @@ _readAggref(void)
 	else
 #endif
 	READ_OID_FIELD(inputcollid);
+#ifdef XCP
+	if (portable_input)
+		READ_TYPID_FIELD(aggtranstype);
+	else
+#endif
 	READ_OID_FIELD(aggtranstype);
 	READ_NODE_FIELD(aggargtypes);
 	READ_NODE_FIELD(aggdirectargs);
@@ -2781,6 +2786,7 @@ _readGroup(void)
 static Agg *
 _readAgg(void)
 {
+	int i;
 	READ_LOCALS(Agg);
 
 	ReadCommonPlan(&local_node->plan);
@@ -2789,7 +2795,57 @@ _readAgg(void)
 	READ_ENUM_FIELD(aggsplit, AggSplit);
 	READ_INT_FIELD(numCols);
 	READ_ATTRNUMBER_ARRAY(grpColIdx, local_node->numCols);
+
+#ifdef PGXC
+	token = pg_strtok(&length);		/* skip :grpOperators */
+	local_node->grpOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+			/* token is already set to nspname */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+			local_node->grpOperators[i] = get_operid(oprname,
+													 oprleft,
+													 oprright,
+													 NSP_OID(nspname));
+		}
+		else
+			local_node->grpOperators[i] = atooid(token);
+	}
+#else
 	READ_OID_ARRAY(grpOperators, local_node->numCols);
+#endif
+
 	READ_LONG_FIELD(numGroups);
 	READ_NODE_FIELD(groupingSets);
 	READ_NODE_FIELD(chain);

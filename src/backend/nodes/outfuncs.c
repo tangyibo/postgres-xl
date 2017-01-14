@@ -1775,6 +1775,11 @@ _outAggref(StringInfo str, const Aggref *node)
 	else
 #endif
 	WRITE_OID_FIELD(inputcollid);
+#ifdef XCP
+	if (portable_output)
+		WRITE_TYPID_FIELD(aggtranstype);
+	else
+#endif
 	WRITE_OID_FIELD(aggtranstype);
 	WRITE_NODE_FIELD(aggargtypes);
 	WRITE_NODE_FIELD(aggdirectargs);

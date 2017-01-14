@@ -4309,8 +4309,8 @@ create_grouping_paths(PlannerInfo *root,
 		}
 
 		/*
-		 * TODO So far we've only constructed simple paths combining partial
-		 * and distributed aggregate paths, i.e.
+		 * So far we've only constructed simple paths combining partial and
+		 * distributed aggregate paths, i.e.
 		 *
 		 *     Finalize -> RemoteSubplan -> Gather -> Partial
 		 *
@@ -4325,7 +4325,101 @@ create_grouping_paths(PlannerInfo *root,
 		 *
 		 * We only want to do this for partial paths with RemoteSubplan on
 		 * top of them, i.e. when the whole aggregate was not pushed down.
+		 *
+		 * XXX Gather output is never sorted, so we can only bother with the
+		 * cheapest partial path here (just like above).
+		 *
+		 * XXX This only generates paths with both the combine and finalize
+		 * steps using the same implementation (sort+sort or hash+hash). Maybe
+		 * we should relax that, and allow hash+sort or sort+hash?
+		 *
+		 * XXX grouped_rel->partial_pathlist may be empty here, if the planner
+		 * did not consider parallel paths (try_parallel_aggregation=false).
+		 * But that's OK - we only want to put the combine on top of a Gather,
+		 * so if there's none we're done.
+		 *
+		 * XXX The "combine" paths seem not to be picked up, most likely
+		 * because of bad costing, not reflecting the reduction in number of
+		 * rows transferred over the network.
 		 */
+		if (grouped_rel->partial_pathlist)
+		{
+			Path	   *path = (Path *) linitial(grouped_rel->partial_pathlist);
+			double		total_groups = path->rows * path->parallel_workers;
+
+			/* We don't care about paths that were fully pushed down. */
+			if (! can_push_down_grouping(root, parse, path))
+			{
+				path = (Path *) create_gather_path(root,
+												   grouped_rel,
+												   path,
+												   partial_grouping_target,
+												   NULL,
+												   &total_groups);
+
+				/*
+				 * Gather is always unsorted, so we'll need to sort, unless
+				 * there's no GROUP BY clause, in which case there will only be a
+				 * single group.
+				 */
+				if (parse->groupClause)
+					path = (Path *) create_sort_path(root,
+													 grouped_rel,
+													 path,
+													 root->group_pathkeys,
+													 -1.0);
+
+				/* Intermediate combine phase. */
+				if (parse->hasAggs)
+				{
+					path = (Path *) create_agg_path(root,
+													grouped_rel,
+													path,
+													target,
+									parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+													AGGSPLIT_COMBINE,
+													parse->groupClause,
+													(List *) parse->havingQual,
+													&agg_final_costs,
+													dNumGroups);
+
+					path = create_remotesubplan_path(root, path, NULL);
+
+					add_path(grouped_rel, (Path *)
+							 create_agg_path(root,
+											 grouped_rel,
+											 path,
+											 target,
+									 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+											 AGGSPLIT_FINAL_DESERIAL,
+											 parse->groupClause,
+											 (List *) parse->havingQual,
+											 &agg_final_costs,
+											 dNumGroups));
+				}
+				else
+				{
+					path = (Path *) create_group_path(root,
+													  grouped_rel,
+													  path,
+													  target,
+													  parse->groupClause,
+													  (List *) parse->havingQual,
+													  dNumGroups);
+
+					path = create_remotesubplan_path(root, path, NULL);
+
+					add_path(grouped_rel, (Path *)
+							 create_group_path(root,
+											   grouped_rel,
+											   path,
+											   target,
+											   parse->groupClause,
+											   (List *) parse->havingQual,
+											   dNumGroups));
+				}
+			}
+		}
 	}
 
 	if (can_hash && !(agg_costs->hasNonPartial || agg_costs->hasNonSerial))
@@ -4390,7 +4484,63 @@ create_grouping_paths(PlannerInfo *root,
 			}
 		}
 
-		/* TODO Generate the additional paths with extra combine phase here. */
+		/*
+		 * Generate a path with the extra combine phase.
+		 *
+		 * XXX See the comments in the block generating combine paths for
+		 * the sorted case.
+		 */
+		if (grouped_rel->partial_pathlist)
+		{
+			Path	   *path = (Path *) linitial(grouped_rel->partial_pathlist);
+
+			hashaggtablesize = estimate_hashagg_tablesize(path,
+														  &agg_final_costs,
+														  dNumGroups);
+
+			/*
+			 * Ignore the path if the hash table won't fit into memory, or
+			 * if we managed to push dowh the whole aggregation.
+			 */
+			if ((hashaggtablesize < work_mem * 1024L) &&
+				(! can_push_down_grouping(root, parse, path)))
+			{
+				double		total_groups = path->rows * path->parallel_workers;
+
+				path = (Path *) create_gather_path(root,
+												   grouped_rel,
+												   path,
+												   partial_grouping_target,
+												   NULL,
+												   &total_groups);
+
+				path = (Path *) create_agg_path(root,
+												grouped_rel,
+												path,
+												target,
+												AGG_HASHED,
+												AGGSPLIT_COMBINE,
+												parse->groupClause,
+												(List *) parse->havingQual,
+												&agg_final_costs,
+												dNumGroups);
+
+				/* We know the full push down can't happen, so redistribute. */
+				path = create_remotesubplan_path(root, path, NULL);
+
+				add_path(grouped_rel, (Path *)
+						 create_agg_path(root,
+										 grouped_rel,
+										 path,
+										 target,
+										 AGG_HASHED,
+										 AGGSPLIT_FINAL_DESERIAL,
+										 parse->groupClause,
+										 (List *) parse->havingQual,
+										 &agg_final_costs,
+										 dNumGroups));
+			}
+		}
 	}
 
 	/* Give a helpful error if we failed to find any implementation */

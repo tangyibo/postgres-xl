@@ -3498,6 +3498,8 @@ create_projection_path(PlannerInfo *root,
 	/* Projection does not change the sort order */
 	pathnode->path.pathkeys = subpath->pathkeys;
 
+	pathnode->path.distribution = (Distribution *) copyObject(subpath->distribution);
+
 	pathnode->subpath = subpath;
 
 	/*

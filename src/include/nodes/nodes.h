@@ -766,7 +766,10 @@ typedef enum AggSplit
 	/* Initial phase of partial aggregation, with serialization: */
 	AGGSPLIT_INITIAL_SERIAL = AGGSPLITOP_SKIPFINAL | AGGSPLITOP_SERIALIZE,
 	/* Final phase of partial aggregation, with deserialization: */
-	AGGSPLIT_FINAL_DESERIAL = AGGSPLITOP_COMBINE | AGGSPLITOP_DESERIALIZE
+	AGGSPLIT_FINAL_DESERIAL = AGGSPLITOP_COMBINE | AGGSPLITOP_DESERIALIZE,
+	/* Combine phase of partial aggregation, with both steps: */
+	AGGSPLIT_COMBINE = AGGSPLITOP_COMBINE | AGGSPLITOP_DESERIALIZE | \
+					   AGGSPLITOP_SERIALIZE | AGGSPLITOP_SKIPFINAL
 } AggSplit;
 
 /* Test whether an AggSplit value selects each primitive option: */

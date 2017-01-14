@@ -2922,6 +2922,9 @@ create_gather_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 	pathnode->path.parallel_workers = subpath->parallel_workers;
 	pathnode->path.pathkeys = NIL;		/* Gather has unordered result */
 
+	/* distribution is the same as in the subpath */
+	pathnode->path.distribution = (Distribution *) copyObject(subpath->distribution);
+
 	pathnode->subpath = subpath;
 	pathnode->single_copy = false;
 
@@ -3662,6 +3665,7 @@ create_sort_path(PlannerInfo *root,
 	pathnode->path.parallel_workers = subpath->parallel_workers;
 	pathnode->path.pathkeys = pathkeys;
 
+	/* distribution is the same as in the subpath */
 	pathnode->path.distribution = copyObject(subpath->distribution);
 
 	pathnode->subpath = subpath;
@@ -3709,6 +3713,9 @@ create_group_path(PlannerInfo *root,
 	pathnode->path.parallel_workers = subpath->parallel_workers;
 	/* Group doesn't change sort ordering */
 	pathnode->path.pathkeys = subpath->pathkeys;
+
+	/* distribution is the same as in the subpath */
+	pathnode->path.distribution = (Distribution *) copyObject(subpath->distribution);
 
 	pathnode->subpath = subpath;
 
@@ -3826,6 +3833,9 @@ create_agg_path(PlannerInfo *root,
 		pathnode->path.pathkeys = NIL;	/* output is unordered */
 	pathnode->subpath = subpath;
 
+	/* distribution is the same as in the subpath */
+	pathnode->path.distribution = (Distribution *) copyObject(subpath->distribution);
+
 	pathnode->aggstrategy = aggstrategy;
 	pathnode->aggsplit = aggsplit;
 	pathnode->numGroups = numGroups;
@@ -3887,6 +3897,9 @@ create_groupingsets_path(PlannerInfo *root,
 		subpath->parallel_safe;
 	pathnode->path.parallel_workers = subpath->parallel_workers;
 	pathnode->subpath = subpath;
+
+	/* distribution is the same as in the subpath */
+	pathnode->path.distribution = (Distribution *) copyObject(subpath->distribution);
 
 	/*
 	 * Output will be in sorted order by group_pathkeys if, and only if, there

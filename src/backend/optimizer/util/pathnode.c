@@ -1290,11 +1290,18 @@ redistribute_path(Path *subpath, char distributionType,
 			pathnode = makeNode(RemoteSubPath);
 			pathnode->path.pathtype = T_RemoteSubplan;
 			pathnode->path.parent = rel;
+			pathnode->path.pathtarget = rel->reltarget;
 			pathnode->path.param_info = subpath->param_info;
 			pathnode->path.pathkeys = subpath->pathkeys;
 			pathnode->subpath = mpath->subpath;
+
+			/* We don't want to run subplains in parallel workers */
+			pathnode->path.parallel_aware = false;
+			pathnode->path.parallel_safe = false;
+
 			mpath->subpath = (Path *) pathnode;
 		}
+
 		subpath = pathnode->subpath;
 		pathnode->path.distribution = distribution;
 		mpath->path.distribution = (Distribution *) copyObject(distribution);
@@ -1316,10 +1323,16 @@ redistribute_path(Path *subpath, char distributionType,
 		pathnode = makeNode(RemoteSubPath);
 		pathnode->path.pathtype = T_RemoteSubplan;
 		pathnode->path.parent = rel;
+		pathnode->path.pathtarget = rel->reltarget;
 		pathnode->path.param_info = subpath->param_info;
 		pathnode->path.pathkeys = subpath->pathkeys;
 		pathnode->subpath = subpath;
 		pathnode->path.distribution = distribution;
+
+		/* We don't want to run subplains in parallel workers */
+		pathnode->path.parallel_aware = false;
+		pathnode->path.parallel_safe = false;
+
 		cost_remote_subplan((Path *) pathnode, subpath->startup_cost,
 							subpath->total_cost, subpath->rows, rel->reltarget->width,
 							IsLocatorReplicated(distributionType) ?

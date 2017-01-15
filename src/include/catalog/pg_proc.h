@@ -4364,9 +4364,9 @@ DATA(insert OID = 3155 (  row_to_json	   PGNSP PGUID 12 1 0 0 0 f f f f t f s s 
 DESCR("map row to json");
 DATA(insert OID = 3156 (  row_to_json	   PGNSP PGUID 12 1 0 0 0 f f f f t f s s 2 0 114 "2249 16" _null_ _null_ _null_ _null_ _null_ row_to_json_pretty _null_ _null_ _null_ ));
 DESCR("map row to json with optional pretty printing");
-DATA(insert OID = 3173 (  json_agg_transfn	 PGNSP PGUID 12 1 0 0 0 f f f f f f s s 2 0 7028 "7028 2283" _null_ _null_ _null_ _null_ _null_ json_agg_transfn _null_ _null_ _null_ ));
+DATA(insert OID = 3173 (  json_agg_transfn	 PGNSP PGUID 12 1 0 0 0 f f f f f f s s 2 0 2281 "2281 2283" _null_ _null_ _null_ _null_ _null_ json_agg_transfn _null_ _null_ _null_ ));
 DESCR("json aggregate transition function");
-DATA(insert OID = 3174 (  json_agg_finalfn	 PGNSP PGUID 12 1 0 0 0 f f f f f f i s 1 0 114 "7028" _null_ _null_ _null_ _null_ _null_ json_agg_finalfn _null_ _null_ _null_ ));
+DATA(insert OID = 3174 (  json_agg_finalfn	 PGNSP PGUID 12 1 0 0 0 f f f f f f i s 1 0 114 "2281" _null_ _null_ _null_ _null_ _null_ json_agg_finalfn _null_ _null_ _null_ ));
 DESCR("json aggregate final function");
 DATA(insert OID = 3175 (  json_agg		   PGNSP PGUID 12 1 0 0 0 t f f f f f s s 1 0 114 "2283" _null_ _null_ _null_ _null_ _null_ aggregate_dummy _null_ _null_ _null_ ));
 DESCR("aggregate input into json");

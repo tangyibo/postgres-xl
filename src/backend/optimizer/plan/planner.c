@@ -3539,6 +3539,7 @@ create_grouping_paths(PlannerInfo *root,
 	bool		can_hash;
 	bool		can_sort;
 	bool		try_parallel_aggregation;
+	bool		try_distributed_aggregation;
 
 	ListCell   *lc;
 
@@ -3705,6 +3706,35 @@ create_grouping_paths(PlannerInfo *root,
 	{
 		/* Everything looks good. */
 		try_parallel_aggregation = true;
+	}
+
+	/*
+	 * The distributed aggregation however works even if there are no partial
+	 * paths, and for grouping sets (we need to be able to at least push them
+	 * on top of remote subplan).
+	 */
+	if (!grouped_rel->consider_parallel)
+	{
+		/* Not even parallel-safe. */
+		try_distributed_aggregation = false;
+	}
+	else if (!parse->hasAggs && parse->groupClause == NIL)
+	{
+		/*
+		 * We don't know how to do parallel aggregation unless we have either
+		 * some aggregates or a grouping clause.
+		 */
+		try_distributed_aggregation = false;
+	}
+	else if (agg_costs->hasNonPartial || agg_costs->hasNonSerial)
+	{
+		/* Insufficient support for partial mode. */
+		try_distributed_aggregation = false;
+	}
+	else
+	{
+		/* Everything looks good. */
+		try_distributed_aggregation = true;
 	}
 
 	/*
@@ -4139,7 +4169,7 @@ create_grouping_paths(PlannerInfo *root,
 	 * we know the per-node groupings won't overlap. But here we need to be
 	 * more careful.
 	 */
-	if (! try_parallel_aggregation)
+	if (try_distributed_aggregation && (! try_parallel_aggregation))
 	{
 		partial_grouping_target = make_partial_grouping_target(root, target);
 
@@ -4173,7 +4203,7 @@ create_grouping_paths(PlannerInfo *root,
 	}
 
 	/* Build final XL grouping paths */
-	if (can_sort && !(agg_costs->hasNonPartial || agg_costs->hasNonSerial))
+	if (can_sort && try_distributed_aggregation)
 	{
 		/*
 		 * Use any available suitably-sorted path as input, and also consider
@@ -4422,7 +4452,7 @@ create_grouping_paths(PlannerInfo *root,
 		}
 	}
 
-	if (can_hash && !(agg_costs->hasNonPartial || agg_costs->hasNonSerial))
+	if (can_hash && try_distributed_aggregation)
 	{
 		hashaggtablesize = estimate_hashagg_tablesize(cheapest_path,
 													  agg_costs,

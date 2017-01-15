@@ -3737,6 +3737,9 @@ create_grouping_paths(PlannerInfo *root,
 		try_distributed_aggregation = true;
 	}
 
+	/* Whenever parallel aggregation is allowed, distributed should be too. */
+	Assert(!(try_parallel_aggregation && !try_distributed_aggregation));
+
 	/*
 	 * Before generating paths for grouped_rel, we first generate any possible
 	 * partial paths; that way, later code can easily consider both parallel
@@ -3929,10 +3932,13 @@ create_grouping_paths(PlannerInfo *root,
 
 				/*
 				 * If the grouping can't be fully pushed down, redistribute the
-				 * path on top of the (sorted) path.
+				 * path on top of the (sorted) path. If if can be pushed down,
+				 * disable construction of complex distributed paths.
 				 */
 				if (! can_push_down_grouping(root, parse, path))
 					path = create_remotesubplan_path(root, path, NULL);
+				else
+					try_distributed_aggregation = false;
 
 				/* Now decide what to stick atop it */
 				if (parse->groupingSets)
@@ -4027,10 +4033,15 @@ create_grouping_paths(PlannerInfo *root,
 			 * first phase of the aggregate, and redistribute only the partial
 			 * results.
 			 *
+			 * If if can be pushed down, disable construction of complex
+			 * distributed paths.
+			 *
 			 * XXX Keep this after the Sort node, to make the path sorted.
 			 */
 			if (! can_push_down_grouping(root, parse, path))
 				path = create_remotesubplan_path(root, path, NULL);
+			else
+				try_distributed_aggregation = false;
 
 			if (parse->hasAggs)
 				add_path(grouped_rel, (Path *)
@@ -4078,9 +4089,14 @@ create_grouping_paths(PlannerInfo *root,
 			 * If the grouping can't be fully pushed down, we'll push down the
 			 * first phase of the aggregate, and redistribute only the partial
 			 * results.
+			 *
+			 * If if can be pushed down, disable construction of complex
+			 * distributed paths.
 			 */
 			if (! can_push_down_grouping(root, parse, path))
 				path = create_remotesubplan_path(root, path, NULL);
+			else
+				try_distributed_aggregation = false;
 
 			/*
 			 * We just need an Agg over the cheapest-total input path, since
@@ -4126,9 +4142,14 @@ create_grouping_paths(PlannerInfo *root,
 				* If the grouping can't be fully pushed down, we'll push down the
 				* first phase of the aggregate, and redistribute only the partial
 				* results.
+				*
+				* If if can be pushed down, disable construction of complex
+				* distributed paths.
 				*/
 				if (! can_push_down_grouping(root, parse, path))
 					path = create_remotesubplan_path(root, path, NULL);
+				else
+					try_distributed_aggregation = false;
 
 				add_path(grouped_rel, (Path *)
 						 create_agg_path(root,
@@ -4169,7 +4190,7 @@ create_grouping_paths(PlannerInfo *root,
 	 * we know the per-node groupings won't overlap. But here we need to be
 	 * more careful.
 	 */
-	if (try_distributed_aggregation && (! try_parallel_aggregation))
+	if (try_distributed_aggregation)
 	{
 		partial_grouping_target = make_partial_grouping_target(root, target);
 

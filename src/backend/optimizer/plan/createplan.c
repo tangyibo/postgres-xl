@@ -5797,9 +5797,6 @@ make_sort(Plan *lefttree, int numCols,
 {
 	Sort	   *node = makeNode(Sort);
 	Plan	   *plan = &node->plan;
-#ifdef XCP
-	RemoteSubplan *pushdown;
-#endif
 
 	plan->targetlist = lefttree->targetlist;
 	plan->qual = NIL;
@@ -5811,84 +5808,6 @@ make_sort(Plan *lefttree, int numCols,
 	node->collations = collations;
 	node->nullsFirst = nullsFirst;
 
-#ifdef XCP
-	/*
-	 * It does not makes sence to sort on one data node and then perform
-	 * one-tape merge sort. So do not push sort down if there is single
-	 * remote data node
-	 */
-	pushdown = find_push_down_plan(lefttree, false);
-	if (pushdown)
-	{
-		/* If we already sort results, need to prepend new keys to existing */
-		/*
-		 * It is not safe to share colum information.
-		 * If another node will be pushed down the same RemoteSubplan column
-		 * indexes may be modified and this would affect the Sort node
-		 */
-		AttrNumber *newSortColIdx;
-		Oid 	   *newSortOperators;
-		Oid 	   *newCollations;
-		bool 	   *newNullsFirst;
-		int 		newNumCols;
-		int 		i, j;
-
-		/*
-		 * Insert new sort node immediately below the pushdown plan
-		 */
-		plan->lefttree = pushdown->scan.plan.lefttree;
-		pushdown->scan.plan.lefttree = plan;
-
-		newNumCols = numCols + (pushdown->sort ? pushdown->sort->numCols : 0);
-		newSortColIdx = (AttrNumber *) palloc(newNumCols * sizeof(AttrNumber));
-		newSortOperators = (Oid *) palloc(newNumCols * sizeof(Oid));
-		newCollations = (Oid *) palloc(newNumCols * sizeof(Oid));
-		newNullsFirst = (bool *) palloc(newNumCols * sizeof(bool));
-
-		/* Copy sort columns */
-		for (i = 0; i < numCols; i++)
-		{
-			newSortColIdx[i] = sortColIdx[i];
-			newSortOperators[i] = sortOperators[i];
-			newCollations[i] = collations[i];
-			newNullsFirst[i] = nullsFirst[i];
-		}
-
-		newNumCols = numCols;
-		if (pushdown->sort)
-		{
-			/* Continue and copy old keys of the subplan which is now under the
-			 * sort */
-			for (j = 0; j < pushdown->sort->numCols; j++)
-				newNumCols = add_sort_column(pushdown->sort->sortColIdx[j],
-											 pushdown->sort->sortOperators[j],
-											 pushdown->sort->sortCollations[j],
-											 pushdown->sort->nullsFirst[j],
-											 newNumCols,
-											 newSortColIdx,
-											 newSortOperators,
-											 newCollations,
-											 newNullsFirst);
-		}
-		else
-		{
-			/* Create simple sort object if does not exist */
-			pushdown->sort = makeNode(SimpleSort);
-		}
-
-		pushdown->sort->numCols = newNumCols;
-		pushdown->sort->sortColIdx = newSortColIdx;
-		pushdown->sort->sortOperators = newSortOperators;
-		pushdown->sort->sortCollations = newCollations;
-		pushdown->sort->nullsFirst = newNullsFirst;
-
-		/*
-		 * lefttree is not actually a Sort, but we hope it is not important and
-		 * the result will be used as a generic Plan node.
-		 */
-		return (Sort *) lefttree;
-	}
-#endif
 	return node;
 }
 

@@ -1194,6 +1194,16 @@ pgxc_shippability_walker(Node *node, Shippability_context *sc_context)
 		}
 		break;
 
+		case T_GroupingFunc:
+			/*
+			 * Let expression tree walker inspect the arguments. Not sure if
+			 * that's necessary, as those are just references to grouping
+			 * expressions of the query (and thus likely examined as part
+			 * of another node).
+			 */
+			return expression_tree_walker(node, pgxc_shippability_walker,
+										  sc_context);
+
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));

@@ -1176,7 +1176,9 @@ tuplesort_begin_merge(TupleDesc tupDesc,
 	state->writetup = NULL;
 	state->readtup = readtup_datanode;
 	state->getlen = getlen_datanode;
-	state->movetup = movetup_heap;
+
+	state->tuples = false;
+	state->batchUsed = false;
 
 	state->tupDesc = tupDesc;	/* assume we need not copy tupDesc */
 	state->sortKeys = (SortSupport) palloc0(nkeys * sizeof(SortSupportData));

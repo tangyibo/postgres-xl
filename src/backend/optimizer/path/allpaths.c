@@ -1326,7 +1326,13 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		/* Generate a partial append path. */
 		appendpath = create_append_path(rel, partial_subpaths, NULL,
 										parallel_workers);
-		add_partial_path(rel, (Path *) appendpath);
+
+		/*
+		 * XL: In case we had to re-distribute the child relations, don't
+		 * do anything. Otherwise create_gather_path hits an Assert etc.
+		 */
+		if (appendpath->path.parallel_safe)
+			add_partial_path(rel, (Path *) appendpath);
 	}
 
 	/*

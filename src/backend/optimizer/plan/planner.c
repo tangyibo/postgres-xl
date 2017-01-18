@@ -162,6 +162,8 @@ static bool equal_distributions(PlannerInfo *root, Distribution *dst1,
 					Distribution *dst2);
 static bool grouping_distribution_match(PlannerInfo *root, Query *parse,
 					  Path *path, List *clauses);
+static bool groupingsets_distribution_match(PlannerInfo *root, Query *parse,
+					  Path *path);
 static Path *adjust_path_distribution(PlannerInfo *root, Query *parse,
 					  Path *path);
 static bool can_push_down_grouping(PlannerInfo *root, Query *parse, Path *path);
@@ -6131,6 +6133,23 @@ grouping_distribution_match(PlannerInfo *root, Query *parse, Path *path,
 	return matches_key;
 }
 
+static bool
+groupingsets_distribution_match(PlannerInfo *root, Query *parse, Path *path)
+{
+	Distribution *distribution = path->distribution;
+
+	/*
+	 * With no explicit data distribution or replicated tables, we can simply
+	 * push down the whole grouping sets to the remote node, without any sort
+	 * of redistribution. So consider this to be a match.
+	 */
+	if ((distribution == NULL) ||
+		IsLocatorReplicated(distribution->distributionType))
+		return true;
+
+	return false;
+}
+
 /*
  * equal_distributions
  * 	Check that two distributions are equal.
@@ -6284,11 +6303,10 @@ static bool
 can_push_down_grouping(PlannerInfo *root, Query *parse, Path *path)
 {
 	/* only called when constructing grouping paths */
-	Assert(parse->groupingSets || parse->hasAggs || parse->groupClause);
+	Assert(parse->hasAggs || parse->groupClause);
 
-	/* push-down of grouping sets is not supported yet */
 	if (parse->groupingSets)
-		return false;
+		return groupingsets_distribution_match(root, parse, path);
 
 	return grouping_distribution_match(root, parse, path, parse->groupClause);
 }

@@ -1386,7 +1386,6 @@ inheritance_planner(PlannerInfo *root)
 			}
 		}
 #endif
-		subroots = lappend(subroots, subroot);
 
 		/*
 		 * If this is the first non-excluded child, its post-planning rtable

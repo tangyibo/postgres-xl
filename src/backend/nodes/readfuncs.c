@@ -2614,6 +2614,7 @@ _readNestLoop(void)
 static MergeJoin *
 _readMergeJoin(void)
 {
+	int			i;
 	int			numCols;
 
 	READ_LOCALS(MergeJoin);
@@ -2625,7 +2626,34 @@ _readMergeJoin(void)
 	numCols = list_length(local_node->mergeclauses);
 
 	READ_OID_ARRAY(mergeFamilies, numCols);
-	READ_OID_ARRAY(mergeCollations, numCols);
+
+	token = pg_strtok(&length);		/* skip :mergeCollations */
+	local_node->mergeCollations = (Oid *) palloc(numCols * sizeof(Oid));
+	for (i = 0; i < numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *collname; /* collation name */
+			int 		collencoding; /* collation encoding */
+			/* the token is already read */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get collname */
+			collname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get nargs */
+			collencoding = atoi(token);
+			if (collname)
+				local_node->mergeCollations[i] = get_collid(collname,
+															collencoding,
+															NSP_OID(nspname));
+			else
+				local_node->mergeCollations[i] = InvalidOid;
+		}
+		else
+		local_node->mergeCollations[i] = atooid(token);
+	}
+
 	READ_INT_ARRAY(mergeStrategies, numCols);
 	READ_BOOL_ARRAY(mergeNullsFirst, numCols);
 

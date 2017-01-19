@@ -213,6 +213,7 @@ explain (costs off, format json) insert into insertconflicttest values (0, 'Bilb
    {                                                                       +
      "Plan": {                                                             +
        "Node Type": "Remote Subquery Scan",                                +
+       "Parallel Aware": false,                                            +
        "Replicated": "no",                                                 +
        "Node List": ["datanode_2"],                                        +
        "Plans": [                                                          +
@@ -220,6 +221,7 @@ explain (costs off, format json) insert into insertconflicttest values (0, 'Bilb
            "Node Type": "ModifyTable",                                     +
            "Operation": "Insert",                                          +
            "Parent Relationship": "Outer",                                 +
+           "Parallel Aware": false,                                        +
            "Relation Name": "insertconflicttest",                          +
            "Alias": "insertconflicttest",                                  +
            "Conflict Resolution": "UPDATE",                                +
@@ -228,7 +230,8 @@ explain (costs off, format json) insert into insertconflicttest values (0, 'Bilb
            "Plans": [                                                      +
              {                                                             +
                "Node Type": "Result",                                      +
-               "Parent Relationship": "Member"                             +
+               "Parent Relationship": "Member",                            +
+               "Parallel Aware": false                                     +
              }                                                             +
            ]                                                               +
          }                                                                 +
@@ -440,23 +443,25 @@ insert into insertconflicttest as i values (23, 'Avocado') on conflict (key) do 
 
 -- deparse whole row var in WHERE and SET clauses:
 explain (costs off) insert into insertconflicttest as i values (23, 'Avocado') on conflict (key) do update set fruit = excluded.fruit where excluded.* is null;
-               QUERY PLAN                
------------------------------------------
- Insert on insertconflicttest i
-   Conflict Resolution: UPDATE
-   Conflict Arbiter Indexes: plain
-   Conflict Filter: (excluded.* IS NULL)
-   ->  Result
-(5 rows)
+                  QUERY PLAN                   
+-----------------------------------------------
+ Remote Subquery Scan on all (datanode_1)
+   ->  Insert on insertconflicttest i
+         Conflict Resolution: UPDATE
+         Conflict Arbiter Indexes: plain
+         Conflict Filter: (excluded.* IS NULL)
+         ->  Result
+(6 rows)
 
 explain (costs off) insert into insertconflicttest as i values (23, 'Avocado') on conflict (key) do update set fruit = excluded.*::text;
-            QUERY PLAN             
------------------------------------
- Insert on insertconflicttest i
-   Conflict Resolution: UPDATE
-   Conflict Arbiter Indexes: plain
-   ->  Result
-(4 rows)
+                QUERY PLAN                
+------------------------------------------
+ Remote Subquery Scan on all (datanode_1)
+   ->  Insert on insertconflicttest i
+         Conflict Resolution: UPDATE
+         Conflict Arbiter Indexes: plain
+         ->  Result
+(5 rows)
 
 drop index plain;
 -- Cleanup

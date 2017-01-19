@@ -12124,7 +12124,8 @@ AlterTableNamespaceInternal(Relation rel, Oid oldNspOid, Oid nspOid,
 	/* Rename also sequence on GTM for a sequence */
 	if (IS_PGXC_LOCAL_COORDINATOR &&
 		rel->rd_rel->relkind == RELKIND_SEQUENCE &&
-		!IsTempSequence(RelationGetRelid(rel)))
+		!IsTempSequence(RelationGetRelid(rel)) &&
+		(oldNspOid != nspOid))
 	{
 		char *seqname = GetGlobalSeqName(rel, NULL, NULL);
 		char *newseqname = GetGlobalSeqName(rel, NULL, get_namespace_name(nspOid));
@@ -12333,7 +12334,8 @@ AlterSeqNamespaces(Relation classRel, Relation rel,
 #ifdef PGXC
 		/* Change also this sequence name on GTM */
 		if (IS_PGXC_LOCAL_COORDINATOR &&
-			!IsTempSequence(RelationGetRelid(seqRel)))
+			!IsTempSequence(RelationGetRelid(seqRel)) &&
+			(oldNspOid != newNspOid))
 		{
 			char *seqname = GetGlobalSeqName(seqRel, NULL, NULL);
 			char *newseqname = GetGlobalSeqName(seqRel, NULL, get_namespace_name(newNspOid));

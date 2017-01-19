@@ -662,6 +662,7 @@ gtm_get_pgxcnodeinfo_size(GTM_PGXCNodeInfo *data)
 	len += sizeof(GlobalTransactionId);	/* xmin */
 	len += sizeof(GTM_Timestamp);		/* reported timestamp */
 
+	len += sizeof(uint32);			/* max_sessions */
 	len += sizeof(uint32);			/* num_sessions */
 	if (data->num_sessions > 0)		/* sessions */
 		len += (data->num_sessions * sizeof(GTM_PGXCSession));

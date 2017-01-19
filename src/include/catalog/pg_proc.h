@@ -5330,7 +5330,7 @@ DATA(insert OID = 6018 ( pg_msgmodule_disable PGNSP PGUID 12 1 1 0 0 f f f f t t
 DESCR("pid to ignore overriden log levels");
 DATA(insert OID = 6019 ( pg_msgmodule_enable_all PGNSP PGUID 12 1 1 0 0 f f f f t t i s 1 0 16 "16" _null_ _null_ _null_ _null_ _null_ pg_msgmodule_enable_all _null_ _null_ _null_ ));
 DESCR("all current/future processes to honour overriden log levels");
-DATA(insert OID = 6020 ( pg_msgmodule_disable_all PGNSP PGUID 12 1 1 0 0 f f f f t t 0 s 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pg_msgmodule_disable_all _null_ _null_ _null_ ));
+DATA(insert OID = 6020 ( pg_msgmodule_disable_all PGNSP PGUID 12 1 1 0 0 f f f f t t i s 0 0 16 "" _null_ _null_ _null_ _null_ _null_ pg_msgmodule_disable_all _null_ _null_ _null_ ));
 DESCR("all processes to ignore overriden log levels");
 #endif
 

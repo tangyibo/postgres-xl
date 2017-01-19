@@ -124,7 +124,7 @@ SELECT '' AS four, height(f1), width(f1) FROM BOX_TBL ORDER BY (f1[0])[0], (f1[0
 -- Test the SP-GiST index
 --
 
-CREATE TEMPORARY TABLE box_temp (f1 box);
+CREATE TEMPORARY TABLE box_temp (f1 box) DISTRIBUTE BY REPLICATION;
 
 INSERT INTO box_temp
 	SELECT box(point(i, i), point(i * 2, i * 2))

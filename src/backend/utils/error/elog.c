@@ -4077,7 +4077,7 @@ pg_msgmodule_set(PG_FUNCTION_ARGS)
 	int32 moduleid = PG_GETARG_INT32(0);
 	int32 fileid = PG_GETARG_INT32(1);
 	int32 msgid = PG_GETARG_INT32(2);
-	const char *levelstr = PG_GETARG_CSTRING(3);
+	const char *levelstr = text_to_cstring(PG_GETARG_TEXT_PP(3));
 	int32 level;
 
 	if (!superuser())

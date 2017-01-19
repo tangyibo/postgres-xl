@@ -1490,12 +1490,12 @@ select * from matest0 order by 1-id;
 explain (verbose, costs off) select min(1-id) from matest0;
                         QUERY PLAN                         
 -----------------------------------------------------------
- Aggregate
-   Output: min((min((1 - id))))
+ Finalize Aggregate
+   Output: min((1 - id))
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-         Output: min((1 - id))
-         ->  Aggregate
-               Output: min((1 - matest0.id))
+         Output: PARTIAL min((1 - id))
+         ->  Partial Aggregate
+               Output: PARTIAL min((1 - matest0.id))
                ->  Append
                      ->  Seq Scan on public.matest0
                            Output: matest0.id
@@ -1550,12 +1550,12 @@ select * from matest0 order by 1-id;
 explain (verbose, costs off) select min(1-id) from matest0;
                                   QUERY PLAN                                  
 ------------------------------------------------------------------------------
- Aggregate
-   Output: min((min((1 - id))))
+ Finalize Aggregate
+   Output: min((1 - id))
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-         Output: min((1 - id))
-         ->  Aggregate
-               Output: min((1 - matest0.id))
+         Output: PARTIAL min((1 - id))
+         ->  Partial Aggregate
+               Output: PARTIAL min((1 - matest0.id))
                ->  Append
                      ->  Index Only Scan using matest0_pkey on public.matest0
                            Output: matest0.id

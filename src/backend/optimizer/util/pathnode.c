@@ -1399,6 +1399,21 @@ set_joinpath_distribution(PlannerInfo *root, JoinPath *pathnode)
 	List		   *alternate = NIL;
 	List		   *restrictClauses = NIL;
 
+	List		   *innerpathkeys = pathnode->innerjoinpath->pathkeys;
+	List		   *outerpathkeys = pathnode->outerjoinpath->pathkeys;
+
+	/* for mergejoins, override with outersortkeys, if needed */
+	if (IsA(pathnode, MergePath))
+	{
+		MergePath *mpath = (MergePath*)pathnode;
+
+		if (mpath->innersortkeys)
+			innerpathkeys = mpath->innersortkeys;
+
+		if (mpath->outersortkeys)
+			outerpathkeys = mpath->outersortkeys;
+	}
+
 	/* Catalog join */
 	if (innerd == NULL && outerd == NULL)
 		return NIL;
@@ -1954,7 +1969,7 @@ not_allowed_join:
 				pathnode->innerjoinpath = redistribute_path(
 						root,
 						pathnode->innerjoinpath,
-						pathnode->innerjoinpath->pathkeys,
+						innerpathkeys,
 						distType,
 						(Node *) new_inner_key,
 						nodes,
@@ -1970,7 +1985,7 @@ not_allowed_join:
 				pathnode->outerjoinpath = redistribute_path(
 						root,
 						pathnode->outerjoinpath,
-						pathnode->outerjoinpath->pathkeys,
+						outerpathkeys,
 						distType,
 						(Node *) new_outer_key,
 						nodes,
@@ -1981,6 +1996,19 @@ not_allowed_join:
 			targetd->nodes = nodes;
 			targetd->restrictNodes = NULL;
 			pathnode->path.distribution = targetd;
+
+			/*
+			 * For mergejoins we can also reset the sortkeys, because
+			 * redistribute_path will take care of that by creating a nested
+			 * Sort if needed. Otherwise create_mergejoin_plan would add
+			 * another sort node, but we want to push it down.
+			 */
+			if (IsA(pathnode, MergePath))
+			{
+				((MergePath*)pathnode)->innersortkeys = NIL;
+				((MergePath*)pathnode)->outersortkeys = NIL;
+			}
+
 			/*
 			 * In case of outer join distribution key should not refer
 			 * distribution key of nullable part.
@@ -2014,7 +2042,7 @@ not_allowed_join:
 	if (innerd)
 		pathnode->innerjoinpath = redistribute_path(root,
 													pathnode->innerjoinpath,
-											pathnode->innerjoinpath->pathkeys,
+													innerpathkeys,
 													LOCATOR_TYPE_NONE,
 													NULL,
 													NULL,
@@ -2022,7 +2050,7 @@ not_allowed_join:
 	if (outerd)
 		pathnode->outerjoinpath = redistribute_path(root,
 													pathnode->outerjoinpath,
-											pathnode->outerjoinpath->pathkeys,
+													outerpathkeys,
 													LOCATOR_TYPE_NONE,
 													NULL,
 													NULL,

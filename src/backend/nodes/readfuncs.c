@@ -3235,6 +3235,111 @@ _readRemoteStmt(void)
 	READ_DONE();
 }
 
+
+/*
+ * _readSimpleSort
+ */
+static SimpleSort *
+_readSimpleSort(void)
+{
+	int i;
+	READ_LOCALS(SimpleSort);
+
+	READ_INT_FIELD(numCols);
+
+	token = pg_strtok(&length);		/* skip :sortColIdx */
+	local_node->sortColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		local_node->sortColIdx[i] = atoi(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :sortOperators */
+	local_node->sortOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+			/* token is already set to nspname */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+			local_node->sortOperators[i] = get_operid(oprname,
+													  oprleft,
+													  oprright,
+													  NSP_OID(nspname));
+		}
+		else
+			local_node->sortOperators[i] = atooid(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :sortCollations */
+	local_node->sortCollations = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *collname; /* collation name */
+			int 		collencoding; /* collation encoding */
+			/* the token is already read */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get collname */
+			collname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get nargs */
+			collencoding = atoi(token);
+			if (collname)
+				local_node->sortCollations[i] = get_collid(collname,
+													   collencoding,
+													   NSP_OID(nspname));
+			else
+				local_node->sortCollations[i] = InvalidOid;
+		}
+		else
+			local_node->sortCollations[i] = atooid(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :nullsFirst */
+	local_node->nullsFirst = (bool *) palloc(local_node->numCols * sizeof(bool));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		local_node->nullsFirst[i] = strtobool(token);
+	}
+
+	READ_DONE();
+}
+
+
 /*
  * parseNodeString
  *
@@ -3469,6 +3574,8 @@ parseNodeString(void)
 		return_value = _readRemoteSubplan();
 	else if (MATCH("REMOTESTMT", 10))
 		return_value = _readRemoteStmt();
+	else if (MATCH("SIMPLESORT", 10))
+		return_value = _readSimpleSort();
 	else
 	{
 		elog(ERROR, "badly formatted node string \"%.32s\"...", token);

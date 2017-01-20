@@ -2940,17 +2940,123 @@ _readAgg(void)
 static WindowAgg *
 _readWindowAgg(void)
 {
-	READ_LOCALS(WindowAgg);
+	int i;
 
-	ReadCommonPlan(&local_node->plan);
+	READ_PLAN_FIELDS(WindowAgg);
 
 	READ_UINT_FIELD(winref);
 	READ_INT_FIELD(partNumCols);
-	READ_ATTRNUMBER_ARRAY(partColIdx, local_node->partNumCols);
-	READ_OID_ARRAY(partOperators, local_node->partNumCols);
+
+	token = pg_strtok(&length);		/* skip :partColIdx */
+	local_node->partColIdx = (AttrNumber *) palloc(local_node->partNumCols * sizeof(AttrNumber));
+	for (i = 0; i < local_node->partNumCols; i++)
+	{
+		token = pg_strtok(&length);
+		local_node->partColIdx[i] = atoi(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :partOperators */
+	local_node->partOperators = (Oid *) palloc(local_node->partNumCols * sizeof(Oid));
+	for (i = 0; i < local_node->partNumCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+			/* token is already set to nspname */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+			local_node->partOperators[i] = get_operid(oprname,
+													  oprleft,
+													  oprright,
+													  NSP_OID(nspname));
+		}
+		else
+			local_node->partOperators[i] = atooid(token);
+	}
+
 	READ_INT_FIELD(ordNumCols);
-	READ_ATTRNUMBER_ARRAY(ordColIdx, local_node->ordNumCols);
-	READ_OID_ARRAY(ordOperators, local_node->ordNumCols);
+
+	token = pg_strtok(&length);		/* skip :ordColIdx */
+	local_node->ordColIdx = (AttrNumber *) palloc(local_node->ordNumCols * sizeof(AttrNumber));
+	for (i = 0; i < local_node->ordNumCols; i++)
+	{
+		token = pg_strtok(&length);
+		local_node->ordColIdx[i] = atoi(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :ordOperators */
+	local_node->ordOperators = (Oid *) palloc(local_node->ordNumCols * sizeof(Oid));
+	for (i = 0; i < local_node->ordNumCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+			/* token is already set to nspname */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+			local_node->ordOperators[i] = get_operid(oprname,
+													 oprleft,
+													 oprright,
+													 NSP_OID(nspname));
+		}
+		else
+			local_node->ordOperators[i] = atooid(token);
+	}
+
 	READ_INT_FIELD(frameOptions);
 	READ_NODE_FIELD(startOffset);
 	READ_NODE_FIELD(endOffset);

@@ -1112,7 +1112,7 @@ _outWindowAgg(StringInfo str, const WindowAgg *node)
 	for (i = 0; i < node->partNumCols; i++)
 		appendStringInfo(str, " %d", node->partColIdx[i]);
 
-	appendStringInfoString(str, " :partOperations");
+	appendStringInfoString(str, " :partOperators");
 	for (i = 0; i < node->partNumCols; i++)
 #ifdef XCP
 		if (portable_output)
@@ -1148,7 +1148,7 @@ _outWindowAgg(StringInfo str, const WindowAgg *node)
 	for (i = 0; i < node->ordNumCols; i++)
 		appendStringInfo(str, " %d", node->ordColIdx[i]);
 
-	appendStringInfoString(str, " :ordOperations");
+	appendStringInfoString(str, " :ordOperators");
 	for (i = 0; i < node->ordNumCols; i++)
 #ifdef XCP
 		if (portable_output)

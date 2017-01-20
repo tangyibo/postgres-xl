@@ -4497,7 +4497,7 @@ create_grouping_paths(PlannerInfo *root,
 			/* If the whole aggregate was pushed down, we're done. */
 			if (! can_push_down_grouping(root, parse, cheapest_path))
 			{
-				Path *path;
+				Path *path, *agg_path;
 
 				path = (Path *) create_agg_path(root,
 									   grouped_rel,
@@ -4509,6 +4509,9 @@ create_grouping_paths(PlannerInfo *root,
 									   NIL,
 									   &agg_partial_costs,
 									   dNumPartialGroups);
+
+				/* keep partially aggregated path for the can_sort branch */
+				agg_path = path;
 
 				path = create_remotesubplan_path(root, path, NULL);
 
@@ -4527,6 +4530,19 @@ create_grouping_paths(PlannerInfo *root,
 										 dNumGroups));
 
 				if (can_sort)
+				{
+					/*
+					 * AGG_HASHED aggregate paths are always unsorted, so add
+					 * a Sorted node for the final AGG_SORTED step.
+					 */
+					path = (Path *) create_sort_path(root,
+													 grouped_rel,
+													 agg_path,
+													 root->group_pathkeys,
+													 -1.0);
+
+					path = create_remotesubplan_path(root, path, NULL);
+
 					add_path(grouped_rel, (Path *)
 							 create_agg_path(root,
 											 grouped_rel,
@@ -4538,6 +4554,7 @@ create_grouping_paths(PlannerInfo *root,
 											 (List *) parse->havingQual,
 											 &agg_final_costs,
 											 dNumGroups));
+				}
 			}
 		}
 

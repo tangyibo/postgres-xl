@@ -330,6 +330,11 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 #ifdef XCP
 	if (root->distribution)
 	{
+		/*
+		 * FIXME, this keeps adding RemoteSubplan at a top of queries that
+		 * don't really need it (e.g above a MergeAppend with subplans pushed
+		 * to remote nodes). Not sure why it's happening, though ...
+		 */
 		top_plan = (Plan *) make_remotesubplan(root, top_plan, NULL,
 											   root->distribution,
 											   root->query_pathkeys);

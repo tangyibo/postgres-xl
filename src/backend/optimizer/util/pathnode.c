@@ -1689,7 +1689,7 @@ not_allowed_join:
 		altpath->innerjoinpath = redistribute_path(
 				root,
 				altpath->innerjoinpath,
-				altpath->innerjoinpath->pathkeys,
+				innerpathkeys,
 				LOCATOR_TYPE_REPLICATED,
 				NULL,
 				bms_copy(outerd->nodes),
@@ -1717,7 +1717,7 @@ not_allowed_join:
 		altpath->outerjoinpath = redistribute_path(
 				root,
 				altpath->outerjoinpath,
-				altpath->outerjoinpath->pathkeys,
+				outerpathkeys,
 				LOCATOR_TYPE_REPLICATED,
 				NULL,
 				bms_copy(innerd->nodes),

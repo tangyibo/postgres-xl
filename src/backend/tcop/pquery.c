@@ -785,6 +785,12 @@ PortalStart(Portal portal, ParamListInfo params,
 						portal->queryDesc = queryDesc;
 
 						/*
+						 * Some basic sanity checking against invalid remote plans.
+						 */
+						Assert((queryDesc->plannedstmt->distributionKey == InvalidAttrNumber) ||
+							   (queryDesc->plannedstmt->distributionKey <= queryDesc->tupDesc->natts));
+
+						/*
 						 * Set up locator if result distribution is requested
 						 */
 						keytype = queryDesc->plannedstmt->distributionKey == InvalidAttrNumber ?

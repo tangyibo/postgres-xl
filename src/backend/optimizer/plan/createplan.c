@@ -2412,21 +2412,16 @@ create_remotescan_plan(PlannerInfo *root,
 	 */
 	saverestrict = root->curOuterRestrict;
 
-	adjust_subplan_distribution(root, best_path->path.distribution,
-							  best_path->subpath->distribution);
+	adjust_subplan_distribution(root,
+								best_path->path.distribution,
+								subpath->distribution);
 
 	/* We don't want any excess columns in the remote tuples */
-	subplan = create_plan_recurse(root, best_path->subpath, CP_SMALL_TLIST);
-
-	plan = make_remotesubplan(root, subplan,
-							  best_path->path.distribution,
-							  best_path->subpath->distribution,
-							  best_path->path.pathkeys);
-
-	copy_generic_path_info(&plan->scan.plan, (Path *) best_path);
+	subplan = create_plan_recurse(root, subpath, CP_SMALL_TLIST);
 
 	/* */
-	(void) prepare_sort_from_pathkeys((Plan *)plan, pathkeys,
+	(void) prepare_sort_from_pathkeys((Plan *)subplan,
+									  pathkeys,
 									  best_path->path.parent->relids,
 									  NULL,
 									  true,
@@ -2439,14 +2434,19 @@ create_remotescan_plan(PlannerInfo *root,
 	/* Now, insert a Sort node if subplan isn't sufficiently ordered */
 	if (!pathkeys_contained_in(pathkeys, subpath->pathkeys))
 	{
-		Sort	   *sort = make_sort(subplan, numsortkeys,
+		subplan = (Plan *) make_sort(subplan, numsortkeys,
 									 sortColIdx, sortOperators,
 									 collations, nullsFirst);
 
-		label_sort_with_costsize(root, sort, -1.0);
-
-		plan->scan.plan.lefttree = (Plan *) sort;
+		label_sort_with_costsize(root, (Sort *)subplan, -1.0);
 	}
+
+	plan = make_remotesubplan(root, subplan,
+							  best_path->path.distribution,
+							  best_path->subpath->distribution,
+							  best_path->path.pathkeys);
+
+	copy_generic_path_info(&plan->scan.plan, (Path *) best_path);
 
 	/* restore current restrict */
 	bms_free(root->curOuterRestrict);

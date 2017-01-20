@@ -58,9 +58,9 @@ static List *translate_sub_tlist(List *tlist, int relid);
 #ifdef XCP
 static void restrict_distribution(PlannerInfo *root, RestrictInfo *ri,
 								  Path *pathnode);
-static Path *redistribute_path(Path *subpath, char distributionType,
-				  Bitmapset *nodes, Bitmapset *restrictNodes,
-				  Node* distributionExpr);
+static Path *redistribute_path(PlannerInfo *root, Path *subpath, List *pathkeys,
+				  char distributionType, Node* distributionExpr,
+				  Bitmapset *nodes, Bitmapset *restrictNodes);
 static void set_scanpath_distribution(PlannerInfo *root, RelOptInfo *rel, Path *pathnode);
 static List *set_joinpath_distribution(PlannerInfo *root, JoinPath *pathnode);
 extern void PoolPingNodes(void);
@@ -1252,13 +1252,17 @@ create_remotesubplan_path(PlannerInfo *root, Path *subpath,
 }
 
 /*
- * Set a RemoteSubPath on top of the specified node and set specified
- * distribution to it
+ * redistribute_path
+ * 	Redistributes the path to match desired distribution parameters.
+ *
+ * It's also possible to specify desired sort order using pathkeys. If the
+ * subpath does not match the order, a Sort node will be added automatically.
+ * This is similar to how create_merge_append_path() injects Sort nodes.
  */
 static Path *
-redistribute_path(Path *subpath, char distributionType,
-				  Bitmapset *nodes, Bitmapset *restrictNodes,
-				  Node* distributionExpr)
+redistribute_path(PlannerInfo *root, Path *subpath, List *pathkeys,
+				  char distributionType, Node* distributionExpr,
+				  Bitmapset *nodes, Bitmapset *restrictNodes)
 {
 	Distribution   *distribution = NULL;
 	RelOptInfo	   *rel = subpath->parent;
@@ -1320,21 +1324,59 @@ redistribute_path(Path *subpath, char distributionType,
 	}
 	else
 	{
+		Cost	input_startup_cost = 0;
+		Cost	input_total_cost = 0;
+
 		pathnode = makeNode(RemoteSubPath);
 		pathnode->path.pathtype = T_RemoteSubplan;
 		pathnode->path.parent = rel;
 		pathnode->path.pathtarget = rel->reltarget;
 		pathnode->path.param_info = subpath->param_info;
-		pathnode->path.pathkeys = subpath->pathkeys;
-		pathnode->subpath = subpath;
+		pathnode->path.pathkeys = pathkeys ? pathkeys : subpath->pathkeys;
 		pathnode->path.distribution = distribution;
+
+		/*
+		 * If we need to insert a Sort node, add it here, so that it gets
+		 * pushed down to the remote node.
+		 *
+		 * This works just like create_merge_append_path, i.e. we only do the
+		 * costing here and only actually construct the Sort node later in
+		 * create_remotescan_plan.
+		 */
+		if (pathkeys_contained_in(pathkeys, subpath->pathkeys))
+		{
+			/* Subpath is adequately ordered, we won't need to sort it */
+			input_startup_cost += subpath->startup_cost;
+			input_total_cost += subpath->total_cost;
+		}
+		else
+		{
+			/* We'll need to insert a Sort node, so include cost for that */
+			Path		sort_path;		/* dummy for result of cost_sort */
+
+			cost_sort(&sort_path,
+					  root,
+					  pathkeys,
+					  subpath->total_cost,
+					  subpath->parent->tuples,
+					  subpath->pathtarget->width,
+					  0.0,
+					  work_mem,
+					  -1.0);
+
+			input_startup_cost += sort_path.startup_cost;
+			input_total_cost += sort_path.total_cost;
+		}
+
+		pathnode->subpath = subpath;
 
 		/* We don't want to run subplains in parallel workers */
 		pathnode->path.parallel_aware = false;
 		pathnode->path.parallel_safe = false;
 
-		cost_remote_subplan((Path *) pathnode, subpath->startup_cost,
-							subpath->total_cost, subpath->rows, rel->reltarget->width,
+		cost_remote_subplan((Path *) pathnode,
+							input_startup_cost, input_total_cost,
+							subpath->rows, rel->reltarget->width,
 							IsLocatorReplicated(distributionType) ?
 									bms_num_members(nodes) : 1);
 		return (Path *) pathnode;
@@ -1630,11 +1672,13 @@ not_allowed_join:
 		JoinPath *altpath = flatCopyJoinPath(pathnode);
 		/* Redistribute inner subquery */
 		altpath->innerjoinpath = redistribute_path(
+				root,
 				altpath->innerjoinpath,
+				altpath->innerjoinpath->pathkeys,
 				LOCATOR_TYPE_REPLICATED,
+				NULL,
 				bms_copy(outerd->nodes),
-				bms_copy(outerd->restrictNodes),
-				NULL);
+				bms_copy(outerd->restrictNodes));
 		targetd = makeNode(Distribution);
 		targetd->distributionType = outerd->distributionType;
 		targetd->nodes = bms_copy(outerd->nodes);
@@ -1656,11 +1700,13 @@ not_allowed_join:
 		JoinPath *altpath = flatCopyJoinPath(pathnode);
 		/* Redistribute inner subquery */
 		altpath->outerjoinpath = redistribute_path(
+				root,
 				altpath->outerjoinpath,
+				altpath->outerjoinpath->pathkeys,
 				LOCATOR_TYPE_REPLICATED,
+				NULL,
 				bms_copy(innerd->nodes),
-				bms_copy(innerd->restrictNodes),
-				NULL);
+				bms_copy(innerd->restrictNodes));
 		targetd = makeNode(Distribution);
 		targetd->distributionType = innerd->distributionType;
 		targetd->nodes = bms_copy(innerd->nodes);
@@ -1906,11 +1952,13 @@ not_allowed_join:
 			{
 				/* Redistribute inner subquery */
 				pathnode->innerjoinpath = redistribute_path(
+						root,
 						pathnode->innerjoinpath,
+						pathnode->innerjoinpath->pathkeys,
 						distType,
+						(Node *) new_inner_key,
 						nodes,
-						restrictNodes,
-						(Node *) new_inner_key);
+						restrictNodes);
 			}
 			/*
 			 * Redistribute join by hash, and, if jointype allows, create
@@ -1920,11 +1968,13 @@ not_allowed_join:
 			{
 				/* Redistribute outer subquery */
 				pathnode->outerjoinpath = redistribute_path(
+						root,
 						pathnode->outerjoinpath,
+						pathnode->outerjoinpath->pathkeys,
 						distType,
+						(Node *) new_outer_key,
 						nodes,
-						restrictNodes,
-						(Node *) new_outer_key);
+						restrictNodes);
 			}
 			targetd = makeNode(Distribution);
 			targetd->distributionType = distType;
@@ -1962,13 +2012,17 @@ not_allowed_join:
 	 * relations.
 	 */
 	if (innerd)
-		pathnode->innerjoinpath = redistribute_path(pathnode->innerjoinpath,
+		pathnode->innerjoinpath = redistribute_path(root,
+													pathnode->innerjoinpath,
+											pathnode->innerjoinpath->pathkeys,
 													LOCATOR_TYPE_NONE,
 													NULL,
 													NULL,
 													NULL);
 	if (outerd)
-		pathnode->outerjoinpath = redistribute_path(pathnode->outerjoinpath,
+		pathnode->outerjoinpath = redistribute_path(root,
+													pathnode->outerjoinpath,
+											pathnode->outerjoinpath->pathkeys,
 													LOCATOR_TYPE_NONE,
 													NULL,
 													NULL,
@@ -2389,8 +2443,9 @@ create_append_path(RelOptInfo *rel, List *subpaths, Relids required_outer,
 			{
 				subpath = (Path *) lfirst(l);
 				if (subpath->distribution)
-					subpath = redistribute_path(subpath, LOCATOR_TYPE_NONE,
-												NULL, NULL, NULL);
+					subpath = redistribute_path(NULL, subpath, NIL,
+												LOCATOR_TYPE_NONE, NULL,
+												NULL, NULL);
 				newsubpaths = lappend(newsubpaths, subpath);
 			}
 			subpaths = newsubpaths;
@@ -2504,8 +2559,16 @@ create_merge_append_path(PlannerInfo *root,
 		{
 			subpath = (Path *) lfirst(l);
 			if (subpath->distribution)
-				subpath = redistribute_path(subpath, LOCATOR_TYPE_NONE,
-											NULL, NULL, NULL);
+			{
+				/*
+				 * If an explicit sort is necessary, make sure it's pushed
+				 * down to the remote node (i.e. add it before the remote
+				 * subplan).
+				 */
+				subpath = redistribute_path(root, subpath, pathkeys,
+											LOCATOR_TYPE_NONE, NULL,
+											NULL, NULL);
+			}
 			newsubpaths = lappend(newsubpaths, subpath);
 		}
 		subpaths = newsubpaths;

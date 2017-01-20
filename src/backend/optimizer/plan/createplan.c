@@ -2397,6 +2397,15 @@ create_remotescan_plan(PlannerInfo *root,
 	Plan	   	   *subplan;
 	Bitmapset  	   *saverestrict;
 
+	Path		   *subpath = best_path->subpath;
+	List		   *pathkeys = best_path->path.pathkeys;
+
+	int 			numsortkeys;
+	AttrNumber	   *sortColIdx;
+	Oid			   *sortOperators;
+	Oid			   *collations;
+	bool		   *nullsFirst;
+
 	/*
 	 * Subsequent code will modify current restriction, it needs to be restored
 	 * so other path nodes in the outer tree could see correct value.
@@ -2415,6 +2424,29 @@ create_remotescan_plan(PlannerInfo *root,
 							  best_path->path.pathkeys);
 
 	copy_generic_path_info(&plan->scan.plan, (Path *) best_path);
+
+	/* */
+	(void) prepare_sort_from_pathkeys((Plan *)plan, pathkeys,
+									  best_path->path.parent->relids,
+									  NULL,
+									  true,
+									  &numsortkeys,
+									  &sortColIdx,
+									  &sortOperators,
+									  &collations,
+									  &nullsFirst);
+
+	/* Now, insert a Sort node if subplan isn't sufficiently ordered */
+	if (!pathkeys_contained_in(pathkeys, subpath->pathkeys))
+	{
+		Sort	   *sort = make_sort(subplan, numsortkeys,
+									 sortColIdx, sortOperators,
+									 collations, nullsFirst);
+
+		label_sort_with_costsize(root, sort, -1.0);
+
+		plan->scan.plan.lefttree = (Plan *) sort;
+	}
 
 	/* restore current restrict */
 	bms_free(root->curOuterRestrict);

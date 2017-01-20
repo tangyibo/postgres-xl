@@ -1902,13 +1902,7 @@ json_agg_transfn(PG_FUNCTION_ARGS)
 		state->str = makeStringInfo();
 		MemoryContextSwitchTo(oldcontext);
 
-#ifndef XCP
-		/* 
-		 * Do not add the start marker. It will be done by the
-		 * json_agg_collectfn on receiving the first result
-		 */
 		appendStringInfoChar(state->str, '[');
-#endif
 		json_categorize_type(arg_type, &state->val_category,
 							 &state->val_output_func);
 	}
@@ -1947,66 +1941,6 @@ json_agg_transfn(PG_FUNCTION_ARGS)
 	PG_RETURN_POINTER(state);
 }
 
-#ifdef XCP
-/*
- * json_agg collection function
- */
-Datum
-json_agg_collectfn(PG_FUNCTION_ARGS)
-{
-	MemoryContext aggcontext,
-				oldcontext;
-	JsonAggState *collectstate;
-	JsonAggState *transstate;
-
-	if (!AggCheckCallContext(fcinfo, &aggcontext))
-	{
-		/* cannot be called directly because of internal-type argument */
-		elog(ERROR, "json_agg_collectfn called in non-aggregate context");
-	}
-
-	if (PG_ARGISNULL(0))
-	{
-		/*
-		 * Make this state object in a context where it will persist for the
-		 * duration of the aggregate call.  MemoryContextSwitchTo is only
-		 * needed the first time, as the StringInfo routines make sure they
-		 * use the right context to enlarge the object if necessary.
-		 */
-		oldcontext = MemoryContextSwitchTo(aggcontext);
-		collectstate = (JsonAggState *) palloc(sizeof(JsonAggState));
-		collectstate->str = makeStringInfo();
-		MemoryContextSwitchTo(oldcontext);
-
-		appendStringInfoChar(collectstate->str, '[');
-	}
-	else
-	{
-		collectstate = (JsonAggState *) PG_GETARG_POINTER(0);
-		if (!PG_ARGISNULL(1))
-			appendStringInfoString(collectstate->str, ", ");
-	}
-
-	/* fast path for NULLs */
-	if (PG_ARGISNULL(1))
-		PG_RETURN_POINTER(collectstate);
-
-	transstate = (JsonAggState *) PG_GETARG_POINTER(1);
-
-	/* add some whitespace if structured type and not first item */
-	if (!PG_ARGISNULL(0) &&
-		(transstate->val_category == JSONTYPE_ARRAY ||
-		 transstate->val_category == JSONTYPE_COMPOSITE))
-	{
-		appendStringInfoString(collectstate->str, "\n ");
-	}
-
-	appendStringInfoString(collectstate->str, transstate->str->data);
-
-	PG_RETURN_POINTER(collectstate);
-}
-#endif
-
 /*
  * json_agg final function
  */
@@ -2014,11 +1948,9 @@ Datum
 json_agg_finalfn(PG_FUNCTION_ARGS)
 {
 	JsonAggState *state;
-	MemoryContext aggcontext;
 
 	/* cannot be called directly because of internal-type argument */
-	if (!AggCheckCallContext(fcinfo, &aggcontext))
-		elog(ERROR, "aggregate function called in non-aggregate context");
+	Assert(AggCheckCallContext(fcinfo, NULL));
 
 	state = PG_ARGISNULL(0) ?
 		NULL :
@@ -2132,11 +2064,9 @@ Datum
 json_object_agg_finalfn(PG_FUNCTION_ARGS)
 {
 	JsonAggState *state;
-	MemoryContext aggcontext;
 
 	/* cannot be called directly because of internal-type argument */
-	if (!AggCheckCallContext(fcinfo, &aggcontext))
-		elog(ERROR, "aggregate function called in non-aggregate context");
+	Assert(AggCheckCallContext(fcinfo, NULL));
 
 	state = PG_ARGISNULL(0) ? NULL : (JsonAggState *) PG_GETARG_POINTER(0);
 

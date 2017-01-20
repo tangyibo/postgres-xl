@@ -85,6 +85,8 @@ static void show_upper_qual(List *qual, const char *qlabel,
 				ExplainState *es);
 static void show_sort_keys(SortState *sortstate, List *ancestors,
 			   ExplainState *es);
+static void show_simple_sort_keys(RemoteSubplanState *remotestate,
+			   List *ancestors, ExplainState *es);
 static void show_merge_append_keys(MergeAppendState *mstate, List *ancestors,
 					   ExplainState *es);
 static void show_agg_keys(AggState *astate, List *ancestors,
@@ -1455,6 +1457,11 @@ ExplainNode(PlanState *planstate, List *ancestors,
 						}
 					}
 				}
+
+				/* add info about output sort order */
+				if (es->verbose)
+					show_simple_sort_keys((RemoteSubplanState *)planstate,
+										  ancestors, es);
 			}
 			break;
 #endif
@@ -1950,6 +1957,28 @@ show_sort_keys(SortState *sortstate, List *ancestors, ExplainState *es)
 						 plan->numCols, plan->sortColIdx,
 						 plan->sortOperators, plan->collations,
 						 plan->nullsFirst,
+						 ancestors, es);
+}
+
+/*
+ * Show the sort keys for a SimpleSort node.
+ */
+static void
+show_simple_sort_keys(RemoteSubplanState *planstate, List *ancestors, ExplainState *es)
+{
+	Plan		   *plan = ((ScanState *)planstate)->ps.plan;
+	RemoteSubplan  *remoteplan = (RemoteSubplan *)plan;
+
+	SimpleSort *sort = (SimpleSort *)remoteplan->sort;
+
+	/* if remote subplan does not sort the results */
+	if (!sort)
+		return;
+
+	show_sort_group_keys((PlanState *) planstate, "Sort Key",
+						 sort->numCols, sort->sortColIdx,
+						 sort->sortOperators, sort->sortCollations,
+						 sort->nullsFirst,
 						 ancestors, es);
 }
 

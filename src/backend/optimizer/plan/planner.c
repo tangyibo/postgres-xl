@@ -4960,8 +4960,6 @@ create_distinct_paths(PlannerInfo *root,
 		if (!grouping_distribution_match(root, parse, path, parse->distinctClause))
 			path = create_remotesubplan_path(root, path, NULL);
 
-		/* XXX Maybe we need another sort here? */
-
 		add_path(distinct_rel, (Path *)
 				 create_upper_unique_path(root, distinct_rel,
 										  path,

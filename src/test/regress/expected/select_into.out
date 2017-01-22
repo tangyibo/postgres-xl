@@ -54,9 +54,9 @@ DROP USER regress_selinto_user;
 CREATE TABLE ctas_base (i int, j int);
 INSERT INTO ctas_base VALUES (1, 2);
 CREATE TABLE ctas_nodata (ii, jj, kk) AS SELECT i, j FROM ctas_base; -- Error
-ERROR:  too many column names were specified
+ERROR:  CREATE TABLE AS specifies too many column names
 CREATE TABLE ctas_nodata (ii, jj, kk) AS SELECT i, j FROM ctas_base WITH NO DATA; -- Error
-ERROR:  too many column names were specified
+ERROR:  CREATE TABLE AS specifies too many column names
 CREATE TABLE ctas_nodata (ii, jj) AS SELECT i, j FROM ctas_base; -- OK
 CREATE TABLE ctas_nodata_2 (ii, jj) AS SELECT i, j FROM ctas_base WITH NO DATA; -- OK
 CREATE TABLE ctas_nodata_3 (ii) AS SELECT i, j FROM ctas_base; -- OK

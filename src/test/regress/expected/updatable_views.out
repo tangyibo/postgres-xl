@@ -948,7 +948,7 @@ NOTICE:  drop cascades to view rw_view1
 CREATE USER regress_view_user1;
 CREATE USER regress_view_user2;
 SET SESSION AUTHORIZATION regress_view_user1;
-CREATE TABLE base_tbl(a int, b text, c float);
+CREATE TABLE base_tbl(a int, b text, c float) DISTRIBUTE BY REPLICATION;
 INSERT INTO base_tbl VALUES (1, 'Row 1', 1.0);
 CREATE VIEW rw_view1 AS SELECT b AS bb, c AS cc, a AS aa FROM base_tbl;
 INSERT INTO rw_view1 VALUES ('Row 2', 2.0, 2);

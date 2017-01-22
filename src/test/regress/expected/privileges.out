@@ -1068,190 +1068,142 @@ SELECT has_sequence_privilege('x_seq', 'USAGE');
 \c -
 SET SESSION AUTHORIZATION regress_user1;
 SELECT lo_create(1001);
- lo_create 
------------
-      1001
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_create(1002);
- lo_create 
------------
-      1002
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_create(1003);
- lo_create 
------------
-      1003
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_create(1004);
- lo_create 
------------
-      1004
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_create(1005);
- lo_create 
------------
-      1005
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 GRANT ALL ON LARGE OBJECT 1001 TO PUBLIC;
+ERROR:  large object 1001 does not exist
 GRANT SELECT ON LARGE OBJECT 1003 TO regress_user2;
+ERROR:  large object 1003 does not exist
 GRANT SELECT,UPDATE ON LARGE OBJECT 1004 TO regress_user2;
+ERROR:  large object 1004 does not exist
 GRANT ALL ON LARGE OBJECT 1005 TO regress_user2;
+ERROR:  large object 1005 does not exist
 GRANT SELECT ON LARGE OBJECT 1005 TO regress_user2 WITH GRANT OPTION;
+ERROR:  large object 1005 does not exist
 GRANT SELECT, INSERT ON LARGE OBJECT 1001 TO PUBLIC;	-- to be failed
-ERROR:  invalid privilege type INSERT for large object
+ERROR:  large object 1001 does not exist
 GRANT SELECT, UPDATE ON LARGE OBJECT 1001 TO nosuchuser;	-- to be failed
-ERROR:  role "nosuchuser" does not exist
+ERROR:  large object 1001 does not exist
 GRANT SELECT, UPDATE ON LARGE OBJECT  999 TO PUBLIC;	-- to be failed
 ERROR:  large object 999 does not exist
 \c -
 SET SESSION AUTHORIZATION regress_user2;
 SELECT lo_create(2001);
- lo_create 
------------
-      2001
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_create(2002);
- lo_create 
------------
-      2002
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1001, x'40000'::int), 32);
- loread 
---------
- \x
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1002, x'40000'::int), 32);	-- to be denied
-ERROR:  permission denied for large object 1002
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1003, x'40000'::int), 32);
- loread 
---------
- \x
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1004, x'40000'::int), 32);
- loread 
---------
- \x
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lowrite(lo_open(1001, x'20000'::int), 'abcd');
- lowrite 
----------
-       4
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lowrite(lo_open(1002, x'20000'::int), 'abcd');	-- to be denied
-ERROR:  permission denied for large object 1002
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lowrite(lo_open(1003, x'20000'::int), 'abcd');	-- to be denied
-ERROR:  permission denied for large object 1003
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lowrite(lo_open(1004, x'20000'::int), 'abcd');
- lowrite 
----------
-       4
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 GRANT SELECT ON LARGE OBJECT 1005 TO regress_user3;
+ERROR:  large object 1005 does not exist
 GRANT UPDATE ON LARGE OBJECT 1006 TO regress_user3;	-- to be denied
 ERROR:  large object 1006 does not exist
 REVOKE ALL ON LARGE OBJECT 2001, 2002 FROM PUBLIC;
+ERROR:  large object 2001 does not exist
 GRANT ALL ON LARGE OBJECT 2001 TO regress_user3;
+ERROR:  large object 2001 does not exist
 SELECT lo_unlink(1001);		-- to be denied
-ERROR:  must be owner of large object 1001
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_unlink(2002);
- lo_unlink 
------------
-         1
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 \c -
 -- confirm ACL setting
 SELECT oid, pg_get_userbyid(lomowner) ownername, lomacl FROM pg_largeobject_metadata;
- oid  |   ownername   |                                             lomacl                                             
-------+---------------+------------------------------------------------------------------------------------------------
- 1002 | regress_user1 | 
- 1001 | regress_user1 | {regress_user1=rw/regress_user1,=rw/regress_user1}
- 1003 | regress_user1 | {regress_user1=rw/regress_user1,regress_user2=r/regress_user1}
- 1004 | regress_user1 | {regress_user1=rw/regress_user1,regress_user2=rw/regress_user1}
- 1005 | regress_user1 | {regress_user1=rw/regress_user1,regress_user2=r*w/regress_user1,regress_user3=r/regress_user2}
- 2001 | regress_user2 | {regress_user2=rw/regress_user2,regress_user3=rw/regress_user2}
-(6 rows)
+ oid | ownername | lomacl 
+-----+-----------+--------
+(0 rows)
 
 SET SESSION AUTHORIZATION regress_user3;
 SELECT loread(lo_open(1001, x'40000'::int), 32);
-   loread   
-------------
- \x61626364
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1003, x'40000'::int), 32);	-- to be denied
-ERROR:  permission denied for large object 1003
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1005, x'40000'::int), 32);
- loread 
---------
- \x
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_truncate(lo_open(1005, x'20000'::int), 10);	-- to be denied
-ERROR:  permission denied for large object 1005
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_truncate(lo_open(2001, x'20000'::int), 10);
- lo_truncate 
--------------
-           0
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 -- compatibility mode in largeobject permission
 \c -
 SET lo_compat_privileges = false;	-- default setting
 SET SESSION AUTHORIZATION regress_user4;
 SELECT loread(lo_open(1002, x'40000'::int), 32);	-- to be denied
-ERROR:  permission denied for large object 1002
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lowrite(lo_open(1002, x'20000'::int), 'abcd');	-- to be denied
-ERROR:  permission denied for large object 1002
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_truncate(lo_open(1002, x'20000'::int), 10);	-- to be denied
-ERROR:  permission denied for large object 1002
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_unlink(1002);					-- to be denied
-ERROR:  must be owner of large object 1002
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_export(1001, '/dev/null');			-- to be denied
-ERROR:  must be superuser to use server-side lo_export()
-HINT:  Anyone can use the client-side lo_export() provided by libpq.
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 \c -
 SET lo_compat_privileges = true;	-- compatibility mode
 SET SESSION AUTHORIZATION regress_user4;
 SELECT loread(lo_open(1002, x'40000'::int), 32);
- loread 
---------
- \x
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lowrite(lo_open(1002, x'20000'::int), 'abcd');
- lowrite 
----------
-       4
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_truncate(lo_open(1002, x'20000'::int), 10);
- lo_truncate 
--------------
-           0
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_unlink(1002);
- lo_unlink 
------------
-         1
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT lo_export(1001, '/dev/null');			-- to be denied
-ERROR:  must be superuser to use server-side lo_export()
-HINT:  Anyone can use the client-side lo_export() provided by libpq.
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 -- don't allow unpriv users to access pg_largeobject contents
 \c -
 SELECT * FROM pg_largeobject LIMIT 0;
@@ -1549,12 +1501,7 @@ DROP TABLE atestp2;
 SELECT lo_unlink(oid) FROM pg_largeobject_metadata;
  lo_unlink 
 -----------
-         1
-         1
-         1
-         1
-         1
-(5 rows)
+(0 rows)
 
 DROP GROUP regress_group1;
 DROP GROUP regress_group2;

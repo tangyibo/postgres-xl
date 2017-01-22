@@ -1369,7 +1369,7 @@ drop table pp, cc;
 -- Test interaction of foreign-key optimization with rules (bug #14219)
 --
 create temp table t1 (a integer primary key, b text);
-create temp table t2 (a integer primary key, b integer references t1);
+create temp table t2 (a integer, b integer references t1) distribute by (b);
 create rule r1 as on delete to t1 do delete from t2 where t2.b = old.a;
 explain (costs off) delete from t1 where a = 1;
                  QUERY PLAN                 

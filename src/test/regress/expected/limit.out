@@ -137,13 +137,17 @@ create temp sequence testseq;
 explain (verbose, costs off)
 select unique1, unique2, nextval('testseq')
   from tenk1 order by unique2 limit 10;
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
  Limit
    Output: unique1, unique2, (nextval('testseq'::regclass))
-   ->  Index Scan using tenk1_unique2 on public.tenk1
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, nextval('testseq'::regclass)
-(4 rows)
+         ->  Limit
+               Output: unique1, unique2, (nextval('testseq'::regclass))
+               ->  Index Scan using tenk1_unique2 on public.tenk1
+                     Output: unique1, unique2, nextval('testseq'::regclass)
+(8 rows)
 
 select unique1, unique2, nextval('testseq')
   from tenk1 order by unique2 limit 10;
@@ -170,18 +174,22 @@ select currval('testseq');
 explain (verbose, costs off)
 select unique1, unique2, nextval('testseq')
   from tenk1 order by tenthous limit 10;
-                                QUERY PLAN                                
---------------------------------------------------------------------------
+                                      QUERY PLAN                                      
+--------------------------------------------------------------------------------------
  Limit
    Output: unique1, unique2, (nextval('testseq'::regclass)), tenthous
-   ->  Result
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, nextval('testseq'::regclass), tenthous
-         ->  Sort
-               Output: unique1, unique2, tenthous
-               Sort Key: tenk1.tenthous
-               ->  Seq Scan on public.tenk1
-                     Output: unique1, unique2, tenthous
-(9 rows)
+         ->  Limit
+               Output: unique1, unique2, (nextval('testseq'::regclass)), tenthous
+               ->  Result
+                     Output: unique1, unique2, nextval('testseq'::regclass), tenthous
+                     ->  Sort
+                           Output: unique1, unique2, tenthous
+                           Sort Key: tenk1.tenthous
+                           ->  Seq Scan on public.tenk1
+                                 Output: unique1, unique2, tenthous
+(13 rows)
 
 select unique1, unique2, nextval('testseq')
   from tenk1 order by tenthous limit 10;
@@ -208,13 +216,17 @@ select currval('testseq');
 explain (verbose, costs off)
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by unique2 limit 7;
-                        QUERY PLAN                        
-----------------------------------------------------------
+                              QUERY PLAN                              
+----------------------------------------------------------------------
  Limit
    Output: unique1, unique2, (generate_series(1, 10))
-   ->  Index Scan using tenk1_unique2 on public.tenk1
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, generate_series(1, 10)
-(4 rows)
+         ->  Limit
+               Output: unique1, unique2, (generate_series(1, 10))
+               ->  Index Scan using tenk1_unique2 on public.tenk1
+                     Output: unique1, unique2, generate_series(1, 10)
+(8 rows)
 
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by unique2 limit 7;
@@ -232,18 +244,22 @@ select unique1, unique2, generate_series(1,10)
 explain (verbose, costs off)
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by tenthous limit 7;
-                             QUERY PLAN                             
---------------------------------------------------------------------
+                                   QUERY PLAN                                   
+--------------------------------------------------------------------------------
  Limit
    Output: unique1, unique2, (generate_series(1, 10)), tenthous
-   ->  Result
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, generate_series(1, 10), tenthous
-         ->  Sort
-               Output: unique1, unique2, tenthous
-               Sort Key: tenk1.tenthous
-               ->  Seq Scan on public.tenk1
-                     Output: unique1, unique2, tenthous
-(9 rows)
+         ->  Limit
+               Output: unique1, unique2, (generate_series(1, 10)), tenthous
+               ->  Result
+                     Output: unique1, unique2, generate_series(1, 10), tenthous
+                     ->  Sort
+                           Output: unique1, unique2, tenthous
+                           Sort Key: tenk1.tenthous
+                           ->  Seq Scan on public.tenk1
+                                 Output: unique1, unique2, tenthous
+(13 rows)
 
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by tenthous limit 7;
@@ -304,12 +320,17 @@ select sum(tenthous) as s1, sum(tenthous) + random()*0 as s2
 -------------------------------------------------------------------------------------------------------------------
  Limit
    Output: (sum(tenthous)), (((sum(tenthous))::double precision + (random() * '0'::double precision))), thousand
-   ->  GroupAggregate
+   ->  Finalize GroupAggregate
          Output: sum(tenthous), ((sum(tenthous))::double precision + (random() * '0'::double precision)), thousand
          Group Key: tenk1.thousand
-         ->  Index Only Scan using tenk1_thous_tenthous on public.tenk1
-               Output: thousand, tenthous
-(7 rows)
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Output: thousand, PARTIAL sum(tenthous)
+               ->  Partial GroupAggregate
+                     Output: thousand, PARTIAL sum(tenthous)
+                     Group Key: tenk1.thousand
+                     ->  Index Only Scan using tenk1_thous_tenthous on public.tenk1
+                           Output: thousand, tenthous
+(12 rows)
 
 select sum(tenthous) as s1, sum(tenthous) + random()*0 as s2
   from tenk1 group by thousand order by thousand limit 3;

@@ -27,14 +27,14 @@ EXPLAIN VERBOSE SELECT * FROM xl_pp WHERE a = 100::bigint;
 (7 rows)
 
 EXPLAIN VERBOSE INSERT INTO xl_pp (a, b) VALUES (200, 1) ;
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
    Output: 200, 1
    Node expr: 200
    Remote query: INSERT INTO xl_pp (a, b) VALUES (200, 1)
-   ->  Insert on public.xl_pp  (cost=0.00..0.01 rows=1 width=0)
-         ->  Result  (cost=0.00..0.01 rows=1 width=0)
+   ->  Insert on public.xl_pp  (cost=0.00..0.01 rows=1 width=12)
+         ->  Result  (cost=0.00..0.01 rows=1 width=12)
                Output: '200'::bigint, 1
 (7 rows)
 
@@ -45,8 +45,8 @@ EXPLAIN VERBOSE INSERT INTO xl_pp (a, b) VALUES (201::bigint, 1) ;
    Output: (201)::bigint, 1
    Node expr: (201)::bigint
    Remote query: INSERT INTO xl_pp (a, b) VALUES ((201)::bigint, 1)
-   ->  Insert on public.xl_pp  (cost=0.00..0.01 rows=1 width=0)
-         ->  Result  (cost=0.00..0.01 rows=1 width=0)
+   ->  Insert on public.xl_pp  (cost=0.00..0.01 rows=1 width=12)
+         ->  Result  (cost=0.00..0.01 rows=1 width=12)
                Output: '201'::bigint, 1
 (7 rows)
 
@@ -57,8 +57,8 @@ EXPLAIN VERBOSE UPDATE xl_pp SET b=2 where a=200;
    Output: 2, xl_pp.a, xl_pp.xc_node_id, xl_pp.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_pp SET b = 2 WHERE (a = 200)
-   ->  Update on public.xl_pp  (cost=0.00..35.50 rows=10 width=14)
-         ->  Seq Scan on public.xl_pp  (cost=0.00..35.50 rows=10 width=14)
+   ->  Update on public.xl_pp  (cost=0.00..35.50 rows=10 width=18)
+         ->  Seq Scan on public.xl_pp  (cost=0.00..35.50 rows=10 width=18)
                Output: a, 2, ctid
                Filter: (xl_pp.a = 200)
 (8 rows)
@@ -70,8 +70,8 @@ EXPLAIN VERBOSE UPDATE xl_pp SET b=2 where a=200::bigint;
    Output: 2, xl_pp.a, xl_pp.xc_node_id, xl_pp.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_pp SET b = 2 WHERE (a = (200)::bigint)
-   ->  Update on public.xl_pp  (cost=0.00..35.50 rows=10 width=14)
-         ->  Seq Scan on public.xl_pp  (cost=0.00..35.50 rows=10 width=14)
+   ->  Update on public.xl_pp  (cost=0.00..35.50 rows=10 width=18)
+         ->  Seq Scan on public.xl_pp  (cost=0.00..35.50 rows=10 width=18)
                Output: a, 2, ctid
                Filter: (xl_pp.a = '200'::bigint)
 (8 rows)
@@ -159,33 +159,33 @@ EXPLAIN VERBOSE INSERT INTO xl_ppm (a, b) VALUES (201::INT2, 1) ;
    Output: (201)::smallint, 1
    Node expr: (201)::smallint
    Remote query: INSERT INTO xl_ppm (a, b) VALUES ((201)::smallint, 1)
-   ->  Insert on public.xl_ppm  (cost=0.00..0.01 rows=1 width=0)
-         ->  Result  (cost=0.00..0.01 rows=1 width=0)
+   ->  Insert on public.xl_ppm  (cost=0.00..0.01 rows=1 width=6)
+         ->  Result  (cost=0.00..0.01 rows=1 width=6)
                Output: '201'::smallint, 1
 (7 rows)
 
 EXPLAIN VERBOSE UPDATE xl_ppm SET b=2 where a=200;
-                                QUERY PLAN                                 
----------------------------------------------------------------------------
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
    Output: 2, xl_ppm.a, xl_ppm.xc_node_id, xl_ppm.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_ppm SET b = 2 WHERE (a = 200)
-   ->  Update on public.xl_ppm  (cost=0.00..40.00 rows=12 width=8)
-         ->  Seq Scan on public.xl_ppm  (cost=0.00..40.00 rows=12 width=8)
+   ->  Update on public.xl_ppm  (cost=0.00..40.00 rows=12 width=12)
+         ->  Seq Scan on public.xl_ppm  (cost=0.00..40.00 rows=12 width=12)
                Output: a, 2, ctid
                Filter: (xl_ppm.a = 200)
 (8 rows)
 
 EXPLAIN VERBOSE UPDATE xl_ppm SET b=2 where a=200::INT2;
-                                QUERY PLAN                                 
----------------------------------------------------------------------------
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
    Output: 2, xl_ppm.a, xl_ppm.xc_node_id, xl_ppm.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_ppm SET b = 2 WHERE (a = (200)::smallint)
-   ->  Update on public.xl_ppm  (cost=0.00..40.00 rows=12 width=8)
-         ->  Seq Scan on public.xl_ppm  (cost=0.00..40.00 rows=12 width=8)
+   ->  Update on public.xl_ppm  (cost=0.00..40.00 rows=12 width=12)
+         ->  Seq Scan on public.xl_ppm  (cost=0.00..40.00 rows=12 width=12)
                Output: a, 2, ctid
                Filter: (xl_ppm.a = '200'::smallint)
 (8 rows)

@@ -1460,6 +1460,7 @@ explain (verbose, costs off, nodes off) select * from matest0 order by 1-id;
 ------------------------------------------------------------------
  Remote Subquery Scan on all
    Output: id, name, (1 - id)
+   Sort Key: (1 - id)
    ->  Sort
          Output: matest0.id, matest0.name, ((1 - matest0.id))
          Sort Key: ((1 - matest0.id))
@@ -1474,7 +1475,7 @@ explain (verbose, costs off, nodes off) select * from matest0 order by 1-id;
                            Output: matest2.id, matest2.name
                      ->  Seq Scan on public.matest3
                            Output: matest3.id, matest3.name
-(16 rows)
+(17 rows)
 
 select * from matest0 order by 1-id;
  id |  name  
@@ -1520,6 +1521,7 @@ explain (verbose, costs off, nodes off) select * from matest0 order by 1-id;
 ---------------------------------------------------------------------
  Remote Subquery Scan on all
    Output: id, name, (1 - id)
+   Sort Key: (1 - id)
    ->  Sort
          Output: matest0.id, matest0.name, ((1 - matest0.id))
          Sort Key: ((1 - matest0.id))
@@ -1534,7 +1536,7 @@ explain (verbose, costs off, nodes off) select * from matest0 order by 1-id;
                            Output: matest2.id, matest2.name
                      ->  Index Scan using matest3i on public.matest3
                            Output: matest3.id, matest3.name
-(16 rows)
+(17 rows)
 
 select * from matest0 order by 1-id;
  id |  name  

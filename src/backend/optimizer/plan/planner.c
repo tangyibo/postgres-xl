@@ -4929,6 +4929,16 @@ create_distinct_paths(PlannerInfo *root,
 
 			if (pathkeys_contained_in(needed_pathkeys, path->pathkeys))
 			{
+				/*
+				 * Make sure the distribution matches the distinct clause,
+				 * needed by the UNIQUE path.
+				 *
+				 * FIXME This could probably benefit from pushing a UNIQUE
+				 * to the remote side, and only doing a merge locally.
+				 */
+				if (!grouping_distribution_match(root, parse, path, parse->distinctClause))
+					path = create_remotesubplan_path(root, path, NULL);
+
 				add_path(distinct_rel, (Path *)
 						 create_upper_unique_path(root, distinct_rel,
 												  path,

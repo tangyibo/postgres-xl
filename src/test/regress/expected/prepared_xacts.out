@@ -31,6 +31,13 @@ SELECT gid FROM pg_prepared_xacts ORDER BY gid;
  foo1
 (1 row)
 
+-- Test pgxc_prepared_xacts system view
+SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
+ pgxc_prepared_xact 
+--------------------
+ foo1
+(1 row)
+
 -- Test ROLLBACK PREPARED
 ROLLBACK PREPARED 'foo1';
 SELECT * FROM pxtest1  ORDER BY foobar;
@@ -39,9 +46,16 @@ SELECT * FROM pxtest1  ORDER BY foobar;
  aaa
 (1 row)
 
+-- Check prepared transactions on Coordinator
 SELECT gid FROM pg_prepared_xacts ORDER BY gid;
  gid 
 -----
+(0 rows)
+
+-- Check prepared transactions in the cluster
+SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
+ pgxc_prepared_xact 
+--------------------
 (0 rows)
 
 -- Test COMMIT PREPARED
@@ -80,9 +94,17 @@ SELECT * FROM pxtest1  ORDER BY foobar;
 (2 rows)
 
 PREPARE TRANSACTION 'foo3';
+-- Check prepared transactions on Coordinator
 SELECT gid FROM pg_prepared_xacts ORDER BY gid;
  gid  
 ------
+ foo3
+(1 row)
+
+-- Check prepared transactions in the cluster
+SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
+ pgxc_prepared_xact 
+--------------------
  foo3
 (1 row)
 
@@ -92,7 +114,7 @@ SELECT * FROM pxtest1  ORDER BY foobar;
 -- This should fail, because the gid foo3 is already in use
 PREPARE TRANSACTION 'foo3';
 ERROR:  transaction identifier "foo3" is already in use
-SELECT * FROM pxtest1;
+SELECT * FROM pxtest1  ORDER BY foobar;
  foobar 
 --------
  aaa
@@ -100,7 +122,7 @@ SELECT * FROM pxtest1;
 (2 rows)
 
 ROLLBACK PREPARED 'foo3';
-SELECT * FROM pxtest1;
+SELECT * FROM pxtest1  ORDER BY foobar;
  foobar 
 --------
  aaa
@@ -238,6 +260,13 @@ SELECT gid FROM pg_prepared_xacts;
  regress-two
 (1 row)
 
+-- Check prepared transactions in the cluster
+SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
+ pgxc_prepared_xact 
+--------------------
+ regress-two
+(1 row)
+
 -- Commit table drop
 COMMIT PREPARED 'regress-two';
 SELECT * FROM pxtest3;
@@ -248,6 +277,12 @@ LINE 1: SELECT * FROM pxtest3;
 SELECT gid FROM pg_prepared_xacts ORDER BY gid;
  gid 
 -----
+(0 rows)
+
+-- Check prepared transactions in the cluster
+SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
+ pgxc_prepared_xact 
+--------------------
 (0 rows)
 
 -- Clean up

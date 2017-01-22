@@ -41,6 +41,10 @@ INSERT INTO uaccount VALUES
     ('regress_rls_bob', 1),
     ('regress_rls_carol', 2),
     ('regress_rls_dave', 3);
+-- PGXL
+--   Distribute by replication so that "document" table below can reference "cid"
+--   column
+--
 CREATE TABLE category (
     cid        int primary key,
     cname      text
@@ -2071,8 +2075,8 @@ GRANT SELECT ON t1 TO regress_rls_bob, regress_rls_carol;
 CREATE POLICY p1 ON t1 TO regress_rls_bob USING ((a % 2) = 0);
 CREATE POLICY p2 ON t1 TO regress_rls_carol USING ((a % 4) = 0);
 ALTER TABLE t1 ENABLE ROW LEVEL SECURITY;
--- Prepare as rls_regress_user1
-SET ROLE rls_regress_user1;
+-- Prepare as regress_rls_bob
+SET ROLE regress_rls_bob;
 PREPARE role_inval AS SELECT * FROM t1;
 -- Check plan
 EXPLAIN (COSTS OFF) EXECUTE role_inval;
@@ -2084,8 +2088,8 @@ EXPLAIN (COSTS OFF) EXECUTE role_inval;
          Filter: ((a % 2) = 0)
 (4 rows)
 
--- Change to rls_regress_user2
-SET ROLE rls_regress_user2;
+-- Change to regress_rls_carol
+SET ROLE regress_rls_carol;
 -- Check plan- should be different
 EXPLAIN (COSTS OFF) EXECUTE role_inval;
             QUERY PLAN            
@@ -2096,8 +2100,8 @@ EXPLAIN (COSTS OFF) EXECUTE role_inval;
          Filter: ((a % 4) = 0)
 (4 rows)
 
--- Change back to rls_regress_user1
-SET ROLE rls_regress_user1;
+-- Change back to regress_rls_bob
+SET ROLE regress_rls_bob;
 -- Check plan- should be back to original
 EXPLAIN (COSTS OFF) EXECUTE role_inval;
             QUERY PLAN            
@@ -2107,16 +2111,6 @@ EXPLAIN (COSTS OFF) EXECUTE role_inval;
    ->  Seq Scan on t1
          Filter: ((a % 2) = 0)
 (4 rows)
-
--- Change back to regress_rls_bob
-SET ROLE regress_rls_bob;
--- Check plan- should be back to original
-EXPLAIN (COSTS OFF) EXECUTE role_inval;
-       QUERY PLAN        
--------------------------
- Seq Scan on t1
-   Filter: ((a % 2) = 0)
-(2 rows)
 
 --
 -- CTE and RLS
@@ -2571,16 +2565,12 @@ COPY copy_t FROM STDIN; --fail - would be affected by RLS.
 ERROR:  query would be affected by row-level security policy for table "copy_t"
 SET row_security TO ON;
 COPY copy_t FROM STDIN; --fail - COPY FROM not supported by RLS.
-ERROR:  COPY FROM not supported with row level security.
-HINT:  Use direct INSERT statements instead.
--- Check COPY TO as user with permissions and BYPASSRLS
-SET SESSION AUTHORIZATION rls_regress_exempt_user;
-SET row_security TO OFF;
-COPY copy_t FROM STDIN; --ok
+ERROR:  COPY FROM not supported with row-level security
+HINT:  Use INSERT statements instead.
+-- Check COPY FROM as user with permissions and BYPASSRLS
+SET SESSION AUTHORIZATION regress_rls_exempt_user;
 SET row_security TO ON;
-COPY copy_t FROM STDIN; --fail - COPY FROM not supported by RLS.
-ERROR:  COPY FROM not supported with row level security.
-HINT:  Use direct INSERT statements instead.
+COPY copy_t FROM STDIN; --ok
 -- Check COPY FROM as user without permissions.
 SET SESSION AUTHORIZATION regress_rls_carol;
 SET row_security TO OFF;
@@ -2593,25 +2583,25 @@ RESET SESSION AUTHORIZATION;
 DROP TABLE copy_t;
 DROP TABLE copy_rel_to CASCADE;
 -- Check WHERE CURRENT OF
-SET SESSION AUTHORIZATION rls_regress_user0;
+SET SESSION AUTHORIZATION regress_rls_alice;
 CREATE TABLE current_check (currentid int, payload text, rlsuser text);
 GRANT ALL ON current_check TO PUBLIC;
 INSERT INTO current_check VALUES
-    (1, 'abc', 'rls_regress_user1'),
-    (2, 'bcd', 'rls_regress_user1'),
-    (3, 'cde', 'rls_regress_user1'),
-    (4, 'def', 'rls_regress_user1');
+    (1, 'abc', 'regress_rls_bob'),
+    (2, 'bcd', 'regress_rls_bob'),
+    (3, 'cde', 'regress_rls_bob'),
+    (4, 'def', 'regress_rls_bob');
 CREATE POLICY p1 ON current_check FOR SELECT USING (currentid % 2 = 0);
 CREATE POLICY p2 ON current_check FOR DELETE USING (currentid = 4 AND rlsuser = current_user);
 CREATE POLICY p3 ON current_check FOR UPDATE USING (currentid = 4) WITH CHECK (rlsuser = current_user);
 ALTER TABLE current_check ENABLE ROW LEVEL SECURITY;
-SET SESSION AUTHORIZATION rls_regress_user1;
+SET SESSION AUTHORIZATION regress_rls_bob;
 -- Can SELECT even rows
 SELECT * FROM current_check;
- currentid | payload |      rlsuser      
------------+---------+-------------------
-         2 | bcd     | rls_regress_user1
-         4 | def     | rls_regress_user1
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         2 | bcd     | regress_rls_bob
+         4 | def     | regress_rls_bob
 (2 rows)
 
 -- Cannot UPDATE row 2
@@ -2659,40 +2649,39 @@ COMMIT;
 -- check pg_stats view filtering
 --
 SET row_security TO ON;
-SET SESSION AUTHORIZATION rls_regress_user0;
+SET SESSION AUTHORIZATION regress_rls_alice;
 ANALYZE current_check;
 -- Stats visible
 SELECT row_security_active('current_check');
-ERROR:  function row_security_active(unknown) does not exist
-LINE 1: SELECT row_security_active('current_check');
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ row_security_active 
+---------------------
+ f
+(1 row)
+
 SELECT attname, most_common_vals FROM pg_stats
   WHERE tablename = 'current_check'
   ORDER BY 1;
-  attname  |           most_common_vals           
------------+--------------------------------------
+  attname  |          most_common_vals          
+-----------+------------------------------------
  currentid | 
  payload   | 
- rlsuser   | (pg_catalog.text){rls_regress_user1}
+ rlsuser   | (pg_catalog.text){regress_rls_bob}
 (3 rows)
 
-SET SESSION AUTHORIZATION rls_regress_user1;
+SET SESSION AUTHORIZATION regress_rls_bob;
 -- Stats not visible
 SELECT row_security_active('current_check');
-ERROR:  function row_security_active(unknown) does not exist
-LINE 1: SELECT row_security_active('current_check');
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ row_security_active 
+---------------------
+ t
+(1 row)
+
 SELECT attname, most_common_vals FROM pg_stats
   WHERE tablename = 'current_check'
   ORDER BY 1;
-  attname  |           most_common_vals           
------------+--------------------------------------
- currentid | 
- payload   | 
- rlsuser   | (pg_catalog.text){rls_regress_user1}
-(3 rows)
+ attname | most_common_vals 
+---------+------------------
+(0 rows)
 
 --
 -- Collation support
@@ -2701,28 +2690,31 @@ BEGIN;
 CREATE TABLE coll_t (c) AS VALUES ('bar'::text);
 CREATE POLICY coll_p ON coll_t USING (c < ('foo'::text COLLATE "C"));
 ALTER TABLE coll_t ENABLE ROW LEVEL SECURITY;
-GRANT SELECT ON coll_t TO rls_regress_user0;
+GRANT SELECT ON coll_t TO regress_rls_alice;
 SELECT (string_to_array(polqual, ':'))[7] AS inputcollid FROM pg_policy WHERE polrelid = 'coll_t'::regclass;
-  inputcollid   
-----------------
- inputcollid 0 
+   inputcollid    
+------------------
+ inputcollid 950 
 (1 row)
 
-SET SESSION AUTHORIZATION rls_regress_user0;
+SET SESSION AUTHORIZATION regress_rls_alice;
 SELECT * FROM coll_t;
-ERROR:  could not determine which collation to use for string comparison
-HINT:  Use the COLLATE clause to set the collation explicitly.
+  c  
+-----
+ bar
+(1 row)
+
 ROLLBACK;
 --
 -- Shared Object Dependencies
 --
 RESET SESSION AUTHORIZATION;
 BEGIN;
-CREATE ROLE alice;
-CREATE ROLE bob;
+CREATE ROLE regress_rls_eve;
+CREATE ROLE regress_rls_frank;
 CREATE TABLE tbl1 (c) AS VALUES ('bar'::text);
-GRANT SELECT ON TABLE tbl1 TO alice;
-CREATE POLICY P ON tbl1 TO alice, bob USING (true);
+GRANT SELECT ON TABLE tbl1 TO regress_rls_eve;
+CREATE POLICY P ON tbl1 TO regress_rls_eve, regress_rls_frank USING (true);
 SELECT refclassid::regclass, deptype
   FROM pg_depend
   WHERE classid = 'pg_policy'::regclass
@@ -2735,10 +2727,12 @@ SELECT refclassid::regclass, deptype
 SELECT refclassid::regclass, deptype
   FROM pg_shdepend
   WHERE classid = 'pg_policy'::regclass
-  AND refobjid IN ('alice'::regrole, 'bob'::regrole);
+  AND refobjid IN ('regress_rls_eve'::regrole, 'regress_rls_frank'::regrole);
  refclassid | deptype 
 ------------+---------
-(0 rows)
+ pg_authid  | r
+ pg_authid  | r
+(2 rows)
 
 SAVEPOINT q;
 ERROR:  SAVEPOINT is not yet supported.
@@ -2812,17 +2806,17 @@ ROLLBACK;
 BEGIN;
 CREATE TABLE t (c) AS VALUES ('bar'::text);
 CREATE POLICY p ON t USING (max(c)); -- fails: aggregate functions are not allowed in policy expressions
-ERROR:  aggregate functions are not allowed in WHERE
+ERROR:  aggregate functions are not allowed in policy expressions
 ROLLBACK;
 --
 -- Non-target relations are only subject to SELECT policies
 --
-SET SESSION AUTHORIZATION rls_regress_user0;
+SET SESSION AUTHORIZATION regress_rls_alice;
 CREATE TABLE r1 (a int);
 CREATE TABLE r2 (a int);
 INSERT INTO r1 VALUES (10), (20);
 INSERT INTO r2 VALUES (10), (20);
-GRANT ALL ON r1, r2 TO rls_regress_user1;
+GRANT ALL ON r1, r2 TO regress_rls_bob;
 CREATE POLICY p1 ON r1 USING (true);
 ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
 CREATE POLICY p1 ON r2 FOR SELECT USING (true);
@@ -2830,7 +2824,7 @@ CREATE POLICY p2 ON r2 FOR INSERT WITH CHECK (false);
 CREATE POLICY p3 ON r2 FOR UPDATE USING (false);
 CREATE POLICY p4 ON r2 FOR DELETE USING (false);
 ALTER TABLE r2 ENABLE ROW LEVEL SECURITY;
-SET SESSION AUTHORIZATION rls_regress_user1;
+SET SESSION AUTHORIZATION regress_rls_bob;
 SELECT * FROM r1;
  a  
 ----
@@ -2847,7 +2841,7 @@ SELECT * FROM r2;
 
 -- r2 is read-only
 INSERT INTO r2 VALUES (2); -- Not allowed
-ERROR:  new row violates row level security policy for "r2"
+ERROR:  new row violates row-level security policy for table "r2"
 UPDATE r2 SET a = 2 RETURNING *; -- Updates nothing
 ERROR:  could not plan this distributed update
 DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
@@ -2888,7 +2882,7 @@ SELECT * FROM r2;
  20
 (2 rows)
 
-SET SESSION AUTHORIZATION rls_regress_user0;
+SET SESSION AUTHORIZATION regress_rls_alice;
 DROP TABLE r1;
 DROP TABLE r2;
 --
@@ -3155,15 +3149,15 @@ RESET SESSION AUTHORIZATION;
 SET client_min_messages TO 'warning';
 DROP SCHEMA regress_rls_schema CASCADE;
 RESET client_min_messages;
-DROP USER rls_regress_user0;
-DROP USER rls_regress_user1;
-DROP USER rls_regress_user2;
-DROP USER rls_regress_exempt_user;
-DROP ROLE rls_regress_group1;
-DROP ROLE rls_regress_group2;
+DROP USER regress_rls_alice;
+DROP USER regress_rls_bob;
+DROP USER regress_rls_carol;
+DROP USER regress_rls_exempt_user;
+DROP ROLE regress_rls_group1;
+DROP ROLE regress_rls_group2;
 -- Arrange to have a few policies left over, for testing
 -- pg_dump/pg_restore
-CREATE SCHEMA rls_regress_schema;
+CREATE SCHEMA regress_rls_schema;
 CREATE TABLE rls_tbl (c1 int);
 ALTER TABLE rls_tbl ENABLE ROW LEVEL SECURITY;
 CREATE POLICY p1 ON rls_tbl USING (c1 > 5);

@@ -39,11 +39,11 @@ CREATE POLICY genpol ON addr_nsp.gentable;
 CREATE SERVER "integer" FOREIGN DATA WRAPPER addr_fdw;
 ERROR:  Postgres-XL does not support SERVER yet
 DETAIL:  The feature is not currently supported
-CREATE USER MAPPING FOR regtest_addr_user SERVER "integer";
+CREATE USER MAPPING FOR regress_addr_user SERVER "integer";
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
-ALTER DEFAULT PRIVILEGES FOR ROLE regtest_addr_user IN SCHEMA public GRANT ALL ON TABLES TO regtest_addr_user;
-ALTER DEFAULT PRIVILEGES FOR ROLE regtest_addr_user REVOKE DELETE ON TABLES FROM regtest_addr_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE regress_addr_user IN SCHEMA public GRANT ALL ON TABLES TO regress_addr_user;
+ALTER DEFAULT PRIVILEGES FOR ROLE regress_addr_user REVOKE DELETE ON TABLES FROM regress_addr_user;
 CREATE TRANSFORM FOR int LANGUAGE SQL (
 	FROM SQL WITH FUNCTION varchar_transform(internal),
 	TO SQL WITH FUNCTION int4recv(internal));

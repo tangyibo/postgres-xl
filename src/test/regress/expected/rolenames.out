@@ -665,7 +665,7 @@ DETAIL:  The feature is not currently supported
 CREATE USER MAPPING FOR "Public" SERVER sv7 OPTIONS (user '"Public"');
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
-CREATE USER MAPPING FOR testrolx SERVER sv8 OPTIONS (user 'testrolx');
+CREATE USER MAPPING FOR regress_testrolx SERVER sv8 OPTIONS (user 'regress_testrolx');
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
 CREATE USER MAPPING FOR CURRENT_ROLE SERVER sv9
@@ -704,8 +704,8 @@ ERROR:  server "sv6" does not exist
 ALTER USER MAPPING FOR "Public" SERVER sv7
  OPTIONS (SET user '"Public"_alt');
 ERROR:  server "sv7" does not exist
-ALTER USER MAPPING FOR testrolx SERVER sv8
- OPTIONS (SET user 'testrolx_alt');
+ALTER USER MAPPING FOR regress_testrolx SERVER sv8
+ OPTIONS (SET user 'regress_testrolx_alt');
 ERROR:  server "sv8" does not exist
 ALTER USER MAPPING FOR CURRENT_ROLE SERVER sv9
  OPTIONS (SET user 'CURRENT_ROLE_alt');
@@ -735,7 +735,7 @@ DROP USER MAPPING FOR PUBLIC SERVER sv6;
 ERROR:  server "sv6" does not exist
 DROP USER MAPPING FOR "Public" SERVER sv7;
 ERROR:  server "sv7" does not exist
-DROP USER MAPPING FOR testrolx SERVER sv8;
+DROP USER MAPPING FOR regress_testrolx SERVER sv8;
 ERROR:  server "sv8" does not exist
 DROP USER MAPPING FOR CURRENT_ROLE SERVER sv9; -- error
 ERROR:  syntax error at or near "CURRENT_ROLE"
@@ -769,7 +769,7 @@ DETAIL:  The feature is not currently supported
 CREATE USER MAPPING FOR "Public" SERVER sv7 OPTIONS (user '"Public"');
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
-CREATE USER MAPPING FOR testrolx SERVER sv8 OPTIONS (user 'testrolx');
+CREATE USER MAPPING FOR regress_testrolx SERVER sv8 OPTIONS (user 'regress_testrolx');
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
 SELECT * FROM chkumapping();
@@ -827,7 +827,7 @@ SELECT * FROM chkumapping();
 --------+----------+-----------
 (0 rows)
 
-DROP USER MAPPING IF EXISTS FOR testrolx SERVER sv8;
+DROP USER MAPPING IF EXISTS FOR regress_testrolx SERVER sv8;
 NOTICE:  server does not exist, skipping
 SELECT * FROM chkumapping();
  umname | umserver | umoptions 

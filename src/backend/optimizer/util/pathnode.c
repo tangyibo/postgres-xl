@@ -4350,6 +4350,8 @@ create_lockrows_path(PlannerInfo *root, RelOptInfo *rel,
 	pathnode->path.parallel_workers = 0;
 	pathnode->path.rows = subpath->rows;
 
+	pathnode->path.distribution = copyObject(subpath->distribution);
+
 	/*
 	 * The result cannot be assumed sorted, since locking might cause the sort
 	 * key columns to be replaced with new values.

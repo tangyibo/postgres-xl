@@ -3884,6 +3884,8 @@ create_upper_unique_path(PlannerInfo *root,
 	/* Unique doesn't change the input ordering */
 	pathnode->path.pathkeys = subpath->pathkeys;
 
+	pathnode->path.distribution = (Distribution *) copyObject(subpath->distribution);
+
 	pathnode->subpath = subpath;
 	pathnode->numkeys = numCols;
 
@@ -4255,6 +4257,8 @@ create_setop_path(PlannerInfo *root,
 	/* SetOp preserves the input sort order if in sort mode */
 	pathnode->path.pathkeys =
 		(strategy == SETOP_SORTED) ? subpath->pathkeys : NIL;
+
+	pathnode->path.distribution = copyObject(subpath->distribution);
 
 	pathnode->subpath = subpath;
 	pathnode->cmd = cmd;

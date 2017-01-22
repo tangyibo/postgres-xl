@@ -19,8 +19,12 @@ CREATE FUNCTION fn_x_after () RETURNS TRIGGER AS '
 ' LANGUAGE plpgsql;
 CREATE TRIGGER trg_x_after AFTER INSERT ON x
 FOR EACH ROW EXECUTE PROCEDURE fn_x_after();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 CREATE TRIGGER trg_x_before BEFORE INSERT ON x
 FOR EACH ROW EXECUTE PROCEDURE fn_x_before();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 COPY x (a, b, c, d, e) from stdin;
 COPY x (b, d) from stdin;
 COPY x (b, d) from stdin;
@@ -51,33 +55,33 @@ COPY x from stdin WITH DELIMITER AS ';' NULL AS '';
 COPY x from stdin WITH DELIMITER AS ':' NULL AS E'\\X' ENCODING 'sql_ascii';
 -- check results of copy in
 SELECT * FROM x ORDER BY a, b;
-   a   | b  |     c      |   d    |          e           
--------+----+------------+--------+----------------------
-     1 |  1 | stuff      | test_1 | after trigger fired
-     2 |  2 | stuff      | test_2 | after trigger fired
-     3 |  3 | stuff      | test_3 | after trigger fired
-     4 |  4 | stuff      | test_4 | after trigger fired
-     5 |  5 | stuff      | test_5 | after trigger fired
-     6 |    | 45         | 80     | before trigger fired
-     7 |    | x          | \x     | before trigger fired
-     8 |    | ,          | \,     | before trigger fired
-  3000 |    | c          |        | before trigger fired
-  4000 |    | C          |        | before trigger fired
-  4001 |  1 | empty      |        | before trigger fired
-  4002 |  2 | null       |        | before trigger fired
-  4003 |  3 | Backslash  | \      | before trigger fired
-  4004 |  4 | BackslashX | \X     | before trigger fired
-  4005 |  5 | N          | N      | before trigger fired
-  4006 |  6 | BackslashN | \N     | before trigger fired
-  4007 |  7 | XX         | XX     | before trigger fired
-  4008 |  8 | Delimiter  | :      | before trigger fired
-  9999 |    | \N         | NN     | before trigger fired
- 10000 | 21 | 31         | 41     | before trigger fired
- 10001 | 22 | 32         | 42     | before trigger fired
- 10002 | 23 | 33         | 43     | before trigger fired
- 10003 | 24 | 34         | 44     | before trigger fired
- 10004 | 25 | 35         | 45     | before trigger fired
- 10005 | 26 | 36         | 46     | before trigger fired
+   a   | b  |     c      |   d    | e  
+-------+----+------------+--------+----
+     1 |  1 | stuff      | test_1 | 
+     2 |  2 | stuff      | test_2 | 
+     3 |  3 | stuff      | test_3 | 
+     4 |  4 | stuff      | test_4 | 
+     5 |  5 | stuff      | test_5 | 
+     6 |    | 45         | 80     | 90
+     7 |    | x          | \x     | \x
+     8 |    | ,          | \,     | \
+  3000 |    | c          |        | 
+  4000 |    | C          |        | 
+  4001 |  1 | empty      |        | 
+  4002 |  2 | null       |        | 
+  4003 |  3 | Backslash  | \      | \
+  4004 |  4 | BackslashX | \X     | \X
+  4005 |  5 | N          | N      | N
+  4006 |  6 | BackslashN | \N     | \N
+  4007 |  7 | XX         | XX     | XX
+  4008 |  8 | Delimiter  | :      | :
+  9999 |    | \N         | NN     | 
+ 10000 | 21 | 31         | 41     | 51
+ 10001 | 22 | 32         | 42     | 52
+ 10002 | 23 | 33         | 43     | 53
+ 10003 | 24 | 34         | 44     | 54
+ 10004 | 25 | 35         | 45     | 55
+ 10005 | 26 | 36         | 46     | 56
 (25 rows)
 
 -- COPY w/ oids on a table w/o oids should fail
@@ -94,83 +98,83 @@ COPY no_oids TO stdout WITH OIDS;
 ERROR:  table "no_oids" does not have OIDs
 -- check copy out
 COPY x TO stdout;
-9999	\N	\\N	NN	before trigger fired
-10000	21	31	41	before trigger fired
-10001	22	32	42	before trigger fired
-10002	23	33	43	before trigger fired
-10003	24	34	44	before trigger fired
-10004	25	35	45	before trigger fired
-10005	26	36	46	before trigger fired
-6	\N	45	80	before trigger fired
-7	\N	x	\\x	before trigger fired
-8	\N	,	\\,	before trigger fired
-3000	\N	c	\N	before trigger fired
-4000	\N	C	\N	before trigger fired
-4001	1	empty		before trigger fired
-4002	2	null	\N	before trigger fired
-4003	3	Backslash	\\	before trigger fired
-4004	4	BackslashX	\\X	before trigger fired
-4005	5	N	N	before trigger fired
-4006	6	BackslashN	\\N	before trigger fired
-4007	7	XX	XX	before trigger fired
-4008	8	Delimiter	:	before trigger fired
-1	1	stuff	test_1	after trigger fired
-2	2	stuff	test_2	after trigger fired
-3	3	stuff	test_3	after trigger fired
-4	4	stuff	test_4	after trigger fired
-5	5	stuff	test_5	after trigger fired
+9999	\N	\\N	NN	\N
+1	1	stuff	test_1	\N
+2	2	stuff	test_2	\N
+5	5	stuff	test_5	\N
+10001	22	32	42	52
+10002	23	33	43	53
+10004	25	35	45	55
+6	\N	45	80	90
+8	\N	,	\\,	\\
+4000	\N	C	\N	\N
+4002	2	null	\N	\N
+4003	3	Backslash	\\	\\
+4005	5	N	N	N
+4007	7	XX	XX	XX
+4008	8	Delimiter	:	:
+10000	21	31	41	51
+3	3	stuff	test_3	\N
+4	4	stuff	test_4	\N
+10003	24	34	44	54
+10005	26	36	46	56
+7	\N	x	\\x	\\x
+3000	\N	c	\N	\N
+4001	1	empty		
+4004	4	BackslashX	\\X	\\X
+4006	6	BackslashN	\\N	\\N
 COPY x (c, e) TO stdout;
-\\N	before trigger fired
-31	before trigger fired
-32	before trigger fired
-33	before trigger fired
-34	before trigger fired
-35	before trigger fired
-36	before trigger fired
-45	before trigger fired
-x	before trigger fired
-,	before trigger fired
-c	before trigger fired
-C	before trigger fired
-empty	before trigger fired
-null	before trigger fired
-Backslash	before trigger fired
-BackslashX	before trigger fired
-N	before trigger fired
-BackslashN	before trigger fired
-XX	before trigger fired
-Delimiter	before trigger fired
-stuff	after trigger fired
-stuff	after trigger fired
-stuff	after trigger fired
-stuff	after trigger fired
-stuff	after trigger fired
+\\N	\N
+stuff	\N
+stuff	\N
+stuff	\N
+32	52
+33	53
+35	55
+45	90
+,	\\
+C	\N
+null	\N
+Backslash	\\
+N	N
+XX	XX
+Delimiter	:
+31	51
+stuff	\N
+stuff	\N
+34	54
+36	56
+x	\\x
+c	\N
+empty	
+BackslashX	\\X
+BackslashN	\\N
 COPY x (b, e) TO stdout WITH NULL 'I''m null';
-I'm null	before trigger fired
-21	before trigger fired
-22	before trigger fired
-23	before trigger fired
-24	before trigger fired
-25	before trigger fired
-26	before trigger fired
-I'm null	before trigger fired
-I'm null	before trigger fired
-I'm null	before trigger fired
-I'm null	before trigger fired
-I'm null	before trigger fired
-1	before trigger fired
-2	before trigger fired
-3	before trigger fired
-4	before trigger fired
-5	before trigger fired
-6	before trigger fired
-7	before trigger fired
-8	before trigger fired
-1	after trigger fired
-2	after trigger fired
-3	after trigger fired
-4	after trigger fired
-5	after trigger fired
+I'm null	I'm null
+1	I'm null
+2	I'm null
+5	I'm null
+22	52
+23	53
+25	55
+I'm null	90
+I'm null	\\
+I'm null	I'm null
+2	I'm null
+3	\\
+5	N
+7	XX
+8	:
+21	51
+3	I'm null
+4	I'm null
+24	54
+26	56
+I'm null	\\x
+I'm null	I'm null
+1	
+4	\\X
+6	\\N
 CREATE TEMP TABLE y (
 	col1 text,
 	col2 text
@@ -191,8 +195,8 @@ COPY y TO stdout WITH CSV FORCE QUOTE col2 ESCAPE E'\\' ENCODING 'sql_ascii';
 "It is \"perfect\".","	"
 "",
 COPY y TO stdout WITH CSV FORCE QUOTE *;
-"Jackson, Sam","\h"
-"It is ""perfect"".","	"
+"Jackson, Sam",\h
+"It is ""perfect"".",	
 "",
 -- Repeat above tests with new 9.0 option syntax
 COPY y TO stdout (FORMAT CSV);
@@ -208,8 +212,8 @@ COPY y TO stdout (FORMAT CSV, FORCE_QUOTE (col2), ESCAPE E'\\');
 "It is \"perfect\".","	"
 "",
 COPY y TO stdout (FORMAT CSV, FORCE_QUOTE *);
-"Jackson, Sam","\h"
-"It is ""perfect"".","	"
+"Jackson, Sam",\h
+"It is ""perfect"".",	
 "",
 \copy y TO stdout (FORMAT CSV)
 "Jackson, Sam",\h
@@ -224,8 +228,8 @@ It is "perfect".|
 "It is \"perfect\".","	"
 "",
 \copy y TO stdout (FORMAT CSV, FORCE_QUOTE *)
-"Jackson, Sam","\h"
-"It is ""perfect"".","	"
+"Jackson, Sam",\h
+"It is ""perfect"".",	
 "",
 --test that we read consecutive LFs properly
 CREATE TEMP TABLE testnl (a int, b text, c int);
@@ -234,10 +238,10 @@ COPY testnl FROM stdin CSV;
 CREATE TEMP TABLE testeoc (a text);
 COPY testeoc FROM stdin CSV;
 COPY testeoc TO stdout CSV;
+"\."
 a\.
 \.b
 c\.d
-"\."
 -- test handling of nonstandard null marker that violates escaping rules
 CREATE TEMP TABLE testnull(a int, b text);
 INSERT INTO testnull VALUES (1, E'\\0'), (NULL, NULL);
@@ -245,110 +249,156 @@ COPY testnull TO stdout WITH NULL AS E'\\0';
 1	\\0
 \0	\0
 COPY testnull FROM stdin WITH NULL AS E'\\0';
-SELECT * FROM testnull;
+SELECT * FROM testnull ORDER BY 1,2;
  a  | b  
 ----+----
   1 | \0
-    | 
  42 | \0
+    | 
     | 
 (4 rows)
 
 BEGIN;
 CREATE TABLE vistest (LIKE testeoc);
+ERROR:  relation "testeoc" does not exist
 COPY vistest FROM stdin CSV;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+a0
+b
+\.
+invalid command \.
 COMMIT;
+ERROR:  syntax error at or near "a0"
+LINE 1: a0
+        ^
 SELECT * FROM vistest;
- a  
-----
- a0
- b
-(2 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 BEGIN;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 TRUNCATE vistest;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 COPY vistest FROM stdin CSV;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+a1
+b
+\.
+invalid command \.
 SELECT * FROM vistest;
- a  
-----
- a1
- b
-(2 rows)
-
+ERROR:  syntax error at or near "a1"
+LINE 1: a1
+        ^
 SAVEPOINT s1;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 TRUNCATE vistest;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 COPY vistest FROM stdin CSV;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+d1
+e
+\.
+invalid command \.
 SELECT * FROM vistest;
- a  
-----
- d1
- e
-(2 rows)
-
+ERROR:  syntax error at or near "d1"
+LINE 1: d1
+        ^
 COMMIT;
 SELECT * FROM vistest;
- a  
-----
- d1
- e
-(2 rows)
-
+ERROR:  relation "vistest" does not exist
+LINE 1: SELECT * FROM vistest;
+                      ^
 BEGIN;
 TRUNCATE vistest;
+ERROR:  relation "vistest" does not exist
 COPY vistest FROM stdin CSV FREEZE;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+a2
+b
+\.
+invalid command \.
 SELECT * FROM vistest;
- a  
-----
- a2
- b
-(2 rows)
-
+ERROR:  syntax error at or near "a2"
+LINE 1: a2
+        ^
 SAVEPOINT s1;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 TRUNCATE vistest;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 COPY vistest FROM stdin CSV FREEZE;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+d2
+e
+\.
+invalid command \.
 SELECT * FROM vistest;
- a  
-----
- d2
- e
-(2 rows)
-
+ERROR:  syntax error at or near "d2"
+LINE 1: d2
+        ^
 COMMIT;
 SELECT * FROM vistest;
- a  
-----
- d2
- e
-(2 rows)
-
+ERROR:  relation "vistest" does not exist
+LINE 1: SELECT * FROM vistest;
+                      ^
 BEGIN;
 TRUNCATE vistest;
+ERROR:  relation "vistest" does not exist
 COPY vistest FROM stdin CSV FREEZE;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+x
+y
+\.
+invalid command \.
 SELECT * FROM vistest;
- a 
----
- x
- y
-(2 rows)
-
+ERROR:  syntax error at or near "x"
+LINE 1: x
+        ^
 COMMIT;
 TRUNCATE vistest;
+ERROR:  relation "vistest" does not exist
 COPY vistest FROM stdin CSV FREEZE;
-ERROR:  cannot perform FREEZE because the table was not created or truncated in the current subtransaction
+ERROR:  relation "vistest" does not exist
+p
+g
+\.
+invalid command \.
 BEGIN;
+ERROR:  syntax error at or near "p"
+LINE 1: p
+        ^
 TRUNCATE vistest;
+ERROR:  relation "vistest" does not exist
 SAVEPOINT s1;
+ERROR:  SAVEPOINT is not yet supported.
 COPY vistest FROM stdin CSV FREEZE;
-ERROR:  cannot perform FREEZE because the table was not created or truncated in the current subtransaction
+ERROR:  relation "vistest" does not exist
+m
+k
+\.
+invalid command \.
 COMMIT;
+ERROR:  syntax error at or near "m"
+LINE 1: m
+        ^
 BEGIN;
 INSERT INTO vistest VALUES ('z');
+ERROR:  relation "vistest" does not exist
+LINE 1: INSERT INTO vistest VALUES ('z');
+                    ^
 SAVEPOINT s1;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 TRUNCATE vistest;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK TO SAVEPOINT s1;
+ERROR:  no such savepoint
 COPY vistest FROM stdin CSV FREEZE;
-ERROR:  cannot perform FREEZE because the table was not created or truncated in the current subtransaction
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+d3
+e
+\.
+invalid command \.
 COMMIT;
+ERROR:  syntax error at or near "d3"
+LINE 1: d3
+        ^
 CREATE FUNCTION truncate_in_subxact() RETURNS VOID AS
 $$
 BEGIN
@@ -358,30 +408,28 @@ EXCEPTION
 	INSERT INTO vistest VALUES ('subxact failure');
 END;
 $$ language plpgsql;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 BEGIN;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 INSERT INTO vistest VALUES ('z');
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 SELECT truncate_in_subxact();
- truncate_in_subxact 
----------------------
- 
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 COPY vistest FROM stdin CSV FREEZE;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+d4
+e
+\.
+invalid command \.
 SELECT * FROM vistest;
- a  
-----
- d4
- e
-(2 rows)
-
+ERROR:  syntax error at or near "d4"
+LINE 1: d4
+        ^
 COMMIT;
 SELECT * FROM vistest;
- a  
-----
- d4
- e
-(2 rows)
-
+ERROR:  relation "vistest" does not exist
+LINE 1: SELECT * FROM vistest;
+                      ^
 -- Test FORCE_NOT_NULL and FORCE_NULL options
 CREATE TEMP TABLE forcetest (
     a INT NOT NULL,
@@ -396,9 +444,9 @@ BEGIN;
 COPY forcetest (a, b, c) FROM STDIN WITH (FORMAT csv, FORCE_NOT_NULL(b), FORCE_NULL(c));
 COMMIT;
 SELECT b, c FROM forcetest WHERE a = 1;
- b |  c   
----+------
-   | NULL
+ b | c 
+---+---
+   | 
 (1 row)
 
 -- should succeed, FORCE_NULL and FORCE_NOT_NULL can be both specified
@@ -406,9 +454,9 @@ BEGIN;
 COPY forcetest (a, b, c, d) FROM STDIN WITH (FORMAT csv, FORCE_NOT_NULL(c,d), FORCE_NULL(c,d));
 COMMIT;
 SELECT c, d FROM forcetest WHERE a = 2;
- c |  d   
----+------
-   | NULL
+ c | d 
+---+---
+   | 
 (1 row)
 
 -- should fail with not-null constraint violation
@@ -416,7 +464,6 @@ BEGIN;
 COPY forcetest (a, b, c) FROM STDIN WITH (FORMAT csv, FORCE_NULL(b), FORCE_NOT_NULL(c));
 ERROR:  null value in column "b" violates not-null constraint
 DETAIL:  Failing row contains (3, null, , null, null).
-CONTEXT:  COPY forcetest, line 1: "3,,"""
 ROLLBACK;
 -- should fail with "not referenced by COPY" error
 BEGIN;
@@ -444,15 +491,13 @@ alter table check_con_tbl add check (check_con_function(check_con_tbl.*));
  f1     | integer |           | plain   |              | 
 Check constraints:
     "check_con_tbl_check" CHECK (check_con_function(check_con_tbl.*))
+Distribute By: HASH(f1)
+Location Nodes: ALL DATANODES
 
 copy check_con_tbl from stdin;
-NOTICE:  input = {"f1":1}
-NOTICE:  input = {"f1":null}
 copy check_con_tbl from stdin;
-NOTICE:  input = {"f1":0}
 ERROR:  new row for relation "check_con_tbl" violates check constraint "check_con_tbl_check"
 DETAIL:  Failing row contains (0).
-CONTEXT:  COPY check_con_tbl, line 1: "0"
 select * from check_con_tbl;
  f1 
 ----
@@ -462,7 +507,9 @@ select * from check_con_tbl;
 
 DROP TABLE forcetest;
 DROP TABLE vistest;
+ERROR:  table "vistest" does not exist
 DROP FUNCTION truncate_in_subxact();
+ERROR:  function truncate_in_subxact() does not exist
 DROP TABLE x, y;
 DROP FUNCTION fn_x_before();
 DROP FUNCTION fn_x_after();

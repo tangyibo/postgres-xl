@@ -5,11 +5,12 @@
 CREATE TABLE clstr_tst_s (rf_a SERIAL PRIMARY KEY,
 	b INT);
 
-CREATE TABLE clstr_tst (a SERIAL PRIMARY KEY,
+CREATE TABLE clstr_tst (a SERIAL,
 	b INT,
 	c TEXT,
 	d TEXT,
-	CONSTRAINT clstr_tst_con FOREIGN KEY (b) REFERENCES clstr_tst_s);
+	CONSTRAINT clstr_tst_con FOREIGN KEY (b) REFERENCES clstr_tst_s)
+	DISTRIBUTE BY (clstr_tst_con);
 
 CREATE INDEX clstr_tst_b ON clstr_tst (b);
 CREATE INDEX clstr_tst_c ON clstr_tst (c);

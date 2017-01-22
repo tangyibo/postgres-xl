@@ -1418,7 +1418,6 @@ _outSetOp(StringInfo str, const SetOp *node)
 					NSP_NAME(get_typ_namespace(oprright)) : NULL);
 			appendStringInfoChar(str, ' ');
 			_outToken(str, OidIsValid(oprright) ? get_typ_name(oprright) : NULL);
-			appendStringInfoChar(str, ' ');
 		}
 		else
 #endif

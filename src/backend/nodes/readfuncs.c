@@ -2223,6 +2223,7 @@ _readAppend(void)
 static MergeAppend *
 _readMergeAppend(void)
 {
+	int i;
 	READ_LOCALS(MergeAppend);
 
 	ReadCommonPlan(&local_node->plan);
@@ -2230,8 +2231,80 @@ _readMergeAppend(void)
 	READ_NODE_FIELD(mergeplans);
 	READ_INT_FIELD(numCols);
 	READ_ATTRNUMBER_ARRAY(sortColIdx, local_node->numCols);
-	READ_OID_ARRAY(sortOperators, local_node->numCols);
-	READ_OID_ARRAY(collations, local_node->numCols);
+
+	token = pg_strtok(&length);		/* skip :sortOperators */
+	local_node->sortOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+			/* token is already set to nspname */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+			local_node->sortOperators[i] = get_operid(oprname,
+													  oprleft,
+													  oprright,
+													  NSP_OID(nspname));
+		}
+		else
+		local_node->sortOperators[i] = atooid(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :collations */
+	local_node->collations = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *collname; /* collation name */
+			int 		collencoding; /* collation encoding */
+			/* the token is already read */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get collname */
+			collname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get nargs */
+			collencoding = atoi(token);
+			if (collname)
+				local_node->collations[i] = get_collid(collname,
+													   collencoding,
+													   NSP_OID(nspname));
+			else
+				local_node->collations[i] = InvalidOid;
+		}
+		else
+		local_node->collations[i] = atooid(token);
+	}
+
 	READ_BOOL_ARRAY(nullsFirst, local_node->numCols);
 
 	READ_DONE();
@@ -3070,13 +3143,59 @@ _readWindowAgg(void)
 static Unique *
 _readUnique(void)
 {
+	int i;
 	READ_LOCALS(Unique);
 
 	ReadCommonPlan(&local_node->plan);
 
 	READ_INT_FIELD(numCols);
 	READ_ATTRNUMBER_ARRAY(uniqColIdx, local_node->numCols);
-	READ_OID_ARRAY(uniqOperators, local_node->numCols);
+
+	token = pg_strtok(&length);		/* skip :uniqOperators */
+	local_node->uniqOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+			/* token is already set to nspname */
+			nspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+			local_node->uniqOperators[i] = get_operid(oprname,
+													  oprleft,
+													  oprright,
+													  NSP_OID(nspname));
+		}
+		else
+			local_node->uniqOperators[i] = atooid(token);
+	}
 
 	READ_DONE();
 }
@@ -3129,15 +3248,81 @@ _readHash(void)
 static SetOp *
 _readSetOp(void)
 {
+	int i;
 	READ_LOCALS(SetOp);
 
 	ReadCommonPlan(&local_node->plan);
 
 	READ_ENUM_FIELD(cmd, SetOpCmd);
 	READ_ENUM_FIELD(strategy, SetOpStrategy);
+
 	READ_INT_FIELD(numCols);
-	READ_ATTRNUMBER_ARRAY(dupColIdx, local_node->numCols);
-	READ_OID_ARRAY(dupOperators, local_node->numCols);
+
+	token = pg_strtok(&length);		/* skip :dupColIdx */
+	local_node->dupColIdx = (AttrNumber *) palloc(local_node->numCols * sizeof(AttrNumber));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		token = pg_strtok(&length);
+		local_node->dupColIdx[i] = atoi(token);
+	}
+
+	token = pg_strtok(&length);		/* skip :dupOperators */
+	local_node->dupOperators = (Oid *) palloc(local_node->numCols * sizeof(Oid));
+	for (i = 0; i < local_node->numCols; i++)
+	{
+		if (portable_input)
+		{
+			char       *nspname; /* namespace name */
+			char       *oprname; /* operator name */
+			char	   *leftnspname; /* left type namespace */
+			char	   *leftname; /* left type name */
+			Oid			oprleft; /* left type */
+			char	   *rightnspname; /* right type namespace */
+			char	   *rightname; /* right type name */
+			Oid			oprright; /* right type */
+
+			token = pg_strtok(&length);	/* get operator namespace */
+			nspname = nullable_string(token, length);
+
+			token = pg_strtok(&length); /* get operator name */
+			oprname = nullable_string(token, length);
+
+			token = pg_strtok(&length); /* left type namespace */
+			leftnspname = nullable_string(token, length);
+
+			token = pg_strtok(&length); /* left type name */
+			leftname = nullable_string(token, length);
+
+			token = pg_strtok(&length); /* right type namespace */
+			rightnspname = nullable_string(token, length);
+
+			token = pg_strtok(&length); /* right type name */
+			rightname = nullable_string(token, length);
+
+			if (leftname)
+				oprleft = get_typname_typid(leftname,
+											NSP_OID(leftnspname));
+			else
+				oprleft = InvalidOid;
+
+			if (rightname)
+				oprright = get_typname_typid(rightname,
+											 NSP_OID(rightnspname));
+			else
+				oprright = InvalidOid;
+
+			local_node->dupOperators[i] = get_operid(oprname,
+													 oprleft,
+													 oprright,
+													 NSP_OID(nspname));
+		}
+		else
+		{
+			token = pg_strtok(&length);
+			local_node->dupOperators[i] = atooid(token);
+		}
+	}
+
 	READ_INT_FIELD(flagColIdx);
 	READ_INT_FIELD(firstFlag);
 	READ_LONG_FIELD(numGroups);

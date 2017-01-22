@@ -1077,7 +1077,6 @@ typedef struct SubqueryScanPath
 {
 	Path		path;
 	Path	   *subpath;		/* path representing subquery execution */
-	Distribution *distribution; /* result distribution */
 } SubqueryScanPath;
 
 /*

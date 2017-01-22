@@ -3066,7 +3066,7 @@ create_subqueryscan_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 	SubqueryScanPath *pathnode = makeNode(SubqueryScanPath);
 
 #ifdef XCP
-	pathnode->distribution = distribution;
+	pathnode->path.distribution = distribution;
 #endif
 	pathnode->path.pathtype = T_SubqueryScan;
 	pathnode->path.parent = rel;

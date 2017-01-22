@@ -4189,6 +4189,8 @@ create_windowagg_path(PlannerInfo *root,
 	pathnode->winclause = winclause;
 	pathnode->winpathkeys = winpathkeys;
 
+	pathnode->path.distribution = copyObject(subpath->distribution);
+
 	/*
 	 * For costing purposes, assume that there are no redundant partitioning
 	 * or ordering columns; it's not worth the trouble to deal with that

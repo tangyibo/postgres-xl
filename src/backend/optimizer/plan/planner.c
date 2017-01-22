@@ -167,7 +167,7 @@ static bool groupingsets_distribution_match(PlannerInfo *root, Query *parse,
 static Path *adjust_path_distribution(PlannerInfo *root, Query *parse,
 					  Path *path);
 static bool can_push_down_grouping(PlannerInfo *root, Query *parse, Path *path);
-
+static bool can_push_down_window(PlannerInfo *root, Path *path);
 
 /*****************************************************************************
  *
@@ -4820,6 +4820,10 @@ create_one_window_path(PlannerInfo *root,
 			window_target = output_target;
 		}
 
+		/* We can't really push down window functions for now. */
+		if (!can_push_down_window(root, path))
+			path = create_remotesubplan_path(root, path, NULL);
+
 		path = (Path *)
 			create_windowagg_path(root, window_rel, path, window_target,
 								  wflists->windowFuncs[wc->winref],
@@ -6339,4 +6343,14 @@ can_push_down_grouping(PlannerInfo *root, Query *parse, Path *path)
 		return groupingsets_distribution_match(root, parse, path);
 
 	return grouping_distribution_match(root, parse, path, parse->groupClause);
+}
+
+static bool
+can_push_down_window(PlannerInfo *root, Path *path)
+{
+	/*  */
+	if (! path->distribution)
+		return true;
+
+	return false;
 }

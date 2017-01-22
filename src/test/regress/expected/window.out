@@ -598,13 +598,15 @@ select first_value(max(x)) over (), y
                            QUERY PLAN                            
 -----------------------------------------------------------------
  WindowAgg
-   ->  HashAggregate
+   ->  Finalize GroupAggregate
          Group Key: (tenk1.ten + tenk1.four)
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  HashAggregate
-                     Group Key: (tenk1.ten + tenk1.four)
-                     ->  Seq Scan on tenk1
-(7 rows)
+               ->  Sort
+                     Sort Key: ((tenk1.ten + tenk1.four))
+                     ->  Partial HashAggregate
+                           Group Key: (tenk1.ten + tenk1.four)
+                           ->  Seq Scan on tenk1
+(9 rows)
 
 -- test non-default frame specifications
 SELECT four, ten,

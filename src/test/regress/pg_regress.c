@@ -846,7 +846,9 @@ set_node_config_file(PGXCNodeTypeNum node)
 	 * Set sequence_range to 1 for deterministic results
 	 */
 	fputs("sequence_range = 1\n", pg_conf);
-	fputs("log_line_prefix = \'\%t [\%p]:xid[\%x-\%v] remote=\%R,coord=\%C,global_session=\%S \'\n", pg_conf);
+	fputs("log_line_prefix = \'\%m [\%p]:xid[\%x-\%v] remote=\%R,coord=\%C,global_session=\%S \'\n", pg_conf);
+
+	fputs("log_error_verbosity = 'verbose'\n", pg_conf);
 
 	/* Set GTM connection information */
 	fputs("gtm_host = 'localhost'\n", pg_conf);

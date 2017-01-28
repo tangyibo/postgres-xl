@@ -1914,6 +1914,35 @@ create_minmaxagg_plan(PlannerInfo *root, MinMaxAggPath *best_path)
 		plan->plan_width = mminfo->path->pathtarget->width;
 		plan->parallel_aware = false;
 
+		/*
+		 * XL: Add a remote subplan, splitting the LIMIT into a remote and
+		 * local part LIMIT parts.
+		 *
+		 * XXX This should probably happen when constructing the path in
+		 * create_minmaxagg_path(), not this late.
+		 *
+		 * XXX The costing in here is mostly bogus. Not that it'd matter
+		 * this late, though.
+		 */
+		if (mminfo->path->distribution)
+		{
+			plan = (Plan *) make_remotesubplan(root, plan,
+											   NULL,
+											   mminfo->path->distribution,
+											   mminfo->path->pathkeys);
+
+			plan = (Plan *) make_limit(plan,
+									   subparse->limitOffset,
+									   subparse->limitCount,
+									   0, 1);
+
+			plan->startup_cost = mminfo->path->startup_cost;
+			plan->total_cost = mminfo->pathcost;
+			plan->plan_rows = 1;
+			plan->plan_width = mminfo->path->pathtarget->width;
+			plan->parallel_aware = false;
+		}
+
 		/* Convert the plan into an InitPlan in the outer query. */
 		SS_make_initplan_from_plan(root, subroot, plan, mminfo->param);
 	}

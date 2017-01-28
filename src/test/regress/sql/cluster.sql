@@ -10,7 +10,7 @@ CREATE TABLE clstr_tst (a SERIAL,
 	c TEXT,
 	d TEXT,
 	CONSTRAINT clstr_tst_con FOREIGN KEY (b) REFERENCES clstr_tst_s)
-	DISTRIBUTE BY (clstr_tst_con);
+	DISTRIBUTE BY HASH (b);
 
 CREATE INDEX clstr_tst_b ON clstr_tst (b);
 CREATE INDEX clstr_tst_c ON clstr_tst (c);

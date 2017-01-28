@@ -3,11 +3,12 @@
 --
 CREATE TABLE clstr_tst_s (rf_a SERIAL PRIMARY KEY,
 	b INT);
-CREATE TABLE clstr_tst (a SERIAL PRIMARY KEY,
+CREATE TABLE clstr_tst (a SERIAL,
 	b INT,
 	c TEXT,
 	d TEXT,
-	CONSTRAINT clstr_tst_con FOREIGN KEY (b) REFERENCES clstr_tst_s);
+	CONSTRAINT clstr_tst_con FOREIGN KEY (b) REFERENCES clstr_tst_s)
+	DISTRIBUTE BY HASH (b);
 CREATE INDEX clstr_tst_b ON clstr_tst (b);
 CREATE INDEX clstr_tst_c ON clstr_tst (c);
 CREATE INDEX clstr_tst_c_b ON clstr_tst (c,b);
@@ -247,11 +248,10 @@ ERROR:  insert or update on table "clstr_tst" violates foreign key constraint "c
 DETAIL:  Key (b)=(1111) is not present in table "clstr_tst_s".
 SELECT conname FROM pg_constraint WHERE conrelid = 'clstr_tst'::regclass
 ORDER BY 1;
-    conname     
-----------------
+    conname    
+---------------
  clstr_tst_con
- clstr_tst_pkey
-(2 rows)
+(1 row)
 
 SELECT relname, relkind,
     EXISTS(SELECT 1 FROM pg_class WHERE oid = c.reltoastrelid) AS hastoast
@@ -265,11 +265,10 @@ FROM pg_class c WHERE relname LIKE 'clstr_tst%' ORDER BY relname;
  clstr_tst_c          | i       | f
  clstr_tst_c_b        | i       | f
  clstr_tst_inh        | r       | t
- clstr_tst_pkey       | i       | f
  clstr_tst_s          | r       | f
  clstr_tst_s_pkey     | i       | f
  clstr_tst_s_rf_a_seq | S       | f
-(11 rows)
+(10 rows)
 
 -- Verify that indisclustered is correctly set
 SELECT pg_class.relname FROM pg_index, pg_class, pg_class AS pg_class_2

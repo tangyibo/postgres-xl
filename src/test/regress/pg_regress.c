@@ -3189,7 +3189,7 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 		start_node(PGXC_GTM, false, false);
 
 		/* Start all the nodes */
-		start_node(PGXC_COORD_1, true, true);
+		start_node(PGXC_COORD_1, true, false);
 		start_node(PGXC_COORD_2, true, false);
 		start_node(PGXC_DATANODE_1, false, false);
 		start_node(PGXC_DATANODE_2, false, false);

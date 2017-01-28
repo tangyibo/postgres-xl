@@ -8,3 +8,4 @@
 /tablespace.sql
 /xc_copy.sql
 /xc_notrans_block.sql
+/xl_bugs.sql

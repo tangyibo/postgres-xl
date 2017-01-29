@@ -1974,6 +1974,9 @@ not_allowed_join:
 						(Node *) new_inner_key,
 						nodes,
 						restrictNodes);
+
+				if (IsA(pathnode, MergePath))
+					((MergePath*)pathnode)->innersortkeys = NIL;
 			}
 			/*
 			 * Redistribute join by hash, and, if jointype allows, create
@@ -1990,6 +1993,9 @@ not_allowed_join:
 						(Node *) new_outer_key,
 						nodes,
 						restrictNodes);
+
+				if (IsA(pathnode, MergePath))
+					((MergePath*)pathnode)->outersortkeys = NIL;
 			}
 			targetd = makeNode(Distribution);
 			targetd->distributionType = distType;
@@ -2005,8 +2011,8 @@ not_allowed_join:
 			 */
 			if (IsA(pathnode, MergePath))
 			{
-				((MergePath*)pathnode)->innersortkeys = NIL;
-				((MergePath*)pathnode)->outersortkeys = NIL;
+				// ((MergePath*)pathnode)->innersortkeys = NIL;
+				// ((MergePath*)pathnode)->outersortkeys = NIL;
 			}
 
 			/*
@@ -2040,6 +2046,7 @@ not_allowed_join:
 	 * relations.
 	 */
 	if (innerd)
+	{
 		pathnode->innerjoinpath = redistribute_path(root,
 													pathnode->innerjoinpath,
 													innerpathkeys,
@@ -2047,7 +2054,13 @@ not_allowed_join:
 													NULL,
 													NULL,
 													NULL);
+
+		if (IsA(pathnode, MergePath))
+			((MergePath*)pathnode)->innersortkeys = NIL;
+	}
+
 	if (outerd)
+	{
 		pathnode->outerjoinpath = redistribute_path(root,
 													pathnode->outerjoinpath,
 													outerpathkeys,
@@ -2055,6 +2068,12 @@ not_allowed_join:
 													NULL,
 													NULL,
 													NULL);
+													
+
+		if (IsA(pathnode, MergePath))
+			((MergePath*)pathnode)->outersortkeys = NIL;
+	}
+
 	return alternate;
 }
 #endif

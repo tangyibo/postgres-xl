@@ -174,22 +174,22 @@ CREATE TABLE aggtest (
 CREATE TABLE hash_i4_heap (
 	seqno 		int4,
 	random 		int4
-);
+) DISTRIBUTE BY REPLICATION;
 
 CREATE TABLE hash_name_heap (
 	seqno 		int4,
 	random 		name
-);
+) DISTRIBUTE BY REPLICATION;
 
 CREATE TABLE hash_txt_heap (
 	seqno 		int4,
 	random 		text
-);
+) DISTRIBUTE BY REPLICATION;
 
 CREATE TABLE hash_f8_heap (
 	seqno		int4,
 	random 		float8
-);
+) DISTRIBUTE BY REPLICATION;
 
 -- don't include the hash_ovfl_heap stuff in the distribution
 -- the data set is too large for what it's worth

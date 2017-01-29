@@ -2792,8 +2792,8 @@ ROLLBACK;
 -- Non-target relations are only subject to SELECT policies
 --
 SET SESSION AUTHORIZATION regress_rls_alice;
-CREATE TABLE r1 (a int);
-CREATE TABLE r2 (a int);
+CREATE TABLE r1 (a int) DISTRIBUTE BY REPLICATION;
+CREATE TABLE r2 (a int) DISTRIBUTE BY REPLICATION;
 INSERT INTO r1 VALUES (10), (20);
 INSERT INTO r2 VALUES (10), (20);
 GRANT ALL ON r1, r2 TO regress_rls_bob;
@@ -2834,26 +2834,30 @@ DELETE FROM r2 RETURNING *; -- Deletes nothing
 INSERT INTO r1 SELECT a + 1 FROM r2 RETURNING *; -- OK
  a  
 ----
- 21
  11
+ 21
 (2 rows)
 
 UPDATE r1 SET a = r2.a + 2 FROM r2 WHERE r1.a = r2.a RETURNING *; -- OK
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
+ a  | a  
+----+----
+ 12 | 10
+ 22 | 20
+(2 rows)
+
 DELETE FROM r1 USING r2 WHERE r1.a = r2.a + 2 RETURNING *; -- OK
- a | a 
----+---
-(0 rows)
+ a  | a  
+----+----
+ 12 | 10
+ 22 | 20
+(2 rows)
 
 SELECT * FROM r1;
  a  
 ----
- 21
- 10
- 20
  11
-(4 rows)
+ 21
+(2 rows)
 
 SELECT * FROM r2;
  a  
@@ -2870,7 +2874,7 @@ DROP TABLE r2;
 --
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security = on;
-CREATE TABLE r1 (a int);
+CREATE TABLE r1 (a int) DISTRIBUTE BY REPLICATION;
 INSERT INTO r1 VALUES (10), (20);
 CREATE POLICY p1 ON r1 USING (false);
 ALTER TABLE r1 ENABLE ROW LEVEL SECURITY;
@@ -2974,7 +2978,7 @@ TABLE r2;
 DROP TABLE r2;
 DROP TABLE r1;
 -- Ensure cascaded UPDATE works
-CREATE TABLE r1 (a int PRIMARY KEY);
+CREATE TABLE r1 (a int PRIMARY KEY) DISTRIBUTE BY REPLICATION;
 CREATE TABLE r2 (a int REFERENCES r1 ON UPDATE CASCADE);
 INSERT INTO r1 VALUES (10), (20);
 INSERT INTO r2 VALUES (10), (20);
@@ -3034,7 +3038,7 @@ DROP TABLE r1;
 --
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security = on;
-CREATE TABLE r1 (a int);
+CREATE TABLE r1 (a int) DISTRIBUTE BY REPLICATION;
 CREATE POLICY p1 ON r1 FOR SELECT USING (a < 20);
 CREATE POLICY p2 ON r1 FOR UPDATE USING (a < 20) WITH CHECK (true);
 INSERT INTO r1 VALUES (10);

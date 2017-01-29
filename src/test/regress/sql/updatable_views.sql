@@ -1069,10 +1069,10 @@ DROP TABLE tx3;
 -- Test handling of vars from correlated subqueries in quals from outer
 -- security barrier views, per bug #13988
 --
-CREATE TABLE t1 (a int, b text, c int);
+CREATE TABLE t1 (a int, b text, c int) DISTRIBUTE BY REPLICATION;
 INSERT INTO t1 VALUES (1, 'one', 10);
 
-CREATE TABLE t2 (cc int);
+CREATE TABLE t2 (cc int) DISTRIBUTE BY REPLICATION;
 INSERT INTO t2 VALUES (10), (20);
 
 CREATE VIEW v1 WITH (security_barrier = true) AS

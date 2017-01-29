@@ -177,12 +177,13 @@ explain (verbose true, costs false, nodes false) select val + val2, val, val2 fr
 --------------------------------------------------------------
  Remote Subquery Scan on all
    Output: (val + val2), val, val2
+   Sort Key: xc_groupby_tab1.val, xc_groupby_tab1.val2
    ->  HashAggregate
          Output: (val + val2), val, val2
          Group Key: xc_groupby_tab1.val, xc_groupby_tab1.val2
          ->  Seq Scan on public.xc_groupby_tab1
                Output: val, val2
-(7 rows)
+(8 rows)
 
 select xc_groupby_tab1.val + xc_groupby_tab2.val2, xc_groupby_tab1.val, xc_groupby_tab2.val2 from xc_groupby_tab1, xc_groupby_tab2 where xc_groupby_tab1.val = xc_groupby_tab2.val group by xc_groupby_tab1.val, xc_groupby_tab2.val2;
  ?column? | val | val2 
@@ -200,6 +201,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
 ---------------------------------------------------------------------------------------------------------
  Remote Subquery Scan on all
    Output: (xc_groupby_tab1.val + xc_groupby_tab2.val2), xc_groupby_tab1.val, xc_groupby_tab2.val2
+   Sort Key: xc_groupby_tab1.val, xc_groupby_tab2.val2
    ->  HashAggregate
          Output: (xc_groupby_tab1.val + xc_groupby_tab2.val2), xc_groupby_tab1.val, xc_groupby_tab2.val2
          Group Key: xc_groupby_tab1.val, xc_groupby_tab2.val2
@@ -216,7 +218,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
                      Sort Key: xc_groupby_tab2.val
                      ->  Seq Scan on public.xc_groupby_tab2
                            Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
-(18 rows)
+(19 rows)
 
 select xc_groupby_tab1.val + xc_groupby_tab2.val2 from xc_groupby_tab1, xc_groupby_tab2 where xc_groupby_tab1.val = xc_groupby_tab2.val group by xc_groupby_tab1.val + xc_groupby_tab2.val2;
  ?column? 
@@ -339,6 +341,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
 -----------------------------------------------------
  Remote Subquery Scan on all
    Output: a, count(a)
+   Sort Key: xc_groupby_def.a
    ->  Sort
          Output: a, (count(a))
          Sort Key: xc_groupby_def.a
@@ -347,7 +350,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
                Group Key: xc_groupby_def.a
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
-(10 rows)
+(11 rows)
 
 select avg(a) from xc_groupby_def group by a; 
           avg           
@@ -386,12 +389,13 @@ explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_d
 -----------------------------------------------
  Remote Subquery Scan on all
    Output: avg(a), a
+   Sort Key: xc_groupby_def.a
    ->  HashAggregate
          Output: avg(a), a
          Group Key: xc_groupby_def.a
          ->  Seq Scan on public.xc_groupby_def
                Output: a, b
-(7 rows)
+(8 rows)
 
 select avg(a) from xc_groupby_def group by b;
         avg         
@@ -485,13 +489,14 @@ explain (verbose true, costs false, nodes false) select count(*) from xc_groupby
 ------------------------------------------------------
  Remote Subquery Scan on all
    Output: count(*), a
+   Sort Key: xc_groupby_def.a
    ->  HashAggregate
          Output: count(*), a
          Group Key: xc_groupby_def.a
          ->  Seq Scan on public.xc_groupby_def
                Output: a, b
                Filter: (xc_groupby_def.a IS NOT NULL)
-(8 rows)
+(9 rows)
 
 select * from (select b from xc_groupby_def group by b) q order by q.b;
    b   
@@ -585,12 +590,13 @@ explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_g
 ---------------------------------------------
  Remote Subquery Scan on all
    Output: sum(a), a
+   Sort Key: xc_groupby_g.a
    ->  HashAggregate
          Output: sum(a), a
          Group Key: xc_groupby_g.a
          ->  Seq Scan on public.xc_groupby_g
                Output: a, b, c
-(7 rows)
+(8 rows)
 
 select sum(b) from xc_groupby_g group by b;
  sum 
@@ -1549,6 +1555,7 @@ explain (verbose true, costs false, nodes false) select val + val2, val, val2 fr
 -------------------------------------------------------------------
  Remote Subquery Scan on all
    Output: (val + val2), val, val2
+   Sort Key: xc_groupby_tab1.val, xc_groupby_tab1.val2
    ->  Group
          Output: (val + val2), val, val2
          Group Key: xc_groupby_tab1.val, xc_groupby_tab1.val2
@@ -1557,7 +1564,7 @@ explain (verbose true, costs false, nodes false) select val + val2, val, val2 fr
                Sort Key: xc_groupby_tab1.val, xc_groupby_tab1.val2
                ->  Seq Scan on public.xc_groupby_tab1
                      Output: val, val2
-(10 rows)
+(11 rows)
 
 select xc_groupby_tab1.val + xc_groupby_tab2.val2, xc_groupby_tab1.val, xc_groupby_tab2.val2 from xc_groupby_tab1, xc_groupby_tab2 where xc_groupby_tab1.val = xc_groupby_tab2.val group by xc_groupby_tab1.val, xc_groupby_tab2.val2;
  ?column? | val | val2 
@@ -1575,6 +1582,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
 ---------------------------------------------------------------------------------------------------------
  Remote Subquery Scan on all
    Output: (xc_groupby_tab1.val + xc_groupby_tab2.val2), xc_groupby_tab1.val, xc_groupby_tab2.val2
+   Sort Key: xc_groupby_tab1.val, xc_groupby_tab2.val2
    ->  Group
          Output: (xc_groupby_tab1.val + xc_groupby_tab2.val2), xc_groupby_tab1.val, xc_groupby_tab2.val2
          Group Key: xc_groupby_tab1.val, xc_groupby_tab2.val2
@@ -1594,7 +1602,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
                            Sort Key: xc_groupby_tab2.val
                            ->  Seq Scan on public.xc_groupby_tab2
                                  Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
-(21 rows)
+(22 rows)
 
 select xc_groupby_tab1.val + xc_groupby_tab2.val2 from xc_groupby_tab1, xc_groupby_tab2 where xc_groupby_tab1.val = xc_groupby_tab2.val group by xc_groupby_tab1.val + xc_groupby_tab2.val2;
  ?column? 
@@ -1613,6 +1621,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
    Group Key: (xc_groupby_tab1.val + xc_groupby_tab2.val2)
    ->  Remote Subquery Scan on all
          Output: (xc_groupby_tab1.val + xc_groupby_tab2.val2)
+         Sort Key: (xc_groupby_tab1.val + xc_groupby_tab2.val2)
          ->  Sort
                Output: ((xc_groupby_tab1.val + xc_groupby_tab2.val2))
                Sort Key: ((xc_groupby_tab1.val + xc_groupby_tab2.val2))
@@ -1629,7 +1638,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
                            Sort Key: xc_groupby_tab2.val
                            ->  Seq Scan on public.xc_groupby_tab2
                                  Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
-(21 rows)
+(22 rows)
 
 -- group by with aggregates in expression
 select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
@@ -1723,6 +1732,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
 -----------------------------------------------------
  Remote Subquery Scan on all
    Output: a, count(a)
+   Sort Key: xc_groupby_def.a
    ->  GroupAggregate
          Output: a, count(a)
          Group Key: xc_groupby_def.a
@@ -1731,7 +1741,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
                Sort Key: xc_groupby_def.a
                ->  Seq Scan on public.xc_groupby_def
                      Output: a
-(10 rows)
+(11 rows)
 
 select avg(a) from xc_groupby_def group by a; 
           avg           
@@ -1770,6 +1780,7 @@ explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_d
 -----------------------------------------------------
  Remote Subquery Scan on all
    Output: avg(a), a
+   Sort Key: xc_groupby_def.a
    ->  GroupAggregate
          Output: avg(a), a
          Group Key: xc_groupby_def.a
@@ -1778,7 +1789,7 @@ explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_d
                Sort Key: xc_groupby_def.a
                ->  Seq Scan on public.xc_groupby_def
                      Output: a
-(10 rows)
+(11 rows)
 
 select avg(a) from xc_groupby_def group by b;
         avg         
@@ -1881,6 +1892,7 @@ explain (verbose true, costs false, nodes false) select count(*) from xc_groupby
 ------------------------------------------------------------
  Remote Subquery Scan on all
    Output: count(*), a
+   Sort Key: xc_groupby_def.a
    ->  GroupAggregate
          Output: count(*), a
          Group Key: xc_groupby_def.a
@@ -1890,7 +1902,7 @@ explain (verbose true, costs false, nodes false) select count(*) from xc_groupby
                ->  Seq Scan on public.xc_groupby_def
                      Output: a
                      Filter: (xc_groupby_def.a IS NOT NULL)
-(11 rows)
+(12 rows)
 
 select b from xc_groupby_def group by b;
    b   
@@ -1984,6 +1996,7 @@ explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_g
 ---------------------------------------------------
  Remote Subquery Scan on all
    Output: sum(a), a
+   Sort Key: xc_groupby_g.a
    ->  GroupAggregate
          Output: sum(a), a
          Group Key: xc_groupby_g.a
@@ -1992,7 +2005,7 @@ explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_g
                Sort Key: xc_groupby_g.a
                ->  Seq Scan on public.xc_groupby_g
                      Output: a
-(10 rows)
+(11 rows)
 
 select sum(b) from xc_groupby_g group by b;
  sum 
@@ -3176,6 +3189,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
 -----------------------------------------------------
  Remote Subquery Scan on all
    Output: a, count(a)
+   Sort Key: xc_groupby_def.a
    ->  Sort
          Output: a, (count(a))
          Sort Key: xc_groupby_def.a
@@ -3184,7 +3198,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
                Group Key: xc_groupby_def.a
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
-(10 rows)
+(11 rows)
 
 select avg(a) from xc_groupby_def group by a; 
           avg           
@@ -3223,12 +3237,13 @@ explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_d
 -----------------------------------------------
  Remote Subquery Scan on all
    Output: avg(a), a
+   Sort Key: xc_groupby_def.a
    ->  HashAggregate
          Output: avg(a), a
          Group Key: xc_groupby_def.a
          ->  Seq Scan on public.xc_groupby_def
                Output: a, b
-(7 rows)
+(8 rows)
 
 select avg(a) from xc_groupby_def group by b;
         avg         
@@ -3322,13 +3337,14 @@ explain (verbose true, costs false, nodes false) select count(*) from xc_groupby
 ------------------------------------------------------
  Remote Subquery Scan on all
    Output: count(*), a
+   Sort Key: xc_groupby_def.a
    ->  HashAggregate
          Output: count(*), a
          Group Key: xc_groupby_def.a
          ->  Seq Scan on public.xc_groupby_def
                Output: a, b
                Filter: (xc_groupby_def.a IS NOT NULL)
-(8 rows)
+(9 rows)
 
 select * from (select b from xc_groupby_def group by b) q order by q.b;
    b   
@@ -3422,12 +3438,13 @@ explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_g
 ---------------------------------------------
  Remote Subquery Scan on all
    Output: sum(a), a
+   Sort Key: xc_groupby_g.a
    ->  HashAggregate
          Output: sum(a), a
          Group Key: xc_groupby_g.a
          ->  Seq Scan on public.xc_groupby_g
                Output: a, b, c
-(7 rows)
+(8 rows)
 
 select sum(b) from xc_groupby_g group by b;
  sum 
@@ -4470,6 +4487,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
    Group Key: (xc_groupby_tab1.val + xc_groupby_tab2.val2)
    ->  Remote Subquery Scan on all
          Output: (xc_groupby_tab1.val + xc_groupby_tab2.val2)
+         Sort Key: (xc_groupby_tab1.val + xc_groupby_tab2.val2)
          ->  Sort
                Output: ((xc_groupby_tab1.val + xc_groupby_tab2.val2))
                Sort Key: ((xc_groupby_tab1.val + xc_groupby_tab2.val2))
@@ -4486,7 +4504,7 @@ explain (verbose true, costs false, nodes false) select xc_groupby_tab1.val + xc
                            Sort Key: xc_groupby_tab2.val
                            ->  Seq Scan on public.xc_groupby_tab2
                                  Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
-(21 rows)
+(22 rows)
 
 -- group by with aggregates in expression
 select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
@@ -4580,6 +4598,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
 -----------------------------------------------------
  Remote Subquery Scan on all
    Output: a, count(a)
+   Sort Key: xc_groupby_def.a
    ->  GroupAggregate
          Output: a, count(a)
          Group Key: xc_groupby_def.a
@@ -4588,7 +4607,7 @@ explain (verbose true, costs false, nodes false) select a,count(a) from xc_group
                Sort Key: xc_groupby_def.a
                ->  Seq Scan on public.xc_groupby_def
                      Output: a
-(10 rows)
+(11 rows)
 
 select avg(a) from xc_groupby_def group by a; 
           avg           
@@ -4627,6 +4646,7 @@ explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_d
 -----------------------------------------------------
  Remote Subquery Scan on all
    Output: avg(a), a
+   Sort Key: xc_groupby_def.a
    ->  GroupAggregate
          Output: avg(a), a
          Group Key: xc_groupby_def.a
@@ -4635,7 +4655,7 @@ explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_d
                Sort Key: xc_groupby_def.a
                ->  Seq Scan on public.xc_groupby_def
                      Output: a
-(10 rows)
+(11 rows)
 
 select avg(a) from xc_groupby_def group by b;
         avg         
@@ -4738,6 +4758,7 @@ explain (verbose true, costs false, nodes false) select count(*) from xc_groupby
 ------------------------------------------------------------
  Remote Subquery Scan on all
    Output: count(*), a
+   Sort Key: xc_groupby_def.a
    ->  GroupAggregate
          Output: count(*), a
          Group Key: xc_groupby_def.a
@@ -4747,7 +4768,7 @@ explain (verbose true, costs false, nodes false) select count(*) from xc_groupby
                ->  Seq Scan on public.xc_groupby_def
                      Output: a
                      Filter: (xc_groupby_def.a IS NOT NULL)
-(11 rows)
+(12 rows)
 
 select b from xc_groupby_def group by b;
    b   
@@ -4841,6 +4862,7 @@ explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_g
 ---------------------------------------------------
  Remote Subquery Scan on all
    Output: sum(a), a
+   Sort Key: xc_groupby_g.a
    ->  GroupAggregate
          Output: sum(a), a
          Group Key: xc_groupby_g.a
@@ -4849,7 +4871,7 @@ explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_g
                Sort Key: xc_groupby_g.a
                ->  Seq Scan on public.xc_groupby_g
                      Output: a
-(10 rows)
+(11 rows)
 
 select sum(b) from xc_groupby_g group by b;
  sum 

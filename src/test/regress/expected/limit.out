@@ -143,11 +143,12 @@ select unique1, unique2, nextval('testseq')
    Output: unique1, unique2, (nextval('testseq'::regclass))
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, nextval('testseq'::regclass)
+         Sort Key: tenk1.unique2
          ->  Limit
                Output: unique1, unique2, (nextval('testseq'::regclass))
                ->  Index Scan using tenk1_unique2 on public.tenk1
                      Output: unique1, unique2, nextval('testseq'::regclass)
-(8 rows)
+(9 rows)
 
 select unique1, unique2, nextval('testseq')
   from tenk1 order by unique2 limit 10;
@@ -180,6 +181,7 @@ select unique1, unique2, nextval('testseq')
    Output: unique1, unique2, (nextval('testseq'::regclass)), tenthous
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, nextval('testseq'::regclass), tenthous
+         Sort Key: tenk1.tenthous
          ->  Limit
                Output: unique1, unique2, (nextval('testseq'::regclass)), tenthous
                ->  Result
@@ -189,7 +191,7 @@ select unique1, unique2, nextval('testseq')
                            Sort Key: tenk1.tenthous
                            ->  Seq Scan on public.tenk1
                                  Output: unique1, unique2, tenthous
-(13 rows)
+(14 rows)
 
 select unique1, unique2, nextval('testseq')
   from tenk1 order by tenthous limit 10;
@@ -222,11 +224,12 @@ select unique1, unique2, generate_series(1,10)
    Output: unique1, unique2, (generate_series(1, 10))
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, generate_series(1, 10)
+         Sort Key: tenk1.unique2
          ->  Limit
                Output: unique1, unique2, (generate_series(1, 10))
                ->  Index Scan using tenk1_unique2 on public.tenk1
                      Output: unique1, unique2, generate_series(1, 10)
-(8 rows)
+(9 rows)
 
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by unique2 limit 7;
@@ -250,6 +253,7 @@ select unique1, unique2, generate_series(1,10)
    Output: unique1, unique2, (generate_series(1, 10)), tenthous
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: unique1, unique2, generate_series(1, 10), tenthous
+         Sort Key: tenk1.tenthous
          ->  Limit
                Output: unique1, unique2, (generate_series(1, 10)), tenthous
                ->  Result
@@ -259,7 +263,7 @@ select unique1, unique2, generate_series(1,10)
                            Sort Key: tenk1.tenthous
                            ->  Seq Scan on public.tenk1
                                  Output: unique1, unique2, tenthous
-(13 rows)
+(14 rows)
 
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by tenthous limit 7;
@@ -325,12 +329,13 @@ select sum(tenthous) as s1, sum(tenthous) + random()*0 as s2
          Group Key: tenk1.thousand
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                Output: thousand, PARTIAL sum(tenthous)
+               Sort Key: tenk1.thousand
                ->  Partial GroupAggregate
                      Output: thousand, PARTIAL sum(tenthous)
                      Group Key: tenk1.thousand
                      ->  Index Only Scan using tenk1_thous_tenthous on public.tenk1
                            Output: thousand, tenthous
-(12 rows)
+(13 rows)
 
 select sum(tenthous) as s1, sum(tenthous) + random()*0 as s2
   from tenk1 group by thousand order by thousand limit 3;

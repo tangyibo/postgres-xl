@@ -452,26 +452,6 @@ SELECT pg_notify('fo' || 'o', 'pay' || 'load');
 
 drop function xl_room_au();
 drop function xl_trap_zero_divide(int);
-
---GROUPING SETs are not supported
---xl_items_sold gets distributed by default on HASH(brand)
--- However existing groupingsets.sql test is failing for Postgres-XL (Low priority)
-create table xl_items_sold (
-	brand char(20),
-	size_sold char(2),
-	sales integer 
-);
-
-insert into xl_items_sold values ('Foo', 'L','10');
-insert into xl_items_sold values ('Foo', 'M','20');
-insert into xl_items_sold values ('Bar', 'M','15');
-insert into xl_items_sold values ('Bar', 'L','5');
-
-select xl_nodename_from_id(xc_node_id), * from xl_items_sold;
-
-SELECT brand, size_sold, sum(sales) FROM xl_items_sold GROUP BY GROUPING SETS ((brand), (size_sold), ());
-
-drop table xl_items_sold;
 drop function xl_nodename_from_id(integer);
 
 

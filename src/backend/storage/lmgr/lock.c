@@ -1395,57 +1395,6 @@ LockCheckConflicts(LockMethod lockMethodTable,
 		return STATUS_OK;
 	}
 
-	/* If no group locking, it's definitely a conflict. */
-	if (proclock->groupLeader == MyProc && MyProc->lockGroupLeader == NULL)
-	{
-		Assert(proclock->tag.myProc == MyProc);
-		PROCLOCK_PRINT("LockCheckConflicts: conflicting (simple)",
-					   proclock);
-		return STATUS_FOUND;
-	}
-
-	/*
-	 * Locks held in conflicting modes by members of our own lock group are
-	 * not real conflicts; we can subtract those out and see if we still have
-	 * a conflict.  This is O(N) in the number of processes holding or
-	 * awaiting locks on this object.  We could improve that by making the
-	 * shared memory state more complex (and larger) but it doesn't seem worth
-	 * it.
-	 */
-	procLocks = &(lock->procLocks);
-	otherproclock = (PROCLOCK *)
-		SHMQueueNext(procLocks, procLocks, offsetof(PROCLOCK, lockLink));
-	while (otherproclock != NULL)
-	{
-		if (proclock != otherproclock &&
-			proclock->groupLeader == otherproclock->groupLeader &&
-			(otherproclock->holdMask & conflictMask) != 0)
-		{
-			int			intersectMask = otherproclock->holdMask & conflictMask;
-
-			for (i = 1; i <= numLockModes; i++)
-			{
-				if ((intersectMask & LOCKBIT_ON(i)) != 0)
-				{
-					if (conflictsRemaining[i] <= 0)
-						elog(PANIC, "proclocks held do not match lock");
-					conflictsRemaining[i]--;
-					totalConflictsRemaining--;
-				}
-			}
-
-			if (totalConflictsRemaining == 0)
-			{
-				PROCLOCK_PRINT("LockCheckConflicts: resolved (group)",
-							   proclock);
-				return STATUS_OK;
-			}
-		}
-		otherproclock = (PROCLOCK *)
-			SHMQueueNext(procLocks, &otherproclock->lockLink,
-						 offsetof(PROCLOCK, lockLink));
-	}
-
 #ifdef XCP
 	/*
 	 * So the lock is conflicting with locks held by some other backend.
@@ -1517,6 +1466,58 @@ LockCheckConflicts(LockMethod lockMethodTable,
 	}
 	LWLockRelease(ProcArrayLock);
 #endif
+
+	/* If no group locking, it's definitely a conflict. */
+	if (proclock->groupLeader == MyProc && MyProc->lockGroupLeader == NULL)
+	{
+		Assert(proclock->tag.myProc == MyProc);
+		PROCLOCK_PRINT("LockCheckConflicts: conflicting (simple)",
+					   proclock);
+		return STATUS_FOUND;
+	}
+
+	/*
+	 * Locks held in conflicting modes by members of our own lock group are
+	 * not real conflicts; we can subtract those out and see if we still have
+	 * a conflict.  This is O(N) in the number of processes holding or
+	 * awaiting locks on this object.  We could improve that by making the
+	 * shared memory state more complex (and larger) but it doesn't seem worth
+	 * it.
+	 */
+	procLocks = &(lock->procLocks);
+	otherproclock = (PROCLOCK *)
+		SHMQueueNext(procLocks, procLocks, offsetof(PROCLOCK, lockLink));
+	while (otherproclock != NULL)
+	{
+		if (proclock != otherproclock &&
+			proclock->groupLeader == otherproclock->groupLeader &&
+			(otherproclock->holdMask & conflictMask) != 0)
+		{
+			int			intersectMask = otherproclock->holdMask & conflictMask;
+
+			for (i = 1; i <= numLockModes; i++)
+			{
+				if ((intersectMask & LOCKBIT_ON(i)) != 0)
+				{
+					if (conflictsRemaining[i] <= 0)
+						elog(PANIC, "proclocks held do not match lock");
+					conflictsRemaining[i]--;
+					totalConflictsRemaining--;
+				}
+			}
+
+			if (totalConflictsRemaining == 0)
+			{
+				PROCLOCK_PRINT("LockCheckConflicts: resolved (group)",
+							   proclock);
+				return STATUS_OK;
+			}
+		}
+		otherproclock = (PROCLOCK *)
+			SHMQueueNext(procLocks, &otherproclock->lockLink,
+						 offsetof(PROCLOCK, lockLink));
+	}
+
 
 	/* Nope, it's a real conflict. */
 	PROCLOCK_PRINT("LockCheckConflicts: conflicting (group)", proclock);

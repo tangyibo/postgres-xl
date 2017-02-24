@@ -2298,6 +2298,7 @@ finalize_plan(PlannerInfo *root, Plan *plan, Bitmapset *valid_params,
 	Bitmapset  *initSetParam;
 	Bitmapset  *child_params;
 	ListCell   *l;
+	List	   *initPlan;
 
 	if (plan == NULL)
 		return NULL;
@@ -2313,7 +2314,18 @@ finalize_plan(PlannerInfo *root, Plan *plan, Bitmapset *valid_params,
 	 * SS_finalize_plan was run on them already.)
 	 */
 	initExtParam = initSetParam = NULL;
-	foreach(l, plan->initPlan)
+
+	/*
+	 * Usually initPlans are attached to the top level plan, but in Postgres-XL
+	 * we might add a RemoteSubplan plan on top the top level plan. If we don't
+	 * look at the initPlans, we might fail to conclude that param references
+	 * are valid (issue #81).
+	 */
+	initPlan = plan->initPlan;
+	if ((initPlan == NULL) && IsA(plan, RemoteSubplan) && plan->lefttree)
+		initPlan = plan->lefttree->initPlan;
+
+	foreach(l, initPlan)
 	{
 		SubPlan    *initsubplan = (SubPlan *) lfirst(l);
 		Plan	   *initplan = planner_subplan_get_plan(root, initsubplan);

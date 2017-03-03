@@ -812,13 +812,14 @@ select unique2 from onek2 where unique2 = 11 and stringu1 < 'B';
 -- but if it's an update target, must retest anyway
 explain (costs off)
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
-                  QUERY PLAN                   
------------------------------------------------
- LockRows
-   ->  Index Scan using onek2_u2_prtl on onek2
-         Index Cond: (unique2 = 11)
-         Filter: (stringu1 < 'B'::name)
-(4 rows)
+                     QUERY PLAN                      
+-----------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  LockRows
+         ->  Index Scan using onek2_u2_prtl on onek2
+               Index Cond: (unique2 = 11)
+               Filter: (stringu1 < 'B'::name)
+(5 rows)
 
 select unique2 from onek2 where unique2 = 11 and stringu1 < 'B' for update;
  unique2 

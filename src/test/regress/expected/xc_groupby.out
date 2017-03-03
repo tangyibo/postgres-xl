@@ -22,15 +22,15 @@ select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_gro
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_groupby_tab1 group by val2;
-                                                                                       QUERY PLAN                                                                                        
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- HashAggregate
-   Output: pg_catalog.count(*), pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((pg_catalog.sum((sum(val))))::double precision / (pg_catalog.count(*))::double precision), val2
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
+ Finalize HashAggregate
+   Output: count(*), sum(val), avg(val), ((sum(val))::double precision / (count(*))::double precision), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  HashAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         ->  Partial HashAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Seq Scan on public.xc_groupby_tab1
                      Output: val, val2
@@ -92,18 +92,18 @@ select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by va
 (2 rows)
 
 explain (verbose true, costs false, nodes false) select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by val2) q1 group by x;
-                                                  QUERY PLAN                                                  
---------------------------------------------------------------------------------------------------------------
+                                         QUERY PLAN                                         
+--------------------------------------------------------------------------------------------
  HashAggregate
-   Output: sum((pg_catalog.sum((sum(xc_groupby_tab1.val))))), ((xc_groupby_tab1.val2 % 2))
+   Output: sum((sum(xc_groupby_tab1.val))), ((xc_groupby_tab1.val2 % 2))
    Group Key: (xc_groupby_tab1.val2 % 2)
-   ->  HashAggregate
-         Output: pg_catalog.sum((sum(xc_groupby_tab1.val))), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
+   ->  Finalize HashAggregate
+         Output: sum(xc_groupby_tab1.val), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
          Group Key: xc_groupby_tab1.val2
          ->  Remote Subquery Scan on all
-               Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
-               ->  HashAggregate
-                     Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
+               Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
+               ->  Partial HashAggregate
+                     Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
                      Group Key: xc_groupby_tab1.val2
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
@@ -121,12 +121,12 @@ select val2 from xc_groupby_tab1 group by val2;
 explain (verbose true, costs false, nodes false) select val2 from xc_groupby_tab1 group by val2;
                       QUERY PLAN                      
 ------------------------------------------------------
- HashAggregate
+ Finalize HashAggregate
    Output: val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
          Output: val2
-         ->  HashAggregate
+         ->  Partial HashAggregate
                Output: val2
                Group Key: xc_groupby_tab1.val2
                ->  Seq Scan on public.xc_groupby_tab1
@@ -147,12 +147,12 @@ select val + val2 from xc_groupby_tab1 group by val + val2;
 explain (verbose true, costs false, nodes false) select val + val2 from xc_groupby_tab1 group by val + val2;
                               QUERY PLAN                               
 -----------------------------------------------------------------------
- HashAggregate
+ Finalize HashAggregate
    Output: ((val + val2))
    Group Key: (xc_groupby_tab1.val + xc_groupby_tab1.val2)
    ->  Remote Subquery Scan on all
          Output: (val + val2)
-         ->  HashAggregate
+         ->  Partial HashAggregate
                Output: ((val + val2))
                Group Key: (xc_groupby_tab1.val + xc_groupby_tab1.val2)
                ->  Seq Scan on public.xc_groupby_tab1
@@ -265,15 +265,15 @@ select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
-                                                  QUERY PLAN                                                  
---------------------------------------------------------------------------------------------------------------
- HashAggregate
-   Output: (((pg_catalog.count(*) + pg_catalog.sum((sum(val)))))::numeric + pg_catalog.avg((avg(val)))), val2
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Finalize HashAggregate
+   Output: (((count(*) + sum(val)))::numeric + avg(val)), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  HashAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         ->  Partial HashAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Seq Scan on public.xc_groupby_tab1
                      Output: val, val2
@@ -289,15 +289,15 @@ select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
-                                   QUERY PLAN                                   
---------------------------------------------------------------------------------
- HashAggregate
-   Output: pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((2 * val2))
+                               QUERY PLAN                               
+------------------------------------------------------------------------
+ Finalize HashAggregate
+   Output: sum(val), avg(val), ((2 * val2))
    Group Key: (2 * xc_groupby_tab1.val2)
    ->  Remote Subquery Scan on all
-         Output: sum(val), avg(val), (2 * val2)
-         ->  HashAggregate
-               Output: sum(val), avg(val), ((2 * val2))
+         Output: (2 * val2), PARTIAL sum(val), PARTIAL avg(val)
+         ->  Partial HashAggregate
+               Output: ((2 * val2)), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: (2 * xc_groupby_tab1.val2)
                ->  Seq Scan on public.xc_groupby_tab1
                      Output: (2 * val2), val
@@ -409,13 +409,13 @@ select avg(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_def group by b;
                      QUERY PLAN                      
 -----------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize HashAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  HashAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_def.b
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
@@ -433,13 +433,13 @@ select sum(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_def group by b;
                      QUERY PLAN                      
 -----------------------------------------------------
- HashAggregate
-   Output: pg_catalog.sum((sum(a))), b
+ Finalize HashAggregate
+   Output: sum(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: sum(a), b
-         ->  HashAggregate
-               Output: sum(a), b
+         Output: b, PARTIAL sum(a)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL sum(a)
                Group Key: xc_groupby_def.b
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
@@ -457,13 +457,13 @@ select count(*) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select count(*) from xc_groupby_def group by b;
                      QUERY PLAN                      
 -----------------------------------------------------
- HashAggregate
-   Output: pg_catalog.count(*), b
+ Finalize HashAggregate
+   Output: count(*), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: count(*), b
-         ->  HashAggregate
-               Output: count(*), b
+         Output: b, PARTIAL count(*)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL count(*)
                Group Key: xc_groupby_def.b
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
@@ -510,20 +510,21 @@ select * from (select b from xc_groupby_def group by b) q order by q.b;
 explain (verbose true, costs false, nodes false) select * from (select b from xc_groupby_def group by b) q order by q.b;
                               QUERY PLAN                              
 ----------------------------------------------------------------------
- Sort
+ Finalize GroupAggregate
    Output: xc_groupby_def.b
-   Sort Key: xc_groupby_def.b
-   ->  HashAggregate
+   Group Key: xc_groupby_def.b
+   ->  Remote Subquery Scan on all
          Output: xc_groupby_def.b
-         Group Key: xc_groupby_def.b
-         ->  Remote Subquery Scan on all
+         Sort Key: xc_groupby_def.b
+         ->  Sort
                Output: xc_groupby_def.b
-               ->  HashAggregate
+               Sort Key: xc_groupby_def.b
+               ->  Partial HashAggregate
                      Output: xc_groupby_def.b
                      Group Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: xc_groupby_def.a, xc_groupby_def.b
-(13 rows)
+(14 rows)
 
 select * from (select b,count(b) from xc_groupby_def group by b) q order by q.b;
    b   | count 
@@ -535,22 +536,23 @@ select * from (select b,count(b) from xc_groupby_def group by b) q order by q.b;
 (4 rows)
 
 explain (verbose true, costs false, nodes false) select * from (select b,count(b) from xc_groupby_def group by b) q order by q.b;
-                              QUERY PLAN                               
------------------------------------------------------------------------
- Sort
-   Output: xc_groupby_def.b, (count((count(xc_groupby_def.b))))
-   Sort Key: xc_groupby_def.b
-   ->  HashAggregate
-         Output: xc_groupby_def.b, count((count(xc_groupby_def.b)))
-         Group Key: xc_groupby_def.b
-         ->  Remote Subquery Scan on all
-               Output: xc_groupby_def.b, count(xc_groupby_def.b)
-               ->  HashAggregate
-                     Output: xc_groupby_def.b, count(xc_groupby_def.b)
+                                  QUERY PLAN                                   
+-------------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: xc_groupby_def.b, count(xc_groupby_def.b)
+   Group Key: xc_groupby_def.b
+   ->  Remote Subquery Scan on all
+         Output: xc_groupby_def.b, PARTIAL count(xc_groupby_def.b)
+         Sort Key: xc_groupby_def.b
+         ->  Sort
+               Output: xc_groupby_def.b, (PARTIAL count(xc_groupby_def.b))
+               Sort Key: xc_groupby_def.b
+               ->  Partial HashAggregate
+                     Output: xc_groupby_def.b, PARTIAL count(xc_groupby_def.b)
                      Group Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: xc_groupby_def.a, xc_groupby_def.b
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def where b is null group by b;
  count 
@@ -608,13 +610,13 @@ select sum(b) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(b) from xc_groupby_g group by b;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: sum((sum(b))), b
+ Finalize HashAggregate
+   Output: sum(b), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(b), b
-         ->  HashAggregate
-               Output: sum(b), b
+         Output: b, PARTIAL sum(b)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL sum(b)
                Group Key: xc_groupby_g.b
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -630,13 +632,13 @@ select sum(c) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(c) from xc_groupby_g group by b;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.sum((sum(c))), b
+ Finalize HashAggregate
+   Output: sum(c), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(c), b
-         ->  HashAggregate
-               Output: sum(c), b
+         Output: b, PARTIAL sum(c)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL sum(c)
                Group Key: xc_groupby_g.b
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -652,13 +654,13 @@ select avg(a) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_g group by b;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize HashAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  HashAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_g.b
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -674,13 +676,13 @@ select avg(b) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(b) from xc_groupby_g group by c;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(b))), c
+ Finalize HashAggregate
+   Output: avg(b), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(b), c
-         ->  HashAggregate
-               Output: avg(b), c
+         Output: c, PARTIAL avg(b)
+         ->  Partial HashAggregate
+               Output: c, PARTIAL avg(b)
                Group Key: xc_groupby_g.c
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -696,13 +698,13 @@ select avg(c) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(c) from xc_groupby_g group by c;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(c))), c
+ Finalize HashAggregate
+   Output: avg(c), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(c), c
-         ->  HashAggregate
-               Output: avg(c), c
+         Output: c, PARTIAL avg(c)
+         ->  Partial HashAggregate
+               Output: c, PARTIAL avg(c)
                Group Key: xc_groupby_g.c
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -1389,22 +1391,23 @@ select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_gro
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_groupby_tab1 group by val2;
-                                                                                       QUERY PLAN                                                                                        
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.count(*), pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((pg_catalog.sum((sum(val))))::double precision / (pg_catalog.count(*))::double precision), val2
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: count(*), sum(val), avg(val), ((sum(val))::double precision / (count(*))::double precision), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  GroupAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         Sort Key: xc_groupby_tab1.val2
+         ->  Partial GroupAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Sort
                      Output: val2, val
                      Sort Key: xc_groupby_tab1.val2
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: val2, val
-(13 rows)
+(14 rows)
 
 -- joins and group by
 select count(*), sum(xc_groupby_tab1.val * xc_groupby_tab2.val), avg(xc_groupby_tab1.val*xc_groupby_tab2.val), sum(xc_groupby_tab1.val*xc_groupby_tab2.val)::float8/count(*), xc_groupby_tab1.val2, xc_groupby_tab2.val2 from xc_groupby_tab1 full outer join xc_groupby_tab2 on xc_groupby_tab1.val2 = xc_groupby_tab2.val2 group by xc_groupby_tab1.val2, xc_groupby_tab2.val2;
@@ -1462,8 +1465,8 @@ select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by va
 (2 rows)
 
 explain (verbose true, costs false, nodes false) select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by val2) q1 group by x;
-                                                        QUERY PLAN                                                        
---------------------------------------------------------------------------------------------------------------------------
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
  GroupAggregate
    Output: sum(q1.y), q1.x
    Group Key: q1.x
@@ -1472,20 +1475,21 @@ explain (verbose true, costs false, nodes false) select sum(y) from (select sum(
          Sort Key: q1.x
          ->  Subquery Scan on q1
                Output: q1.x, q1.y
-               ->  GroupAggregate
-                     Output: pg_catalog.sum((sum(xc_groupby_tab1.val))), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
+               ->  Finalize GroupAggregate
+                     Output: sum(xc_groupby_tab1.val), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
                      Group Key: xc_groupby_tab1.val2
                      ->  Remote Subquery Scan on all
-                           Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
-                           ->  GroupAggregate
-                                 Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
+                           Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
+                           Sort Key: xc_groupby_tab1.val2
+                           ->  Partial GroupAggregate
+                                 Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
                                  Group Key: xc_groupby_tab1.val2
                                  ->  Sort
                                        Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
                                        Sort Key: xc_groupby_tab1.val2
                                        ->  Seq Scan on public.xc_groupby_tab1
                                              Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
-(21 rows)
+(22 rows)
 
 -- group by without aggregate
 select val2 from xc_groupby_tab1 group by val2;
@@ -1650,22 +1654,23 @@ select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
-                                                  QUERY PLAN                                                  
---------------------------------------------------------------------------------------------------------------
- GroupAggregate
-   Output: (((pg_catalog.count(*) + pg_catalog.sum((sum(val)))))::numeric + pg_catalog.avg((avg(val)))), val2
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: (((count(*) + sum(val)))::numeric + avg(val)), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  GroupAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         Sort Key: xc_groupby_tab1.val2
+         ->  Partial GroupAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Sort
                      Output: val2, val
                      Sort Key: xc_groupby_tab1.val2
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: val2, val
-(13 rows)
+(14 rows)
 
 -- group by with expressions in group by clause
 select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
@@ -1677,22 +1682,23 @@ select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
-                                   QUERY PLAN                                   
---------------------------------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((2 * val2))
+                               QUERY PLAN                               
+------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: sum(val), avg(val), ((2 * val2))
    Group Key: (2 * xc_groupby_tab1.val2)
    ->  Remote Subquery Scan on all
-         Output: sum(val), avg(val), (2 * val2)
-         ->  GroupAggregate
-               Output: sum(val), avg(val), ((2 * val2))
+         Output: (2 * val2), PARTIAL sum(val), PARTIAL avg(val)
+         Sort Key: (2 * xc_groupby_tab1.val2)
+         ->  Partial GroupAggregate
+               Output: ((2 * val2)), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: ((2 * xc_groupby_tab1.val2))
                ->  Sort
                      Output: ((2 * val2)), val
                      Sort Key: ((2 * xc_groupby_tab1.val2))
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: (2 * val2), val
-(13 rows)
+(14 rows)
 
 drop table xc_groupby_tab1;
 drop table xc_groupby_tab2;
@@ -1803,20 +1809,21 @@ select avg(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize GroupAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  GroupAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b, a
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b, a
-(13 rows)
+(14 rows)
 
 select sum(a) from xc_groupby_def group by b;
  sum 
@@ -1830,20 +1837,21 @@ select sum(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.sum((sum(a))), b
+ Finalize GroupAggregate
+   Output: sum(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: sum(a), b
-         ->  GroupAggregate
-               Output: sum(a), b
+         Output: b, PARTIAL sum(a)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL sum(a)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b, a
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b, a
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def group by b;
  count 
@@ -1857,20 +1865,21 @@ select count(*) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select count(*) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.count(*), b
+ Finalize GroupAggregate
+   Output: count(*), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: count(*), b
-         ->  GroupAggregate
-               Output: count(*), b
+         Output: b, PARTIAL count(*)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL count(*)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def where a is not null group by a;
  count 
@@ -1940,20 +1949,21 @@ select b,count(b) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select b,count(b) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: b, count((count(b)))
+ Finalize GroupAggregate
+   Output: b, count(b)
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: b, count(b)
-         ->  GroupAggregate
-               Output: b, count(b)
+         Output: b, PARTIAL count(b)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL count(b)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def where b is null group by b;
  count 
@@ -2017,20 +2027,21 @@ select sum(b) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(b) from xc_groupby_g group by b;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: sum((sum(b))), b
+ Finalize GroupAggregate
+   Output: sum(b), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(b), b
-         ->  GroupAggregate
-               Output: sum(b), b
+         Output: b, PARTIAL sum(b)
+         Sort Key: xc_groupby_g.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL sum(b)
                Group Key: xc_groupby_g.b
                ->  Sort
                      Output: b
                      Sort Key: xc_groupby_g.b
                      ->  Seq Scan on public.xc_groupby_g
                            Output: b
-(13 rows)
+(14 rows)
 
 select sum(c) from xc_groupby_g group by b;
  sum 
@@ -2042,20 +2053,21 @@ select sum(c) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(c) from xc_groupby_g group by b;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.sum((sum(c))), b
+ Finalize GroupAggregate
+   Output: sum(c), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(c), b
-         ->  GroupAggregate
-               Output: sum(c), b
+         Output: b, PARTIAL sum(c)
+         Sort Key: xc_groupby_g.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL sum(c)
                Group Key: xc_groupby_g.b
                ->  Sort
                      Output: b, c
                      Sort Key: xc_groupby_g.b
                      ->  Seq Scan on public.xc_groupby_g
                            Output: b, c
-(13 rows)
+(14 rows)
 
 select avg(a) from xc_groupby_g group by b;
           avg           
@@ -2067,20 +2079,21 @@ select avg(a) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_g group by b;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize GroupAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  GroupAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         Sort Key: xc_groupby_g.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_g.b
                ->  Sort
                      Output: b, a
                      Sort Key: xc_groupby_g.b
                      ->  Seq Scan on public.xc_groupby_g
                            Output: b, a
-(13 rows)
+(14 rows)
 
 select avg(b) from xc_groupby_g group by c;
  avg 
@@ -2092,20 +2105,21 @@ select avg(b) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(b) from xc_groupby_g group by c;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(b))), c
+ Finalize GroupAggregate
+   Output: avg(b), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(b), c
-         ->  GroupAggregate
-               Output: avg(b), c
+         Output: c, PARTIAL avg(b)
+         Sort Key: xc_groupby_g.c
+         ->  Partial GroupAggregate
+               Output: c, PARTIAL avg(b)
                Group Key: xc_groupby_g.c
                ->  Sort
                      Output: c, b
                      Sort Key: xc_groupby_g.c
                      ->  Seq Scan on public.xc_groupby_g
                            Output: c, b
-(13 rows)
+(14 rows)
 
 select avg(c) from xc_groupby_g group by c;
         avg         
@@ -2117,20 +2131,21 @@ select avg(c) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(c) from xc_groupby_g group by c;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(c))), c
+ Finalize GroupAggregate
+   Output: avg(c), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(c), c
-         ->  GroupAggregate
-               Output: avg(c), c
+         Output: c, PARTIAL avg(c)
+         Sort Key: xc_groupby_g.c
+         ->  Partial GroupAggregate
+               Output: c, PARTIAL avg(c)
                Group Key: xc_groupby_g.c
                ->  Sort
                      Output: c
                      Sort Key: xc_groupby_g.c
                      ->  Seq Scan on public.xc_groupby_g
                            Output: c
-(13 rows)
+(14 rows)
 
 drop table xc_groupby_def;
 drop table xc_groupby_g;
@@ -2870,15 +2885,15 @@ select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_gro
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_groupby_tab1 group by val2;
-                                                                                       QUERY PLAN                                                                                        
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- HashAggregate
-   Output: pg_catalog.count(*), pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((pg_catalog.sum((sum(val))))::double precision / (pg_catalog.count(*))::double precision), val2
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
+ Finalize HashAggregate
+   Output: count(*), sum(val), avg(val), ((sum(val))::double precision / (count(*))::double precision), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  HashAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         ->  Partial HashAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Seq Scan on public.xc_groupby_tab1
                      Output: val, val2
@@ -2940,18 +2955,18 @@ select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by va
 (2 rows)
 
 explain (verbose true, costs false, nodes false) select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by val2) q1 group by x;
-                                                  QUERY PLAN                                                  
---------------------------------------------------------------------------------------------------------------
+                                         QUERY PLAN                                         
+--------------------------------------------------------------------------------------------
  HashAggregate
-   Output: sum((pg_catalog.sum((sum(xc_groupby_tab1.val))))), ((xc_groupby_tab1.val2 % 2))
+   Output: sum((sum(xc_groupby_tab1.val))), ((xc_groupby_tab1.val2 % 2))
    Group Key: (xc_groupby_tab1.val2 % 2)
-   ->  HashAggregate
-         Output: pg_catalog.sum((sum(xc_groupby_tab1.val))), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
+   ->  Finalize HashAggregate
+         Output: sum(xc_groupby_tab1.val), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
          Group Key: xc_groupby_tab1.val2
          ->  Remote Subquery Scan on all
-               Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
-               ->  HashAggregate
-                     Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
+               Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
+               ->  Partial HashAggregate
+                     Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
                      Group Key: xc_groupby_tab1.val2
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
@@ -2969,12 +2984,12 @@ select val2 from xc_groupby_tab1 group by val2;
 explain (verbose true, costs false, nodes false) select val2 from xc_groupby_tab1 group by val2;
                       QUERY PLAN                      
 ------------------------------------------------------
- HashAggregate
+ Finalize HashAggregate
    Output: val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
          Output: val2
-         ->  HashAggregate
+         ->  Partial HashAggregate
                Output: val2
                Group Key: xc_groupby_tab1.val2
                ->  Seq Scan on public.xc_groupby_tab1
@@ -2995,12 +3010,12 @@ select val + val2 from xc_groupby_tab1 group by val + val2;
 explain (verbose true, costs false, nodes false) select val + val2 from xc_groupby_tab1 group by val + val2;
                               QUERY PLAN                               
 -----------------------------------------------------------------------
- HashAggregate
+ Finalize HashAggregate
    Output: ((val + val2))
    Group Key: (xc_groupby_tab1.val + xc_groupby_tab1.val2)
    ->  Remote Subquery Scan on all
          Output: (val + val2)
-         ->  HashAggregate
+         ->  Partial HashAggregate
                Output: ((val + val2))
                Group Key: (xc_groupby_tab1.val + xc_groupby_tab1.val2)
                ->  Seq Scan on public.xc_groupby_tab1
@@ -3113,15 +3128,15 @@ select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
-                                                  QUERY PLAN                                                  
---------------------------------------------------------------------------------------------------------------
- HashAggregate
-   Output: (((pg_catalog.count(*) + pg_catalog.sum((sum(val)))))::numeric + pg_catalog.avg((avg(val)))), val2
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Finalize HashAggregate
+   Output: (((count(*) + sum(val)))::numeric + avg(val)), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  HashAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         ->  Partial HashAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Seq Scan on public.xc_groupby_tab1
                      Output: val, val2
@@ -3137,15 +3152,15 @@ select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
-                                   QUERY PLAN                                   
---------------------------------------------------------------------------------
- HashAggregate
-   Output: pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((2 * val2))
+                               QUERY PLAN                               
+------------------------------------------------------------------------
+ Finalize HashAggregate
+   Output: sum(val), avg(val), ((2 * val2))
    Group Key: (2 * xc_groupby_tab1.val2)
    ->  Remote Subquery Scan on all
-         Output: sum(val), avg(val), (2 * val2)
-         ->  HashAggregate
-               Output: sum(val), avg(val), ((2 * val2))
+         Output: (2 * val2), PARTIAL sum(val), PARTIAL avg(val)
+         ->  Partial HashAggregate
+               Output: ((2 * val2)), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: (2 * xc_groupby_tab1.val2)
                ->  Seq Scan on public.xc_groupby_tab1
                      Output: (2 * val2), val
@@ -3257,13 +3272,13 @@ select avg(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_def group by b;
                      QUERY PLAN                      
 -----------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize HashAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  HashAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_def.b
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
@@ -3281,13 +3296,13 @@ select sum(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_def group by b;
                      QUERY PLAN                      
 -----------------------------------------------------
- HashAggregate
-   Output: pg_catalog.sum((sum(a))), b
+ Finalize HashAggregate
+   Output: sum(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: sum(a), b
-         ->  HashAggregate
-               Output: sum(a), b
+         Output: b, PARTIAL sum(a)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL sum(a)
                Group Key: xc_groupby_def.b
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
@@ -3305,13 +3320,13 @@ select count(*) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select count(*) from xc_groupby_def group by b;
                      QUERY PLAN                      
 -----------------------------------------------------
- HashAggregate
-   Output: pg_catalog.count(*), b
+ Finalize HashAggregate
+   Output: count(*), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: count(*), b
-         ->  HashAggregate
-               Output: count(*), b
+         Output: b, PARTIAL count(*)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL count(*)
                Group Key: xc_groupby_def.b
                ->  Seq Scan on public.xc_groupby_def
                      Output: a, b
@@ -3358,20 +3373,21 @@ select * from (select b from xc_groupby_def group by b) q order by q.b;
 explain (verbose true, costs false, nodes false) select * from (select b from xc_groupby_def group by b) q order by q.b;
                               QUERY PLAN                              
 ----------------------------------------------------------------------
- Sort
+ Finalize GroupAggregate
    Output: xc_groupby_def.b
-   Sort Key: xc_groupby_def.b
-   ->  HashAggregate
+   Group Key: xc_groupby_def.b
+   ->  Remote Subquery Scan on all
          Output: xc_groupby_def.b
-         Group Key: xc_groupby_def.b
-         ->  Remote Subquery Scan on all
+         Sort Key: xc_groupby_def.b
+         ->  Sort
                Output: xc_groupby_def.b
-               ->  HashAggregate
+               Sort Key: xc_groupby_def.b
+               ->  Partial HashAggregate
                      Output: xc_groupby_def.b
                      Group Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: xc_groupby_def.a, xc_groupby_def.b
-(13 rows)
+(14 rows)
 
 select * from (select b,count(b) from xc_groupby_def group by b) q order by q.b;
    b   | count 
@@ -3383,22 +3399,23 @@ select * from (select b,count(b) from xc_groupby_def group by b) q order by q.b;
 (4 rows)
 
 explain (verbose true, costs false, nodes false) select * from (select b,count(b) from xc_groupby_def group by b) q order by q.b;
-                              QUERY PLAN                               
------------------------------------------------------------------------
- Sort
-   Output: xc_groupby_def.b, (count((count(xc_groupby_def.b))))
-   Sort Key: xc_groupby_def.b
-   ->  HashAggregate
-         Output: xc_groupby_def.b, count((count(xc_groupby_def.b)))
-         Group Key: xc_groupby_def.b
-         ->  Remote Subquery Scan on all
-               Output: xc_groupby_def.b, count(xc_groupby_def.b)
-               ->  HashAggregate
-                     Output: xc_groupby_def.b, count(xc_groupby_def.b)
+                                  QUERY PLAN                                   
+-------------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: xc_groupby_def.b, count(xc_groupby_def.b)
+   Group Key: xc_groupby_def.b
+   ->  Remote Subquery Scan on all
+         Output: xc_groupby_def.b, PARTIAL count(xc_groupby_def.b)
+         Sort Key: xc_groupby_def.b
+         ->  Sort
+               Output: xc_groupby_def.b, (PARTIAL count(xc_groupby_def.b))
+               Sort Key: xc_groupby_def.b
+               ->  Partial HashAggregate
+                     Output: xc_groupby_def.b, PARTIAL count(xc_groupby_def.b)
                      Group Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: xc_groupby_def.a, xc_groupby_def.b
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def where b is null group by b;
  count 
@@ -3456,13 +3473,13 @@ select sum(b) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(b) from xc_groupby_g group by b;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: sum((sum(b))), b
+ Finalize HashAggregate
+   Output: sum(b), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(b), b
-         ->  HashAggregate
-               Output: sum(b), b
+         Output: b, PARTIAL sum(b)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL sum(b)
                Group Key: xc_groupby_g.b
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -3478,13 +3495,13 @@ select sum(c) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(c) from xc_groupby_g group by b;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.sum((sum(c))), b
+ Finalize HashAggregate
+   Output: sum(c), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(c), b
-         ->  HashAggregate
-               Output: sum(c), b
+         Output: b, PARTIAL sum(c)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL sum(c)
                Group Key: xc_groupby_g.b
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -3500,13 +3517,13 @@ select avg(a) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_g group by b;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize HashAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  HashAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         ->  Partial HashAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_g.b
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -3522,13 +3539,13 @@ select avg(b) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(b) from xc_groupby_g group by c;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(b))), c
+ Finalize HashAggregate
+   Output: avg(b), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(b), c
-         ->  HashAggregate
-               Output: avg(b), c
+         Output: c, PARTIAL avg(b)
+         ->  Partial HashAggregate
+               Output: c, PARTIAL avg(b)
                Group Key: xc_groupby_g.c
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -3544,13 +3561,13 @@ select avg(c) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(c) from xc_groupby_g group by c;
                     QUERY PLAN                     
 ---------------------------------------------------
- HashAggregate
-   Output: pg_catalog.avg((avg(c))), c
+ Finalize HashAggregate
+   Output: avg(c), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(c), c
-         ->  HashAggregate
-               Output: avg(c), c
+         Output: c, PARTIAL avg(c)
+         ->  Partial HashAggregate
+               Output: c, PARTIAL avg(c)
                Group Key: xc_groupby_g.c
                ->  Seq Scan on public.xc_groupby_g
                      Output: a, b, c
@@ -4255,22 +4272,23 @@ select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_gro
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_groupby_tab1 group by val2;
-                                                                                       QUERY PLAN                                                                                        
------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.count(*), pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((pg_catalog.sum((sum(val))))::double precision / (pg_catalog.count(*))::double precision), val2
+                                                 QUERY PLAN                                                  
+-------------------------------------------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: count(*), sum(val), avg(val), ((sum(val))::double precision / (count(*))::double precision), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  GroupAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         Sort Key: xc_groupby_tab1.val2
+         ->  Partial GroupAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Sort
                      Output: val2, val
                      Sort Key: xc_groupby_tab1.val2
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: val2, val
-(13 rows)
+(14 rows)
 
 -- joins and group by
 select count(*), sum(xc_groupby_tab1.val * xc_groupby_tab2.val), avg(xc_groupby_tab1.val*xc_groupby_tab2.val), sum(xc_groupby_tab1.val*xc_groupby_tab2.val)::float8/count(*), xc_groupby_tab1.val2, xc_groupby_tab2.val2 from xc_groupby_tab1 full outer join xc_groupby_tab2 on xc_groupby_tab1.val2 = xc_groupby_tab2.val2 group by xc_groupby_tab1.val2, xc_groupby_tab2.val2;
@@ -4328,8 +4346,8 @@ select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by va
 (2 rows)
 
 explain (verbose true, costs false, nodes false) select sum(y) from (select sum(val) y, val2%2 x from xc_groupby_tab1 group by val2) q1 group by x;
-                                                        QUERY PLAN                                                        
---------------------------------------------------------------------------------------------------------------------------
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
  GroupAggregate
    Output: sum(q1.y), q1.x
    Group Key: q1.x
@@ -4338,20 +4356,21 @@ explain (verbose true, costs false, nodes false) select sum(y) from (select sum(
          Sort Key: q1.x
          ->  Subquery Scan on q1
                Output: q1.x, q1.y
-               ->  GroupAggregate
-                     Output: pg_catalog.sum((sum(xc_groupby_tab1.val))), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
+               ->  Finalize GroupAggregate
+                     Output: sum(xc_groupby_tab1.val), (xc_groupby_tab1.val2 % 2), xc_groupby_tab1.val2
                      Group Key: xc_groupby_tab1.val2
                      ->  Remote Subquery Scan on all
-                           Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
-                           ->  GroupAggregate
-                                 Output: sum(xc_groupby_tab1.val), xc_groupby_tab1.val2, xc_groupby_tab1.val2
+                           Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
+                           Sort Key: xc_groupby_tab1.val2
+                           ->  Partial GroupAggregate
+                                 Output: xc_groupby_tab1.val2, PARTIAL sum(xc_groupby_tab1.val)
                                  Group Key: xc_groupby_tab1.val2
                                  ->  Sort
                                        Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
                                        Sort Key: xc_groupby_tab1.val2
                                        ->  Seq Scan on public.xc_groupby_tab1
                                              Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
-(21 rows)
+(22 rows)
 
 -- group by without aggregate
 select val2 from xc_groupby_tab1 group by val2;
@@ -4516,22 +4535,23 @@ select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select count(*) + sum(val) + avg(val), val2 from xc_groupby_tab1 group by val2;
-                                                  QUERY PLAN                                                  
---------------------------------------------------------------------------------------------------------------
- GroupAggregate
-   Output: (((pg_catalog.count(*) + pg_catalog.sum((sum(val)))))::numeric + pg_catalog.avg((avg(val)))), val2
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: (((count(*) + sum(val)))::numeric + avg(val)), val2
    Group Key: xc_groupby_tab1.val2
    ->  Remote Subquery Scan on all
-         Output: count(*), sum(val), avg(val), val2
-         ->  GroupAggregate
-               Output: count(*), sum(val), avg(val), val2
+         Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+         Sort Key: xc_groupby_tab1.val2
+         ->  Partial GroupAggregate
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: xc_groupby_tab1.val2
                ->  Sort
                      Output: val2, val
                      Sort Key: xc_groupby_tab1.val2
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: val2, val
-(13 rows)
+(14 rows)
 
 -- group by with expressions in group by clause
 select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
@@ -4543,22 +4563,23 @@ select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
 (3 rows)
 
 explain (verbose true, costs false, nodes false) select sum(val), avg(val), 2 * val2 from xc_groupby_tab1 group by 2 * val2;
-                                   QUERY PLAN                                   
---------------------------------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), ((2 * val2))
+                               QUERY PLAN                               
+------------------------------------------------------------------------
+ Finalize GroupAggregate
+   Output: sum(val), avg(val), ((2 * val2))
    Group Key: (2 * xc_groupby_tab1.val2)
    ->  Remote Subquery Scan on all
-         Output: sum(val), avg(val), (2 * val2)
-         ->  GroupAggregate
-               Output: sum(val), avg(val), ((2 * val2))
+         Output: (2 * val2), PARTIAL sum(val), PARTIAL avg(val)
+         Sort Key: (2 * xc_groupby_tab1.val2)
+         ->  Partial GroupAggregate
+               Output: ((2 * val2)), PARTIAL sum(val), PARTIAL avg(val)
                Group Key: ((2 * xc_groupby_tab1.val2))
                ->  Sort
                      Output: ((2 * val2)), val
                      Sort Key: ((2 * xc_groupby_tab1.val2))
                      ->  Seq Scan on public.xc_groupby_tab1
                            Output: (2 * val2), val
-(13 rows)
+(14 rows)
 
 drop table xc_groupby_tab1;
 drop table xc_groupby_tab2;
@@ -4669,20 +4690,21 @@ select avg(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize GroupAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  GroupAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b, a
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b, a
-(13 rows)
+(14 rows)
 
 select sum(a) from xc_groupby_def group by b;
  sum 
@@ -4696,20 +4718,21 @@ select sum(a) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select sum(a) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.sum((sum(a))), b
+ Finalize GroupAggregate
+   Output: sum(a), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: sum(a), b
-         ->  GroupAggregate
-               Output: sum(a), b
+         Output: b, PARTIAL sum(a)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL sum(a)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b, a
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b, a
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def group by b;
  count 
@@ -4723,20 +4746,21 @@ select count(*) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select count(*) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.count(*), b
+ Finalize GroupAggregate
+   Output: count(*), b
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: count(*), b
-         ->  GroupAggregate
-               Output: count(*), b
+         Output: b, PARTIAL count(*)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL count(*)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def where a is not null group by a;
  count 
@@ -4806,20 +4830,21 @@ select b,count(b) from xc_groupby_def group by b;
 explain (verbose true, costs false, nodes false) select b,count(b) from xc_groupby_def group by b;
                         QUERY PLAN                         
 -----------------------------------------------------------
- GroupAggregate
-   Output: b, count((count(b)))
+ Finalize GroupAggregate
+   Output: b, count(b)
    Group Key: xc_groupby_def.b
    ->  Remote Subquery Scan on all
-         Output: b, count(b)
-         ->  GroupAggregate
-               Output: b, count(b)
+         Output: b, PARTIAL count(b)
+         Sort Key: xc_groupby_def.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL count(b)
                Group Key: xc_groupby_def.b
                ->  Sort
                      Output: b
                      Sort Key: xc_groupby_def.b
                      ->  Seq Scan on public.xc_groupby_def
                            Output: b
-(13 rows)
+(14 rows)
 
 select count(*) from xc_groupby_def where b is null group by b;
  count 
@@ -4883,20 +4908,21 @@ select sum(b) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(b) from xc_groupby_g group by b;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: sum((sum(b))), b
+ Finalize GroupAggregate
+   Output: sum(b), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(b), b
-         ->  GroupAggregate
-               Output: sum(b), b
+         Output: b, PARTIAL sum(b)
+         Sort Key: xc_groupby_g.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL sum(b)
                Group Key: xc_groupby_g.b
                ->  Sort
                      Output: b
                      Sort Key: xc_groupby_g.b
                      ->  Seq Scan on public.xc_groupby_g
                            Output: b
-(13 rows)
+(14 rows)
 
 select sum(c) from xc_groupby_g group by b;
  sum 
@@ -4908,20 +4934,21 @@ select sum(c) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select sum(c) from xc_groupby_g group by b;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.sum((sum(c))), b
+ Finalize GroupAggregate
+   Output: sum(c), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: sum(c), b
-         ->  GroupAggregate
-               Output: sum(c), b
+         Output: b, PARTIAL sum(c)
+         Sort Key: xc_groupby_g.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL sum(c)
                Group Key: xc_groupby_g.b
                ->  Sort
                      Output: b, c
                      Sort Key: xc_groupby_g.b
                      ->  Seq Scan on public.xc_groupby_g
                            Output: b, c
-(13 rows)
+(14 rows)
 
 select avg(a) from xc_groupby_g group by b;
           avg           
@@ -4933,20 +4960,21 @@ select avg(a) from xc_groupby_g group by b;
 explain (verbose true, costs false, nodes false) select avg(a) from xc_groupby_g group by b;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(a))), b
+ Finalize GroupAggregate
+   Output: avg(a), b
    Group Key: xc_groupby_g.b
    ->  Remote Subquery Scan on all
-         Output: avg(a), b
-         ->  GroupAggregate
-               Output: avg(a), b
+         Output: b, PARTIAL avg(a)
+         Sort Key: xc_groupby_g.b
+         ->  Partial GroupAggregate
+               Output: b, PARTIAL avg(a)
                Group Key: xc_groupby_g.b
                ->  Sort
                      Output: b, a
                      Sort Key: xc_groupby_g.b
                      ->  Seq Scan on public.xc_groupby_g
                            Output: b, a
-(13 rows)
+(14 rows)
 
 select avg(b) from xc_groupby_g group by c;
  avg 
@@ -4958,20 +4986,21 @@ select avg(b) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(b) from xc_groupby_g group by c;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(b))), c
+ Finalize GroupAggregate
+   Output: avg(b), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(b), c
-         ->  GroupAggregate
-               Output: avg(b), c
+         Output: c, PARTIAL avg(b)
+         Sort Key: xc_groupby_g.c
+         ->  Partial GroupAggregate
+               Output: c, PARTIAL avg(b)
                Group Key: xc_groupby_g.c
                ->  Sort
                      Output: c, b
                      Sort Key: xc_groupby_g.c
                      ->  Seq Scan on public.xc_groupby_g
                            Output: c, b
-(13 rows)
+(14 rows)
 
 select avg(c) from xc_groupby_g group by c;
         avg         
@@ -4983,20 +5012,21 @@ select avg(c) from xc_groupby_g group by c;
 explain (verbose true, costs false, nodes false) select avg(c) from xc_groupby_g group by c;
                        QUERY PLAN                        
 ---------------------------------------------------------
- GroupAggregate
-   Output: pg_catalog.avg((avg(c))), c
+ Finalize GroupAggregate
+   Output: avg(c), c
    Group Key: xc_groupby_g.c
    ->  Remote Subquery Scan on all
-         Output: avg(c), c
-         ->  GroupAggregate
-               Output: avg(c), c
+         Output: c, PARTIAL avg(c)
+         Sort Key: xc_groupby_g.c
+         ->  Partial GroupAggregate
+               Output: c, PARTIAL avg(c)
                Group Key: xc_groupby_g.c
                ->  Sort
                      Output: c
                      Sort Key: xc_groupby_g.c
                      ->  Seq Scan on public.xc_groupby_g
                            Output: c
-(13 rows)
+(14 rows)
 
 drop table xc_groupby_def;
 drop table xc_groupby_g;

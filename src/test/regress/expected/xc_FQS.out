@@ -89,14 +89,14 @@ select sum(val), avg(val), count(*) from tab1_rr;
 (1 row)
 
 explain (verbose on, nodes off, costs off) select sum(val), avg(val), count(*) from tab1_rr;
-                                      QUERY PLAN                                       
----------------------------------------------------------------------------------------
- Aggregate
-   Output: pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), pg_catalog.count(*)
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: sum(val), avg(val), count(*)
    ->  Remote Subquery Scan on all
-         Output: sum(val), avg(val), count(*)
-         ->  Aggregate
-               Output: sum(val), avg(val), count(*)
+         Output: PARTIAL sum(val), PARTIAL avg(val), PARTIAL count(*)
+         ->  Partial Aggregate
+               Output: PARTIAL sum(val), PARTIAL avg(val), PARTIAL count(*)
                ->  Seq Scan on public.tab1_rr
                      Output: val, val2
 (8 rows)
@@ -360,12 +360,12 @@ select avg(val) from tab1_rr where val = 7;
 explain (verbose on, nodes off, costs off) select avg(val) from tab1_rr where val = 7;
                   QUERY PLAN                   
 -----------------------------------------------
- Aggregate
-   Output: pg_catalog.avg((avg(val)))
+ Finalize Aggregate
+   Output: avg(val)
    ->  Remote Subquery Scan on all
-         Output: avg(val)
-         ->  Aggregate
-               Output: avg(val)
+         Output: PARTIAL avg(val)
+         ->  Partial Aggregate
+               Output: PARTIAL avg(val)
                ->  Seq Scan on public.tab1_rr
                      Output: val, val2
                      Filter: (tab1_rr.val = 7)
@@ -506,14 +506,14 @@ select sum(val), avg(val), count(*) from tab1_hash;
 (1 row)
 
 explain (verbose on, nodes off, costs off) select sum(val), avg(val), count(*) from tab1_hash;
-                                      QUERY PLAN                                       
----------------------------------------------------------------------------------------
- Aggregate
-   Output: pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), pg_catalog.count(*)
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: sum(val), avg(val), count(*)
    ->  Remote Subquery Scan on all
-         Output: sum(val), avg(val), count(*)
-         ->  Aggregate
-               Output: sum(val), avg(val), count(*)
+         Output: PARTIAL sum(val), PARTIAL avg(val), PARTIAL count(*)
+         ->  Partial Aggregate
+               Output: PARTIAL sum(val), PARTIAL avg(val), PARTIAL count(*)
                ->  Seq Scan on public.tab1_hash
                      Output: val, val2
 (8 rows)
@@ -918,14 +918,14 @@ select sum(val), avg(val), count(*) from tab1_modulo;
 (1 row)
 
 explain (verbose on, nodes off, costs off) select sum(val), avg(val), count(*) from tab1_modulo;
-                                      QUERY PLAN                                       
----------------------------------------------------------------------------------------
- Aggregate
-   Output: pg_catalog.sum((sum(val))), pg_catalog.avg((avg(val))), pg_catalog.count(*)
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Finalize Aggregate
+   Output: sum(val), avg(val), count(*)
    ->  Remote Subquery Scan on all
-         Output: sum(val), avg(val), count(*)
-         ->  Aggregate
-               Output: sum(val), avg(val), count(*)
+         Output: PARTIAL sum(val), PARTIAL avg(val), PARTIAL count(*)
+         ->  Partial Aggregate
+               Output: PARTIAL sum(val), PARTIAL avg(val), PARTIAL count(*)
                ->  Seq Scan on public.tab1_modulo
                      Output: val, val2
 (8 rows)

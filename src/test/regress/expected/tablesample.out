@@ -194,9 +194,9 @@ explain (costs off)
   select count(*) from person tablesample bernoulli (100);
                          QUERY PLAN                          
 -------------------------------------------------------------
- Aggregate
+ Finalize Aggregate
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-         ->  Aggregate
+         ->  Partial Aggregate
                ->  Append
                      ->  Sample Scan on person
                            Sampling: bernoulli ('100'::real)

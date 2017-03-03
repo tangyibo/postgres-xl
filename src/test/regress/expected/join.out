@@ -3360,9 +3360,9 @@ select count(*) from
   join int4_tbl on b.thousand = f1;
                                            QUERY PLAN                                            
 -------------------------------------------------------------------------------------------------
- Aggregate
+ Finalize Aggregate
    ->  Remote Subquery Scan on all
-         ->  Aggregate
+         ->  Partial Aggregate
                ->  Nested Loop Left Join
                      Join Filter: (a.unique2 = b.unique1)
                      ->  Remote Subquery Scan on all
@@ -4726,9 +4726,9 @@ explain (num_nodes off, nodes off, costs off)
     tenk1 b join lateral (values(a.unique1)) ss(x) on b.unique2 = ss.x;
                                   QUERY PLAN                                  
 ------------------------------------------------------------------------------
- Aggregate
+ Finalize Aggregate
    ->  Remote Subquery Scan on all
-         ->  Aggregate
+         ->  Partial Aggregate
                ->  Merge Join
                      Merge Cond: (b.unique2 = a.unique1)
                      ->  Remote Subquery Scan on all
@@ -5632,12 +5632,12 @@ set enable_hashjoin TO false;
 EXPLAIN VERBOSE SELECT count(*) FROM testr WHERE NOT EXISTS (SELECT * FROM testh WHERE testr.b = testh.b);
                                                          QUERY PLAN                                                         
 ----------------------------------------------------------------------------------------------------------------------------
- Aggregate  (cost=41632.20..41632.21 rows=1 width=0)
-   Output: pg_catalog.count(*)
-   ->  Remote Subquery Scan on all (datanode_1,datanode_2)  (cost=0.00..41629.38 rows=1130 width=0)
-         Output: count(*)
-         ->  Aggregate  (cost=0.00..41629.38 rows=1 width=0)
-               Output: count(*)
+ Finalize Aggregate  (cost=41732.22..41732.23 rows=1 width=8)
+   Output: count(*)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)  (cost=41732.20..41732.22 rows=1 width=8)
+         Output: PARTIAL count(*)
+         ->  Partial Aggregate  (cost=41632.20..41632.21 rows=1 width=8)
+               Output: PARTIAL count(*)
                ->  Nested Loop Anti Join  (cost=0.00..41629.38 rows=1130 width=0)
                      Join Filter: (testr.b = testh.b)
                      ->  Remote Subquery Scan on all (datanode_1)  (cost=100.00..152.94 rows=2260 width=4)

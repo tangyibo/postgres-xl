@@ -319,21 +319,21 @@ explain (num_nodes on, nodes off, costs off, verbose on) select * from tab3_rep 
  Merge Join
    Output: tab3_rep.val, tab3_rep.val2
    Merge Cond: ((tab3_rep.val = tab4_rep.val) AND (tab3_rep.val2 = tab4_rep.val2))
-   ->  Sort
+   ->  Remote Subquery Scan on all
          Output: tab3_rep.val, tab3_rep.val2
-         Sort Key: tab3_rep.val, tab3_rep.val2
-         ->  Remote Subquery Scan on all
+         ->  Sort
                Output: tab3_rep.val, tab3_rep.val2
+               Sort Key: tab3_rep.val, tab3_rep.val2
                ->  Seq Scan on public.tab3_rep
                      Output: tab3_rep.val, tab3_rep.val2
                      Filter: (tab3_rep.val > 2)
    ->  Materialize
          Output: tab4_rep.val, tab4_rep.val2
-         ->  Sort
+         ->  Remote Subquery Scan on all
                Output: tab4_rep.val, tab4_rep.val2
-               Sort Key: tab4_rep.val, tab4_rep.val2
-               ->  Remote Subquery Scan on all
+               ->  Sort
                      Output: tab4_rep.val, tab4_rep.val2
+                     Sort Key: tab4_rep.val, tab4_rep.val2
                      ->  Seq Scan on public.tab4_rep
                            Output: tab4_rep.val, tab4_rep.val2
                            Filter: (tab4_rep.val < 5)
@@ -400,6 +400,7 @@ explain (verbose on, nodes off, costs off) select * from tab1_mod natural join t
    Merge Cond: ((tab1_mod.val = tab4_rep.val) AND (tab1_mod.val2 = tab4_rep.val2))
    ->  Remote Subquery Scan on all
          Output: tab1_mod.val, tab1_mod.val2
+         Sort Key: tab1_mod.val, tab1_mod.val2
          ->  Sort
                Output: tab1_mod.val, tab1_mod.val2
                Sort Key: tab1_mod.val, tab1_mod.val2
@@ -408,15 +409,15 @@ explain (verbose on, nodes off, costs off) select * from tab1_mod natural join t
                      Filter: (tab1_mod.val > 2)
    ->  Materialize
          Output: tab4_rep.val, tab4_rep.val2
-         ->  Sort
+         ->  Remote Subquery Scan on all
                Output: tab4_rep.val, tab4_rep.val2
-               Sort Key: tab4_rep.val, tab4_rep.val2
-               ->  Remote Subquery Scan on all
+               ->  Sort
                      Output: tab4_rep.val, tab4_rep.val2
+                     Sort Key: tab4_rep.val, tab4_rep.val2
                      ->  Seq Scan on public.tab4_rep
                            Output: tab4_rep.val, tab4_rep.val2
                            Filter: (tab4_rep.val < 4)
-(21 rows)
+(22 rows)
 
 -- Join involving two distributed tables, never shipped
 select * from tab1_mod natural join tab2_mod
@@ -447,12 +448,12 @@ explain (verbose on, nodes off, costs off) select * from tab1_mod natural join t
                      Filter: (tab1_mod.val > 2)
          ->  Materialize
                Output: tab2_mod.val, tab2_mod.val2
-               ->  Sort
+               ->  Remote Subquery Scan on all
                      Output: tab2_mod.val, tab2_mod.val2
-                     Sort Key: tab2_mod.val, tab2_mod.val2
-                     ->  Remote Subquery Scan on all
+                     Distribute results by M: val
+                     ->  Sort
                            Output: tab2_mod.val, tab2_mod.val2
-                           Distribute results by M: val
+                           Sort Key: tab2_mod.val, tab2_mod.val2
                            ->  Seq Scan on public.tab2_mod
                                  Output: tab2_mod.val, tab2_mod.val2
                                  Filter: (tab2_mod.val < 4)
@@ -728,12 +729,12 @@ explain (verbose on, nodes off, costs off) update tab1_mod set val2 = 1000 from 
                            Output: tab1_mod.val, tab1_mod.val2, tab1_mod.xc_node_id, tab1_mod.ctid
                ->  Materialize
                      Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
-                     ->  Sort
+                     ->  Remote Subquery Scan on all
                            Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
-                           Sort Key: tab2_mod.val, tab2_mod.val2
-                           ->  Remote Subquery Scan on all
+                           Distribute results by M: val
+                           ->  Sort
                                  Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
-                                 Distribute results by M: val
+                                 Sort Key: tab2_mod.val, tab2_mod.val2
                                  ->  Seq Scan on public.tab2_mod
                                        Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
 (20 rows)
@@ -754,12 +755,12 @@ explain (verbose on, nodes off, costs off) delete from tab1_mod using tab2_mod
                            Output: tab1_mod.val, tab1_mod.val2, tab1_mod.xc_node_id, tab1_mod.ctid
                ->  Materialize
                      Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
-                     ->  Sort
+                     ->  Remote Subquery Scan on all
                            Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
-                           Sort Key: tab2_mod.val, tab2_mod.val2
-                           ->  Remote Subquery Scan on all
+                           Distribute results by M: val
+                           ->  Sort
                                  Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
-                                 Distribute results by M: val
+                                 Sort Key: tab2_mod.val, tab2_mod.val2
                                  ->  Seq Scan on public.tab2_mod
                                        Output: tab2_mod.ctid, tab2_mod.val, tab2_mod.val2
 (20 rows)

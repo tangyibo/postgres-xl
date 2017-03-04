@@ -1109,7 +1109,7 @@ S. T. Coleridge (1772-1834)
 (1 row)
 
 --Rewrite sub system
-CREATE TABLE test_tsquery (txtkeyword TEXT, txtsample TEXT);
+CREATE TABLE test_tsquery (txtkeyword TEXT, txtsample TEXT) DISTRIBUTE BY REPLICATION;
 \set ECHO none
 ALTER TABLE test_tsquery ADD COLUMN keyword tsquery;
 UPDATE test_tsquery SET keyword = to_tsquery('english', txtkeyword);
@@ -1408,27 +1408,30 @@ SELECT to_tsquery('SKIES & My | booKs');
 CREATE TRIGGER tsvectorupdate
 BEFORE UPDATE OR INSERT ON test_tsvector
 FOR EACH ROW EXECUTE PROCEDURE tsvector_update_trigger(a, 'pg_catalog.english', t);
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
  count 
 -------
      0
 (1 row)
 
-INSERT INTO test_tsvector (t) VALUES ('345 qwerty');
+INSERT INTO test_tsvector (t, a) VALUES ('345 qwerty', to_tsvector('pg_catalog.english', '345 qwerty'));
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
  count 
 -------
      1
 (1 row)
 
-UPDATE test_tsvector SET t = null WHERE t = '345 qwerty';
+DELETE FROM test_tsvector WHERE t = '345 qwerty';
+INSERT INTO test_tsvector (t, a) VALUES (null, null);
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
  count 
 -------
      0
 (1 row)
 
-INSERT INTO test_tsvector (t) VALUES ('345 qwerty');
+INSERT INTO test_tsvector (t, a) VALUES ('345 qwerty', to_tsvector('pg_catalog.english', '345 qwerty'));
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
  count 
 -------
@@ -1436,7 +1439,7 @@ SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
 (1 row)
 
 -- test finding items in GIN's pending list
-create temp table pendtest (ts tsvector);
+create table pendtest (ts tsvector);
 create index pendtest_idx on pendtest using gin(ts);
 insert into pendtest values (to_tsvector('Lore ipsam'));
 insert into pendtest values (to_tsvector('Lore ipsum'));

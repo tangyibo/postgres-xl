@@ -365,7 +365,7 @@ S. T. Coleridge (1772-1834)
 
 --Rewrite sub system
 
-CREATE TABLE test_tsquery (txtkeyword TEXT, txtsample TEXT);
+CREATE TABLE test_tsquery (txtkeyword TEXT, txtsample TEXT) DISTRIBUTE BY REPLICATION;
 \set ECHO none
 \copy test_tsquery from stdin
 'New York'	new & york | big & apple | nyc
@@ -463,12 +463,13 @@ BEFORE UPDATE OR INSERT ON test_tsvector
 FOR EACH ROW EXECUTE PROCEDURE tsvector_update_trigger(a, 'pg_catalog.english', t);
 
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
-INSERT INTO test_tsvector (t) VALUES ('345 qwerty');
+INSERT INTO test_tsvector (t, a) VALUES ('345 qwerty', to_tsvector('pg_catalog.english', '345 qwerty'));
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
-UPDATE test_tsvector SET t = null WHERE t = '345 qwerty';
+DELETE FROM test_tsvector WHERE t = '345 qwerty';
+INSERT INTO test_tsvector (t, a) VALUES (null, null);
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
 
-INSERT INTO test_tsvector (t) VALUES ('345 qwerty');
+INSERT INTO test_tsvector (t, a) VALUES ('345 qwerty', to_tsvector('pg_catalog.english', '345 qwerty'));
 
 SELECT count(*) FROM test_tsvector WHERE a @@ to_tsquery('345&qwerty');
 

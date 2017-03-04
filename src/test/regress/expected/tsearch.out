@@ -429,18 +429,18 @@ SELECT length(to_tsvector('english', '345 qwe@efd.r '' http://www.com/ http://ae
 (1 row)
 
 -- ts_debug
-SELECT * from ts_debug('english', '<myns:foo-bar_baz.blurfl>abc&nm1;def&#xa9;ghi&#245;jkl</myns:foo-bar_baz.blurfl>') ORDER BY alias, description, token;
+SELECT * from ts_debug('english', '<myns:foo-bar_baz.blurfl>abc&nm1;def&#xa9;ghi&#245;jkl</myns:foo-bar_baz.blurfl>');
    alias   |   description   |           token            |  dictionaries  |  dictionary  | lexemes 
 -----------+-----------------+----------------------------+----------------+--------------+---------
- asciiword | Word, all ASCII | abc                        | {english_stem} | english_stem | {abc}
- asciiword | Word, all ASCII | def                        | {english_stem} | english_stem | {def}
- asciiword | Word, all ASCII | ghi                        | {english_stem} | english_stem | {ghi}
- asciiword | Word, all ASCII | jkl                        | {english_stem} | english_stem | {jkl}
- entity    | XML entity      | &#245;                     | {}             |              | 
- entity    | XML entity      | &#xa9;                     | {}             |              | 
- entity    | XML entity      | &nm1;                      | {}             |              | 
- tag       | XML tag         | </myns:foo-bar_baz.blurfl> | {}             |              | 
  tag       | XML tag         | <myns:foo-bar_baz.blurfl>  | {}             |              | 
+ asciiword | Word, all ASCII | abc                        | {english_stem} | english_stem | {abc}
+ entity    | XML entity      | &nm1;                      | {}             |              | 
+ asciiword | Word, all ASCII | def                        | {english_stem} | english_stem | {def}
+ entity    | XML entity      | &#xa9;                     | {}             |              | 
+ asciiword | Word, all ASCII | ghi                        | {english_stem} | english_stem | {ghi}
+ entity    | XML entity      | &#245;                     | {}             |              | 
+ asciiword | Word, all ASCII | jkl                        | {english_stem} | english_stem | {jkl}
+ tag       | XML tag         | </myns:foo-bar_baz.blurfl> | {}             |              | 
 (9 rows)
 
 -- check parsing of URLs

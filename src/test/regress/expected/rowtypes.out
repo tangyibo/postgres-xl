@@ -288,11 +288,12 @@ create index on test_table (a,b);
 set enable_sort = off;
 explain (costs off)
 select a,b from test_table where (a,b) > ('a','a') order by a,b;
-                       QUERY PLAN                       
---------------------------------------------------------
- Index Only Scan using test_table_a_b_idx on test_table
-   Index Cond: (ROW(a, b) > ROW('a'::text, 'a'::text))
-(2 rows)
+                          QUERY PLAN                          
+--------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Index Only Scan using test_table_a_b_idx on test_table
+         Index Cond: (ROW(a, b) > ROW('a'::text, 'a'::text))
+(3 rows)
 
 select a,b from test_table where (a,b) > ('a','a') order by a,b;
  a | b 

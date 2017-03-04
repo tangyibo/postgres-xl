@@ -59,11 +59,21 @@ INSERT INTO brintest SELECT
 FROM tenk1 ORDER BY unique2 LIMIT 100;
 
 -- throw in some NULL's and different values
-INSERT INTO brintest (inetcol, cidrcol, int4rangecol) SELECT
+
+-- Postgres-XL does not support ORDER BY in subqueries yet, so to get the
+-- same ordering as upstream, we work around it by clustering the table
+CREATE TABLE brintest2 (LIKE brintest, thousand INTEGER, tenthous INTEGER) DISTRIBUTE BY REPLICATION;
+INSERT INTO brintest2 (inetcol, cidrcol, int4rangecol, thousand, tenthous) SELECT
 	inet 'fe80::6e40:8ff:fea9:8c46' + tenthous,
 	cidr 'fe80::6e40:8ff:fea9:8c46' + tenthous,
-	'empty'::int4range
-FROM tenk1 ORDER BY thousand, tenthous LIMIT 25;
+	'empty'::int4range,
+	thousand,
+	tenthous
+FROM tenk1;
+CREATE INDEX brintest2_idx ON brintest2 (thousand, tenthous);
+CLUSTER brintest2 USING brintest2_idx;
+INSERT INTO brintest (inetcol, cidrcol, int4rangecol) SELECT inetcol, cidrcol, int4rangecol FROM brintest2 LIMIT 25;
+DROP TABLE brintest2;
 
 CREATE INDEX brinidx ON brintest USING brin (
 	byteacol,
@@ -316,7 +326,7 @@ BEGIN
 
 		plan_ok := false;
 		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT ctid FROM brintest WHERE %s $y$, cond) LOOP
-			IF plan_line LIKE 'Bitmap Heap Scan on brintest%' THEN
+			IF plan_line LIKE '%Bitmap Heap Scan on brintest%' THEN
 				plan_ok := true;
 			END IF;
 		END LOOP;
@@ -333,7 +343,7 @@ BEGIN
 
 		plan_ok := false;
 		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT ctid FROM brintest WHERE %s $y$, cond) LOOP
-			IF plan_line LIKE 'Seq Scan on brintest%' THEN
+			IF plan_line LIKE '%Seq Scan on brintest%' THEN
 				plan_ok := true;
 			END IF;
 		END LOOP;

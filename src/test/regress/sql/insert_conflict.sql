@@ -267,7 +267,7 @@ drop table syscolconflicttest;
 -- Previous tests all managed to not test any expressions requiring
 -- planner preprocessing ...
 --
-create table insertconflict (a bigint, b bigint);
+create table insertconflict (a bigint, b bigint) distribute by replication;
 
 create unique index insertconflicti1 on insertconflict(coalesce(a, 0));
 

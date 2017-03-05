@@ -12,15 +12,15 @@ INSERT INTO lotest_stash_values (loid) VALUES( lo_creat(42) );
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 -- Test ALTER LARGE OBJECT
-CREATE ROLE regresslo;
+CREATE ROLE regress_lo_user;
 DO $$
   BEGIN
     EXECUTE 'ALTER LARGE OBJECT ' || (select loid from lotest_stash_values)
-		|| ' OWNER TO regresslo';
+		|| ' OWNER TO regress_lo_user';
   END
 $$;
 ERROR:  query string argument of EXECUTE is null
-CONTEXT:  PL/pgSQL function inline_code_block line 3 at EXECUTE statement
+CONTEXT:  PL/pgSQL function inline_code_block line 3 at EXECUTE
 SELECT
 	rol.rolname
 FROM
@@ -425,4 +425,4 @@ SELECT lo_get(:newloid);
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 DROP TABLE lotest_stash_values;
-DROP ROLE regresslo;
+DROP ROLE regress_lo_user;

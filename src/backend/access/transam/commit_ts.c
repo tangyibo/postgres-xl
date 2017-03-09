@@ -765,6 +765,7 @@ void
 ExtendCommitTs(TransactionId newestXact)
 {
 	int			pageno;
+	TransactionId latestXid;
 
 	/*
 	 * Nothing to do if module not enabled.  Note we do an unlocked read of
@@ -776,19 +777,45 @@ ExtendCommitTs(TransactionId newestXact)
 		return;
 
 	/*
-	 * No work except at first XID of a page.  But beware: just after
-	 * wraparound, the first XID of page zero is FirstNormalTransactionId.
+	 * See ExtendCLOG for comments about why in Postgres-XL we may not see
+	 * contiguous XIDs and why it's important to deal with them. The same
+	 * principles apply here too.
 	 */
-	if (TransactionIdToCTsEntry(newestXact) != 0 &&
-		!TransactionIdEquals(newestXact, FirstNormalTransactionId))
-		return;
-
 	pageno = TransactionIdToCTsPage(newestXact);
+
+	/*
+	 *  Note that this value can change and we are not holding a lock, so we
+	 *  repeat the check below. We do it this way instead of grabbing the lock
+	 *  to avoid lock contention.
+	 */
+	latestXid = (CommitTsCtl->shared->latest_page_number *
+			COMMIT_TS_XACTS_PER_PAGE) + COMMIT_TS_XACTS_PER_PAGE - 1;
+
+	if (TransactionIdPrecedesOrEquals(newestXact, latestXid))
+		return;
 
 	LWLockAcquire(CommitTsControlLock, LW_EXCLUSIVE);
 
-	/* Zero the page and make an XLOG entry about it */
-	ZeroCommitTsPage(pageno, !InRecovery);
+	latestXid = (CommitTsCtl->shared->latest_page_number *
+			COMMIT_TS_XACTS_PER_PAGE) + COMMIT_TS_XACTS_PER_PAGE - 1;
+
+	if (TransactionIdPrecedesOrEquals(newestXact, latestXid))
+	{
+		LWLockRelease(CommitTsControlLock);
+		return;
+	}
+
+	for (;;)
+	{
+		/* Zero the page and make an XLOG entry about it */
+		int target_pageno =
+			CommitTsCtl->shared->latest_page_number + 1;
+		if (target_pageno > TransactionIdToCTsPage(MaxTransactionId))
+			target_pageno = 0;
+		ZeroCommitTsPage(target_pageno, !InRecovery);
+		if (target_pageno == pageno)
+			break;
+	}
 
 	LWLockRelease(CommitTsControlLock);
 }

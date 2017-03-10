@@ -573,7 +573,9 @@ distrib_copy_from(RedistribState *distribState, ExecNodes *exec_nodes)
 
 		if (DataNodeCopyIn(data, len,
 						   GET_NODES(copyState->locator, value, is_null, NULL),
-				   (PGXCNodeHandle**) getLocatorResults(copyState->locator)))
+						   (PGXCNodeHandle**)
+						   getLocatorResults(copyState->locator),
+						   false))
 				ereport(ERROR,
 						(errcode(ERRCODE_CONNECTION_EXCEPTION),
 						 errmsg("Copy failed on a data node")));

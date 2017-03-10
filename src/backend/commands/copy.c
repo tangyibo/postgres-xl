@@ -690,13 +690,6 @@ CopyGetData(CopyState cstate, void *databuf, int minread, int maxread)
 							break;
 					}
 				}
-#ifdef PGXC
-				/* A PGXC Datanode does not need to read the header data received from Coordinator */
-				if (IS_PGXC_DATANODE &&
-					cstate->binary &&
-					cstate->fe_msgbuf->data[cstate->fe_msgbuf->len-1] == '\n')
-					cstate->fe_msgbuf->len--;
-#endif
 				avail = cstate->fe_msgbuf->len - cstate->fe_msgbuf->cursor;
 				if (avail > maxread)
 					avail = maxread;
@@ -2594,7 +2587,8 @@ CopyFrom(CopyState cstate)
 			if (DataNodeCopyIn(cstate->line_buf.data,
 							   cstate->line_buf.len,
 							   GET_NODES(rcstate->locator, value, isnull, NULL),
-					   (PGXCNodeHandle**) getLocatorResults(rcstate->locator)))
+							   (PGXCNodeHandle**) getLocatorResults(rcstate->locator),
+					   		   cstate->binary))
 					ereport(ERROR,
 							(errcode(ERRCODE_CONNECTION_EXCEPTION),
 							 errmsg("Copy failed on a data node")));
@@ -2716,7 +2710,8 @@ CopyFrom(CopyState cstate)
 		if (DataNodeCopyIn(cstate->line_buf.data,
 						   cstate->line_buf.len,
 						   getLocatorNodeCount(rcstate->locator),
-					   (PGXCNodeHandle **) getLocatorNodeMap(rcstate->locator)))
+						   (PGXCNodeHandle **) getLocatorNodeMap(rcstate->locator),
+						   cstate->binary))
 				ereport(ERROR,
 						(errcode(ERRCODE_CONNECTION_EXCEPTION),
 						 errmsg("Copy failed on a data node")));

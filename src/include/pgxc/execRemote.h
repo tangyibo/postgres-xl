@@ -228,7 +228,8 @@ typedef void (*xact_callback) (bool isCommit, void *args);
 /* Copy command just involves Datanodes */
 extern void DataNodeCopyBegin(RemoteCopyData *rcstate);
 extern int DataNodeCopyIn(char *data_row, int len, int conn_count,
-						  PGXCNodeHandle** copy_connections);
+						  PGXCNodeHandle** copy_connections,
+						  bool binary);
 extern uint64 DataNodeCopyOut(PGXCNodeHandle** copy_connections,
 							  int conn_count, FILE* copy_file);
 extern uint64 DataNodeCopyStore(PGXCNodeHandle** copy_connections,

@@ -2862,10 +2862,12 @@ DataNodeCopyBegin(RemoteCopyData *rcstate)
  * Send a data row to the specified nodes
  */
 int
-DataNodeCopyIn(char *data_row, int len, int conn_count, PGXCNodeHandle** copy_connections)
+DataNodeCopyIn(char *data_row, int len,
+		int conn_count, PGXCNodeHandle** copy_connections,
+		bool binary)
 {
-	/* size + data row + \n */
-	int msgLen = 4 + len + 1;
+	/* size + data row + \n in CSV mode */
+	int msgLen = 4 + len + (binary ? 0 : 1);
 	int nLen = htonl(msgLen);
 	int i;
 
@@ -2928,7 +2930,8 @@ DataNodeCopyIn(char *data_row, int len, int conn_count, PGXCNodeHandle** copy_co
 			handle->outEnd += 4;
 			memcpy(handle->outBuffer + handle->outEnd, data_row, len);
 			handle->outEnd += len;
-			handle->outBuffer[handle->outEnd++] = '\n';
+			if (!binary)
+				handle->outBuffer[handle->outEnd++] = '\n';
 
 			handle->in_extended_query = false;
 		}
@@ -3699,7 +3702,7 @@ DataNodeCopyInBinaryForAll(char *msg_buf, int len, int conn_count,
 									  PGXCNodeHandle** connections)
 {
 	int 		i;
-	int msgLen = 4 + len + 1;
+	int msgLen = 4 + len;
 	int nLen = htonl(msgLen);
 
 	for (i = 0; i < conn_count; i++)
@@ -3720,7 +3723,6 @@ DataNodeCopyInBinaryForAll(char *msg_buf, int len, int conn_count,
 			handle->outEnd += 4;
 			memcpy(handle->outBuffer + handle->outEnd, msg_buf, len);
 			handle->outEnd += len;
-			handle->outBuffer[handle->outEnd++] = '\n';
 		}
 		else
 		{

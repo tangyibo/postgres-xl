@@ -416,7 +416,6 @@ with recursive q as (
        select * from x)
     )
 select * from q order by 1, 2, 3 limit 32;
-ERROR:  unrecognized node type: 120
 -- recursive term has sub-UNION
 WITH RECURSIVE t(i,j) AS (
 	VALUES (1,2)
@@ -732,7 +731,6 @@ WITH t AS (
 )
 INSERT INTO y
 SELECT a+20 FROM t RETURNING *;
-ERROR:  unrecognized node type: 119
 SELECT * FROM y order by 1;
  a  
 ----

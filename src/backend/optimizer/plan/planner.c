@@ -6236,14 +6236,9 @@ equal_distributions(PlannerInfo *root, Distribution *dst1,
 static Path *
 adjust_path_distribution(PlannerInfo *root, Query *parse, Path *path)
 {
-	if (!root->distribution)
-	{
-		/*
-		 * Inform caller about distribution of the subplan
-		 */
-		root->distribution = path->distribution;
+	/* don't touch paths without distribution attached (catalogs etc.) */
+	if ((path->distribution == NULL) && (root->distribution == NULL))
 		return path;
-	}
 
 	if (equal_distributions(root, root->distribution, path->distribution))
 	{

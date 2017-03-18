@@ -866,7 +866,7 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 		recursiveOk = true;
 
 		/* seems to start at 1... */
-		for (idx = 1; idx < root->simple_rel_array_size - 1 && recursiveOk; idx++)
+		for (idx = 1; idx < root->simple_rel_array_size && recursiveOk; idx++)
 		{
 			RangeTblEntry *rte;
 

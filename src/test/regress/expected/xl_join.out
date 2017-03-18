@@ -9,7 +9,7 @@ EXPLAIN SELECT * FROM xl_join_t1
 	INNER JOIN xl_join_t3 ON xl_join_t1.val1 = xl_join_t3.val1;
                                                       QUERY PLAN                                                      
 ----------------------------------------------------------------------------------------------------------------------
- Remote Subquery Scan on all (datanode_1,datanode_2)  (cost=475.52..5209.87 rows=288579 width=24)
+ Remote Subquery Scan on all (datanode_1,datanode_2)  (cost=575.52..13678.66 rows=288579 width=24)
    ->  Merge Join  (cost=475.52..5209.87 rows=288579 width=24)
          Merge Cond: (xl_join_t3.val1 = xl_join_t1.val1)
          ->  Sort  (cost=158.51..164.16 rows=2260 width=8)

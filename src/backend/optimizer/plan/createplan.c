@@ -308,8 +308,6 @@ static int add_sort_column(AttrNumber colIdx, Oid sortOp, Oid coll,
 #endif
 
 static RemoteSubplan *find_push_down_plan(Plan *plan, bool force);
-static RemoteSubplan *find_delete_push_down_plan(PlannerInfo *root, Plan *plan,
-		bool force, Plan **parent);
 
 /*
  * create_plan
@@ -2530,14 +2528,6 @@ find_push_down_plan(Plan *plan, bool force)
 	return find_push_down_plan_int(NULL, plan, force, false, NULL);
 }
 
-static RemoteSubplan *
-find_delete_push_down_plan(PlannerInfo *root,
-		Plan *plan,
-		bool force,
-		Plan **parent)
-{
-	return find_push_down_plan_int(root, plan, force, true, parent);
-}
 #endif
 
 
@@ -5631,9 +5621,6 @@ make_recursive_union(PlannerInfo *root,
 	RecursiveUnion *node = makeNode(RecursiveUnion);
 	Plan	   *plan = &node->plan;
 	int			numCols = list_length(distinctList);
-#ifdef XCP	
-	RemoteSubplan *left_pushdown, *right_pushdown;
-#endif	
 
 	plan->targetlist = tlist;
 	plan->qual = NIL;
@@ -5672,44 +5659,6 @@ make_recursive_union(PlannerInfo *root,
 	}
 	node->numGroups = numGroups;
 
-#ifdef XCP	
-	/*
-	 * For recursive CTE, we have already checked that all tables involved in
-	 * the query are replicated tables (or coordinator local tables such as
-	 * catalog tables). So drill down the left and right plan trees and find
-	 * the corresponding remote subplan(s). If both sides contain a
-	 * RemoteSubplan then its possible that they are marked for execution on
-	 * different nodes, but that does not matter since tables are replicated
-	 * and nodes are picked randomly for replicated tables. So just reuse
-	 * either of the RemoteSubplan and pin the RecursiveUnion plan generated
-	 * above to the RemoteSubplan. They must have been already removed from the
-	 * subtree by find_delete_push_down_plan function
-	 *
-	 * XXX For tables replicated on different subsets of nodes, this may not
-	 * work. In fact, we probably can't support recursive queries for such
-	 * tables.
-	 */
-	left_pushdown = find_delete_push_down_plan(root, lefttree, true, &plan->lefttree);
-	right_pushdown = find_delete_push_down_plan(root, righttree, true, &plan->righttree);
-	if (left_pushdown || right_pushdown)
-	{
-		/* Pick either one */
-		if (!left_pushdown)
-			left_pushdown = right_pushdown;
-
-		/*
-		 * Push the RecursiveUnion to the remote node
-		 */
-		left_pushdown->scan.plan.lefttree = plan;
-
-		/*
-		 * The only caller for this function does not really care if the
-		 * returned node is RecursiveUnion or not. So we just return the
-		 * RemoteSubplan as it
-		 */
-		return (RecursiveUnion *) left_pushdown;
-	}
-#endif	
 	return node;
 }
 

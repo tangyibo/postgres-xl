@@ -4338,6 +4338,17 @@ create_recursiveunion_path(PlannerInfo *root,
 	/* RecursiveUnion result is always unsorted */
 	pathnode->path.pathkeys = NIL;
 
+	/*
+	 * FIXME This assumes left/right path have the same distribution, or one
+	 * of them is NULL. This is related to the subquery_planner() assuming all
+	 * tables are replicated on the same group of nodes, which may or may not
+	 * be the case, and we need to be more careful about it.
+	 */
+	if (leftpath->distribution)
+		pathnode->path.distribution = copyObject(leftpath->distribution);
+	else
+		pathnode->path.distribution = copyObject(rightpath->distribution);
+
 	pathnode->leftpath = leftpath;
 	pathnode->rightpath = rightpath;
 	pathnode->distinctList = distinctList;

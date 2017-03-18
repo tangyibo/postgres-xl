@@ -419,6 +419,41 @@ recurse_set_operations(Node *setOp, PlannerInfo *root,
 }
 
 /*
+ * remove RemoteSubquery from the top of the path
+ *
+ * Essentially find_push_down_plan() but applied when constructing the path,
+ * not when creating the plan. Compared to find_push_down_plan it only deals
+ * with a subset of node types, however.
+ *
+ * XXX Does this need to handle additional node types?
+ */
+static Path *
+strip_remote_subquery(PlannerInfo *root, Path *path)
+{
+	/* if there's RemoteSubplan at the top, we're trivially done */
+	if (IsA(path, RemoteSubPath))
+		return ((RemoteSubPath *)path)->subpath;
+
+	/* for subquery, we tweak the subpath (and descend into it) */
+	if (IsA(path, SubqueryScanPath))
+	{
+		SubqueryScanPath *subquery = (SubqueryScanPath *)path;
+		subquery->subpath = strip_remote_subquery(root, subquery->subpath);
+
+		subquery->path.param_info = subquery->subpath->param_info;
+		subquery->path.pathkeys = subquery->subpath->pathkeys;
+
+		/* also update the distribution */
+		subquery->path.distribution = copyObject(subquery->subpath->distribution);
+
+		/* recompute costs */
+		cost_subqueryscan(subquery, root, path->parent, subquery->path.param_info);
+	}
+
+	return path;
+}
+
+/*
  * Generate path for a recursive UNION node
  */
 static Path *
@@ -497,6 +532,32 @@ generate_recursion_path(SetOperationStmt *setOp, PlannerInfo *root,
 		 */
 		dNumGroups = lpath->rows + rpath->rows * 10;
 	}
+
+	/*
+	 * Push the resursive union (CTE) below Remote Subquery.
+	 *
+	 * We have already checked that all tables involved in the recursive CTE
+	 * are replicated tables (or coordinator local tables such as catalogs).
+	 * See subquery_planner for details. So here we search the left and right
+	 * subpaths, and search for those remote subqueries.
+	 *
+	 * If either side contains a remote subquery, we remove those, and instead
+	 * add a remote subquery on top of the recursive union later (we don't need
+	 * to do that manually, it'll happen automatically).
+	 *
+	 * XXX The tables may be marked for execution on different nodes, but that
+	 * does not matter since tables are replicated, and execution nodes are
+	 * picked randomly.
+	 *
+	 * XXX For tables replicated on different groups of nodes, this may not
+	 * work. We either need to pick a node from an intersection of the groups,
+	 * or simply disable recursive queries on such tables.
+	 *
+	 * XXX This obviously breaks costing, because we're removing nodes that
+	 * affected the cost (network transfers).
+	 */
+	rpath = strip_remote_subquery(root, rpath);
+	lpath = strip_remote_subquery(root, lpath);
 
 	/*
 	 * And make the path node.

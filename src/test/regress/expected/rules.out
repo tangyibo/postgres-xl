@@ -3047,6 +3047,12 @@ WITH data(hat_name, hat_color) AS (
 INSERT INTO hats
     SELECT * FROM data
 RETURNING *;
+  hat_name  | hat_color  
+------------+------------
+ h8         | green     
+ h9         | blue      
+(2 rows)
+
 EXPLAIN (nodes off, costs off) WITH data(hat_name, hat_color) AS (
     VALUES ('h8', 'green'),
         ('h9', 'blue'),
@@ -3055,13 +3061,13 @@ EXPLAIN (nodes off, costs off) WITH data(hat_name, hat_color) AS (
 INSERT INTO hats
     SELECT * FROM data
 RETURNING *;
-                              QUERY PLAN                              
-----------------------------------------------------------------------
+                                              QUERY PLAN                                               
+-------------------------------------------------------------------------------------------------------
  Remote Subquery Scan on all
    ->  Insert on hat_data
          Conflict Resolution: UPDATE
          Conflict Arbiter Indexes: hat_data_unique_idx
-         Conflict Filter: (excluded.hat_color <> 'forbidden'::bpchar)
+         Conflict Filter: ((excluded.hat_color <> 'forbidden'::bpchar) AND (hat_data.* <> excluded.*))
          CTE data
            ->  Values Scan on "*VALUES*"
          ->  Remote Subquery Scan on all
@@ -3073,8 +3079,9 @@ SELECT * FROM hat_data WHERE hat_name IN ('h8', 'h9', 'h7') ORDER BY hat_name;
   hat_name  | hat_color  
 ------------+------------
  h7         | black     
- h8         | white     
-(2 rows)
+ h8         | green     
+ h9         | blue      
+(3 rows)
 
 DROP RULE hat_upsert ON hats;
 drop table hats;

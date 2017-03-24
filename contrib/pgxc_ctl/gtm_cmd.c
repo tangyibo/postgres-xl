@@ -1090,13 +1090,6 @@ cmd_t *prepare_initGtmProxy(char *nodeName)
 			timeStampString(timestamp, MAXTOKEN),
 			aval(VAR_gtmProxyNames)[idx]);
 
-	if (!is_none(sval(VAR_gtmPxyExtraConfig)))
-		AddMember(fileList, sval(VAR_gtmPxyExtraConfig));
-	if (!is_none(sval(VAR_gtmPxySpecificExtraConfig)))
-		AddMember(fileList, sval(VAR_gtmPxySpecificExtraConfig));
-	appendFiles(f, fileList);
-	CleanArray(fileList);
-
 	fprintf(f,
 			"port = %s\n"
 			"gtm_host = '%s'\n"
@@ -1107,6 +1100,14 @@ cmd_t *prepare_initGtmProxy(char *nodeName)
 			aval(VAR_gtmProxyPorts)[idx],
 			sval(VAR_gtmMasterServer),
 			sval(VAR_gtmMasterPort));
+
+	if (!is_none(sval(VAR_gtmPxyExtraConfig)))
+		AddMember(fileList, sval(VAR_gtmPxyExtraConfig));
+	if (!is_none(sval(VAR_gtmPxySpecificExtraConfig)))
+		AddMember(fileList, sval(VAR_gtmPxySpecificExtraConfig));
+	appendFiles(f, fileList);
+	CleanArray(fileList);
+
 	fclose(f);
 	snprintf(newCommand(cmdGtmProxyConf), MAXLINE,
 			 "cat >> %s/gtm_proxy.conf", aval(VAR_gtmProxyDirs)[idx]);

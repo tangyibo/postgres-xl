@@ -2900,8 +2900,22 @@ DataNodeCopyIn(char *data_row, int len,
 					 * Make sure there are zeroes in unused fields
 					 */
 					memset(&combiner, 0, sizeof(ScanState));
-					handle_response(handle, &combiner);
-					if (!ValidateAndCloseCombiner(&combiner))
+
+					/*
+					 * Validate the combiner but only if we see a proper
+					 * resposne for our COPY message. The problem is that
+					 * sometimes we might receive async messages such as
+					 * 'M' which is used to send back command ID generated and
+					 * consumed by the datanode. While the message gets handled
+					 * in handle_response(), we don't want to declare receipt
+					 * of an invalid message below.
+					 *
+					 * If there is an actual error of some sort then the
+					 * connection state is will be set appropriately and we
+					 * shall catch that subsequently.
+					 */
+					if (handle_response(handle, &combiner) == RESPONSE_COPY &&
+						!ValidateAndCloseCombiner(&combiner))
 						return EOF;
 				}
 

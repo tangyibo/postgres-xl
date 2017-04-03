@@ -6048,6 +6048,8 @@ exec_cast_value(PLpgSQL_execstate *estate,
 			ExprContext *econtext = estate->eval_econtext;
 			MemoryContext oldcontext;
 
+			SPI_push();
+
 			oldcontext = MemoryContextSwitchTo(econtext->ecxt_per_tuple_memory);
 
 			econtext->caseValue_datum = value;
@@ -6061,6 +6063,8 @@ exec_cast_value(PLpgSQL_execstate *estate,
 			cast_entry->cast_in_use = false;
 
 			MemoryContextSwitchTo(oldcontext);
+
+			SPI_pop();
 		}
 	}
 

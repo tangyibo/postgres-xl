@@ -2376,7 +2376,13 @@ ProcessUtilitySlow(Node *parsetree,
 				break;
 
 			case T_AlterTSConfigurationStmt:
-				address = AlterTSConfiguration((AlterTSConfigurationStmt *) parsetree);
+				AlterTSConfiguration((AlterTSConfigurationStmt *) parsetree);
+				/*
+				 * Commands are stashed in MakeConfigurationMapping and
+				 * DropConfigurationMapping, which are called from
+				 * AlterTSConfiguration
+				 */
+				commandCollected = true;
 #ifdef PGXC
 				if (IS_PGXC_LOCAL_COORDINATOR)
 					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);

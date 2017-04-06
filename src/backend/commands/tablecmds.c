@@ -6888,15 +6888,6 @@ ATExecAlterConstraint(Relation rel, AlterTableCmd *cmd,
 	bool		found = false;
 	ObjectAddress address;
 
-#ifdef XCP
-	/*
-	 * Do not validate distributed relations on Coordinator, let Datanode do
-	 * that when executing the ALTER TABLE statement.
-	 */
-	if (IS_PGXC_COORDINATOR && rel->rd_locator_info)
-		return InvalidObjectAddress;
-#endif
-
 	Assert(IsA(cmd->def, Constraint));
 	cmdcon = (Constraint *) cmd->def;
 

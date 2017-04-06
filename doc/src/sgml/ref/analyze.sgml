@@ -22,6 +22,7 @@ PostgreSQL documentation
  <refsynopsisdiv>
 <synopsis>
 ANALYZE [ VERBOSE ] [ <replaceable class="PARAMETER">table_name</replaceable> [ ( <replaceable class="PARAMETER">column_name</replaceable> [, ...] ) ] ]
+ANALYZE [ ( { VERBOSE | COORDINATOR } ) ] [ <replaceable class="PARAMETER">table_name</replaceable> [ ( <replaceable class="PARAMETER">column_name</replaceable> [, ...] ) ] ]
 </synopsis>
  </refsynopsisdiv>
 
@@ -54,6 +55,17 @@ ANALYZE [ VERBOSE ] [ <replaceable class="PARAMETER">table_name</replaceable> [ 
     <listitem>
      <para>
       Enables display of progress messages.
+     </para>
+    </listitem>
+   </varlistentry>
+
+   <varlistentry>
+    <term><literal>COORDINATOR</literal></term>
+    <listitem>
+     <para>
+      Only updates statistics on the coordinator side using current statistics
+on the datanodes. The datanode statistics are not updated and the current
+values are used as they are.
      </para>
     </listitem>
    </varlistentry>

@@ -308,6 +308,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 
 %type <ival>	opt_lock lock_type cast_context
 %type <ival>	vacuum_option_list vacuum_option_elem
+%type <ival>	analyze_option_list analyze_option_elem
 %type <boolean>	opt_force opt_or_replace
 				opt_grant_grant_option opt_grant_admin_option
 				opt_nowait opt_if_exists opt_with_data
@@ -9766,6 +9767,22 @@ AnalyzeStmt:
 					n->va_cols = $4;
 					$$ = (Node *)n;
 				}
+			| analyze_keyword '(' analyze_option_list ')'
+				{
+					VacuumStmt *n = makeNode(VacuumStmt);
+					n->options = VACOPT_ANALYZE | $3;
+					n->relation = NULL;
+					n->va_cols = NIL;
+					$$ = (Node *)n;
+				}
+			| analyze_keyword '(' analyze_option_list ')' qualified_name opt_name_list
+				{
+					VacuumStmt *n = makeNode(VacuumStmt);
+					n->options = VACOPT_ANALYZE | $3;
+					n->relation = $5;
+					n->va_cols = $6;
+					$$ = (Node *)n;
+				}
 		;
 
 analyze_keyword:
@@ -9784,6 +9801,17 @@ opt_full:	FULL									{ $$ = TRUE; }
 
 opt_freeze: FREEZE									{ $$ = TRUE; }
 			| /*EMPTY*/								{ $$ = FALSE; }
+		;
+
+
+analyze_option_list:
+			analyze_option_elem								{ $$ = $1; }
+			| analyze_option_list ',' analyze_option_elem		{ $$ = $1 | $3; }
+		;
+
+analyze_option_elem:
+			VERBOSE			{ $$ = VACOPT_VERBOSE; }
+			| COORDINATOR 	{ $$ = VACOPT_COORDINATOR; }
 		;
 
 opt_name_list:

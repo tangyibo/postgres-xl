@@ -893,14 +893,15 @@ standard_ProcessUtility(Node *parsetree,
 				/* we choose to allow this during "read only" transactions */
 				PreventCommandDuringRecovery((stmt->options & VACOPT_VACUUM) ?
 											 "VACUUM" : "ANALYZE");
-#ifdef PGXC
 				/*
 				 * We have to run the command on nodes before Coordinator because
 				 * vacuum() pops active snapshot and we can not send it to nodes
 				 */
-				if (IS_PGXC_LOCAL_COORDINATOR)
-					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_DATANODES, false);
-#endif
+				if (IS_PGXC_LOCAL_COORDINATOR &&
+					!(stmt->options & VACOPT_COORDINATOR))
+						ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+							true,
+							EXEC_ON_DATANODES, false);
 				/* forbidden in parallel mode due to CommandIsReadOnly */
 				ExecVacuum(stmt, isTopLevel);
 			}

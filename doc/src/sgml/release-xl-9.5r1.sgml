@@ -1,5 +1,116 @@
 <!-- doc/src/sgml/release-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
+ <sect1 id="release-xl-9-5r1.5">
+  <title>Postgres-XL Release 9.5r1.5</title>
+
+  <note>
+  <title>Release Date</title>
+  <simpara>2017-04-??</simpara>
+  </note>
+  <para>
+   This release includes all the bug fixes and security fixes from PostgreSQL
+   9.5.6. In addition, there are a few Postgres-XL specific bug fixes in this
+   release. For information about new features in the Postgres-XL 9.5r1 major release, see
+   <xref linkend="release-xl-9-5r1">.
+  </para>
+  <sect2>
+   <title>Migration to Version Postgres-XL 9.5r1.5</title>
+   <para>
+    A dump/restore is not required for those running Postgres-XL 9.5r1.2 and
+    above.
+   </para>
+  </sect2>
+  <sect2>
+   <title>Changes</title>
+   <itemizedlist>
+    <listitem>
+     <para>
+      Handle multi-command SQL strings correctly even when there are 'null' sql
+      commands (Krzysztof Nienartowicz).
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a bug in handling of relcache invalidation in distributed sessions.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Ensure variable values are properly quoted in all cases when necessary
+      while sending down SET comamnds to the remote nodes.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Introduce a simplistic way to deal with the fact that RemoteQuery (which EXECUTE
+      DIRECT internally uses) cannot support cursor fetch.
+     </para>
+    
+     <para>
+      FOR EXECUTE query inside plpgsql uses cursor mechanism to fetch a few
+      tuples at a time. But that fails badly when the query is a EXECUTE DIRECT
+      statement because we internally use RemoteQuery to execute that. Instead just
+      fetch 10000 tuples at a time and complain if RemoteQuery returns more than
+      10000 rows.  May be that's enough for the scenario that we're trying to address
+      where a global view can be created using EXECUTE DIRECT.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Handle sequence's transactional behaviour on GTM.
+     </para>
+     <para>
+      Previously we were tracking changes to sequences on the coordinator side
+      and applying those changes at transaction commit/rollback time. While this
+      worked ok for most cases, there were issues such as what happens if a sequence
+      is dropped and then recreated in the same transaction. Since the DROP is not
+      executed until the transaction commit time, the subsequent CREATE would fail on
+      the GTM.
+     </para>
+     <para>
+      We now track sequences renamed/dropped/created on the GTM side and do a cleanup
+      on transaction commit/rollback. For example, if a sequence is renamed but the
+      transaction is later aborted, the sequence will be renamed back to its original
+      name. Similarly, if a sequence is dropped and the transaction aborts, the
+      sequence will be re-instated.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Extend CommitTS properly, filling in any holes, just like ExtendCLOG.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a problem regarding accidental newline ('\n') additional between rows
+      while running a BINARY COPY protocol.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Ensure that the config parameters specified in the gtmPxyExtraConfig file
+      take precendence over the defaults.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Support an additional syntax ANALYZE (COORDINATOR) to allow users to rebuild
+      coordinator side statistics without running ANALYZE again on the datanodes.
+     </para>
+    </listitem>
+
+   </itemizedlist>
+  </sect2>
+ </sect1>
+
  <sect1 id="release-xl-9-5r1.4">
   <title>Postgres-XL Release 9.5r1.4</title>
 

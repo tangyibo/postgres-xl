@@ -2045,7 +2045,8 @@ ReadCommand(GTMProxy_ConnectionInfo *conninfo, StringInfo inBuf)
 
 	if (qtype == EOF)			/* frontend disconnected */
 	{
-		ereport(COMMERROR,
+		/* don't fill up the proxy log with client disconnect messages */
+		ereport(DEBUG1,
 				(EPROTO,
 				 errmsg("unexpected EOF on client connection")));
 		return qtype;

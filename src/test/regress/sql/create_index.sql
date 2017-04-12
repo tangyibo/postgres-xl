@@ -961,6 +961,7 @@ SELECT count(*) FROM dupindexcols
 -- Check ordering of =ANY indexqual results (bug in 9.2.0)
 --
 
+select pg_sleep(5);	-- sleep for 5s to allow cluster monitor to advance OldestXmin
 vacuum tenk1;		-- ensure we get consistent plans here
 
 explain (costs off)

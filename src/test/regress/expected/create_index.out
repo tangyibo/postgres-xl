@@ -2970,21 +2970,23 @@ SELECT count(*) FROM dupindexcols
 --
 -- Check ordering of =ANY indexqual results (bug in 9.2.0)
 --
+select pg_sleep(5);	-- sleep for 5s to allow cluster monitor to advance OldestXmin
+ pg_sleep 
+----------
+ 
+(1 row)
+
 vacuum tenk1;		-- ensure we get consistent plans here
 explain (costs off)
 SELECT unique1 FROM tenk1
 WHERE unique1 IN (1,42,7)
 ORDER BY unique1;
-                               QUERY PLAN                                
--------------------------------------------------------------------------
+                         QUERY PLAN                          
+-------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Sort
-         Sort Key: unique1
-         ->  Bitmap Heap Scan on tenk1
-               Recheck Cond: (unique1 = ANY ('{1,42,7}'::integer[]))
-               ->  Bitmap Index Scan on tenk1_unique1
-                     Index Cond: (unique1 = ANY ('{1,42,7}'::integer[]))
-(7 rows)
+   ->  Index Only Scan using tenk1_unique1 on tenk1
+         Index Cond: (unique1 = ANY ('{1,42,7}'::integer[]))
+(3 rows)
 
 SELECT unique1 FROM tenk1
 WHERE unique1 IN (1,42,7)
@@ -3000,14 +3002,13 @@ explain (costs off)
 SELECT thousand, tenthous FROM tenk1
 WHERE thousand < 2 AND tenthous IN (1001,3000)
 ORDER BY thousand;
-                                         QUERY PLAN                                         
---------------------------------------------------------------------------------------------
+                         QUERY PLAN                          
+-------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Sort
-         Sort Key: thousand
-         ->  Index Only Scan using tenk1_thous_tenthous on tenk1
-               Index Cond: ((thousand < 2) AND (tenthous = ANY ('{1001,3000}'::integer[])))
-(5 rows)
+   ->  Index Only Scan using tenk1_thous_tenthous on tenk1
+         Index Cond: (thousand < 2)
+         Filter: (tenthous = ANY ('{1001,3000}'::integer[]))
+(4 rows)
 
 SELECT thousand, tenthous FROM tenk1
 WHERE thousand < 2 AND tenthous IN (1001,3000)

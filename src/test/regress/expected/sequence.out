@@ -518,3 +518,23 @@ SELECT * FROM information_schema.sequences WHERE sequence_name IN
 
 DROP USER regress_seq_user;
 DROP SEQUENCE seq;
+create table test_seqtab (unique1 int, unique2 int);
+insert into test_seqtab select i, i from generate_series(1,1000) s(i);
+create temp sequence testseq;
+select unique1, unique2, nextval('testseq')
+  from test_seqtab order by unique2 limit 10;
+ unique1 | unique2 | nextval 
+---------+---------+---------
+       1 |       1 |       1
+       2 |       2 |       3
+       3 |       3 |       2
+       4 |       4 |       4
+       5 |       5 |       5
+       6 |       6 |       7
+       7 |       7 |       6
+       8 |       8 |       9
+       9 |       9 |      11
+      10 |      10 |       8
+(10 rows)
+
+drop table test_seqtab;

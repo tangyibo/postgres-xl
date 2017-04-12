@@ -419,8 +419,7 @@ doRename(const ObjectAddress *object, const char *oldname, const char *newname)
 			 * An operation with GTM can just be done from a remote Coordinator.
 			 */
 			if (relKind == RELKIND_SEQUENCE &&
-				IS_PGXC_LOCAL_COORDINATOR &&
-				!IsTempSequence(object->objectId))
+				IS_PGXC_LOCAL_COORDINATOR)
 			{
 				Relation relseq = relation_open(object->objectId, AccessShareLock);
 				char *seqname = GetGlobalSeqName(relseq, NULL, oldname);
@@ -1268,7 +1267,6 @@ doDeletion(const ObjectAddress *object, int flags)
 						 * Sequence is dropped on GTM by a remote Coordinator only
 						 * for a non temporary sequence.
 						 */
-						if (!IsTempSequence(object->objectId))
 						{
 							/*
 							 * The sequence has already been removed from Coordinator,

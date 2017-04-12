@@ -2715,8 +2715,7 @@ RenameRelationInternal(Oid myrelid, const char *newrelname, bool is_internal)
 	/* Operation with GTM can only be done with a Remote Coordinator */
 	if (IS_PGXC_LOCAL_COORDINATOR &&
 		(targetrelation->rd_rel->reltype == OBJECT_SEQUENCE ||
-		 targetrelation->rd_rel->relkind == RELKIND_SEQUENCE) &&
-		!IsTempSequence(myrelid)) /* It is possible to rename a sequence with ALTER TABLE */
+		 targetrelation->rd_rel->relkind == RELKIND_SEQUENCE))
 	{
 		char *seqname = GetGlobalSeqName(targetrelation, NULL, NULL);
 		char *newseqname = GetGlobalSeqName(targetrelation, newrelname, NULL);
@@ -12228,8 +12227,7 @@ AlterTableNamespaceInternal(Relation rel, Oid oldNspOid, Oid nspOid,
 #ifdef PGXC
 	/* Rename also sequence on GTM for a sequence */
 	if (IS_PGXC_LOCAL_COORDINATOR &&
-		rel->rd_rel->relkind == RELKIND_SEQUENCE &&
-		!IsTempSequence(RelationGetRelid(rel)))
+		rel->rd_rel->relkind == RELKIND_SEQUENCE)
 	{
 		char *seqname = GetGlobalSeqName(rel, NULL, NULL);
 		char *newseqname = GetGlobalSeqName(rel, NULL, get_namespace_name(nspOid));
@@ -12429,8 +12427,7 @@ AlterSeqNamespaces(Relation classRel, Relation rel,
 
 #ifdef PGXC
 		/* Change also this sequence name on GTM */
-		if (IS_PGXC_LOCAL_COORDINATOR &&
-			!IsTempSequence(RelationGetRelid(seqRel)))
+		if (IS_PGXC_LOCAL_COORDINATOR)
 		{
 			char *seqname = GetGlobalSeqName(seqRel, NULL, NULL);
 			char *newseqname = GetGlobalSeqName(seqRel, NULL, get_namespace_name(newNspOid));

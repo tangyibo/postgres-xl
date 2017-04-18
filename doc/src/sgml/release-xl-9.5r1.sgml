@@ -25,6 +25,20 @@
    <itemizedlist>
     <listitem>
      <para>
+      Make sure that <command>pg_dump</command> can correctly dump from even
+      vanilla PostgreSQL.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Handle temporary sequences correctly, ensuring that they do not generate
+      duplicate values on different datanodes.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
       Handle multi-command SQL strings correctly even when there are 'null' sql
       commands (Krzysztof Nienartowicz).
      </para>

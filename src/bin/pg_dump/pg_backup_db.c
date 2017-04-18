@@ -72,6 +72,26 @@ _check_database_version(ArchiveHandle *AH)
 	}
 	else
 		AH->public.isStandby = false;
+
+	/*
+	 * Check if we are connected to a Postgres-XL node. We do a pretty basic
+	 * check for existence of pgxc_class table in pg_catalog schema.
+	 *
+	 * We don't think there will be a XC/XL database running anything older
+	 * than 9.1. So only look for server versions great than that.
+	 */
+	if (remoteversion >= 90100)
+	{
+		res = ExecuteSqlQueryForSingleRow((Archive *) AH, "SELECT EXISTS "
+				"(SELECT 1 FROM pg_catalog.pg_class where relname = 'pgxc_class' "
+					"AND relnamespace = (SELECT oid FROM pg_namespace "
+						"WHERE nspname = 'pg_catalog'))");
+
+		AH->public.isPostgresXL = (strcmp(PQgetvalue(res, 0, 0), "t") == 0);
+		PQclear(res);
+	}
+	else
+		AH->public.isPostgresXL = false;
 }
 
 /*

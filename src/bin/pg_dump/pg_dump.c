@@ -4763,9 +4763,7 @@ getTables(Archive *fout, int *numTables)
 						  "d.refobjsubid AS owning_col, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = c.reltablespace) AS reltablespace, "
 #ifdef PGXC
-						  "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
-						  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
-						  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+						  "%s"
 #endif
 						  "array_remove(array_remove(c.reloptions,'check_option=local'),'check_option=cascaded') AS reloptions, "
 						  "CASE WHEN 'check_option=local' = ANY (c.reloptions) THEN 'LOCAL'::text "
@@ -4781,6 +4779,11 @@ getTables(Archive *fout, int *numTables)
 				   "WHERE c.relkind in ('%c', '%c', '%c', '%c', '%c', '%c') "
 						  "ORDER BY c.oid",
 						  username_subquery,
+						  fout->isPostgresXL
+							  ?  "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
+							  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
+							  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+							  : "",
 						  RELKIND_SEQUENCE,
 						  RELKIND_RELATION, RELKIND_SEQUENCE,
 						  RELKIND_VIEW, RELKIND_COMPOSITE_TYPE,
@@ -4810,9 +4813,7 @@ getTables(Archive *fout, int *numTables)
 						  "d.refobjsubid AS owning_col, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = c.reltablespace) AS reltablespace, "
 #ifdef PGXC
-						  "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
-						  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
-						  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+						  "%s"
 #endif
 						  "array_remove(array_remove(c.reloptions,'check_option=local'),'check_option=cascaded') AS reloptions, "
 						  "CASE WHEN 'check_option=local' = ANY (c.reloptions) THEN 'LOCAL'::text "
@@ -4828,6 +4829,11 @@ getTables(Archive *fout, int *numTables)
 				   "WHERE c.relkind in ('%c', '%c', '%c', '%c', '%c', '%c') "
 						  "ORDER BY c.oid",
 						  username_subquery,
+						  fout->isPostgresXL
+							  ? "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
+							  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
+							  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+							  : "",
 						  RELKIND_SEQUENCE,
 						  RELKIND_RELATION, RELKIND_SEQUENCE,
 						  RELKIND_VIEW, RELKIND_COMPOSITE_TYPE,
@@ -4857,9 +4863,7 @@ getTables(Archive *fout, int *numTables)
 						  "d.refobjsubid AS owning_col, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = c.reltablespace) AS reltablespace, "
 #ifdef PGXC
-						  "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
-						  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
-						  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+						  "%s"
 #endif
 						  "array_remove(array_remove(c.reloptions,'check_option=local'),'check_option=cascaded') AS reloptions, "
 						  "CASE WHEN 'check_option=local' = ANY (c.reloptions) THEN 'LOCAL'::text "
@@ -4875,6 +4879,11 @@ getTables(Archive *fout, int *numTables)
 				   "WHERE c.relkind in ('%c', '%c', '%c', '%c', '%c', '%c') "
 						  "ORDER BY c.oid",
 						  username_subquery,
+						  fout->isPostgresXL
+						  	? "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
+							  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
+							  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+							: "",
 						  RELKIND_SEQUENCE,
 						  RELKIND_RELATION, RELKIND_SEQUENCE,
 						  RELKIND_VIEW, RELKIND_COMPOSITE_TYPE,
@@ -4904,9 +4913,7 @@ getTables(Archive *fout, int *numTables)
 						  "d.refobjsubid AS owning_col, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = c.reltablespace) AS reltablespace, "
 #ifdef PGXC
-						  "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
-						  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
-						  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+						  "%s"
 #endif
 						  "c.reloptions AS reloptions, "
 						  "tc.reloptions AS toast_reloptions "
@@ -4920,6 +4927,11 @@ getTables(Archive *fout, int *numTables)
 				   "WHERE c.relkind in ('%c', '%c', '%c', '%c', '%c', '%c') "
 						  "ORDER BY c.oid",
 						  username_subquery,
+						  fout->isPostgresXL
+							  ?  "(SELECT pclocatortype from pgxc_class v where v.pcrelid = c.oid) AS pgxclocatortype,"
+							  "(SELECT pcattnum from pgxc_class v where v.pcrelid = c.oid) AS pgxcattnum,"
+							  "(SELECT string_agg(node_name,',') AS pgxc_node_names from pgxc_node n where n.oid in (select unnest(nodeoids) from pgxc_class v where v.pcrelid=c.oid) ) , "
+							  : "",
 						  RELKIND_SEQUENCE,
 						  RELKIND_RELATION, RELKIND_SEQUENCE,
 						  RELKIND_VIEW, RELKIND_COMPOSITE_TYPE,
@@ -5258,9 +5270,12 @@ getTables(Archive *fout, int *numTables)
 	i_owning_tab = PQfnumber(res, "owning_tab");
 	i_owning_col = PQfnumber(res, "owning_col");
 #ifdef PGXC
-	i_pgxclocatortype = PQfnumber(res, "pgxclocatortype");
-	i_pgxcattnum = PQfnumber(res, "pgxcattnum");
-	i_pgxc_node_names = PQfnumber(res, "pgxc_node_names");
+	if (fout->isPostgresXL)
+	{
+		i_pgxclocatortype = PQfnumber(res, "pgxclocatortype");
+		i_pgxcattnum = PQfnumber(res, "pgxcattnum");
+		i_pgxc_node_names = PQfnumber(res, "pgxc_node_names");
+	}
 #endif
 	i_reltablespace = PQfnumber(res, "reltablespace");
 	i_reloptions = PQfnumber(res, "reloptions");
@@ -5328,18 +5343,21 @@ getTables(Archive *fout, int *numTables)
 			tblinfo[i].owning_col = atoi(PQgetvalue(res, i, i_owning_col));
 		}
 #ifdef PGXC
-		/* Not all the tables have pgxc locator Data */
-		if (PQgetisnull(res, i, i_pgxclocatortype))
+		if (fout->isPostgresXL)
 		{
-			tblinfo[i].pgxclocatortype = 'E';
-			tblinfo[i].pgxcattnum = 0;
+			/* Not all the tables have pgxc locator Data */
+			if (PQgetisnull(res, i, i_pgxclocatortype))
+			{
+				tblinfo[i].pgxclocatortype = 'E';
+				tblinfo[i].pgxcattnum = 0;
+			}
+			else
+			{
+				tblinfo[i].pgxclocatortype = *(PQgetvalue(res, i, i_pgxclocatortype));
+				tblinfo[i].pgxcattnum = atoi(PQgetvalue(res, i, i_pgxcattnum));
+			}
+			tblinfo[i].pgxc_node_names = pg_strdup(PQgetvalue(res, i, i_pgxc_node_names));
 		}
-		else
-		{
-			tblinfo[i].pgxclocatortype = *(PQgetvalue(res, i, i_pgxclocatortype));
-			tblinfo[i].pgxcattnum = atoi(PQgetvalue(res, i, i_pgxcattnum));
-		}
-		tblinfo[i].pgxc_node_names = pg_strdup(PQgetvalue(res, i, i_pgxc_node_names));
 #endif
 		tblinfo[i].reltablespace = pg_strdup(PQgetvalue(res, i, i_reltablespace));
 		tblinfo[i].reloptions = pg_strdup(PQgetvalue(res, i, i_reloptions));
@@ -14268,38 +14286,41 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		}
 
 #ifdef PGXC
-		/* Add the grammar extension linked to PGXC depending on data got from pgxc_class */
-		if (tbinfo->pgxclocatortype != 'E')
+		if (fout->isPostgresXL)
 		{
-			/* N: DISTRIBUTE BY ROUNDROBIN */
-			if (tbinfo->pgxclocatortype == 'N')
+			/* Add the grammar extension linked to PGXC depending on data got from pgxc_class */
+			if (tbinfo->pgxclocatortype != 'E')
 			{
-				appendPQExpBuffer(q, "\nDISTRIBUTE BY ROUNDROBIN");
+				/* N: DISTRIBUTE BY ROUNDROBIN */
+				if (tbinfo->pgxclocatortype == 'N')
+				{
+					appendPQExpBuffer(q, "\nDISTRIBUTE BY ROUNDROBIN");
+				}
+				/* R: DISTRIBUTE BY REPLICATED */
+				else if (tbinfo->pgxclocatortype == 'R')
+				{
+					appendPQExpBuffer(q, "\nDISTRIBUTE BY REPLICATION");
+				}
+				/* H: DISTRIBUTE BY HASH  */
+				else if (tbinfo->pgxclocatortype == 'H')
+				{
+					int hashkey = tbinfo->pgxcattnum;
+					appendPQExpBuffer(q, "\nDISTRIBUTE BY HASH (%s)",
+									  fmtId(tbinfo->attnames[hashkey - 1]));
+				}
+				else if (tbinfo->pgxclocatortype == 'M')
+				{
+					int hashkey = tbinfo->pgxcattnum;
+					appendPQExpBuffer(q, "\nDISTRIBUTE BY MODULO (%s)",
+									  fmtId(tbinfo->attnames[hashkey - 1]));
+				}
 			}
-			/* R: DISTRIBUTE BY REPLICATED */
-			else if (tbinfo->pgxclocatortype == 'R')
+			if (include_nodes &&
+				tbinfo->pgxc_node_names != NULL &&
+				tbinfo->pgxc_node_names[0] != '\0')
 			{
-				appendPQExpBuffer(q, "\nDISTRIBUTE BY REPLICATION");
+				appendPQExpBuffer(q, "\nTO NODE (%s)", tbinfo->pgxc_node_names);
 			}
-			/* H: DISTRIBUTE BY HASH  */
-			else if (tbinfo->pgxclocatortype == 'H')
-			{
-				int hashkey = tbinfo->pgxcattnum;
-				appendPQExpBuffer(q, "\nDISTRIBUTE BY HASH (%s)",
-								  fmtId(tbinfo->attnames[hashkey - 1]));
-			}
-			else if (tbinfo->pgxclocatortype == 'M')
-			{
-				int hashkey = tbinfo->pgxcattnum;
-				appendPQExpBuffer(q, "\nDISTRIBUTE BY MODULO (%s)",
-								  fmtId(tbinfo->attnames[hashkey - 1]));
-			}
-		}
-		if (include_nodes &&
-			tbinfo->pgxc_node_names != NULL &&
-			tbinfo->pgxc_node_names[0] != '\0')
-		{
-			appendPQExpBuffer(q, "\nTO NODE (%s)", tbinfo->pgxc_node_names);
 		}
 #endif
 		/* Dump generic options if any */
@@ -15364,32 +15385,35 @@ dumpSequenceData(Archive *fout, TableDataInfo *tdinfo)
 	last = PQgetvalue(res, 0, 0);
 	called = (strcmp(PQgetvalue(res, 0, 1), "t") == 0);
 #ifdef PGXC
-    /* 
- 	 * In Postgres-XC it is possible that the current value of a
-	 * sequence cached on each node is different as several sessions
-	 * might use the sequence on different nodes. So what we do here
-	 * to get a consistent dump is to get the next value of sequence.
-	 * This insures that sequence value is unique as nextval is directly
-	 * obtained from GTM.
-	 */
-	resetPQExpBuffer(query);
-	appendPQExpBufferStr(query, "SELECT pg_catalog.nextval(");
-	appendStringLiteralAH(query, fmtId(tbinfo->dobj.name), fout);
-	appendPQExpBuffer(query, ");\n");
-	res = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
-
-	if (PQntuples(res) != 1)
+	if (fout->isPostgresXL)
 	{
-		write_msg(NULL, ngettext("query to get nextval of sequence \"%s\" "
-								 "returned %d rows (expected 1)\n",
-									"query to get nextval of sequence \"%s\" "
-								 "returned %d rows (expected 1)\n",
-								 PQntuples(res)),
-				tbinfo->dobj.name, PQntuples(res));
-		exit_nicely(1);
-	}
+		/* 
+		 * In Postgres-XC it is possible that the current value of a
+		 * sequence cached on each node is different as several sessions
+		 * might use the sequence on different nodes. So what we do here
+		 * to get a consistent dump is to get the next value of sequence.
+		 * This insures that sequence value is unique as nextval is directly
+		 * obtained from GTM.
+		 */
+		resetPQExpBuffer(query);
+		appendPQExpBufferStr(query, "SELECT pg_catalog.nextval(");
+		appendStringLiteralAH(query, fmtId(tbinfo->dobj.name), fout);
+		appendPQExpBuffer(query, ");\n");
+		res = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
 
-	last = PQgetvalue(res, 0, 0);
+		if (PQntuples(res) != 1)
+		{
+			write_msg(NULL, ngettext("query to get nextval of sequence \"%s\" "
+									 "returned %d rows (expected 1)\n",
+										"query to get nextval of sequence \"%s\" "
+									 "returned %d rows (expected 1)\n",
+									 PQntuples(res)),
+					tbinfo->dobj.name, PQntuples(res));
+			exit_nicely(1);
+		}
+
+		last = PQgetvalue(res, 0, 0);
+	}
 #endif
 
 	resetPQExpBuffer(query);

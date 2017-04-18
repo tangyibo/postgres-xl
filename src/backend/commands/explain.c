@@ -3480,12 +3480,8 @@ ExplainRemoteQuery(RemoteQuery *plan, PlanState *planstate, List *ancestors, Exp
 		plan->scan.plan.targetlist = lappend(plan->scan.plan.targetlist,
 				makeTargetEntry((Expr *) dummy, 1, "QUERY PLAN", false));
 
-		/* Execute query on the data nodes */
-		estate = CreateExecutorState();
-
+		estate = planstate->state;
 		oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
-
-		estate->es_snapshot = GetActiveSnapshot();
 
 		node = ExecInitRemoteQuery(step, estate, 0);
 		MemoryContextSwitchTo(oldcontext);

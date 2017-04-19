@@ -5,7 +5,7 @@
 
   <note>
   <title>Release Date</title>
-  <simpara>2017-04-??</simpara>
+  <simpara>2017-04-20</simpara>
   </note>
   <para>
    This release includes all the bug fixes and security fixes from PostgreSQL

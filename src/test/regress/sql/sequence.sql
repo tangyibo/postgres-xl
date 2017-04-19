@@ -268,6 +268,6 @@ create table test_seqtab (unique1 int, unique2 int);
 insert into test_seqtab select i, i from generate_series(1,1000) s(i);
 
 create temp sequence testseq;
-select unique1, unique2, nextval('testseq')
-  from test_seqtab order by unique2 limit 10;
+select distinct(nextval('testseq'))
+  from test_seqtab order by 1 limit 10;
 drop table test_seqtab;

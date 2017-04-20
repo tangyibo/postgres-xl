@@ -211,16 +211,16 @@ COPY atest5 (two) TO stdout; -- fail
 SELECT atest5 FROM atest5; -- fail
 COPY atest5 (one,two) TO stdout; -- fail
 SELECT 1 FROM atest5; -- ok
-SELECT 1 FROM atest5 a JOIN atest5 b USING (one); -- ok 
+SELECT 1 FROM atest5 a JOIN atest5 b USING (one); -- ok
 SELECT 1 FROM atest5 a JOIN atest5 b USING (two); -- fail
 SELECT 1 FROM atest5 a NATURAL JOIN atest5 b; -- fail
 SELECT (j.*) IS NULL FROM (atest5 a JOIN atest5 b USING (one)) j; -- fail
 SELECT 1 FROM atest5 WHERE two = 2; -- fail
 SELECT * FROM atest1, atest5; -- fail
 SELECT atest1.* FROM atest1, atest5; -- ok
-SELECT atest1.*,atest5.one FROM atest1, atest5; -- ok 
+SELECT atest1.*,atest5.one FROM atest1, atest5; -- ok
 SELECT atest1.*,atest5.one FROM atest1 JOIN atest5 ON (atest1.a = atest5.two); -- fail
-SELECT atest1.*,atest5.one FROM atest1 JOIN atest5 ON (atest1.a = atest5.one); -- ok 
+SELECT atest1.*,atest5.one FROM atest1 JOIN atest5 ON (atest1.a = atest5.one); -- ok
 SELECT one, two FROM atest5; -- fail
 
 SET SESSION AUTHORIZATION regress_user1;
@@ -260,7 +260,7 @@ INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLU
 INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLUDED.three;
 INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set one = 8; -- fails (due to UPDATE)
 INSERT INTO atest5(three) VALUES (4) ON CONFLICT (two) DO UPDATE set three = 10; -- fails (due to INSERT)
--- Check that the the columns in the inference require select privileges
+-- Check that the columns in the inference require select privileges
 -- Error. No privs on four
 INSERT INTO atest5(three) VALUES (4) ON CONFLICT (four) DO UPDATE set three = 10;
 
@@ -316,7 +316,7 @@ ALTER TABLE atest6 DROP COLUMN three;
 
 SET SESSION AUTHORIZATION regress_user4;
 SELECT atest6 FROM atest6; -- ok
-SELECT one FROM atest5 NATURAL JOIN atest6; -- ok 
+SELECT one FROM atest5 NATURAL JOIN atest6; -- ok
 
 SET SESSION AUTHORIZATION regress_user1;
 ALTER TABLE atest6 DROP COLUMN two;

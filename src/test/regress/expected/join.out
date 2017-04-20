@@ -5528,9 +5528,12 @@ lateral (select * from int8_tbl t1,
                                      where q2 = (select greatest(t1.q1,t2.q2))
                                        and (select v.id=0)) offset 0) ss2) ss
          where t1.q1 = ss.q2) ss0;
- id | q1 | q2 | q1 | q2 
-----+----+----+----+----
-(0 rows)
+ id |        q1        |        q2         |        q1        |        q2        
+----+------------------+-------------------+------------------+------------------
+  0 | 4567890123456789 |               123 | 4567890123456789 | 4567890123456789
+  0 | 4567890123456789 |  4567890123456789 | 4567890123456789 | 4567890123456789
+  0 | 4567890123456789 | -4567890123456789 | 4567890123456789 | 4567890123456789
+(3 rows)
 
 -- test some error cases where LATERAL should have been used but wasn't
 select f1,g from int4_tbl a, (select f1 as g) ss;

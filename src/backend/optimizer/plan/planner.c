@@ -6236,6 +6236,13 @@ equal_distributions(PlannerInfo *root, Distribution *dst1,
 static Path *
 adjust_path_distribution(PlannerInfo *root, Query *parse, Path *path)
 {
+	/* if the root distribution is NULL, set it to path distribution */
+	if (!root->distribution)
+	{
+		root->distribution = path->distribution;
+		return path;
+	}
+
 	/* don't touch paths without distribution attached (catalogs etc.) */
 	if ((path->distribution == NULL) && (root->distribution == NULL))
 		return path;

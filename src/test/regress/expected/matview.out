@@ -192,13 +192,14 @@ SELECT * FROM mvtest_tvm ORDER BY type;
  z    |     11
 (3 rows)
 
+REFRESH MATERIALIZED VIEW mvtest_tm;
 REFRESH MATERIALIZED VIEW mvtest_tvm;
 SELECT * FROM mvtest_tm ORDER BY type;
  type | totamt 
 ------+--------
  x    |      5
  y    |     12
- z    |     11
+ z    |     24
 (3 rows)
 
 SELECT * FROM mvtest_tvm ORDER BY type;
@@ -280,7 +281,7 @@ EXPLAIN (costs off)
 SELECT * FROM mvtest_tmm;
  grandtot 
 ----------
-       28
+       41
 (1 row)
 
 SELECT * FROM mvtest_tvmm;
@@ -310,7 +311,7 @@ SELECT type, m.totamt AS mtot, v.totamt AS vtot FROM mvtest_tm m LEFT JOIN mvtes
 ------+------+------
  x    |    5 |    5
  y    |   12 |   12
- z    |   11 |   24
+ z    |   24 |   24
 (3 rows)
 
 -- make sure that dependencies are reported properly when they block the drop
@@ -432,6 +433,7 @@ CREATE UNIQUE INDEX on mvtest_mv (c);
 INSERT INTO mvtest_foo VALUES(2, 3, 4);
 INSERT INTO mvtest_foo VALUES(3, 4, 5);
 REFRESH MATERIALIZED VIEW mvtest_mv;
+REFRESH MATERIALIZED VIEW mvtest_mv;
 DROP TABLE mvtest_foo CASCADE;
 NOTICE:  drop cascades to materialized view mvtest_mv
 -- allow subquery to reference unpopulated matview if WITH NO DATA is specified
@@ -449,11 +451,12 @@ INSERT INTO mvtest_boxes (b) VALUES
 CREATE MATERIALIZED VIEW mvtest_boxmv AS SELECT * FROM mvtest_boxes;
 CREATE UNIQUE INDEX mvtest_boxmv_id ON mvtest_boxmv (id);
 UPDATE mvtest_boxes SET b = '(2,2),(1,1)' WHERE id = 2;
+REFRESH MATERIALIZED VIEW mvtest_boxmv;
 SELECT * FROM mvtest_boxmv ORDER BY id;
  id |              b              
 ----+-----------------------------
   1 | (32,32),(31,31)
-  2 | (2.0000004,2.0000004),(1,1)
+  2 | (2,2),(1,1)
   3 | (1.9999996,1.9999996),(1,1)
 (3 rows)
 
@@ -474,6 +477,7 @@ INSERT INTO mvtest_v values (1, 2);
 CREATE UNIQUE INDEX mvtest_mv_v_ii ON mvtest_mv_v (ii);
 REFRESH MATERIALIZED VIEW mvtest_mv_v;
 UPDATE mvtest_v SET j = 3 WHERE x = 1;
+REFRESH MATERIALIZED VIEW mvtest_mv_v;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_2;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_3;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_4;
@@ -486,7 +490,7 @@ SELECT * FROM mvtest_v;
 SELECT * FROM mvtest_mv_v;
  ii | jj 
 ----+----
-  1 |  2
+  1 |  3
 (1 row)
 
 SELECT * FROM mvtest_mv_v_2;
@@ -565,6 +569,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS mvtest_mv_foo AS SELECT * FROM mvtest_foo
 NOTICE:  relation "mvtest_mv_foo" already exists, skipping
 CREATE UNIQUE INDEX ON mvtest_mv_foo (i);
 RESET ROLE;
+REFRESH MATERIALIZED VIEW mvtest_mv_foo;
 REFRESH MATERIALIZED VIEW mvtest_mv_foo;
 DROP OWNED BY regress_user_mvtest CASCADE;
 DROP ROLE regress_user_mvtest;

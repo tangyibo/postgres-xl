@@ -21,12 +21,12 @@ EXPLAIN (costs off)
   CREATE MATERIALIZED VIEW mvtest_tm AS SELECT type, sum(amt) AS totamt FROM mvtest_t GROUP BY type WITH NO DATA;
                         QUERY PLAN                         
 -----------------------------------------------------------
- HashAggregate
+ GroupAggregate
    Group Key: type
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-         ->  HashAggregate
-               Group Key: type
-               ->  Seq Scan on t
+         ->  Sort
+               Sort Key: type
+               ->  Seq Scan on mvtest_t
 (6 rows)
 
 CREATE MATERIALIZED VIEW mvtest_tm AS SELECT type, sum(amt) AS totamt FROM mvtest_t GROUP BY type WITH NO DATA;
@@ -58,17 +58,15 @@ SELECT * FROM mvtest_tm ORDER BY 1;
 -- create various views
 EXPLAIN (costs off)
   CREATE MATERIALIZED VIEW mvtest_tvm AS SELECT * FROM mvtest_tv ORDER BY type;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Sort
-   Sort Key: mvtest_t.type
-   ->  HashAggregate
-         Group Key: t.type
-         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  HashAggregate
-                     Group Key: t.type
-                     ->  Seq Scan on t
-(8 rows)
+                        QUERY PLAN                         
+-----------------------------------------------------------
+ GroupAggregate
+   Group Key: mvtest_t.type
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: mvtest_t.type
+               ->  Seq Scan on mvtest_t
+(6 rows)
 
 CREATE MATERIALIZED VIEW mvtest_tvm AS SELECT * FROM mvtest_tv ORDER BY type;
 SELECT * FROM mvtest_tvm;
@@ -89,12 +87,12 @@ EXPLAIN (costs off)
                            QUERY PLAN                            
 -----------------------------------------------------------------
  Aggregate
-   ->  HashAggregate
-         Group Key: t.type
+   ->  GroupAggregate
+         Group Key: mvtest_t.type
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  HashAggregate
-                     Group Key: t.type
-                     ->  Seq Scan on t
+               ->  Sort
+                     Sort Key: mvtest_t.type
+                     ->  Seq Scan on mvtest_t
 (7 rows)
 
 CREATE MATERIALIZED VIEW mvtest_tvvm AS SELECT * FROM mvtest_tvv;

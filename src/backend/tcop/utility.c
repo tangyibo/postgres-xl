@@ -2473,6 +2473,10 @@ ProcessUtilitySlow(Node *parsetree,
 
 			case T_CreateAmStmt:
 				address = CreateAccessMethod((CreateAmStmt *) parsetree);
+#ifdef PGXC
+				if (IS_PGXC_LOCAL_COORDINATOR)
+					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
+#endif
 				break;
 
 			default:

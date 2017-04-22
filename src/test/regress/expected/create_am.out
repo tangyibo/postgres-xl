@@ -45,13 +45,14 @@ EXPLAIN (COSTS OFF)
 SELECT * FROM fast_emp4000
     WHERE home_base @ '(200,200),(2000,1000)'::box
     ORDER BY (home_base[0])[0];
-                           QUERY PLAN                           
-----------------------------------------------------------------
- Sort
-   Sort Key: ((home_base[0])[0])
-   ->  Index Only Scan using grect2ind2 on fast_emp4000
-         Index Cond: (home_base @ '(2000,1000),(200,200)'::box)
-(4 rows)
+                              QUERY PLAN                              
+----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Sort
+         Sort Key: ((home_base[0])[0])
+         ->  Index Only Scan using grect2ind2 on fast_emp4000
+               Index Cond: (home_base @ '(2000,1000),(200,200)'::box)
+(5 rows)
 
 SELECT * FROM fast_emp4000
     WHERE home_base @ '(200,200),(2000,1000)'::box
@@ -64,12 +65,14 @@ SELECT * FROM fast_emp4000
 
 EXPLAIN (COSTS OFF)
 SELECT count(*) FROM fast_emp4000 WHERE home_base && '(1000,1000,0,0)'::box;
-                         QUERY PLAN                          
--------------------------------------------------------------
- Aggregate
-   ->  Index Only Scan using grect2ind2 on fast_emp4000
-         Index Cond: (home_base && '(1000,1000),(0,0)'::box)
-(3 rows)
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
+ Finalize Aggregate
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Partial Aggregate
+               ->  Index Only Scan using grect2ind2 on fast_emp4000
+                     Index Cond: (home_base && '(1000,1000),(0,0)'::box)
+(5 rows)
 
 SELECT count(*) FROM fast_emp4000 WHERE home_base && '(1000,1000,0,0)'::box;
  count 
@@ -79,12 +82,14 @@ SELECT count(*) FROM fast_emp4000 WHERE home_base && '(1000,1000,0,0)'::box;
 
 EXPLAIN (COSTS OFF)
 SELECT count(*) FROM fast_emp4000 WHERE home_base IS NULL;
-                       QUERY PLAN                       
---------------------------------------------------------
- Aggregate
-   ->  Index Only Scan using grect2ind2 on fast_emp4000
-         Index Cond: (home_base IS NULL)
-(3 rows)
+                             QUERY PLAN                             
+--------------------------------------------------------------------
+ Finalize Aggregate
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Partial Aggregate
+               ->  Index Only Scan using grect2ind2 on fast_emp4000
+                     Index Cond: (home_base IS NULL)
+(5 rows)
 
 SELECT count(*) FROM fast_emp4000 WHERE home_base IS NULL;
  count 

@@ -764,15 +764,15 @@ explain (verbose true, costs false, nodes false) select * from (select count(*),
                      Output: xc_groupby_tab1.val2, xc_groupby_tab2.val2, xc_groupby_tab1.val, xc_groupby_tab2.val
                      Merge Cond: (xc_groupby_tab1.val2 = xc_groupby_tab2.val2)
                      ->  Sort
-                           Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                           Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                            Sort Key: xc_groupby_tab1.val2
                            ->  Seq Scan on public.xc_groupby_tab1
-                                 Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                                 Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                      ->  Sort
-                           Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                           Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
                            Sort Key: xc_groupby_tab2.val2
                            ->  Seq Scan on public.xc_groupby_tab2
-                                 Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                                 Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
 (21 rows)
 
 -- aggregates over aggregates
@@ -2204,15 +2204,15 @@ explain (verbose true, costs false, nodes false) select count(*), sum(xc_groupby
                      Output: xc_groupby_tab1.val2, xc_groupby_tab2.val2, xc_groupby_tab1.val, xc_groupby_tab2.val
                      Merge Cond: (xc_groupby_tab1.val2 = xc_groupby_tab2.val2)
                      ->  Sort
-                           Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                           Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                            Sort Key: xc_groupby_tab1.val2
                            ->  Seq Scan on public.xc_groupby_tab1
-                                 Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                                 Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                      ->  Sort
-                           Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                           Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
                            Sort Key: xc_groupby_tab2.val2
                            ->  Seq Scan on public.xc_groupby_tab2
-                                 Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                                 Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
 (21 rows)
 
 -- aggregates over aggregates
@@ -3628,15 +3628,15 @@ explain (verbose true, costs false, nodes false) select * from (select count(*),
                      Output: xc_groupby_tab1.val2, xc_groupby_tab2.val2, xc_groupby_tab1.val, xc_groupby_tab2.val
                      Merge Cond: (xc_groupby_tab1.val2 = xc_groupby_tab2.val2)
                      ->  Sort
-                           Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                           Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                            Sort Key: xc_groupby_tab1.val2
                            ->  Seq Scan on public.xc_groupby_tab1
-                                 Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                                 Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                      ->  Sort
-                           Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                           Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
                            Sort Key: xc_groupby_tab2.val2
                            ->  Seq Scan on public.xc_groupby_tab2
-                                 Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                                 Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
 (21 rows)
 
 -- aggregates over aggregates
@@ -5087,15 +5087,15 @@ explain (verbose true, costs false, nodes false) select count(*), sum(xc_groupby
                      Output: xc_groupby_tab1.val2, xc_groupby_tab2.val2, xc_groupby_tab1.val, xc_groupby_tab2.val
                      Merge Cond: (xc_groupby_tab1.val2 = xc_groupby_tab2.val2)
                      ->  Sort
-                           Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                           Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                            Sort Key: xc_groupby_tab1.val2
                            ->  Seq Scan on public.xc_groupby_tab1
-                                 Output: xc_groupby_tab1.val2, xc_groupby_tab1.val
+                                 Output: xc_groupby_tab1.val, xc_groupby_tab1.val2
                      ->  Sort
-                           Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                           Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
                            Sort Key: xc_groupby_tab2.val2
                            ->  Seq Scan on public.xc_groupby_tab2
-                                 Output: xc_groupby_tab2.val2, xc_groupby_tab2.val
+                                 Output: xc_groupby_tab2.val, xc_groupby_tab2.val2
 (22 rows)
 
 -- aggregates over aggregates

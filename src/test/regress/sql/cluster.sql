@@ -161,7 +161,7 @@ ORDER BY 1;
 -- Test MVCC-safety of cluster. There isn't much we can do to verify the
 -- results with a single backend...
 
-CREATE TABLE clustertest (key int PRIMARY KEY);
+CREATE TABLE clustertest (key int PRIMARY KEY) DISTRIBUTE BY REPLICATION;
 
 INSERT INTO clustertest VALUES (10);
 INSERT INTO clustertest VALUES (20);
@@ -183,30 +183,30 @@ UPDATE clustertest SET key = 60 WHERE key = 50;
 UPDATE clustertest SET key = 70 WHERE key = 60;
 UPDATE clustertest SET key = 80 WHERE key = 70;
 
-SELECT * FROM clustertest ORDER BY 1;
+SELECT * FROM clustertest;
 CLUSTER clustertest_pkey ON clustertest;
-SELECT * FROM clustertest ORDER BY 1;
+SELECT * FROM clustertest;
 
 COMMIT;
 
-SELECT * FROM clustertest ORDER BY 1;
+SELECT * FROM clustertest;
 
 -- check that temp tables can be clustered
 -- Enforce use of COMMIT instead of 2PC for temporary objects
 RESET SESSION AUTHORIZATION;
-SET SESSION AUTHORIZATION clstr_user;
+SET SESSION AUTHORIZATION regress_clstr_user;
 
-create temp table clstr_temp (col1 int primary key, col2 text);
+create temp table clstr_temp (col1 int primary key, col2 text) DISTRIBUTE BY REPLICATION;
 insert into clstr_temp values (2, 'two'), (1, 'one');
 cluster clstr_temp using clstr_temp_pkey;
-select * from clstr_temp order by 1;
+select * from clstr_temp;
 drop table clstr_temp;
 
 RESET SESSION AUTHORIZATION;
 
 -- Test CLUSTER with external tuplesorting
 
-create table clstr_4 as select * from tenk1;
+create table clstr_4 distribute by replication as select * from tenk1;
 create index cluster_sort on clstr_4 (hundred, thousand, tenthous);
 -- ensure we don't use the index in CLUSTER nor the checking SELECTs
 set enable_indexscan = off;

@@ -131,7 +131,7 @@ gtmProxyPorts=()				# Not used if it is not configured.
 gtmProxyDirs=()	# Not used if it is not configured.
 
 #---- Configuration ----
-gtmPxyExtraConfig=n		# Extra configuration parameter for gtm_proxy.  Coordinator section has an example.
+gtmPxyExtraConfig=none		# Extra configuration parameter for gtm_proxy.  Coordinator section has an example.
 
 #---- Coordinators ----------------------------------------------------------------------------------------------------
 

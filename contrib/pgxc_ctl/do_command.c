@@ -854,7 +854,8 @@ static void stop_all(char *immediate)
 		stop_gtm_proxy_all();
 	if (isVarYes(VAR_gtmSlave))
 		stop_gtm_slave();
-	stop_gtm_master();
+	if (!is_none(sval(VAR_gtmMasterServer)))
+		stop_gtm_master();
 }
 
 
@@ -880,6 +881,12 @@ static void do_add_command(char *line)
 		elog(ERROR, "ERROR: Specify options for add command.\n");
 		return;
 	}
+	if (!TestToken("gtm") && is_none(sval(VAR_gtmMasterServer)))
+	{
+		elog(ERROR, "ERROR: GTM master must be added before adding any other component.\n");
+		return;
+	}
+
 	if (TestToken("gtm"))
 	{
 		/*
@@ -1166,13 +1173,14 @@ static void do_stop_command(char *line)
 			elog(WARNING, "-m option is not available with gtm. Ignoring.\n");
 		if (!GetToken() || (TestToken("all")))
 		{
-			stop_gtm_master();
+			if (!is_none(sval(VAR_gtmMasterServer)))
+				stop_gtm_master();
 			if (isVarYes(VAR_gtmSlave))
 				stop_gtm_slave();
 		}
-		else if (TestToken("master"))
+		else if (TestToken("master") && !is_none(sval(VAR_gtmMasterServer)))
 			stop_gtm_master();
-		else if (TestToken("slave"))
+		else if (TestToken("slave") && isVarYes(VAR_gtmSlave))
 			stop_gtm_slave();
 		else
 			elog(ERROR, "ERROR: please specify master, slave or all for stop gtm command.\n");
@@ -1736,7 +1744,8 @@ static void do_clean_command(char *line)
 		stop_all("immediate");
 
 		elog(INFO, "Cleaning all the directories and sockets.\n");
-		clean_gtm_master();
+		if (!is_none(sval(VAR_gtmMasterServer)))
+			clean_gtm_master();
 		if (isVarYes(VAR_gtmSlave))
 			clean_gtm_slave();
 		if (isVarYes(VAR_gtmProxy))
@@ -1754,15 +1763,17 @@ static void do_clean_command(char *line)
 		if ((token == NULL) || TestToken("all"))
 		{
 			elog(INFO, "Stopping and cleaning GTM slave/master \n");
-			stop_gtm_master();
+			if (!is_none(sval(VAR_gtmMasterServer)))
+				stop_gtm_master();
 			if (isVarYes(VAR_gtmSlave))
 				stop_gtm_slave();
 
-			clean_gtm_master();
+			if (!is_none(sval(VAR_gtmMasterServer)))
+				clean_gtm_master();
 			if (isVarYes(VAR_gtmSlave))
 				clean_gtm_slave();
 		}
-		else if (TestToken("master"))
+		else if (TestToken("master") && !is_none(sval(VAR_gtmMasterServer)))
 		{
 			stop_gtm_master();
 			clean_gtm_master();

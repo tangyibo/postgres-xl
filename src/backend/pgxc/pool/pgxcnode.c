@@ -950,56 +950,100 @@ release_handles(void)
 }
 
 /*
+ * Ensure that the supplied buffer has enough capacity and if not, it's
+ * extended to an appropriate size.
+ *
+ * currbuf is the currently used buffer of currsize. bytes_needed is the
+ * minimum size required. We shall return the new buffer, if allocated
+ * successfully and set newsize_p to contain the size of the repalloced buffer.
+ * If allocation fails, NULL is returned.
+ *
+ * The function checks for requests beyond MaxAllocSize and throw an error.
+ */
+static char *
+ensure_buffer_capacity(char *currbuf, size_t currsize, size_t bytes_needed, size_t *newsize_p)
+{
+	char	   *newbuf;
+	Size		newsize = (Size) currsize;
+
+	if (((Size) bytes_needed) >= MaxAllocSize)
+		ereport(ERROR,
+				(ENOSPC,
+				 errmsg("out of memory"),
+				 errdetail("Cannot enlarge buffer containing %ld bytes by %ld more bytes.",
+						   currsize, bytes_needed)));
+
+	if (bytes_needed <= newsize)
+	{
+		*newsize_p = currsize;
+		return currbuf;
+	}
+
+	/*
+	 * The current size of the buffer should never be zero (init_pgxc_handle
+	 * guarantees that.
+	 */
+	Assert(newsize > 0);
+
+	/*
+	 * Double the buffer size until we have enough space to hold bytes_needed
+	 */
+	while (bytes_needed > newsize)
+		newsize = 2 * newsize;
+
+	/*
+	 * Clamp to MaxAllocSize in case we went past it.  Note we are assuming
+	 * here that MaxAllocSize <= INT_MAX/2, else the above loop could
+	 * overflow.  We will still have newsize >= bytes_needed.
+	 */
+	if (newsize > (int) MaxAllocSize)
+		newsize = (int) MaxAllocSize;
+
+	newbuf = repalloc(currbuf, newsize);
+	if (newbuf)
+	{
+		/* repalloc succeeded, set new size and return the buffer */
+		*newsize_p = newsize;
+		return newbuf;
+	}
+
+	/*
+	 * If we fail to double the buffer, try to repalloc a buffer of the given
+	 * size, rounded to the next multiple of 8192 and see if that works.
+	 */
+	newsize = bytes_needed;
+	newsize = ((bytes_needed / 8192) + 1) * 8192;
+
+	newbuf = repalloc(currbuf, newsize);
+	if (newbuf)
+	{
+		/* repalloc succeeded, set new size and return the buffer */
+		*newsize_p = newsize;
+		return newbuf;
+	}
+
+	/* repalloc failed */
+	return NULL;
+}
+
+/*
  * Ensure specified amount of data can fit to the incoming buffer and
  * increase it if necessary
  */
 int
 ensure_in_buffer_capacity(size_t bytes_needed, PGXCNodeHandle *handle)
 {
-	int			newsize = handle->inSize;
-	char	   *newbuf;
-
-	if (bytes_needed <= (size_t) newsize)
+	size_t newsize;
+	char *newbuf = ensure_buffer_capacity(handle->inBuffer, handle->inSize,
+			bytes_needed, &newsize);
+	if (newbuf)
+	{
+		handle->inBuffer = newbuf;
+		handle->inSize = newsize;
 		return 0;
-
-	do
-	{
-		newsize *= 2;
-	} while (newsize > 0 && bytes_needed > (size_t) newsize);
-
-	if (newsize > 0 && bytes_needed <= (size_t) newsize)
-	{
-		newbuf = repalloc(handle->inBuffer, newsize);
-		if (newbuf)
-		{
-			/* repalloc succeeded */
-			handle->inBuffer = newbuf;
-			handle->inSize = newsize;
-			return 0;
-		}
 	}
-
-	newsize = handle->inSize;
-	do
-	{
-		newsize += 8192;
-	} while (newsize > 0 && bytes_needed > (size_t) newsize);
-
-	if (newsize > 0 && bytes_needed <= (size_t) newsize)
-	{
-		newbuf = repalloc(handle->inBuffer, newsize);
-		if (newbuf)
-		{
-			/* repalloc succeeded */
-			handle->inBuffer = newbuf;
-			handle->inSize = newsize;
-			return 0;
-		}
-	}
-
 	return EOF;
 }
-
 
 /*
  * Ensure specified amount of data can fit to the outgoing buffer and
@@ -1008,47 +1052,15 @@ ensure_in_buffer_capacity(size_t bytes_needed, PGXCNodeHandle *handle)
 int
 ensure_out_buffer_capacity(size_t bytes_needed, PGXCNodeHandle *handle)
 {
-	int			newsize = handle->outSize;
-	char	   *newbuf;
-
-	if (bytes_needed <= (size_t) newsize)
+	size_t newsize;
+	char *newbuf = ensure_buffer_capacity(handle->outBuffer, handle->outSize,
+			bytes_needed, &newsize);
+	if (newbuf)
+	{
+		handle->outBuffer = newbuf;
+		handle->outSize = newsize;
 		return 0;
-
-	do
-	{
-		newsize *= 2;
-	} while (newsize > 0 && bytes_needed > (size_t) newsize);
-
-	if (newsize > 0 && bytes_needed <= (size_t) newsize)
-	{
-		newbuf = repalloc(handle->outBuffer, newsize);
-		if (newbuf)
-		{
-			/* repalloc succeeded */
-			handle->outBuffer = newbuf;
-			handle->outSize = newsize;
-			return 0;
-		}
 	}
-
-	newsize = handle->outSize;
-	do
-	{
-		newsize += 8192;
-	} while (newsize > 0 && bytes_needed > (size_t) newsize);
-
-	if (newsize > 0 && bytes_needed <= (size_t) newsize)
-	{
-		newbuf = repalloc(handle->outBuffer, newsize);
-		if (newbuf)
-		{
-			/* repalloc succeeded */
-			handle->outBuffer = newbuf;
-			handle->outSize = newsize;
-			return 0;
-		}
-	}
-
 	return EOF;
 }
 

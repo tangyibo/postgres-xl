@@ -68,6 +68,9 @@
  */
 #define END_QUERY_TIMEOUT	1000
 
+/* Declarations used by guc.c */
+int PGXLRemoteFetchSize;
+
 typedef struct
 {
 	xact_callback function;
@@ -1346,7 +1349,7 @@ FetchTuple(ResponseCombiner *combiner)
 				return NULL;
 			}
 
-			if (pgxc_node_send_execute(conn, combiner->cursor, 1000) != 0)
+			if (pgxc_node_send_execute(conn, combiner->cursor, PGXLRemoteFetchSize) != 0)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1394,7 +1397,7 @@ FetchTuple(ResponseCombiner *combiner)
 			 */
 			if (combiner->merge_sort || combiner->probing_primary)
 			{
-				if (pgxc_node_send_execute(conn, combiner->cursor, 1000) != 0)
+				if (pgxc_node_send_execute(conn, combiner->cursor, PGXLRemoteFetchSize) != 0)
 					ereport(ERROR,
 							(errcode(ERRCODE_INTERNAL_ERROR),
 							 errmsg("Failed to send execute cursor '%s' to node %u", combiner->cursor, conn->nodeoid)));
@@ -1413,7 +1416,7 @@ FetchTuple(ResponseCombiner *combiner)
 			 * Tell the node to fetch data in background, next loop when we 
 			 * pgxc_node_receive, data is already there, so we can run faster
 			 * */
-			if (pgxc_node_send_execute(conn, combiner->cursor, 1000) != 0)
+			if (pgxc_node_send_execute(conn, combiner->cursor, PGXLRemoteFetchSize) != 0)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_INTERNAL_ERROR),
@@ -1692,7 +1695,6 @@ handle_response(PGXCNodeHandle *conn, ResponseCombiner *combiner)
 			case 's':			/* PortalSuspended */
 				/* No activity is expected on the connection until next query */
 				PGXCNodeSetConnectionState(conn, DN_CONNECTION_STATE_IDLE);
-				conn->combiner = NULL;
 				return RESPONSE_SUSPENDED;
 			case '1': /* ParseComplete */
 			case '2': /* BindComplete */
@@ -5819,7 +5821,7 @@ primary_mode_phase_two:
 
 		if (plan->cursor)
 		{
-			fetch = 1000;
+			fetch = PGXLRemoteFetchSize;
 			if (plan->unique)
 				snprintf(cursor, NAMEDATALEN, "%s_%d", plan->cursor, plan->unique);
 			else
@@ -5993,6 +5995,7 @@ primary_mode_phase_two:
 				}
 				else
 				{
+					combiner->cursor = pstrdup(cursor);
 					combiner->cursor_count = combiner->conn_count;
 					combiner->cursor_connections = (PGXCNodeHandle **) palloc(
 								combiner->conn_count * sizeof(PGXCNodeHandle *));

@@ -223,6 +223,8 @@ typedef struct RemoteStmt
 	List	   *distributionRestrict;
 } RemoteStmt;
 
+extern int PGXLRemoteFetchSize;
+
 typedef void (*xact_callback) (bool isCommit, void *args);
 
 /* Copy command just involves Datanodes */

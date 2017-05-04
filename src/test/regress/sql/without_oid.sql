@@ -75,11 +75,8 @@ SELECT count(oid) FROM create_table_test2;
 -- should fail
 SELECT count(oid) FROM create_table_test3;
 
-PREPARE table_source(int) AS
-    SELECT a + b AS c1, a - b AS c2, $1 AS c3 FROM create_table_test;
-
-CREATE TABLE execute_with WITH OIDS AS EXECUTE table_source(1);
-CREATE TABLE execute_without WITHOUT OIDS AS EXECUTE table_source(2);
+CREATE TABLE execute_with WITH OIDS AS SELECT a + b AS c1, a - b AS c2, 1 AS c3 FROM create_table_test;
+CREATE TABLE execute_without WITHOUT OIDS AS SELECT a + b AS c1, a - b AS c2, 2 AS c3 FROM create_table_test;
 
 SELECT count(oid) FROM execute_with;
 -- should fail

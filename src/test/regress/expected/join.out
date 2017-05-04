@@ -4260,18 +4260,15 @@ select d.* from d left join (select * from b group by b.id, b.c_id) s
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Merge Left Join
-         Merge Cond: (d.a = s.id)
+   ->  Merge Right Join
+         Merge Cond: (b.id = d.a)
+         ->  Group
+               Group Key: b.id
+               ->  Index Scan using b_pkey on b
          ->  Sort
                Sort Key: d.a
                ->  Seq Scan on d
-         ->  Sort
-               Sort Key: s.id
-               ->  Subquery Scan on s
-                     ->  HashAggregate
-                           Group Key: b.id, b.c_id
-                           ->  Seq Scan on b
-(12 rows)
+(9 rows)
 
 -- similarly, but keying off a DISTINCT clause
 explain (costs off)
@@ -4280,18 +4277,16 @@ select d.* from d left join (select distinct * from b) s
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Merge Left Join
-         Merge Cond: (d.a = s.id)
+   ->  Merge Right Join
+         Merge Cond: (b.id = d.a)
+         ->  Unique
+               ->  Sort
+                     Sort Key: b.id, b.c_id
+                     ->  Seq Scan on b
          ->  Sort
                Sort Key: d.a
                ->  Seq Scan on d
-         ->  Sort
-               Sort Key: s.id
-               ->  Subquery Scan on s
-                     ->  HashAggregate
-                           Group Key: b.id, b.c_id
-                           ->  Seq Scan on b
-(12 rows)
+(10 rows)
 
 -- check join removal works when uniqueness of the join condition is enforced
 -- by a UNION

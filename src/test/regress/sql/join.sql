@@ -1783,5 +1783,5 @@ CREATE TABLE testh (a int, b int);
 INSERT INTO testh SELECT generate_series(1, 10000), generate_series(8001, 18000);
 set enable_mergejoin TO false;
 set enable_hashjoin TO false;
-EXPLAIN VERBOSE SELECT count(*) FROM testr WHERE NOT EXISTS (SELECT * FROM testh WHERE testr.b = testh.b);
+EXPLAIN (VERBOSE, COSTS OFF) SELECT count(*) FROM testr WHERE NOT EXISTS (SELECT * FROM testh WHERE testr.b = testh.b);
 SELECT count(*) FROM testr WHERE NOT EXISTS (SELECT * FROM testh WHERE testr.b = testh.b);

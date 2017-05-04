@@ -5618,28 +5618,28 @@ CREATE TABLE testh (a int, b int);
 INSERT INTO testh SELECT generate_series(1, 10000), generate_series(8001, 18000);
 set enable_mergejoin TO false;
 set enable_hashjoin TO false;
-EXPLAIN VERBOSE SELECT count(*) FROM testr WHERE NOT EXISTS (SELECT * FROM testh WHERE testr.b = testh.b);
-                                                         QUERY PLAN                                                         
-----------------------------------------------------------------------------------------------------------------------------
- Finalize Aggregate  (cost=41732.22..41732.23 rows=1 width=8)
+EXPLAIN (VERBOSE, COSTS OFF) SELECT count(*) FROM testr WHERE NOT EXISTS (SELECT * FROM testh WHERE testr.b = testh.b);
+                                    QUERY PLAN                                     
+-----------------------------------------------------------------------------------
+ Finalize Aggregate
    Output: count(*)
-   ->  Remote Subquery Scan on all (datanode_1,datanode_2)  (cost=41732.20..41732.22 rows=1 width=8)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: PARTIAL count(*)
-         ->  Partial Aggregate  (cost=41632.20..41632.21 rows=1 width=8)
+         ->  Partial Aggregate
                Output: PARTIAL count(*)
-               ->  Nested Loop Anti Join  (cost=0.00..41629.38 rows=1130 width=0)
+               ->  Nested Loop Anti Join
                      Join Filter: (testr.b = testh.b)
-                     ->  Remote Subquery Scan on all (datanode_1)  (cost=100.00..152.94 rows=2260 width=4)
+                     ->  Remote Subquery Scan on all (datanode_1)
                            Output: testr.b
                            Distribute results by H: b
-                           ->  Seq Scan on public.testr  (cost=0.00..32.60 rows=2260 width=4)
+                           ->  Seq Scan on public.testr
                                  Output: testr.b
-                     ->  Materialize  (cost=100.00..164.24 rows=2260 width=4)
+                     ->  Materialize
                            Output: testh.b
-                           ->  Remote Subquery Scan on all (datanode_1,datanode_2)  (cost=100.00..152.94 rows=2260 width=4)
+                           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                                  Output: testh.b
                                  Distribute results by H: b
-                                 ->  Seq Scan on public.testh  (cost=0.00..32.60 rows=2260 width=4)
+                                 ->  Seq Scan on public.testh
                                        Output: testh.b
 (20 rows)
 

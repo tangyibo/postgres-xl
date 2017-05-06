@@ -84,7 +84,7 @@ select to_jsonb(timestamptz '-Infinity');
 
 --jsonb_agg
 
-CREATE TEMP TABLE rows AS
+CREATE TEMP TABLE rows DISTRIBUTED RANDOMLY AS
 SELECT x, 'txt' || x as y
 FROM generate_series(1,3) AS x;
 

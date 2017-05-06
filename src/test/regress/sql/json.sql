@@ -93,12 +93,12 @@ FROM (SELECT $$a$$ || x AS b,
       FROM generate_series(1,2) x,
            generate_series(4,5) y) q;
 
-CREATE TEMP TABLE rows AS
+CREATE TEMP TABLE rows DISTRIBUTED RANDOMLY AS
 SELECT x, 'txt' || x as y
 FROM generate_series(1,3) AS x;
 
 SELECT row_to_json(q,true)
-FROM rows q;
+FROM rows q ORDER BY x, y;
 
 SELECT row_to_json(row((select array_agg(x) as d from generate_series(5,10) x)),false);
 

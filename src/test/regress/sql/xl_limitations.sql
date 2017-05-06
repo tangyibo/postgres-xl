@@ -454,4 +454,10 @@ drop function xl_room_au();
 drop function xl_trap_zero_divide(int);
 drop function xl_nodename_from_id(integer);
 
-
+-- TRUNCATE ... RESTART IDENTITY
+CREATE SEQUENCE truncate_a_id1 START WITH 33;
+CREATE TABLE truncate_a (id serial,
+                         id1 integer default nextval('truncate_a_id1'));
+ALTER SEQUENCE truncate_a_id1 OWNED BY truncate_a.id1;
+TRUNCATE truncate_a RESTART IDENTITY;
+DROP TABLE truncate_a;

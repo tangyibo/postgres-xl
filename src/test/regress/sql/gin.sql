@@ -11,7 +11,9 @@ create index gin_test_idx on gin_test_tbl using gin (i)
 insert into gin_test_tbl select array[1, 2, g] from generate_series(1, 20000) g;
 insert into gin_test_tbl select array[1, 3, g] from generate_series(1, 1000) g;
 
-select gin_clean_pending_list('gin_test_idx')>10 as many; -- flush the fastupdate buffers
+-- flush the fastupdate buffers (in XL we have to push that do datanodes)
+execute direct on (datanode_1) 'select gin_clean_pending_list(''gin_test_idx'')>10 as many';
+execute direct on (datanode_2) 'select gin_clean_pending_list(''gin_test_idx'')>10 as many';
 
 insert into gin_test_tbl select array[3, 1, g] from generate_series(1, 1000) g;
 

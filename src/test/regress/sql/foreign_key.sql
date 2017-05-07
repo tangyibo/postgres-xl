@@ -1018,3 +1018,8 @@ create rule r1 as on delete to t1 do delete from t2 where t2.b = old.a;
 
 explain (costs off) delete from t1 where a = 1;
 delete from t1 where a = 1;
+
+drop rule r1 on t1;
+
+explain (costs off, nodes off) delete from t1 where a = 1;
+delete from t1 where a = 1;

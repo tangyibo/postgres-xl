@@ -378,14 +378,16 @@ LINE 3:        lateral (select a, b, sum(v.x) from gstest_data(v.x) ...
 -- min max optimisation should still work with GROUP BY ()
 explain (costs off)
   select min(unique1) from tenk1 GROUP BY ();
-                         QUERY PLAN                         
-------------------------------------------------------------
+                               QUERY PLAN                               
+------------------------------------------------------------------------
  Result
    InitPlan 1 (returns $0)
      ->  Limit
-           ->  Index Only Scan using tenk1_unique1 on tenk1
-                 Index Cond: (unique1 IS NOT NULL)
-(5 rows)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Limit
+                       ->  Index Only Scan using tenk1_unique1 on tenk1
+                             Index Cond: (unique1 IS NOT NULL)
+(7 rows)
 
 -- Views with GROUPING SET queries
 CREATE VIEW gstest_view AS select a, b, grouping(a,b), sum(c), count(*), max(c)
@@ -625,16 +627,17 @@ select a,count(*) from gstest2 group by rollup(a) having a is distinct from 1 or
 
 explain (costs off)
   select a,count(*) from gstest2 group by rollup(a) having a is distinct from 1 order by a;
-            QUERY PLAN            
-----------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a
    Group Key: ()
    Filter: (a IS DISTINCT FROM 1)
-   ->  Sort
-         Sort Key: a
-         ->  Seq Scan on gstest2
-(7 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a
+               ->  Seq Scan on gstest2
+(8 rows)
 
 select v.c, (select count(*) from gstest2 group by () having v.c)
   from (values (false),(true)) v(c) order by v.c;
@@ -647,8 +650,8 @@ select v.c, (select count(*) from gstest2 group by () having v.c)
 explain (costs off)
   select v.c, (select count(*) from gstest2 group by () having v.c)
     from (values (false),(true)) v(c) order by v.c;
-                        QUERY PLAN                         
------------------------------------------------------------
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
  Sort
    Sort Key: "*VALUES*".column1
    ->  Values Scan on "*VALUES*"
@@ -656,10 +659,11 @@ explain (costs off)
            ->  Aggregate
                  Group Key: ()
                  Filter: "*VALUES*".column1
-                 ->  Result
-                       One-Time Filter: "*VALUES*".column1
-                       ->  Seq Scan on gstest2
-(10 rows)
+                 ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                       ->  Result
+                             One-Time Filter: "*VALUES*".column1
+                             ->  Seq Scan on gstest2
+(11 rows)
 
 -- HAVING with GROUPING queries
 select ten, grouping(ten) from onek

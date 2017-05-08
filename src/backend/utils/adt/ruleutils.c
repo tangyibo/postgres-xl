@@ -6211,8 +6211,8 @@ get_utility_query_def(Query *query, deparse_context *context)
 				stmt->if_not_exists ? "IF NOT EXISTS " : "");
 
 		if (!istemp && relation->schemaname && relation->schemaname[0])
-			appendStringInfo(buf, "%s.", relation->schemaname);
-		appendStringInfo(buf, "%s", relation->relname);
+			appendStringInfo(buf, "%s.", quote_identifier(relation->schemaname));
+		appendStringInfo(buf, "%s", quote_identifier(relation->relname));
 
 		appendStringInfo(buf, "(");
 		foreach(column, stmt->tableElts)
@@ -6226,13 +6226,13 @@ get_utility_query_def(Query *query, deparse_context *context)
 			{
 				ColumnDef *coldef = (ColumnDef *) node;
 				TypeName *typename = coldef->typeName;
+				Type type;
 #ifdef XCP
 				appendStringInfo(buf, "%s %s",
 								 quote_identifier(coldef->colname),
 								 format_type_with_typemod(typename->typeOid,
 														  typename->typemod));
 #else
-				Type type;
 
 				/* error out if we have no recourse at all */
 				if (!OidIsValid(typename->typeOid))
@@ -6315,7 +6315,8 @@ get_utility_query_def(Query *query, deparse_context *context)
 					break;
 
 				case DISTTYPE_MODULO:
-					appendStringInfo(buf, " DISTRIBUTE BY MODULO(%s)", stmt->distributeby->colname);
+					appendStringInfo(buf, " DISTRIBUTE BY MODULO(%s)",
+							quote_identifier(stmt->distributeby->colname));
 					break;
 
 				default:
@@ -6338,7 +6339,8 @@ get_utility_query_def(Query *query, deparse_context *context)
 					Assert(stmt->subcluster->members);
 					foreach(cell, stmt->subcluster->members)
 					{
-						appendStringInfo(buf, " %s", strVal(lfirst(cell)));
+						appendStringInfo(buf, " %s",
+								quote_identifier(strVal(lfirst(cell))));
 						if (cell->next)
 							appendStringInfo(buf, ",");
 					}
@@ -6352,7 +6354,8 @@ get_utility_query_def(Query *query, deparse_context *context)
 					Assert(stmt->subcluster->members);
 					foreach(cell, stmt->subcluster->members)
 					{
-						appendStringInfo(buf, " %s", strVal(lfirst(cell)));
+						appendStringInfo(buf, " %s",
+								quote_identifier(strVal(lfirst(cell))));
 						if (cell->next)
 							appendStringInfo(buf, ",");
 					}

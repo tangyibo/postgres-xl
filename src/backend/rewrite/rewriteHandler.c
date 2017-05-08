@@ -4048,11 +4048,9 @@ QueryRewriteCTAS(Query *parsetree)
 	/* Now, finally build the INSERT INTO statement */
 	initStringInfo(&cquery);
 
-	if (relation->schemaname)
-		appendStringInfo(&cquery, "INSERT INTO %s.%s",
-				relation->schemaname, relation->relname);
-	else
-		appendStringInfo(&cquery, "INSERT INTO %s", relation->relname);
+	appendStringInfo(&cquery, "INSERT INTO %s.%s",
+				quote_identifier(get_namespace_name(RangeVarGetCreationNamespace(relation))),
+				quote_identifier(relation->relname));
 
 	appendStringInfo(&cquery, " %s %s", selectstr,
 			into->skipData ? "LIMIT 0" : "");

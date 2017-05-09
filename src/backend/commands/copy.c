@@ -1456,6 +1456,34 @@ BeginCopy(bool is_from,
 					 errmsg("COPY (query) WITH OIDS is not supported")));
 
 		/*
+		 * The grammar allows SELECT INTO, but we don't support that. We do
+		 * this check before transforming the query since QueryRewriteCTAS will
+		 * transform the statemet into a CREATE TABLE followed by INSERT INTO.
+		 * The CREATE TABLE is processed separately by QueryRewriteCTAS and
+		 * what we get back is just the INSERT statement. Not doing a check
+		 * will ultimately lead to an error, but doing it here allows us to
+		 * throw a more friendly and PG-compatible error.
+		 */
+		if (IsA(raw_query, SelectStmt))
+		{
+			SelectStmt *stmt = (SelectStmt *) raw_query;
+
+			/*
+			 * If it's a set-operation tree, drilldown to leftmost SelectStmt
+			 */
+			while (stmt && stmt->op != SETOP_NONE)
+				stmt = stmt->larg;
+			Assert(stmt && IsA(stmt, SelectStmt) && stmt->larg == NULL);
+
+			if (stmt->intoClause)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("COPY (SELECT INTO) is not supported")));
+			}
+		}
+
+		/*
 		 * Run parse analysis and rewrite.  Note this also acquires sufficient
 		 * locks on the source table(s).
 		 *
@@ -1500,23 +1528,6 @@ BeginCopy(bool is_from,
 		}
 
 		query = (Query *) linitial(rewritten);
-
-#ifdef PGXC
-		/*
-		 * The grammar allows SELECT INTO, but we don't support that.
-		 * Postgres-XC uses an INSERT SELECT command in this case
-		 */
-		if ((query->utilityStmt != NULL &&
-			 IsA(query->utilityStmt, CreateTableAsStmt)) ||
-			query->commandType == CMD_INSERT)
-#else
-		/* The grammar allows SELECT INTO, but we don't support that */
-		if (query->utilityStmt != NULL &&
-			IsA(query->utilityStmt, CreateTableAsStmt))
-#endif
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("COPY (SELECT INTO) is not supported")));
 
 		Assert(query->utilityStmt == NULL);
 

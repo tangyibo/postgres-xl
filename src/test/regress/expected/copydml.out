@@ -94,19 +94,17 @@ end
 $$ language plpgsql;
 create trigger qqqbef before insert or update or delete on copydml_test
     for each row execute procedure qqq_trig();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 create trigger qqqaf after insert or update or delete on copydml_test
     for each row execute procedure qqq_trig();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 copy (insert into copydml_test (t) values ('f') returning id) to stdout;
-NOTICE:  INSERT 8
 8
-NOTICE:  INSERT 8
 copy (update copydml_test set t = 'g' where t = 'f' returning id) to stdout;
-NOTICE:  UPDATE 8
 8
-NOTICE:  UPDATE 8
 copy (delete from copydml_test where t = 'g' returning id) to stdout;
-NOTICE:  DELETE 8
 8
-NOTICE:  DELETE 8
 drop table copydml_test;
 drop function qqq_trig();

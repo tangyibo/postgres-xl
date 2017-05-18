@@ -1942,8 +1942,10 @@ pgxc_node_remote_cleanup_all(void)
 	PGXCNodeHandle *new_connections[handles->co_conn_count + handles->dn_conn_count];
 	int				new_conn_count = 0;
 	int				i;
-	char		   *resetcmd = "RESET ALL;RESET SESSION AUTHORIZATION;"
-							   "RESET transaction_isolation;";
+	char		   *resetcmd = "RESET ALL;"
+							   "RESET SESSION AUTHORIZATION;"
+							   "RESET transaction_isolation;"
+							   "RESET global_session";
 
 	elog(DEBUG5, "pgxc_node_remote_cleanup_all - handles->co_conn_count %d,"
 			"handles->dn_conn_count %d", handles->co_conn_count,

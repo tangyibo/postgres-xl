@@ -1008,6 +1008,11 @@ ParallelWorkerMain(Datum main_arg)
 	BackgroundWorkerInitializeConnectionByOid(fps->database_id,
 											  fps->authenticated_user_id);
 
+	StartTransactionCommand();
+	/* Initialize XL executor. This must be done inside a transaction block. */
+	InitMultinodeExecutor(false);
+	CommitTransactionCommand();
+
 	/*
 	 * Set the client encoding to the database encoding, since that is what
 	 * the leader will expect.

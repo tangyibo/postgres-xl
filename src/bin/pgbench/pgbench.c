@@ -347,22 +347,6 @@ static const BuiltinScript builtin_script[] =
 		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
 		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
 		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
-		"\\set delta random(-5000, 5000)\n"
-		"BEGIN;\n"
-		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid;\n"
-		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
-		"UPDATE pgbench_tellers SET tbalance = tbalance + :delta WHERE tid = :tid;\n"
-		"UPDATE pgbench_branches SET bbalance = bbalance + :delta WHERE bid = :bid;\n"
-		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
-		"END;\n"
-	},
-#ifdef PGXC
-	{
-		"tpcb-like-bid",
-		"<builtin: TPC-B (sort of)>",
-		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
-		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
-		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
 		"\\setrandom delta -5000 5000\n"
 		"BEGIN;\n"
 		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid AND bid = :bid;\n"
@@ -372,23 +356,8 @@ static const BuiltinScript builtin_script[] =
 		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
 		"END;\n"
 	},
-#endif
 	{
 		"simple-update",
-		"<builtin: simple update>",
-		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
-		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
-		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
-		"\\set delta random(-5000, 5000)\n"
-		"BEGIN;\n"
-		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid;\n"
-		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
-		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
-		"END;\n"
-	},
-#ifdef PGXC
-	{
-		"simple-update-bid",
 		"<builtin: simple update bid>",
 		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
 		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
@@ -400,7 +369,6 @@ static const BuiltinScript builtin_script[] =
 		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
 		"END;\n"
 	},
-#endif
 	{
 		"select-only",
 		"<builtin: select only>",

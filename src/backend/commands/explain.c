@@ -1231,7 +1231,8 @@ ExplainNode(PlanState *planstate, List *ancestors,
 					ExplainPropertyText("Replicated",
 										rsubplan->execOnAll ? "no" : "yes",
 										es);
-					ExplainPropertyList("Node List", nodeNameList, es);
+					if (es->nodes)
+						ExplainPropertyList("Node List", nodeNameList, es);
 				}
 			}
 			break;

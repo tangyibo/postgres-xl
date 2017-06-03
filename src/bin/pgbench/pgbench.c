@@ -360,12 +360,9 @@ static const BuiltinScript builtin_script[] =
 	{
 		"tpcb-like-bid",
 		"<builtin: TPC-B (sort of)>",
-		"\\set nbranches " CppAsString2(nbranches) " * :scale\n"
-		"\\set ntellers " CppAsString2(ntellers) " * :scale\n"
-		"\\set naccounts " CppAsString2(naccounts) " * :scale\n"
-		"\\setrandom aid 1 :naccounts\n"
-		"\\setrandom bid 1 :nbranches\n"
-		"\\setrandom tid 1 :ntellers\n"
+		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
+		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
+		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
 		"\\setrandom delta -5000 5000\n"
 		"BEGIN;\n"
 		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid AND bid = :bid;\n"
@@ -393,13 +390,10 @@ static const BuiltinScript builtin_script[] =
 	{
 		"simple-update-bid",
 		"<builtin: simple update bid>",
-		"\\set nbranches " CppAsString2(nbranches) " * :scale\n"
-		"\\set ntellers " CppAsString2(ntellers) " * :scale\n"
-		"\\set naccounts " CppAsString2(naccounts) " * :scale\n"
-		"\\setrandom aid 1 :naccounts\n"
-		"\\setrandom bid 1 :nbranches\n"
-		"\\setrandom tid 1 :ntellers\n"
-		"\\setrandom delta -5000 5000\n"
+		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
+		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
+		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
+		"\\set delta random(-5000, 5000)\n"
 		"BEGIN;\n"
 		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid AND bid = :bid;\n"
 		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid AND bid = :bid;\n"

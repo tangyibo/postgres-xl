@@ -221,6 +221,7 @@ InitResponseCombiner(ResponseCombiner *combiner, int node_count,
 	combiner->connections = NULL;
 	combiner->conn_count = 0;
 	combiner->combine_type = combine_type;
+	combiner->current_conn_rows_consumed = 0;
 	combiner->command_complete_count = 0;
 	combiner->request_type = REQUEST_TYPE_NOT_DEFINED;
 	combiner->description_count = 0;
@@ -1377,6 +1378,22 @@ FetchTuple(ResponseCombiner *combiner)
 		{
 			slot = combiner->ss.ps.ps_ResultTupleSlot;
 			CopyDataRowTupleToSlot(combiner, slot);
+			combiner->current_conn_rows_consumed++;
+
+			/*
+			 * If we are running simple query protocol, yield the connection
+			 * after we process PGXLRemoteFetchSize rows from the connection.
+			 * This should allow us to consume rows quickly from other
+			 * connections, while this node gets chance to generate more rows
+			 * which would then be processed in the next iteration.
+			 */
+			if (!combiner->extended_query &&
+				combiner->current_conn_rows_consumed >= PGXLRemoteFetchSize)
+			{
+				if (++combiner->current_conn >= combiner->conn_count)
+					combiner->current_conn = 0;
+				combiner->current_conn_rows_consumed = 0;
+			}
 			return slot;
 		}
 		else if (res == RESPONSE_EOF)
@@ -1432,6 +1449,7 @@ FetchTuple(ResponseCombiner *combiner)
 
 			if (++combiner->current_conn >= combiner->conn_count)
 				combiner->current_conn = 0;
+			combiner->current_conn_rows_consumed = 0;
 			conn = combiner->connections[combiner->current_conn];
 		}
 		else if (res == RESPONSE_COMPLETE)
@@ -1453,7 +1471,10 @@ FetchTuple(ResponseCombiner *combiner)
 				}
 				REMOVE_CURR_CONN(combiner);
 				if (combiner->conn_count > 0)
+				{
 					conn = combiner->connections[combiner->current_conn];
+					combiner->current_conn_rows_consumed = 0;
+				}
 				else
 					return NULL;
 			}

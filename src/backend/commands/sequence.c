@@ -685,17 +685,11 @@ nextval_internal(Oid relid)
 	Page		page;
 	HeapTupleData seqtuple;
 	Form_pg_sequence seq;
-	int64		incby,
-				maxv,
-				minv,
-				cache,
+	int64		cache,
 				log,
-				fetch,
-				last;
+				fetch;
 	int64		result,
-				next,
 				rescnt = 0;
-	bool		logit = false;
 
 	/* open and AccessShareLock sequence */
 	init_sequence(relid, &elm, &seqrel);
@@ -835,7 +829,6 @@ nextval_internal(Oid relid)
 	{
 		/* forced log to satisfy local demand for values */
 		fetch = log = fetch + SEQ_LOG_VALS;
-		logit = true;
 	}
 	else
 	{
@@ -845,7 +838,6 @@ nextval_internal(Oid relid)
 		{
 			/* last update of seq was before checkpoint */
 			fetch = log = fetch + SEQ_LOG_VALS;
-			logit = true;
 		}
 	}
 

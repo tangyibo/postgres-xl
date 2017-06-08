@@ -6344,7 +6344,6 @@ get_utility_query_def(Query *query, deparse_context *context)
 			{
 				ColumnDef *coldef = (ColumnDef *) node;
 				TypeName *typename = coldef->typeName;
-				Type type;
 #ifdef XCP
 				appendStringInfo(buf, "%s %s",
 								 quote_identifier(coldef->colname),

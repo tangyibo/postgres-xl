@@ -2355,13 +2355,9 @@ adjust_subplan_distribution(PlannerInfo *root, Distribution *pathd,
 	root->curOuterRestrict = NULL;
 
 	/*
-	 * Set new restriction for the subpath
-	 * Do not restrict if distributions are equal, they are going to be merged
-	 * and subplan will be executed on caller nodes.
-	 * However if there are upper query levels caller's distribution may be
-	 * adjusted.
+	 * Set new restriction for the subpath.
 	 */
-	if (subd && !equal(subd, pathd))
+	if (subd)
 	{
 		/*
 		 * If subpath is replicated without restriction choose one execution

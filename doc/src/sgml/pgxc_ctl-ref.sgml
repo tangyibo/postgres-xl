@@ -30,7 +30,7 @@
    source code tarball.  The latest version of the source code will be
    available at its home repository,
 <programlisting>
-http://  pgxc_ctl
+pgxc_ctl
 </programlisting>
    If you would like to use the latest version from the pgxc_ctl home
    repository, get the source code tarball and expand it in the source's

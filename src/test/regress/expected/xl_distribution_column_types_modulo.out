@@ -7,9 +7,8 @@ CREATE TABLE xl_dcm (
     name text,
     price numeric
 ) DISTRIBUTE BY MODULO (product_id);
-ERROR:  Column product_id is not modulo distributable data type
 --integer
-CREATE TABLE xl_dcm (
+CREATE TABLE xl_dcm0 (
     product_no integer,
     product_id integer PRIMARY KEY,
     name text,

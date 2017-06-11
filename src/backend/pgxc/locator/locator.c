@@ -577,7 +577,6 @@ RelationBuildLocator(Relation rel)
 		 */
 		offset = compute_modulo(abs(rand()), list_length(relationLocInfo->rl_nodeList));
 
-		srand(time(NULL));
 		relationLocInfo->roundRobinNode = relationLocInfo->rl_nodeList->head; /* initialize */
 		for (j = 0; j < offset && relationLocInfo->roundRobinNode->next != NULL; j++)
 			relationLocInfo->roundRobinNode = relationLocInfo->roundRobinNode->next;
@@ -907,7 +906,8 @@ createLocator(char locatorType, RelationAccessType accessType,
 						Assert(false);
 						break;
 				}
-				locator->roundRobinNode = -1;
+				/* randomize choice of the initial node */
+				locator->roundRobinNode = (abs(rand()) % locator->nodeCount) - 1;
 			}
 			else
 			{

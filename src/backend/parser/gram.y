@@ -130,14 +130,6 @@ typedef struct ImportQual
 	List	   *table_names;
 } ImportQual;
 
-typedef struct StmtMulti
-{
-	List	*parsetrees;
-	List	*queries;
-	int		offset;
-	char	*lastQuery;
-} StmtMulti;
-
 /* ConstraintAttributeSpec yields an integer bitmask of these flags: */
 #define CAS_NOT_DEFERRABLE			0x01
 #define CAS_DEFERRABLE				0x02
@@ -250,7 +242,6 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 	InsertStmt			*istmt;
 	VariableSetStmt		*vsetstmt;
 /* PGXC_BEGIN */
-	struct StmtMulti			*stmtmulti;
 	DistributeBy		*distby;
 	PGXCSubCluster		*subclus;
 /* PGXC_END */
@@ -388,8 +379,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
 %type <ival>	import_qualification_type
 %type <importqual> import_qualification
 
-%type <stmtmulti> stmtmulti
-%type <list>	stmtblock
+%type <list>	stmtblock stmtmulti
 				OptTableElementList TableElementList OptInherit definition
 				OptTypedTableElementList TypedTableElementList
 				reloptions opt_reloptions
@@ -806,8 +796,7 @@ static Node *makeRecursiveViewSelect(char *relname, List *aliases, Node *query);
  */
 stmtblock:	stmtmulti
 			{
-				pg_yyget_extra(yyscanner)->parsetree = $1 ? $1->parsetrees : NIL;
-				pg_yyget_extra(yyscanner)->queries = $1 ? $1->queries : NIL;
+				pg_yyget_extra(yyscanner)->parsetree = $1;
 			}
 		;
 
@@ -823,61 +812,10 @@ stmtblock:	stmtmulti
  */
 stmtmulti:	stmtmulti ';' stmt
 				{
-					/* 
-					 * XXX PG10MERGE: Looks like support for obtaining raw
-					 * query string for individual commands is added in PG10.
-					 * If so, we can make use of the same infrastructure.
-					 *
-					 * XXX The following gives a compilation WARNING because
-					 * stmtmulti is defined as a List in PG10, but we have our
-					 * own definition.
-					 */
 					if ($1 != NIL)
 					{
 						/* update length of previous stmt */
 						updateRawStmtEnd(llast_node(RawStmt, $1), @2);
-					}
-					if ($3 != NULL)
-					{
-						char *query;
-						ListCell *last;
-						/*
-						 * Because of the way multi-commands are parsed by the
-						 * parser, when the earlier command was parsed and
-						 * reduced to a 'stmtmulti', we did not have the
-						 * end-of-the-query marker. But now that we have seen
-						 * the ';' token, add '\0' at the corresponding offset
-						 * to get a separated command.
-						 */
-						if ($1 != NULL)
-						{
-							last = list_tail($1->queries);
-							query = palloc(@2 - $1->offset + 1);
-							memcpy(query, lfirst(last), @2 - $1->offset);
-							query[@2 - $1->offset] = '\0';
-							lfirst(last) = query;
-
-							query = scanner_get_query(@3, -1, yyscanner);
-							$1->offset = @2;
-							$1->parsetrees = lappend($1->parsetrees, $3);
-							$1->queries = lappend($1->queries, query);
-							$$ = $1;
-						}
-						/*
-						 *
-						 * If the earlier statements were all null, then we
-						 * must initialise the StmtMulti structure and make
-						 * singleton lists
-						 */
-						else
-						{
-							StmtMulti *n = (StmtMulti *) palloc0(sizeof (StmtMulti));
-							query = scanner_get_query(@3, -1, yyscanner);
-							n->offset = @2;
-							n->parsetrees = list_make1($3);
-							n->queries = list_make1(query);
-							$$ = n;
-						}
 					}
 					if ($3 != NULL)
 						$$ = lappend($1, makeRawStmt($3, @2 + 1));
@@ -887,36 +825,9 @@ stmtmulti:	stmtmulti ';' stmt
 			| stmt
 				{
 					if ($1 != NULL)
-					{
-						StmtMulti *n = (StmtMulti *) palloc0(sizeof (StmtMulti));
-						char *query = scanner_get_query(@1, -1, yyscanner);
-
-						/*
-						 * Keep track of the offset where $1 started. We don't
-						 * have the offset where it ends so we copy the entire
-						 * query to the end. If later, we find a ';' followed
-						 * by another command, we'll add the '\0' at the
-						 * appropriate offset
-						 *
-						 * XXX May be there is a better way to get the matching  
-						 * portion of the query string, but this does the trick
-						 * for regression as well as the problem we are trying
-						 * to solve with multi-command queries
-						 */
-						n->offset = @1;
-
-						/*
-						 * Collect both parsetree as well as the original query
-						 * that resulted in the parsetree
-						 */
-						n->parsetrees = list_make1($1);
-						n->queries = list_make1(query);
-						$$ = n;
-					}
-					if ($1 != NULL)
 						$$ = list_make1(makeRawStmt($1, 0));
 					else
-						$$ = NULL;
+						$$ = NIL;
 				}
 		;
 

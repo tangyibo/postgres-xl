@@ -33,7 +33,7 @@
  * of the list are always RawStmt nodes.
  */
 List *
-raw_parser(const char *str, List **queries)
+raw_parser(const char *str)
 {
 	core_yyscan_t yyscanner;
 	base_yy_extra_type yyextra;
@@ -57,9 +57,6 @@ raw_parser(const char *str, List **queries)
 
 	if (yyresult)				/* error */
 		return NIL;
-
-	if (queries)
-		*queries = yyextra.queries;
 
 	return yyextra.parsetree;
 }

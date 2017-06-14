@@ -116,6 +116,7 @@
   &textsearch;
   &mvcc;
   &perform;
+  &parallel;
 
  </part>
 
@@ -169,6 +170,7 @@
   &monitoring;
   &diskusage;
   &wal;
+  &logical-replication;
   &regress;
 
  </part>
@@ -285,7 +287,6 @@
  </part>
 
  &biblio;
- <![%include-index;[&bookindex;]]>
- <![%include-xslt-index;[<index id="bookindex"></index>]]>
+ <index id="bookindex"></index>
 
 </book>

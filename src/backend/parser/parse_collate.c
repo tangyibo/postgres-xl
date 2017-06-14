@@ -29,7 +29,7 @@
  * at runtime.  If we knew exactly which functions require collation
  * information, we could throw those errors at parse time instead.
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -514,8 +514,7 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 
 				if (qtree->targetList == NIL)
 					return false;
-				tent = (TargetEntry *) linitial(qtree->targetList);
-				Assert(IsA(tent, TargetEntry));
+				tent = linitial_node(TargetEntry, qtree->targetList);
 				if (tent->resjunk)
 					return false;
 
@@ -650,9 +649,7 @@ assign_collations_walker(Node *node, assign_collations_context *context)
 
 							foreach(lc, expr->args)
 							{
-								CaseWhen   *when = (CaseWhen *) lfirst(lc);
-
-								Assert(IsA(when, CaseWhen));
+								CaseWhen   *when = lfirst_node(CaseWhen, lc);
 
 								/*
 								 * The condition expressions mustn't affect
@@ -805,7 +802,7 @@ merge_collation_state(Oid collation,
 					else if (collation != DEFAULT_COLLATION_OID)
 					{
 						/*
-						 * Ooops, we have a conflict.  We cannot throw error
+						 * Oops, we have a conflict.  We cannot throw error
 						 * here, since the conflict could be resolved by a
 						 * later sibling CollateExpr, or the parent might not
 						 * care about collation anyway.  Return enough info to
@@ -824,7 +821,7 @@ merge_collation_state(Oid collation,
 				if (collation != context->collation)
 				{
 					/*
-					 * Ooops, we have a conflict of explicit COLLATE clauses.
+					 * Oops, we have a conflict of explicit COLLATE clauses.
 					 * Here we choose to throw error immediately; that is what
 					 * the SQL standard says to do, and there's no good reason
 					 * to be less strict.
@@ -868,9 +865,8 @@ assign_aggregate_collations(Aggref *aggref,
 	/* Process aggregated args, holding resjunk ones at arm's length */
 	foreach(lc, aggref->args)
 	{
-		TargetEntry *tle = (TargetEntry *) lfirst(lc);
+		TargetEntry *tle = lfirst_node(TargetEntry, lc);
 
-		Assert(IsA(tle, TargetEntry));
 		if (tle->resjunk)
 			assign_expr_collations(loccontext->pstate, (Node *) tle);
 		else
@@ -913,9 +909,8 @@ assign_ordered_set_collations(Aggref *aggref,
 	/* Process aggregated args appropriately */
 	foreach(lc, aggref->args)
 	{
-		TargetEntry *tle = (TargetEntry *) lfirst(lc);
+		TargetEntry *tle = lfirst_node(TargetEntry, lc);
 
-		Assert(IsA(tle, TargetEntry));
 		if (merge_sort_collations)
 			(void) assign_collations_walker((Node *) tle, loccontext);
 		else

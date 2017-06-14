@@ -9,7 +9,7 @@
  *	  polluting the namespace with lots of stuff...
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/c.h
@@ -149,6 +149,8 @@
 /*
  * CppAsString
  *		Convert the argument to a string, using the C preprocessor.
+ * CppAsString2
+ *		Convert the argument to a string, after one round of macro expansion.
  * CppConcat
  *		Concatenate two arguments together, using the C preprocessor.
  *
@@ -157,6 +159,7 @@
  * backward compatibility with existing PostgreSQL code.
  */
 #define CppAsString(identifier) #identifier
+#define CppAsString2(x)			CppAsString(x)
 #define CppConcat(x, y)			x##y
 
 /*
@@ -340,10 +343,11 @@ typedef unsigned PG_INT128_TYPE uint128;
 #define PG_INT64_MAX	INT64CONST(0x7FFFFFFFFFFFFFFF)
 #define PG_UINT64_MAX	UINT64CONST(0xFFFFFFFFFFFFFFFF)
 
-/* Select timestamp representation (float8 or int64) */
-#ifdef USE_INTEGER_DATETIMES
+/*
+ * We now always use int64 timestamps, but keep this symbol defined for the
+ * benefit of external code that might test it.
+ */
 #define HAVE_INT64_TIMESTAMP
-#endif
 
 /*
  * Size
@@ -416,7 +420,7 @@ typedef uint32 CommandId;
 typedef struct
 {
 	int			indx[MAXDIM];
-} IntArray;
+}	IntArray;
 
 /* ----------------
  *		Variable-length datatypes all share the 'struct varlena' header.
@@ -425,10 +429,11 @@ typedef struct
  * may be compressed or moved out-of-line.  However datatype-specific routines
  * are mostly content to deal with de-TOASTed values only, and of course
  * client-side routines should never see a TOASTed value.  But even in a
- * de-TOASTed value, beware of touching vl_len_ directly, as its representation
- * is no longer convenient.  It's recommended that code always use the VARDATA,
- * VARSIZE, and SET_VARSIZE macros instead of relying on direct mentions of
- * the struct fields.  See postgres.h for details of the TOASTed form.
+ * de-TOASTed value, beware of touching vl_len_ directly, as its
+ * representation is no longer convenient.  It's recommended that code always
+ * use macros VARDATA_ANY, VARSIZE_ANY, VARSIZE_ANY_EXHDR, VARDATA, VARSIZE,
+ * and SET_VARSIZE instead of relying on direct mentions of the struct fields.
+ * See postgres.h for details of the TOASTed form.
  * ----------------
  */
 struct varlena
@@ -442,7 +447,7 @@ struct varlena
 /*
  * These widely-used datatypes are just a varlena header and the data bytes.
  * There is no terminating null or anything like that --- the data length is
- * always VARSIZE(ptr) - VARHDRSZ.
+ * always VARSIZE_ANY_EXHDR(ptr).
  */
 typedef struct varlena bytea;
 typedef struct varlena text;
@@ -526,6 +531,9 @@ typedef NameData *Name;
  */
 #define PointerIsAligned(pointer, type) \
 		(((uintptr_t)(pointer) % (sizeof (type))) == 0)
+
+#define OffsetToPointer(base, offset) \
+		((void *)((char *) base + offset))
 
 #define OidIsValid(objectId)  ((bool) ((objectId) != InvalidOid))
 
@@ -939,6 +947,22 @@ typedef NameData *Name;
 #endif
 
 
+/*
+ * Hints to the compiler about the likelihood of a branch. Both likely() and
+ * unlikely() return the boolean value of the contained expression.
+ *
+ * These should only be used sparingly, in very hot code paths. It's very easy
+ * to mis-estimate likelihoods.
+ */
+#if __GNUC__ >= 3
+#define likely(x)	__builtin_expect((x) != 0, 1)
+#define unlikely(x) __builtin_expect((x) != 0, 0)
+#else
+#define likely(x)	((x) != 0)
+#define unlikely(x) ((x) != 0)
+#endif
+
+
 /* ----------------------------------------------------------------
  *				Section 8:	random stuff
  * ----------------------------------------------------------------
@@ -972,7 +996,7 @@ typedef NameData *Name;
 /* gettext domain name mangling */
 
 /*
- * To better support parallel installations of major PostgeSQL
+ * To better support parallel installations of major PostgreSQL
  * versions as well as parallel installations of major library soname
  * versions, we mangle the gettext domain name by appending those
  * version numbers.  The coding rule ought to be that wherever the
@@ -984,10 +1008,6 @@ typedef NameData *Name;
  *
  * Make sure this matches the installation rules in nls-global.mk.
  */
-
-/* need a second indirection because we want to stringize the macro value, not the name */
-#define CppAsString2(x) CppAsString(x)
-
 #ifdef SO_MAJOR_VERSION
 #define PG_TEXTDOMAIN(domain) (domain CppAsString2(SO_MAJOR_VERSION) "-" PG_MAJORVERSION)
 #else

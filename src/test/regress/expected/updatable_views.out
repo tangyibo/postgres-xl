@@ -86,55 +86,48 @@ SELECT table_name, column_name, is_updatable
   FROM information_schema.columns
  WHERE table_name LIKE E'r_\\_view%'
  ORDER BY table_name, ordinal_position;
- table_name |  column_name  | is_updatable 
-------------+---------------+--------------
- ro_view1   | a             | NO
- ro_view1   | b             | NO
- ro_view10  | a             | NO
- ro_view11  | a             | NO
- ro_view11  | b             | NO
- ro_view12  | a             | NO
- ro_view13  | a             | NO
- ro_view13  | b             | NO
- ro_view17  | a             | NO
- ro_view17  | b             | NO
- ro_view18  | a             | NO
- ro_view19  | sequence_name | NO
- ro_view19  | last_value    | NO
- ro_view19  | start_value   | NO
- ro_view19  | increment_by  | NO
- ro_view19  | max_value     | NO
- ro_view19  | min_value     | NO
- ro_view19  | cache_value   | NO
- ro_view19  | log_cnt       | NO
- ro_view19  | is_cycled     | NO
- ro_view19  | is_called     | NO
- ro_view2   | a             | NO
- ro_view2   | b             | NO
- ro_view20  | a             | NO
- ro_view20  | b             | NO
- ro_view20  | g             | NO
- ro_view3   | ?column?      | NO
- ro_view4   | count         | NO
- ro_view5   | a             | NO
- ro_view5   | rank          | NO
- ro_view6   | a             | NO
- ro_view6   | b             | NO
- ro_view7   | a             | NO
- ro_view7   | b             | NO
- ro_view8   | a             | NO
- ro_view8   | b             | NO
- ro_view9   | a             | NO
- ro_view9   | b             | NO
- rw_view14  | ctid          | NO
- rw_view14  | a             | YES
- rw_view14  | b             | YES
- rw_view15  | a             | YES
- rw_view15  | upper         | NO
- rw_view16  | a             | YES
- rw_view16  | b             | YES
- rw_view16  | aa            | YES
-(46 rows)
+ table_name | column_name | is_updatable 
+------------+-------------+--------------
+ ro_view1   | a           | NO
+ ro_view1   | b           | NO
+ ro_view10  | a           | NO
+ ro_view11  | a           | NO
+ ro_view11  | b           | NO
+ ro_view12  | a           | NO
+ ro_view13  | a           | NO
+ ro_view13  | b           | NO
+ ro_view17  | a           | NO
+ ro_view17  | b           | NO
+ ro_view18  | a           | NO
+ ro_view19  | last_value  | NO
+ ro_view19  | log_cnt     | NO
+ ro_view19  | is_called   | NO
+ ro_view2   | a           | NO
+ ro_view2   | b           | NO
+ ro_view20  | a           | NO
+ ro_view20  | b           | NO
+ ro_view20  | g           | NO
+ ro_view3   | ?column?    | NO
+ ro_view4   | count       | NO
+ ro_view5   | a           | NO
+ ro_view5   | rank        | NO
+ ro_view6   | a           | NO
+ ro_view6   | b           | NO
+ ro_view7   | a           | NO
+ ro_view7   | b           | NO
+ ro_view8   | a           | NO
+ ro_view8   | b           | NO
+ ro_view9   | a           | NO
+ ro_view9   | b           | NO
+ rw_view14  | ctid        | NO
+ rw_view14  | a           | YES
+ rw_view14  | b           | YES
+ rw_view15  | a           | YES
+ rw_view15  | upper       | NO
+ rw_view16  | a           | YES
+ rw_view16  | b           | YES
+ rw_view16  | aa          | YES
+(39 rows)
 
 -- Read-only views
 DELETE FROM ro_view1;
@@ -327,7 +320,7 @@ DELETE FROM ro_view18;
 ERROR:  cannot delete from view "ro_view18"
 DETAIL:  Views that do not select from a single table or view are not automatically updatable.
 HINT:  To enable deleting from the view, provide an INSTEAD OF DELETE trigger or an unconditional ON DELETE DO INSTEAD rule.
-UPDATE ro_view19 SET max_value=1000;
+UPDATE ro_view19 SET last_value=1000;
 ERROR:  cannot update view "ro_view19"
 DETAIL:  Views that do not select from a single table or view are not automatically updatable.
 HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
@@ -1423,11 +1416,11 @@ INSERT INTO base_tbl VALUES (1,2), (2,3), (1,-1);
 CREATE VIEW rw_view1 AS SELECT * FROM base_tbl WHERE a < b
   WITH LOCAL CHECK OPTION;
 \d+ rw_view1
-                View "public.rw_view1"
- Column |  Type   | Modifiers | Storage | Description 
---------+---------+-----------+---------+-------------
- a      | integer |           | plain   | 
- b      | integer |           | plain   | 
+                          View "public.rw_view1"
+ Column |  Type   | Collation | Nullable | Default | Storage | Description 
+--------+---------+-----------+----------+---------+---------+-------------
+ a      | integer |           |          |         | plain   | 
+ b      | integer |           |          |         | plain   | 
 View definition:
  SELECT base_tbl.a,
     base_tbl.b
@@ -1477,10 +1470,10 @@ CREATE VIEW rw_view1 AS SELECT * FROM base_tbl WHERE a > 0;
 CREATE VIEW rw_view2 AS SELECT * FROM rw_view1 WHERE a < 10
   WITH CHECK OPTION; -- implicitly cascaded
 \d+ rw_view2
-                View "public.rw_view2"
- Column |  Type   | Modifiers | Storage | Description 
---------+---------+-----------+---------+-------------
- a      | integer |           | plain   | 
+                          View "public.rw_view2"
+ Column |  Type   | Collation | Nullable | Default | Storage | Description 
+--------+---------+-----------+----------+---------+---------+-------------
+ a      | integer |           |          |         | plain   | 
 View definition:
  SELECT rw_view1.a
    FROM rw_view1
@@ -1517,10 +1510,10 @@ DETAIL:  Failing row contains (15).
 CREATE OR REPLACE VIEW rw_view2 AS SELECT * FROM rw_view1 WHERE a < 10
   WITH LOCAL CHECK OPTION;
 \d+ rw_view2
-                View "public.rw_view2"
- Column |  Type   | Modifiers | Storage | Description 
---------+---------+-----------+---------+-------------
- a      | integer |           | plain   | 
+                          View "public.rw_view2"
+ Column |  Type   | Collation | Nullable | Default | Storage | Description 
+--------+---------+-----------+----------+---------+---------+-------------
+ a      | integer |           |          |         | plain   | 
 View definition:
  SELECT rw_view1.a
    FROM rw_view1
@@ -1558,10 +1551,10 @@ ERROR:  new row violates check option for view "rw_view2"
 DETAIL:  Failing row contains (30).
 ALTER VIEW rw_view2 RESET (check_option);
 \d+ rw_view2
-                View "public.rw_view2"
- Column |  Type   | Modifiers | Storage | Description 
---------+---------+-----------+---------+-------------
- a      | integer |           | plain   | 
+                          View "public.rw_view2"
+ Column |  Type   | Collation | Nullable | Default | Storage | Description 
+--------+---------+-----------+----------+---------+---------+-------------
+ a      | integer |           |          |         | plain   | 
 View definition:
  SELECT rw_view1.a
    FROM rw_view1
@@ -2409,3 +2402,40 @@ DROP VIEW v2;
 DROP VIEW v1;
 DROP TABLE t2;
 DROP TABLE t1;
+--
+-- Test CREATE OR REPLACE VIEW turning a non-updatable view into an
+-- auto-updatable view and adding check options in a single step
+--
+CREATE TABLE t1 (a int, b text);
+CREATE VIEW v1 AS SELECT null::int AS a;
+CREATE OR REPLACE VIEW v1 AS SELECT * FROM t1 WHERE a > 0 WITH CHECK OPTION;
+INSERT INTO v1 VALUES (1, 'ok'); -- ok
+INSERT INTO v1 VALUES (-1, 'invalid'); -- should fail
+ERROR:  new row violates check option for view "v1"
+DETAIL:  Failing row contains (-1, invalid).
+DROP VIEW v1;
+DROP TABLE t1;
+-- check that an auto-updatable view on a partitioned table works correctly
+create table pt (a int, b int) partition by range (a, b);
+create table pt1 (b int not null, a int not null) partition by range (b);
+create table pt11 (like pt1);
+alter table pt11 drop a;
+alter table pt11 add a int;
+alter table pt11 drop a;
+alter table pt11 add a int not null;
+alter table pt1 attach partition pt11 for values from (2) to (5);
+alter table pt attach partition pt1 for values from (1, 2) to (1, 10);
+create view ptv as select * from pt;
+insert into ptv values (1, 2);
+select tableoid::regclass, * from pt;
+ tableoid | a | b 
+----------+---+---
+ pt11     | 1 | 2
+(1 row)
+
+create view ptv_wco as select * from pt where a = 0 with check option;
+insert into ptv_wco values (1, 2);
+ERROR:  new row violates check option for view "ptv_wco"
+DETAIL:  Failing row contains (2, 1).
+drop view ptv, ptv_wco;
+drop table pt, pt1, pt11;

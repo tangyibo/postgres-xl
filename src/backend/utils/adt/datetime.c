@@ -3,7 +3,7 @@
  * datetime.c
  *	  Support functions for date/time types.
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -43,11 +43,6 @@ static int DecodeTime(char *str, int fmask, int range,
 static const datetkn *datebsearch(const char *key, const datetkn *base, int nel);
 static int DecodeDate(char *str, int fmask, int *tmask, bool *is2digits,
 		   struct pg_tm * tm);
-
-#ifndef HAVE_INT64_TIMESTAMP
-static char *TrimTrailingZeros(char *str);
-#endif   /* HAVE_INT64_TIMESTAMP */
-
 static char *AppendSeconds(char *cp, int sec, fsec_t fsec,
 			  int precision, bool fillzeros);
 static void AdjustFractSeconds(double frac, struct pg_tm * tm, fsec_t *fsec,
@@ -56,8 +51,9 @@ static void AdjustFractDays(double frac, struct pg_tm * tm, fsec_t *fsec,
 				int scale);
 static int DetermineTimeZoneOffsetInternal(struct pg_tm * tm, pg_tz *tzp,
 								pg_time_t *tp);
-static int DetermineTimeZoneAbbrevOffsetInternal(pg_time_t t, const char *abbr,
-									  pg_tz *tzp, int *isdst);
+static bool DetermineTimeZoneAbbrevOffsetInternal(pg_time_t t,
+									  const char *abbr, pg_tz *tzp,
+									  int *offset, int *isdst);
 static pg_tz *FetchDynamicTimeZone(TimeZoneAbbrevTable *tbl, const datetkn *tp);
 
 
@@ -400,28 +396,6 @@ GetCurrentTimeUsec(struct pg_tm * tm, fsec_t *fsec, int *tzp)
 }
 
 
-/* TrimTrailingZeros()
- * ... resulting from printing numbers with full precision.
- *
- * Returns a pointer to the new end of string.  No NUL terminator is put
- * there; callers are responsible for NUL terminating str themselves.
- *
- * Before Postgres 8.4, this always left at least 2 fractional digits,
- * but conversations on the lists suggest this isn't desired
- * since showing '0.10' is misleading with values of precision(1).
- */
-#ifndef HAVE_INT64_TIMESTAMP
-static char *
-TrimTrailingZeros(char *str)
-{
-	int			len = strlen(str);
-
-	while (len > 1 && *(str + len - 1) == '0' && *(str + len - 2) != '.')
-		len--;
-	return str + len;
-}
-#endif   /* HAVE_INT64_TIMESTAMP */
-
 /*
  * Append seconds and fractional seconds (if any) at *cp.
  *
@@ -438,14 +412,12 @@ AppendSeconds(char *cp, int sec, fsec_t fsec, int precision, bool fillzeros)
 {
 	Assert(precision >= 0);
 
-#ifdef HAVE_INT64_TIMESTAMP
-	/* fsec_t is just an int32 */
-
 	if (fillzeros)
 		cp = pg_ltostr_zeropad(cp, Abs(sec), 2);
 	else
 		cp = pg_ltostr(cp, Abs(sec));
 
+	/* fsec_t is just an int32 */
 	if (fsec != 0)
 	{
 		int32		value = Abs(fsec);
@@ -489,25 +461,6 @@ AppendSeconds(char *cp, int sec, fsec_t fsec, int precision, bool fillzeros)
 	}
 	else
 		return cp;
-#else
-	/* fsec_t is a double */
-
-	if (fsec == 0)
-	{
-		if (fillzeros)
-			return pg_ltostr_zeropad(cp, Abs(sec), 2);
-		else
-			return pg_ltostr(cp, Abs(sec));
-	}
-	else
-	{
-		if (fillzeros)
-			sprintf(cp, "%0*.*f", precision + 3, precision, fabs(sec + fsec));
-		else
-			sprintf(cp, "%.*f", precision, fabs(sec + fsec));
-		return TrimTrailingZeros(cp);
-	}
-#endif   /* HAVE_INT64_TIMESTAMP */
 }
 
 
@@ -520,14 +473,6 @@ AppendSeconds(char *cp, int sec, fsec_t fsec, int precision, bool fillzeros)
 static char *
 AppendTimestampSeconds(char *cp, struct pg_tm * tm, fsec_t fsec)
 {
-	/*
-	 * In float mode, don't print fractional seconds before 1 AD, since it's
-	 * unlikely there's any precision left ...
-	 */
-#ifndef HAVE_INT64_TIMESTAMP
-	if (tm->tm_year <= 0)
-		fsec = 0;
-#endif
 	return AppendSeconds(cp, tm->tm_sec, fsec, MAX_TIMESTAMP_PRECISION, true);
 }
 
@@ -546,11 +491,7 @@ AdjustFractSeconds(double frac, struct pg_tm * tm, fsec_t *fsec, int scale)
 	sec = (int) frac;
 	tm->tm_sec += sec;
 	frac -= sec;
-#ifdef HAVE_INT64_TIMESTAMP
 	*fsec += rint(frac * 1000000);
-#else
-	*fsec += frac;
-#endif
 }
 
 /* As above, but initial scale produces days */
@@ -581,11 +522,7 @@ ParseFractionalSecond(char *cp, fsec_t *fsec)
 	/* check for parse failure */
 	if (*cp != '\0' || errno != 0)
 		return DTERR_BAD_FORMAT;
-#ifdef HAVE_INT64_TIMESTAMP
 	*fsec = rint(frac * 1000000);
-#else
-	*fsec = frac;
-#endif
 	return 0;
 }
 
@@ -1161,12 +1098,7 @@ DecodeDateTime(char **field, int *ftype, int nf,
 								time = strtod(cp, &cp);
 								if (*cp != '\0' || errno != 0)
 									return DTERR_BAD_FORMAT;
-
-#ifdef HAVE_INT64_TIMESTAMP
 								time *= USECS_PER_DAY;
-#else
-								time *= SECS_PER_DAY;
-#endif
 								dt2time(time,
 										&tm->tm_hour, &tm->tm_min,
 										&tm->tm_sec, fsec);
@@ -1689,19 +1621,40 @@ overflow:
  * This differs from the behavior of DetermineTimeZoneOffset() in that a
  * standard-time or daylight-time abbreviation forces use of the corresponding
  * GMT offset even when the zone was then in DS or standard time respectively.
+ * (However, that happens only if we can match the given abbreviation to some
+ * abbreviation that appears in the IANA timezone data.  Otherwise, we fall
+ * back to doing DetermineTimeZoneOffset().)
  */
 int
 DetermineTimeZoneAbbrevOffset(struct pg_tm * tm, const char *abbr, pg_tz *tzp)
 {
 	pg_time_t	t;
+	int			zone_offset;
+	int			abbr_offset;
+	int			abbr_isdst;
 
 	/*
 	 * Compute the UTC time we want to probe at.  (In event of overflow, we'll
 	 * probe at the epoch, which is a bit random but probably doesn't matter.)
 	 */
-	(void) DetermineTimeZoneOffsetInternal(tm, tzp, &t);
+	zone_offset = DetermineTimeZoneOffsetInternal(tm, tzp, &t);
 
-	return DetermineTimeZoneAbbrevOffsetInternal(t, abbr, tzp, &tm->tm_isdst);
+	/*
+	 * Try to match the abbreviation to something in the zone definition.
+	 */
+	if (DetermineTimeZoneAbbrevOffsetInternal(t, abbr, tzp,
+											  &abbr_offset, &abbr_isdst))
+	{
+		/* Success, so use the abbrev-specific answers. */
+		tm->tm_isdst = abbr_isdst;
+		return abbr_offset;
+	}
+
+	/*
+	 * No match, so use the answers we already got from
+	 * DetermineTimeZoneOffsetInternal.
+	 */
+	return zone_offset;
 }
 
 
@@ -1715,19 +1668,41 @@ DetermineTimeZoneAbbrevOffsetTS(TimestampTz ts, const char *abbr,
 								pg_tz *tzp, int *isdst)
 {
 	pg_time_t	t = timestamptz_to_time_t(ts);
+	int			zone_offset;
+	int			abbr_offset;
+	int			tz;
+	struct pg_tm tm;
+	fsec_t		fsec;
 
-	return DetermineTimeZoneAbbrevOffsetInternal(t, abbr, tzp, isdst);
+	/*
+	 * If the abbrev matches anything in the zone data, this is pretty easy.
+	 */
+	if (DetermineTimeZoneAbbrevOffsetInternal(t, abbr, tzp,
+											  &abbr_offset, isdst))
+		return abbr_offset;
+
+	/*
+	 * Else, break down the timestamp so we can use DetermineTimeZoneOffset.
+	 */
+	if (timestamp2tm(ts, &tz, &tm, &fsec, NULL, tzp) != 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_DATETIME_VALUE_OUT_OF_RANGE),
+				 errmsg("timestamp out of range")));
+
+	zone_offset = DetermineTimeZoneOffset(&tm, tzp);
+	*isdst = tm.tm_isdst;
+	return zone_offset;
 }
 
 
 /* DetermineTimeZoneAbbrevOffsetInternal()
  *
  * Workhorse for above two functions: work from a pg_time_t probe instant.
- * DST status is returned into *isdst.
+ * On success, return GMT offset and DST status into *offset and *isdst.
  */
-static int
-DetermineTimeZoneAbbrevOffsetInternal(pg_time_t t, const char *abbr,
-									  pg_tz *tzp, int *isdst)
+static bool
+DetermineTimeZoneAbbrevOffsetInternal(pg_time_t t, const char *abbr, pg_tz *tzp,
+									  int *offset, int *isdst)
 {
 	char		upabbr[TZ_STRLEN_MAX + 1];
 	unsigned char *p;
@@ -1739,18 +1714,17 @@ DetermineTimeZoneAbbrevOffsetInternal(pg_time_t t, const char *abbr,
 		*p = pg_toupper(*p);
 
 	/* Look up the abbrev's meaning at this time in this zone */
-	if (!pg_interpret_timezone_abbrev(upabbr,
-									  &t,
-									  &gmtoff,
-									  isdst,
-									  tzp))
-		ereport(ERROR,
-				(errcode(ERRCODE_CONFIG_FILE_ERROR),
-				 errmsg("time zone abbreviation \"%s\" is not used in time zone \"%s\"",
-						abbr, pg_get_timezone_name(tzp))));
-
-	/* Change sign to agree with DetermineTimeZoneOffset() */
-	return (int) -gmtoff;
+	if (pg_interpret_timezone_abbrev(upabbr,
+									 &t,
+									 &gmtoff,
+									 isdst,
+									 tzp))
+	{
+		/* Change sign to agree with DetermineTimeZoneOffset() */
+		*offset = (int) -gmtoff;
+		return true;
+	}
+	return false;
 }
 
 
@@ -2027,12 +2001,7 @@ DecodeTimeOnly(char **field, int *ftype, int nf,
 								time = strtod(cp, &cp);
 								if (*cp != '\0' || errno != 0)
 									return DTERR_BAD_FORMAT;
-
-#ifdef HAVE_INT64_TIMESTAMP
 								time *= USECS_PER_DAY;
-#else
-								time *= SECS_PER_DAY;
-#endif
 								dt2time(time,
 										&tm->tm_hour, &tm->tm_min,
 										&tm->tm_sec, fsec);
@@ -2295,12 +2264,7 @@ DecodeTimeOnly(char **field, int *ftype, int nf,
 	/* test for > 24:00:00 */
 		(tm->tm_hour == HOURS_PER_DAY &&
 		 (tm->tm_min > 0 || tm->tm_sec > 0 || *fsec > 0)) ||
-#ifdef HAVE_INT64_TIMESTAMP
-		*fsec < INT64CONST(0) || *fsec > USECS_PER_SEC
-#else
-		*fsec < 0 || *fsec > 1
-#endif
-		)
+		*fsec < INT64CONST(0) || *fsec > USECS_PER_SEC)
 		return DTERR_FIELD_OVERFLOW;
 
 	if ((fmask & DTK_TIME_M) != DTK_TIME_M)
@@ -2652,18 +2616,11 @@ DecodeTime(char *str, int fmask, int range,
 		return DTERR_BAD_FORMAT;
 
 	/* do a sanity check */
-#ifdef HAVE_INT64_TIMESTAMP
 	if (tm->tm_hour < 0 || tm->tm_min < 0 || tm->tm_min > MINS_PER_HOUR - 1 ||
 		tm->tm_sec < 0 || tm->tm_sec > SECS_PER_MINUTE ||
 		*fsec < INT64CONST(0) ||
 		*fsec > USECS_PER_SEC)
 		return DTERR_FIELD_OVERFLOW;
-#else
-	if (tm->tm_hour < 0 || tm->tm_min < 0 || tm->tm_min > MINS_PER_HOUR - 1 ||
-		tm->tm_sec < 0 || tm->tm_sec > SECS_PER_MINUTE ||
-		*fsec < 0 || *fsec > 1)
-		return DTERR_FIELD_OVERFLOW;
-#endif
 
 	return 0;
 }
@@ -2880,11 +2837,7 @@ DecodeNumberField(int len, char *str, int fmask,
 		frac = strtod(cp, NULL);
 		if (errno != 0)
 			return DTERR_BAD_FORMAT;
-#ifdef HAVE_INT64_TIMESTAMP
 		*fsec = rint(frac * 1000000);
-#else
-		*fsec = frac;
-#endif
 		/* Now truncate off the fraction for further processing */
 		*cp = '\0';
 		len = strlen(str);
@@ -3293,11 +3246,7 @@ DecodeInterval(char **field, int *ftype, int nf, int range,
 				switch (type)
 				{
 					case DTK_MICROSEC:
-#ifdef HAVE_INT64_TIMESTAMP
 						*fsec += rint(val + fval);
-#else
-						*fsec += (val + fval) * 1e-6;
-#endif
 						tmask = DTK_M(MICROSECOND);
 						break;
 
@@ -3305,21 +3254,13 @@ DecodeInterval(char **field, int *ftype, int nf, int range,
 						/* avoid overflowing the fsec field */
 						tm->tm_sec += val / 1000;
 						val -= (val / 1000) * 1000;
-#ifdef HAVE_INT64_TIMESTAMP
 						*fsec += rint((val + fval) * 1000);
-#else
-						*fsec += (val + fval) * 1e-3;
-#endif
 						tmask = DTK_M(MILLISECOND);
 						break;
 
 					case DTK_SECOND:
 						tm->tm_sec += val;
-#ifdef HAVE_INT64_TIMESTAMP
 						*fsec += rint(fval * 1000000);
-#else
-						*fsec += fval;
-#endif
 
 						/*
 						 * If any subseconds were specified, consider this
@@ -3441,12 +3382,8 @@ DecodeInterval(char **field, int *ftype, int nf, int range,
 	{
 		int			sec;
 
-#ifdef HAVE_INT64_TIMESTAMP
 		sec = *fsec / USECS_PER_SEC;
 		*fsec -= sec * USECS_PER_SEC;
-#else
-		TMODULO(*fsec, sec, 1.0);
-#endif
 		tm->tm_sec += sec;
 	}
 
@@ -4548,11 +4485,10 @@ CheckDateTokenTables(void)
 Node *
 TemporalTransform(int32 max_precis, Node *node)
 {
-	FuncExpr   *expr = (FuncExpr *) node;
+	FuncExpr   *expr = castNode(FuncExpr, node);
 	Node	   *ret = NULL;
 	Node	   *typmod;
 
-	Assert(IsA(expr, FuncExpr));
 	Assert(list_length(expr->args) >= 2);
 
 	typmod = (Node *) lsecond(expr->args);
@@ -4914,8 +4850,17 @@ pg_timezone_names(PG_FUNCTION_ARGS)
 						 &tzoff, &tm, &fsec, &tzn, tz) != 0)
 			continue;			/* ignore if conversion fails */
 
-		/* Ignore zic's rather silly "Factory" time zone */
-		if (tzn && strcmp(tzn, "Local time zone must be set--see zic manual page") == 0)
+		/*
+		 * Ignore zic's rather silly "Factory" time zone.  The long string
+		 * about "see zic manual page" is used in tzdata versions before
+		 * 2016g; we can drop it someday when we're pretty sure no such data
+		 * exists in the wild on platforms using --with-system-tzdata.  In
+		 * 2016g and later, the time zone abbreviation "-00" is used for
+		 * "Factory" as well as some invalid cases, all of which we can
+		 * reasonably omit from the pg_timezone_names view.
+		 */
+		if (tzn && (strcmp(tzn, "-00") == 0 ||
+		strcmp(tzn, "Local time zone must be set--see zic manual page") == 0))
 			continue;
 
 		/* Found a displayable zone */

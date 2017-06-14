@@ -28,6 +28,7 @@
 #include "access/relscan.h"
 #include "access/xact.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_authid.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "storage/bufmgr.h"
@@ -37,6 +38,7 @@
 #include "utils/rel.h"
 #include "utils/snapmgr.h"
 #include "utils/tqual.h"
+#include "utils/varlena.h"
 
 PG_MODULE_MAGIC;
 
@@ -93,13 +95,19 @@ pgrowlocks(PG_FUNCTION_ARGS)
 		attinmeta = TupleDescGetAttInMetadata(tupdesc);
 		funcctx->attinmeta = attinmeta;
 
-		relname = PG_GETARG_TEXT_P(0);
+		relname = PG_GETARG_TEXT_PP(0);
 		relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 		rel = heap_openrv(relrv, AccessShareLock);
 
-		/* check permissions: must have SELECT on table */
+		/*
+		 * check permissions: must have SELECT on table or be in
+		 * pg_stat_scan_tables
+		 */
 		aclresult = pg_class_aclcheck(RelationGetRelid(rel), GetUserId(),
 									  ACL_SELECT);
+		if (aclresult != ACLCHECK_OK)
+			aclresult = is_member_of_role(GetUserId(), DEFAULT_ROLE_STAT_SCAN_TABLES) ? ACLCHECK_OK : ACLCHECK_NO_PRIV;
+
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, ACL_KIND_CLASS,
 						   RelationGetRelationName(rel));

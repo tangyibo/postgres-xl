@@ -5,7 +5,7 @@
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
- * Copyright (c) 2000-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2000-2017, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *	  src/backend/access/transam/varsup.c
@@ -536,7 +536,28 @@ ReadNewTransactionId(void)
 }
 
 /*
- * Determine the last safe XID to allocate given the currently oldest
+ * Advance the cluster-wide value for the oldest valid clog entry.
+ *
+ * We must acquire CLogTruncationLock to advance the oldestClogXid. It's not
+ * necessary to hold the lock during the actual clog truncation, only when we
+ * advance the limit, as code looking up arbitrary xids is required to hold
+ * CLogTruncationLock from when it tests oldestClogXid through to when it
+ * completes the clog lookup.
+ */
+void
+AdvanceOldestClogXid(TransactionId oldest_datfrozenxid)
+{
+	LWLockAcquire(CLogTruncationLock, LW_EXCLUSIVE);
+	if (TransactionIdPrecedes(ShmemVariableCache->oldestClogXid,
+							  oldest_datfrozenxid))
+	{
+		ShmemVariableCache->oldestClogXid = oldest_datfrozenxid;
+	}
+	LWLockRelease(CLogTruncationLock);
+}
+
+/*
+ * Determine the last safe XID to allocate using the currently oldest
  * datfrozenxid (ie, the oldest XID that might exist in any database
  * of our cluster), and the OID of the (or a) database with that value.
  */
@@ -676,7 +697,7 @@ SetTransactionIdLimit(TransactionId oldest_datfrozenxid, Oid oldest_datoid)
  *
  * We primarily check whether oldestXidDB is valid.  The cases we have in
  * mind are that that database was dropped, or the field was reset to zero
- * by pg_resetxlog.  In either case we should force recalculation of the
+ * by pg_resetwal.  In either case we should force recalculation of the
  * wrap limit.  Also do it if oldestXid is old enough to be forcing
  * autovacuums or other actions; this ensures we update our state as soon
  * as possible once extra overhead is being incurred.

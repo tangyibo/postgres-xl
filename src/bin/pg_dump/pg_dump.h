@@ -3,7 +3,7 @@
  * pg_dump.h
  *	  Common header file for the pg_dump utility
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/bin/pg_dump/pg_dump.h
@@ -56,6 +56,7 @@ typedef enum
 	DO_TABLE,
 	DO_ATTRDEF,
 	DO_INDEX,
+	DO_STATSEXT,
 	DO_RULE,
 	DO_TRIGGER,
 	DO_CONSTRAINT,
@@ -63,6 +64,7 @@ typedef enum
 	DO_PROCLANG,
 	DO_CAST,
 	DO_TABLE_DATA,
+	DO_SEQUENCE_SET,
 	DO_DUMMY_TYPE,
 	DO_TSPARSER,
 	DO_TSDICT,
@@ -78,7 +80,10 @@ typedef enum
 	DO_POST_DATA_BOUNDARY,
 	DO_EVENT_TRIGGER,
 	DO_REFRESH_MATVIEW,
-	DO_POLICY
+	DO_POLICY,
+	DO_PUBLICATION,
+	DO_PUBLICATION_REL,
+	DO_SUBSCRIPTION
 } DumpableObjectType;
 
 /* component types of an object which can be selected for dumping */
@@ -283,10 +288,13 @@ typedef struct _tableInfo
 	/* these two are set only if table is a sequence owned by a column: */
 	Oid			owning_tab;		/* OID of table owning sequence */
 	int			owning_col;		/* attr # of column owning sequence */
+	bool		is_identity_sequence;
 	int			relpages;		/* table's size in pages (from pg_class) */
 
 	bool		interesting;	/* true if need to collect more data */
+	bool		dummy_view;		/* view's real definition must be postponed */
 	bool		postponed_def;	/* matview must be postponed into post-data */
+	bool		ispartition;	/* is table a partition? */
 
 #ifdef PGXC
 	/* PGXC table locator Data */
@@ -306,6 +314,7 @@ typedef struct _tableInfo
 	char	   *attstorage;		/* attribute storage scheme */
 	char	   *typstorage;		/* type storage scheme */
 	bool	   *attisdropped;	/* true if attr is dropped; don't dump it */
+	char	   *attidentity;
 	int		   *attlen;			/* attribute length, used by binary_upgrade */
 	char	   *attalign;		/* attribute align, used by binary_upgrade */
 	bool	   *attislocal;		/* true if attr has local definition */
@@ -316,6 +325,9 @@ typedef struct _tableInfo
 	bool	   *inhNotNull;		/* true if NOT NULL is inherited */
 	struct _attrDefInfo **attrdefs;		/* DEFAULT expressions */
 	struct _constraintInfo *checkexprs; /* CHECK constraints */
+	char	   *partkeydef;		/* partition key definition */
+	char	   *partbound;		/* partition bound definition */
+	bool		needs_override; /* has GENERATED ALWAYS AS IDENTITY */
 
 	/*
 	 * Stuff computed only for dumpable tables.
@@ -360,6 +372,13 @@ typedef struct _indxInfo
 	int			relpages;		/* relpages of the underlying table */
 } IndxInfo;
 
+typedef struct _statsExtInfo
+{
+	DumpableObject dobj;
+	TableInfo  *statsexttable;	/* link to table the stats ext is for */
+	char	   *statsextdef;
+} StatsExtInfo;
+
 typedef struct _ruleInfo
 {
 	DumpableObject dobj;
@@ -369,8 +388,6 @@ typedef struct _ruleInfo
 	char		ev_enabled;
 	bool		separate;		/* TRUE if must dump as separate item */
 	/* separate is always true for non-ON SELECT rules */
-	char	   *reloptions;		/* options specified by WITH (...) */
-	/* reloptions is only set if we need to dump the options with the rule */
 } RuleInfo;
 
 typedef struct _triggerInfo
@@ -530,6 +547,9 @@ typedef struct _defaultACLInfo
 	char	   *defaclrole;
 	char		defaclobjtype;
 	char	   *defaclacl;
+	char	   *rdefaclacl;
+	char	   *initdefaclacl;
+	char	   *initrdefaclacl;
 } DefaultACLInfo;
 
 typedef struct _blobInfo
@@ -553,11 +573,49 @@ typedef struct _policyInfo
 	DumpableObject dobj;
 	TableInfo  *poltable;
 	char	   *polname;		/* null indicates RLS is enabled on rel */
-	char	   *polcmd;
+	char		polcmd;
+	bool		polpermissive;
 	char	   *polroles;
 	char	   *polqual;
 	char	   *polwithcheck;
 } PolicyInfo;
+
+/*
+ * The PublicationInfo struct is used to represent publications.
+ */
+typedef struct _PublicationInfo
+{
+	DumpableObject dobj;
+	char	   *rolname;
+	bool		puballtables;
+	bool		pubinsert;
+	bool		pubupdate;
+	bool		pubdelete;
+} PublicationInfo;
+
+/*
+ * The PublicationRelInfo struct is used to represent publication table
+ * mapping.
+ */
+typedef struct _PublicationRelInfo
+{
+	DumpableObject dobj;
+	TableInfo  *pubtable;
+	char	   *pubname;
+} PublicationRelInfo;
+
+/*
+ * The SubscriptionInfo struct is used to represent subscription.
+ */
+typedef struct _SubscriptionInfo
+{
+	DumpableObject dobj;
+	char	   *rolname;
+	char	   *subconninfo;
+	char	   *subslotname;
+	char	   *subsynccommit;
+	char	   *subpublications;
+} SubscriptionInfo;
 
 /*
  * We build an array of these with an entry for each object that is an
@@ -611,7 +669,6 @@ extern void parseOidArray(const char *str, Oid *array, int arraysize);
 extern void sortDumpableObjects(DumpableObject **objs, int numObjs,
 					DumpId preBoundaryId, DumpId postBoundaryId);
 extern void sortDumpableObjectsByTypeName(DumpableObject **objs, int numObjs);
-extern void sortDumpableObjectsByTypeOid(DumpableObject **objs, int numObjs);
 extern void sortDataAndIndexObjectsBySize(DumpableObject **objs, int numObjs);
 
 /*
@@ -632,6 +689,7 @@ extern TableInfo *getTables(Archive *fout, int *numTables);
 extern void getOwnedSeqs(Archive *fout, TableInfo tblinfo[], int numTables);
 extern InhInfo *getInherits(Archive *fout, int *numInherits);
 extern void getIndexes(Archive *fout, TableInfo tblinfo[], int numTables);
+extern void getExtendedStatistics(Archive *fout, TableInfo tblinfo[], int numTables);
 extern void getConstraints(Archive *fout, TableInfo tblinfo[], int numTables);
 extern RuleInfo *getRules(Archive *fout, int *numRules);
 extern void getTriggers(Archive *fout, TableInfo tblinfo[], int numTables);
@@ -655,5 +713,9 @@ extern void processExtensionTables(Archive *fout, ExtensionInfo extinfo[],
 					   int numExtensions);
 extern EventTriggerInfo *getEventTriggers(Archive *fout, int *numEventTriggers);
 extern void getPolicies(Archive *fout, TableInfo tblinfo[], int numTables);
+extern void getPublications(Archive *fout);
+extern void getPublicationTables(Archive *fout, TableInfo tblinfo[],
+					 int numTables);
+extern void getSubscriptions(Archive *fout);
 
 #endif   /* PG_DUMP_H */

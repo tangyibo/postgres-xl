@@ -283,9 +283,10 @@ explain (verbose, costs off)
 select generate_series(0,2) as s1, generate_series((random()*.1)::int,2) as s2;
                                               QUERY PLAN                                              
 ------------------------------------------------------------------------------------------------------
- Result
+ ProjectSet
    Output: generate_series(0, 2), generate_series(((random() * '0.1'::double precision))::integer, 2)
-(2 rows)
+   ->  Result
+(3 rows)
 
 select generate_series(0,2) as s1, generate_series((random()*.1)::int,2) as s2;
  s1 | s2 
@@ -303,9 +304,10 @@ order by s2 desc;
  Sort
    Output: (generate_series(0, 2)), (generate_series(((random() * '0.1'::double precision))::integer, 2))
    Sort Key: (generate_series(((random() * '0.1'::double precision))::integer, 2)) DESC
-   ->  Result
+   ->  ProjectSet
          Output: generate_series(0, 2), generate_series(((random() * '0.1'::double precision))::integer, 2)
-(5 rows)
+         ->  Result
+(6 rows)
 
 select generate_series(0,2) as s1, generate_series((random()*.1)::int,2) as s2
 order by s2 desc;

@@ -323,6 +323,31 @@ SELECT q1 FROM int8_tbl EXCEPT ALL SELECT DISTINCT q2 FROM int8_tbl ORDER BY 1;
 
 SELECT q1 FROM int8_tbl EXCEPT ALL SELECT q1 FROM int8_tbl FOR NO KEY UPDATE;
 ERROR:  FOR NO KEY UPDATE is not allowed with UNION/INTERSECT/EXCEPT
+-- nested cases
+(SELECT 1,2,3 UNION SELECT 4,5,6) INTERSECT SELECT 4,5,6;
+ ?column? | ?column? | ?column? 
+----------+----------+----------
+        4 |        5 |        6
+(1 row)
+
+(SELECT 1,2,3 UNION SELECT 4,5,6 ORDER BY 1,2) INTERSECT SELECT 4,5,6;
+ ?column? | ?column? | ?column? 
+----------+----------+----------
+        4 |        5 |        6
+(1 row)
+
+(SELECT 1,2,3 UNION SELECT 4,5,6) EXCEPT SELECT 4,5,6;
+ ?column? | ?column? | ?column? 
+----------+----------+----------
+        1 |        2 |        3
+(1 row)
+
+(SELECT 1,2,3 UNION SELECT 4,5,6 ORDER BY 1,2) EXCEPT SELECT 4,5,6;
+ ?column? | ?column? | ?column? 
+----------+----------+----------
+        1 |        2 |        3
+(1 row)
+
 --
 -- Mixed types
 --
@@ -369,6 +394,7 @@ SELECT q1 FROM int8_tbl INTERSECT (((SELECT q2 FROM int8_tbl UNION ALL SELECT q2
  -4567890123456789
                123
                123
+  4567890123456789
                456
   4567890123456789
   4567890123456789
@@ -604,23 +630,27 @@ SELECT * FROM
   (SELECT 1 AS t, 2 AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x < 4;
-                 QUERY PLAN                 
---------------------------------------------
- Unique
-   ->  Sort
-         Sort Key: (1), (2)
-         ->  Append
-               ->  Result
-               ->  Result
-                     One-Time Filter: false
-(7 rows)
+WHERE x < 4
+ORDER BY x;
+                    QUERY PLAN                    
+--------------------------------------------------
+ Sort
+   Sort Key: (2)
+   ->  Unique
+         ->  Sort
+               Sort Key: (1), (2)
+               ->  Append
+                     ->  Result
+                     ->  Result
+                           One-Time Filter: false
+(9 rows)
 
 SELECT * FROM
   (SELECT 1 AS t, 2 AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x < 4;
+WHERE x < 4
+ORDER BY x;
  t | x 
 ---+---
  1 | 2
@@ -642,9 +672,10 @@ ORDER BY x;
          ->  HashAggregate
                Group Key: (1), (generate_series(1, 10))
                ->  Append
+                     ->  ProjectSet
+                           ->  Result
                      ->  Result
-                     ->  Result
-(9 rows)
+(10 rows)
 
 SELECT * FROM
   (SELECT 1 AS t, generate_series(1,10) AS x
@@ -664,24 +695,28 @@ SELECT * FROM
   (SELECT 1 AS t, (random()*3)::int AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x > 3;
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
- Subquery Scan on ss
-   Filter: (ss.x > 3)
-   ->  Unique
-         ->  Sort
-               Sort Key: (1), (((random() * '3'::double precision))::integer)
-               ->  Append
-                     ->  Result
-                     ->  Result
-(8 rows)
+WHERE x > 3
+ORDER BY x;
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Sort
+   Sort Key: ss.x
+   ->  Subquery Scan on ss
+         Filter: (ss.x > 3)
+         ->  Unique
+               ->  Sort
+                     Sort Key: (1), (((random() * '3'::double precision))::integer)
+                     ->  Append
+                           ->  Result
+                           ->  Result
+(10 rows)
 
 SELECT * FROM
   (SELECT 1 AS t, (random()*3)::int AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x > 3;
+WHERE x > 3
+ORDER BY x;
  t | x 
 ---+---
  2 | 4
@@ -722,3 +757,33 @@ select * from
 
 drop table t3;
 drop function expensivefunc(int);
+-- Test handling of appendrel quals that const-simplify into an AND
+explain (costs off)
+select * from
+  (select *, 0 as x from int8_tbl a
+   union all
+   select *, 1 as x from int8_tbl b) ss
+where (x = 0) or (q1 >= q2 and q1 <= q2);
+                 QUERY PLAN                  
+---------------------------------------------
+ Append
+   ->  Seq Scan on int8_tbl a
+   ->  Seq Scan on int8_tbl b
+         Filter: ((q1 >= q2) AND (q1 <= q2))
+(4 rows)
+
+select * from
+  (select *, 0 as x from int8_tbl a
+   union all
+   select *, 1 as x from int8_tbl b) ss
+where (x = 0) or (q1 >= q2 and q1 <= q2);
+        q1        |        q2         | x 
+------------------+-------------------+---
+              123 |               456 | 0
+              123 |  4567890123456789 | 0
+ 4567890123456789 |               123 | 0
+ 4567890123456789 |  4567890123456789 | 0
+ 4567890123456789 | -4567890123456789 | 0
+ 4567890123456789 |  4567890123456789 | 1
+(6 rows)
+

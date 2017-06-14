@@ -5,7 +5,7 @@
  * backend/utils/misc/guc-file.l
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Copyright (c) 2000-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2000-2017, PostgreSQL Global Development Group
  * Written by Peter Eisentraut <peter_e@gmx.net>.
  *
  * src/include/utils/guc.h
@@ -219,13 +219,13 @@ typedef enum
 #define GUC_UNIT_KB				0x1000	/* value is in kilobytes */
 #define GUC_UNIT_BLOCKS			0x2000	/* value is in blocks */
 #define GUC_UNIT_XBLOCKS		0x3000	/* value is in xlog blocks */
-#define GUC_UNIT_XSEGS			0x4000	/* value is in xlog segments */
-#define GUC_UNIT_MEMORY			0xF000	/* mask for KB, BLOCKS, XBLOCKS */
+#define GUC_UNIT_MB				0x4000	/* value is in megabytes */
+#define GUC_UNIT_MEMORY			0xF000	/* mask for size-related units */
 
 #define GUC_UNIT_MS			   0x10000	/* value is in milliseconds */
 #define GUC_UNIT_S			   0x20000	/* value is in seconds */
 #define GUC_UNIT_MIN		   0x30000	/* value is in minutes */
-#define GUC_UNIT_TIME		   0xF0000	/* mask for MS, S, MIN */
+#define GUC_UNIT_TIME		   0xF0000	/* mask for time-related units */
 
 #define GUC_UNIT				(GUC_UNIT_MEMORY | GUC_UNIT_TIME)
 
@@ -250,7 +250,6 @@ extern bool log_remotesubplan_stats;
 
 extern PGDLLIMPORT bool check_function_bodies;
 extern bool default_with_oids;
-extern bool SQL_inheritance;
 
 extern int	log_min_error_statement;
 extern int	log_min_messages;

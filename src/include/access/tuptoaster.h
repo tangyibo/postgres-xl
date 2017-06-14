@@ -4,7 +4,7 @@
  *	  POSTGRES definitions for external and compressed storage
  *	  of variable size attributes.
  *
- * Copyright (c) 2000-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2000-2017, PostgreSQL Global Development Group
  *
  * src/include/access/tuptoaster.h
  *
@@ -142,7 +142,7 @@ extern HeapTuple toast_insert_or_update(Relation rel,
  *	Called by heap_delete().
  * ----------
  */
-extern void toast_delete(Relation rel, HeapTuple oldtup);
+extern void toast_delete(Relation rel, HeapTuple oldtup, bool is_speculative);
 
 /* ----------
  * heap_tuple_fetch_attr() -
@@ -192,6 +192,17 @@ extern HeapTuple toast_flatten_tuple(HeapTuple tup, TupleDesc tupleDesc);
 extern Datum toast_flatten_tuple_to_datum(HeapTupleHeader tup,
 							 uint32 tup_len,
 							 TupleDesc tupleDesc);
+
+/* ----------
+ * toast_build_flattened_tuple -
+ *
+ *	Build a tuple containing no out-of-line toasted fields.
+ *	(This does not eliminate compressed or short-header datums.)
+ * ----------
+ */
+extern HeapTuple toast_build_flattened_tuple(TupleDesc tupleDesc,
+							Datum *values,
+							bool *isnull);
 
 /* ----------
  * toast_compress_datum -

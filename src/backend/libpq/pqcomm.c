@@ -27,7 +27,7 @@
  * the backend's "backend/libpq" is quite separate from "interfaces/libpq".
  * All that remains is similarities of names to trap the unwary...
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *	src/backend/libpq/pqcomm.c
@@ -85,11 +85,11 @@
 #ifdef HAVE_UTIME_H
 #include <utime.h>
 #endif
-#ifdef WIN32_ONLY_COMPILER		/* mstcpip.h is missing on mingw */
+#ifdef _MSC_VER					/* mstcpip.h is missing on mingw */
 #include <mstcpip.h>
 #endif
 
-#include "libpq/ip.h"
+#include "common/ip.h"
 #include "libpq/libpq.h"
 #include "miscadmin.h"
 #include "storage/ipc.h"
@@ -145,7 +145,6 @@ static void socket_startcopyout(void);
 static void socket_endcopyout(bool errorAbort);
 static int	internal_putbytes(const char *s, size_t len);
 static int	internal_flush(void);
-static void socket_set_nonblocking(bool nonblocking);
 
 #ifdef HAVE_UNIX_SOCKETS
 static int	Lock_AF_UNIX(char *unixSocketDir, char *unixSocketPath);
@@ -320,6 +319,8 @@ StreamServerPort(int family, char *hostName, unsigned short portNumber,
 	char		portNumberStr[32];
 	const char *familyDesc;
 	char		familyDescBuf[64];
+	const char *addrDesc;
+	char		addrBuf[NI_MAXHOST];
 	char	   *service;
 	struct addrinfo *addrs = NULL,
 			   *addr;
@@ -408,7 +409,7 @@ StreamServerPort(int family, char *hostName, unsigned short portNumber,
 			break;
 		}
 
-		/* set up family name for possible error messages */
+		/* set up address family name for log messages */
 		switch (addr->ai_family)
 		{
 			case AF_INET:
@@ -432,13 +433,28 @@ StreamServerPort(int family, char *hostName, unsigned short portNumber,
 				break;
 		}
 
+		/* set up text form of address for log messages */
+#ifdef HAVE_UNIX_SOCKETS
+		if (addr->ai_family == AF_UNIX)
+			addrDesc = unixSocketPath;
+		else
+#endif
+		{
+			pg_getnameinfo_all((const struct sockaddr_storage *) addr->ai_addr,
+							   addr->ai_addrlen,
+							   addrBuf, sizeof(addrBuf),
+							   NULL, 0,
+							   NI_NUMERICHOST);
+			addrDesc = addrBuf;
+		}
+
 		if ((fd = socket(addr->ai_family, SOCK_STREAM, 0)) == PGINVALID_SOCKET)
 		{
 			ereport(LOG,
 					(errcode_for_socket_access(),
-			/* translator: %s is IPv4, IPv6, or Unix */
-					 errmsg("could not create %s socket: %m",
-							familyDesc)));
+			/* translator: first %s is IPv4, IPv6, or Unix */
+				  errmsg("could not create %s socket for address \"%s\": %m",
+						 familyDesc, addrDesc)));
 			continue;
 		}
 
@@ -462,7 +478,9 @@ StreamServerPort(int family, char *hostName, unsigned short portNumber,
 			{
 				ereport(LOG,
 						(errcode_for_socket_access(),
-						 errmsg("setsockopt(SO_REUSEADDR) failed: %m")));
+				/* translator: first %s is IPv4, IPv6, or Unix */
+						 errmsg("setsockopt(SO_REUSEADDR) failed for %s address \"%s\": %m",
+								familyDesc, addrDesc)));
 				closesocket(fd);
 				continue;
 			}
@@ -477,7 +495,9 @@ StreamServerPort(int family, char *hostName, unsigned short portNumber,
 			{
 				ereport(LOG,
 						(errcode_for_socket_access(),
-						 errmsg("setsockopt(IPV6_V6ONLY) failed: %m")));
+				/* translator: first %s is IPv4, IPv6, or Unix */
+						 errmsg("setsockopt(IPV6_V6ONLY) failed for %s address \"%s\": %m",
+								familyDesc, addrDesc)));
 				closesocket(fd);
 				continue;
 			}
@@ -495,9 +515,9 @@ StreamServerPort(int family, char *hostName, unsigned short portNumber,
 		{
 			ereport(LOG,
 					(errcode_for_socket_access(),
-			/* translator: %s is IPv4, IPv6, or Unix */
-					 errmsg("could not bind %s socket: %m",
-							familyDesc),
+			/* translator: first %s is IPv4, IPv6, or Unix */
+					 errmsg("could not bind %s address \"%s\": %m",
+							familyDesc, addrDesc),
 					 (IS_AF_UNIX(addr->ai_family)) ?
 				  errhint("Is another postmaster already running on port %d?"
 						  " If not, remove socket file \"%s\" and retry.",
@@ -534,12 +554,25 @@ StreamServerPort(int family, char *hostName, unsigned short portNumber,
 		{
 			ereport(LOG,
 					(errcode_for_socket_access(),
-			/* translator: %s is IPv4, IPv6, or Unix */
-					 errmsg("could not listen on %s socket: %m",
-							familyDesc)));
+			/* translator: first %s is IPv4, IPv6, or Unix */
+					 errmsg("could not listen on %s address \"%s\": %m",
+							familyDesc, addrDesc)));
 			closesocket(fd);
 			continue;
 		}
+
+#ifdef HAVE_UNIX_SOCKETS
+		if (addr->ai_family == AF_UNIX)
+			ereport(LOG,
+					(errmsg("listening on Unix socket \"%s\"",
+							addrDesc)));
+		else
+#endif
+			ereport(LOG,
+			/* translator: first %s is IPv4 or IPv6 */
+					(errmsg("listening on %s address \"%s\", port %d",
+							familyDesc, addrDesc, (int) portNumber)));
+
 		ListenSocket[listen_index] = fd;
 		added++;
 	}
@@ -683,16 +716,6 @@ StreamConnection(pgsocket server_fd, Port *port)
 		pg_usleep(100000L);		/* wait 0.1 sec */
 		return STATUS_ERROR;
 	}
-
-#ifdef SCO_ACCEPT_BUG
-
-	/*
-	 * UnixWare 7+ and OpenServer 5.0.4 are known to have this bug, but it
-	 * shouldn't hurt to catch it for all versions of those platforms.
-	 */
-	if (port->raddr.addr.ss_family == 0)
-		port->raddr.addr.ss_family = AF_UNIX;
-#endif
 
 	/* fill in the server (local) address */
 	port->laddr.salen = sizeof(port->laddr.addr);

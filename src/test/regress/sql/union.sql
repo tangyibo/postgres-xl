@@ -68,8 +68,8 @@ SELECT f1 AS five FROM FLOAT8_TBL
   WHERE f1 BETWEEN -1e6 AND 1e6
 UNION
 SELECT f1 FROM INT4_TBL
-  WHERE f1 BETWEEN 0 AND 1000000 
-  ORDER BY 1;
+  WHERE f1 BETWEEN 0 AND 1000000
+ORDER BY 1;
 
 SELECT CAST(f1 AS char(4)) AS three FROM VARCHAR_TBL
 UNION
@@ -115,6 +115,12 @@ SELECT q1 FROM int8_tbl EXCEPT ALL SELECT DISTINCT q2 FROM int8_tbl ORDER BY 1;
 
 SELECT q1 FROM int8_tbl EXCEPT ALL SELECT q1 FROM int8_tbl FOR NO KEY UPDATE;
 
+-- nested cases
+(SELECT 1,2,3 UNION SELECT 4,5,6) INTERSECT SELECT 4,5,6;
+(SELECT 1,2,3 UNION SELECT 4,5,6 ORDER BY 1,2) INTERSECT SELECT 4,5,6;
+(SELECT 1,2,3 UNION SELECT 4,5,6) EXCEPT SELECT 4,5,6;
+(SELECT 1,2,3 UNION SELECT 4,5,6 ORDER BY 1,2) EXCEPT SELECT 4,5,6;
+
 --
 -- Mixed types
 --
@@ -127,11 +133,11 @@ SELECT f1 FROM float8_tbl EXCEPT SELECT f1 FROM int4_tbl ORDER BY 1;
 -- Operator precedence and (((((extra))))) parentheses
 --
 
-SELECT q1 FROM int8_tbl INTERSECT SELECT q2 FROM int8_tbl UNION ALL SELECT q2 FROM int8_tbl ORDER BY 1;
+SELECT q1 FROM int8_tbl INTERSECT SELECT q2 FROM int8_tbl UNION ALL SELECT q2 FROM int8_tbl  ORDER BY 1;
 
 SELECT q1 FROM int8_tbl INTERSECT (((SELECT q2 FROM int8_tbl UNION ALL SELECT q2 FROM int8_tbl))) ORDER BY 1;
 
-(((SELECT q1 FROM int8_tbl INTERSECT SELECT q2 FROM int8_tbl))) UNION ALL SELECT q2 FROM int8_tbl ORDER BY 1;
+(((SELECT q1 FROM int8_tbl INTERSECT SELECT q2 FROM int8_tbl ORDER BY 1))) UNION ALL SELECT q2 FROM int8_tbl;
 
 SELECT q1 FROM int8_tbl UNION ALL SELECT q2 FROM int8_tbl EXCEPT SELECT q1 FROM int8_tbl ORDER BY 1;
 
@@ -151,7 +157,7 @@ ORDER BY q2,q1;
 SELECT q1 FROM int8_tbl EXCEPT SELECT q2 FROM int8_tbl ORDER BY q2 LIMIT 1;
 
 -- But this should work:
-SELECT q1 FROM int8_tbl EXCEPT (((SELECT q2 FROM int8_tbl ORDER BY q2 LIMIT 1))) ORDER BY q1;
+SELECT q1 FROM int8_tbl EXCEPT (((SELECT q2 FROM int8_tbl ORDER BY q2 LIMIT 1))) ORDER BY 1;
 
 --
 -- New syntaxes (7.1) permit new tests
@@ -264,13 +270,15 @@ SELECT * FROM
   (SELECT 1 AS t, 2 AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x < 4;
+WHERE x < 4
+ORDER BY x;
 
 SELECT * FROM
   (SELECT 1 AS t, 2 AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x < 4;
+WHERE x < 4
+ORDER BY x;
 
 explain (costs off)
 SELECT * FROM
@@ -292,13 +300,15 @@ SELECT * FROM
   (SELECT 1 AS t, (random()*3)::int AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x > 3;
+WHERE x > 3
+ORDER BY x;
 
 SELECT * FROM
   (SELECT 1 AS t, (random()*3)::int AS x
    UNION
    SELECT 2 AS t, 4 AS x) ss
-WHERE x > 3;
+WHERE x > 3
+ORDER BY x;
 
 -- Test proper handling of parameterized appendrel paths when the
 -- potential join qual is expensive
@@ -320,3 +330,16 @@ select * from
 
 drop table t3;
 drop function expensivefunc(int);
+
+-- Test handling of appendrel quals that const-simplify into an AND
+explain (costs off)
+select * from
+  (select *, 0 as x from int8_tbl a
+   union all
+   select *, 1 as x from int8_tbl b) ss
+where (x = 0) or (q1 >= q2 and q1 <= q2);
+select * from
+  (select *, 0 as x from int8_tbl a
+   union all
+   select *, 1 as x from int8_tbl b) ss
+where (x = 0) or (q1 >= q2 and q1 <= q2);

@@ -3,7 +3,7 @@
  * syscache.c
  *	  System cache management routines
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -49,15 +49,22 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
+#include "catalog/pg_partitioned_table.h"
 #include "catalog/pg_proc.h"
+#include "catalog/pg_publication.h"
+#include "catalog/pg_publication_rel.h"
 #include "catalog/pg_range.h"
 #include "catalog/pg_rewrite.h"
 #include "catalog/pg_seclabel.h"
+#include "catalog/pg_sequence.h"
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_shdescription.h"
 #include "catalog/pg_shseclabel.h"
 #include "catalog/pg_replication_origin.h"
 #include "catalog/pg_statistic.h"
+#include "catalog/pg_statistic_ext.h"
+#include "catalog/pg_subscription.h"
+#include "catalog/pg_subscription_rel.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_transform.h"
 #include "catalog/pg_ts_config.h"
@@ -101,10 +108,8 @@
 	adding/deleting caches only requires a recompile.)
 
 	Finally, any place your relation gets heap_insert() or
-	heap_update() calls, make sure there is a CatalogUpdateIndexes() or
-	similar call.  The heap_* calls do not update indexes.
-
-	bjm 1999/11/22
+	heap_update() calls, use CatalogTupleInsert() or CatalogTupleUpdate()
+	instead, which also update indexes.  The heap_* calls do not do that.
 
 *---------------------------------------------------------------------------
 */
@@ -642,6 +647,17 @@ static const struct cachedesc cacheinfo[] = {
 		256
 	},
 #endif
+	{PartitionedRelationId,		/* PARTRELID */
+		PartitionedRelidIndexId,
+		1,
+		{
+			Anum_pg_partitioned_table_partrelid,
+			0,
+			0,
+			0
+		},
+		32
+	},
 	{ProcedureRelationId,		/* PROCNAMEARGSNSP */
 		ProcedureNameArgsNspIndexId,
 		3,
@@ -719,6 +735,50 @@ static const struct cachedesc cacheinfo[] = {
 		},
 		16
 	},
+	{PublicationRelationId,		/* PUBLICATIONOID */
+		PublicationObjectIndexId,
+		1,
+		{
+			ObjectIdAttributeNumber,
+			0,
+			0,
+			0
+		},
+		8
+	},
+	{PublicationRelationId,		/* PUBLICATIONNAME */
+		PublicationNameIndexId,
+		1,
+		{
+			Anum_pg_publication_pubname,
+			0,
+			0,
+			0
+		},
+		8
+	},
+	{PublicationRelRelationId,	/* PUBLICATIONREL */
+		PublicationRelObjectIndexId,
+		1,
+		{
+			ObjectIdAttributeNumber,
+			0,
+			0,
+			0
+		},
+		64
+	},
+	{PublicationRelRelationId,	/* PUBLICATIONRELMAP */
+		PublicationRelPrrelidPrpubidIndexId,
+		2,
+		{
+			Anum_pg_publication_rel_prrelid,
+			Anum_pg_publication_rel_prpubid,
+			0,
+			0
+		},
+		64
+	},
 	{RewriteRelationId,			/* RULERELNAME */
 		RewriteRelRulenameIndexId,
 		2,
@@ -730,6 +790,39 @@ static const struct cachedesc cacheinfo[] = {
 		},
 		8
 	},
+	{SequenceRelationId,		/* SEQRELID */
+		SequenceRelidIndexId,
+		1,
+		{
+			Anum_pg_sequence_seqrelid,
+			0,
+			0,
+			0
+		},
+		32
+	},
+	{StatisticExtRelationId,	/* STATEXTNAMENSP */
+		StatisticExtNameIndexId,
+		2,
+		{
+			Anum_pg_statistic_ext_stxname,
+			Anum_pg_statistic_ext_stxnamespace,
+			0,
+			0
+		},
+		4
+	},
+	{StatisticExtRelationId,	/* STATEXTOID */
+		StatisticExtOidIndexId,
+		1,
+		{
+			ObjectIdAttributeNumber,
+			0,
+			0,
+			0
+		},
+		4
+	},
 	{StatisticRelationId,		/* STATRELATTINH */
 		StatisticRelidAttnumInhIndexId,
 		3,
@@ -740,6 +833,39 @@ static const struct cachedesc cacheinfo[] = {
 			0
 		},
 		128
+	},
+	{SubscriptionRelationId,	/* SUBSCRIPTIONOID */
+		SubscriptionObjectIndexId,
+		1,
+		{
+			ObjectIdAttributeNumber,
+			0,
+			0,
+			0
+		},
+		4
+	},
+	{SubscriptionRelationId,	/* SUBSCRIPTIONNAME */
+		SubscriptionNameIndexId,
+		2,
+		{
+			Anum_pg_subscription_subdbid,
+			Anum_pg_subscription_subname,
+			0,
+			0
+		},
+		4
+	},
+	{SubscriptionRelRelationId, /* SUBSCRIPTIONRELMAP */
+		SubscriptionRelSrrelidSrsubidIndexId,
+		2,
+		{
+			Anum_pg_subscription_rel_srrelid,
+			Anum_pg_subscription_rel_srsubid,
+			0,
+			0
+		},
+		64
 	},
 	{TableSpaceRelationId,		/* TABLESPACEOID */
 		TablespaceOidIndexId,
@@ -919,8 +1045,6 @@ static const struct cachedesc cacheinfo[] = {
 	}
 };
 
-#define SysCacheSize	((int) lengthof(cacheinfo))
-
 static CatCache *SysCache[SysCacheSize];
 
 static bool CacheInitialized = false;
@@ -950,6 +1074,9 @@ InitCatalogCache(void)
 	int			cacheId;
 	int			i,
 				j;
+
+	StaticAssertStmt(SysCacheSize == (int) lengthof(cacheinfo),
+					 "SysCacheSize does not match syscache.c's array");
 
 	Assert(!CacheInitialized);
 
@@ -1284,6 +1411,27 @@ SearchSysCacheList(int cacheId, int nkeys,
 
 	return SearchCatCacheList(SysCache[cacheId], nkeys,
 							  key1, key2, key3, key4);
+}
+
+/*
+ * SysCacheInvalidate
+ *
+ *	Invalidate entries in the specified cache, given a hash value.
+ *	See CatCacheInvalidate() for more info.
+ *
+ *	This routine is only quasi-public: it should only be used by inval.c.
+ */
+void
+SysCacheInvalidate(int cacheId, uint32 hashValue)
+{
+	if (cacheId < 0 || cacheId >= SysCacheSize)
+		elog(ERROR, "invalid cache ID: %d", cacheId);
+
+	/* if this cache isn't initialized yet, no need to do anything */
+	if (!PointerIsValid(SysCache[cacheId]))
+		return;
+
+	CatCacheInvalidate(SysCache[cacheId], hashValue);
 }
 
 /*

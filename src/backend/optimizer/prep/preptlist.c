@@ -27,7 +27,7 @@
  * that because it's faster in typical non-inherited cases.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -301,7 +301,7 @@ preprocess_targetlist(PlannerInfo *root, List *tlist)
 				var->varno == result_relation)
 				continue;		/* don't need it */
 
-			if (tlist_member((Node *) var, tlist))
+			if (tlist_member((Expr *) var, tlist))
 				continue;		/* already got it */
 
 			tle = makeTargetEntry((Expr *) var,

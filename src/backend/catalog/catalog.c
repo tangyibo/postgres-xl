@@ -6,7 +6,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -37,6 +37,7 @@
 #include "catalog/pg_shdepend.h"
 #include "catalog/pg_shdescription.h"
 #include "catalog/pg_shseclabel.h"
+#include "catalog/pg_subscription.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/toasting.h"
 #include "catalog/pgxc_node.h"
@@ -237,7 +238,8 @@ IsSharedRelation(Oid relationId)
 		relationId == PgxcNodeRelationId ||
 #endif
 		relationId == DbRoleSettingRelationId ||
-		relationId == ReplicationOriginRelationId)
+		relationId == ReplicationOriginRelationId ||
+		relationId == SubscriptionRelationId)
 		return true;
 	/* These are their indexes (see indexing.h) */
 	if (relationId == AuthIdRolnameIndexId ||
@@ -262,7 +264,9 @@ IsSharedRelation(Oid relationId)
 #endif
 		relationId == DbRoleSettingDatidRolidIndexId ||
 		relationId == ReplicationOriginIdentIndex ||
-		relationId == ReplicationOriginNameIndex)
+		relationId == ReplicationOriginNameIndex ||
+		relationId == SubscriptionObjectIndexId ||
+		relationId == SubscriptionNameIndexId)
 		return true;
 	/* These are their toast tables and toast indexes (see toasting.h) */
 	if (relationId == PgShdescriptionToastTable ||

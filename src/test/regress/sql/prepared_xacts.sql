@@ -136,8 +136,7 @@ SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
 
 -- pxtest3 should be locked because of the pending DROP
 begin;
-set statement_timeout to 2000;
-SELECT * FROM pxtest3;
+lock table pxtest3 in access share mode nowait;
 rollback;
 
 -- Disconnect, we will continue testing in a different backend
@@ -150,8 +149,7 @@ SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
 
 -- pxtest3 should still be locked because of the pending DROP
 begin;
-set statement_timeout to 2000;
-SELECT * FROM pxtest3;
+lock table pxtest3 in access share mode nowait;
 rollback;
 
 -- Commit table creation

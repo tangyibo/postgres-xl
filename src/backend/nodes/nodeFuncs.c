@@ -3,7 +3,7 @@
  * nodeFuncs.c
  *		Various general-purpose manipulations of Node trees
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -111,8 +111,7 @@ exprType(const Node *expr)
 
 					if (!qtree || !IsA(qtree, Query))
 						elog(ERROR, "cannot get type for untransformed sublink");
-					tent = (TargetEntry *) linitial(qtree->targetList);
-					Assert(IsA(tent, TargetEntry));
+					tent = linitial_node(TargetEntry, qtree->targetList);
 					Assert(!tent->resjunk);
 					type = exprType((Node *) tent->expr);
 					if (sublink->subLinkType == ARRAY_SUBLINK)
@@ -218,6 +217,9 @@ exprType(const Node *expr)
 		case T_MinMaxExpr:
 			type = ((const MinMaxExpr *) expr)->minmaxtype;
 			break;
+		case T_SQLValueFunction:
+			type = ((const SQLValueFunction *) expr)->type;
+			break;
 		case T_XmlExpr:
 			if (((const XmlExpr *) expr)->op == IS_DOCUMENT)
 				type = BOOLOID;
@@ -243,6 +245,9 @@ exprType(const Node *expr)
 			break;
 		case T_CurrentOfExpr:
 			type = BOOLOID;
+			break;
+		case T_NextValueExpr:
+			type = ((const NextValueExpr *) expr)->typeId;
 			break;
 		case T_InferenceElem:
 			{
@@ -319,8 +324,7 @@ exprTypmod(const Node *expr)
 
 					if (!qtree || !IsA(qtree, Query))
 						elog(ERROR, "cannot get type for untransformed sublink");
-					tent = (TargetEntry *) linitial(qtree->targetList);
-					Assert(IsA(tent, TargetEntry));
+					tent = linitial_node(TargetEntry, qtree->targetList);
 					Assert(!tent->resjunk);
 					return exprTypmod((Node *) tent->expr);
 					/* note we don't need to care if it's an array */
@@ -378,9 +382,8 @@ exprTypmod(const Node *expr)
 					return -1;	/* no point in trying harder */
 				foreach(arg, cexpr->args)
 				{
-					CaseWhen   *w = (CaseWhen *) lfirst(arg);
+					CaseWhen   *w = lfirst_node(CaseWhen, arg);
 
-					Assert(IsA(w, CaseWhen));
 					if (exprType((Node *) w->result) != casetype)
 						return -1;
 					if (exprTypmod((Node *) w->result) != typmod)
@@ -479,6 +482,8 @@ exprTypmod(const Node *expr)
 				return typmod;
 			}
 			break;
+		case T_SQLValueFunction:
+			return ((const SQLValueFunction *) expr)->typmod;
 		case T_CoerceToDomain:
 			return ((const CoerceToDomain *) expr)->resulttypmod;
 		case T_CoerceToDomainValue:
@@ -718,6 +723,8 @@ expression_returns_set_walker(Node *node, void *context)
 		return false;
 	if (IsA(node, MinMaxExpr))
 		return false;
+	if (IsA(node, SQLValueFunction))
+		return false;
 	if (IsA(node, XmlExpr))
 		return false;
 
@@ -802,8 +809,7 @@ exprCollation(const Node *expr)
 
 					if (!qtree || !IsA(qtree, Query))
 						elog(ERROR, "cannot get collation for untransformed sublink");
-					tent = (TargetEntry *) linitial(qtree->targetList);
-					Assert(IsA(tent, TargetEntry));
+					tent = linitial_node(TargetEntry, qtree->targetList);
 					Assert(!tent->resjunk);
 					coll = exprCollation((Node *) tent->expr);
 					/* collation doesn't change if it's converted to array */
@@ -883,6 +889,9 @@ exprCollation(const Node *expr)
 		case T_MinMaxExpr:
 			coll = ((const MinMaxExpr *) expr)->minmaxcollid;
 			break;
+		case T_SQLValueFunction:
+			coll = InvalidOid;	/* all cases return non-collatable types */
+			break;
 		case T_XmlExpr:
 
 			/*
@@ -912,6 +921,9 @@ exprCollation(const Node *expr)
 			break;
 		case T_CurrentOfExpr:
 			coll = InvalidOid;	/* result is always boolean */
+			break;
+		case T_NextValueExpr:
+			coll = InvalidOid;	/* result is always an integer type */
 			break;
 		case T_InferenceElem:
 			coll = exprCollation((Node *) ((const InferenceElem *) expr)->expr);
@@ -1042,8 +1054,7 @@ exprSetCollation(Node *expr, Oid collation)
 
 					if (!qtree || !IsA(qtree, Query))
 						elog(ERROR, "cannot set collation for untransformed sublink");
-					tent = (TargetEntry *) linitial(qtree->targetList);
-					Assert(IsA(tent, TargetEntry));
+					tent = linitial_node(TargetEntry, qtree->targetList);
 					Assert(!tent->resjunk);
 					Assert(collation == exprCollation((Node *) tent->expr));
 				}
@@ -1091,6 +1102,9 @@ exprSetCollation(Node *expr, Oid collation)
 		case T_MinMaxExpr:
 			((MinMaxExpr *) expr)->minmaxcollid = collation;
 			break;
+		case T_SQLValueFunction:
+			Assert(!OidIsValid(collation));		/* no collatable results */
+			break;
 		case T_XmlExpr:
 			Assert((((XmlExpr *) expr)->op == IS_XMLSERIALIZE) ?
 				   (collation == DEFAULT_COLLATION_OID) :
@@ -1113,6 +1127,10 @@ exprSetCollation(Node *expr, Oid collation)
 			break;
 		case T_CurrentOfExpr:
 			Assert(!OidIsValid(collation));		/* result is always boolean */
+			break;
+		case T_NextValueExpr:
+			Assert(!OidIsValid(collation));		/* result is always an integer
+												 * type */
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(expr));
@@ -1203,6 +1221,9 @@ exprLocation(const Node *expr)
 	{
 		case T_RangeVar:
 			loc = ((const RangeVar *) expr)->location;
+			break;
+		case T_TableFunc:
+			loc = ((const TableFunc *) expr)->location;
 			break;
 		case T_Var:
 			loc = ((const Var *) expr)->location;
@@ -1363,6 +1384,10 @@ exprLocation(const Node *expr)
 		case T_MinMaxExpr:
 			/* GREATEST/LEAST keyword should always be the first thing */
 			loc = ((const MinMaxExpr *) expr)->location;
+			break;
+		case T_SQLValueFunction:
+			/* function keyword should always be the first thing */
+			loc = ((const SQLValueFunction *) expr)->location;
 			break;
 		case T_XmlExpr:
 			{
@@ -1535,6 +1560,18 @@ exprLocation(const Node *expr)
 			/* just use nested expr's location */
 			loc = exprLocation((Node *) ((const InferenceElem *) expr)->expr);
 			break;
+		case T_PartitionElem:
+			loc = ((const PartitionElem *) expr)->location;
+			break;
+		case T_PartitionSpec:
+			loc = ((const PartitionSpec *) expr)->location;
+			break;
+		case T_PartitionBoundSpec:
+			loc = ((const PartitionBoundSpec *) expr)->location;
+			break;
+		case T_PartitionRangeDatum:
+			loc = ((const PartitionRangeDatum *) expr)->location;
+			break;
 		default:
 			/* for any other node type it's just unknown... */
 			loc = -1;
@@ -1633,9 +1670,10 @@ set_sa_opfuncid(ScalarArrayOpExpr *opexpr)
  * for themselves, in case additional checks should be made, or because they
  * have special rules about which parts of the tree need to be visited.
  *
- * Note: we ignore MinMaxExpr, XmlExpr, and CoerceToDomain nodes, because they
- * do not contain SQL function OIDs.  However, they can invoke SQL-visible
- * functions, so callers should take thought about how to treat them.
+ * Note: we ignore MinMaxExpr, SQLValueFunction, XmlExpr, and CoerceToDomain
+ * nodes, because they do not contain SQL function OIDs.  However, they can
+ * invoke SQL-visible functions, so callers should take thought about how to
+ * treat them.
  */
 bool
 check_functions_in_node(Node *node, check_function_callback checker,
@@ -1859,6 +1897,8 @@ expression_tree_walker(Node *node,
 		case T_CaseTestExpr:
 		case T_SetToDefault:
 		case T_CurrentOfExpr:
+		case T_NextValueExpr:
+		case T_SQLValueFunction:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			/* primitive node types with no expression subnodes */
@@ -2025,9 +2065,8 @@ expression_tree_walker(Node *node,
 				/* we assume walker doesn't care about CaseWhens, either */
 				foreach(temp, caseexpr->args)
 				{
-					CaseWhen   *when = (CaseWhen *) lfirst(temp);
+					CaseWhen   *when = lfirst_node(CaseWhen, temp);
 
-					Assert(IsA(when, CaseWhen));
 					if (walker(when->expr, context))
 						return true;
 					if (walker(when->result, context))
@@ -2192,6 +2231,22 @@ expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
+		case T_TableFunc:
+			{
+				TableFunc  *tf = (TableFunc *) node;
+
+				if (walker(tf->ns_uris, context))
+					return true;
+				if (walker(tf->docexpr, context))
+					return true;
+				if (walker(tf->rowexpr, context))
+					return true;
+				if (walker(tf->colexprs, context))
+					return true;
+				if (walker(tf->coldefexprs, context))
+					return true;
+			}
+			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
@@ -2283,6 +2338,7 @@ range_table_walker(List *rtable,
 					return true;
 				break;
 			case RTE_CTE:
+			case RTE_NAMEDTUPLESTORE:
 				/* nothing to do */
 				break;
 			case RTE_SUBQUERY:
@@ -2297,6 +2353,10 @@ range_table_walker(List *rtable,
 				break;
 			case RTE_FUNCTION:
 				if (walker(rte->functions, context))
+					return true;
+				break;
+			case RTE_TABLEFUNC:
+				if (walker(rte->tablefunc, context))
 					return true;
 				break;
 			case RTE_VALUES:
@@ -2438,6 +2498,8 @@ expression_tree_mutator(Node *node,
 		case T_CaseTestExpr:
 		case T_SetToDefault:
 		case T_CurrentOfExpr:
+		case T_NextValueExpr:
+		case T_SQLValueFunction:
 		case T_RangeTblRef:
 		case T_SortGroupClause:
 			return (Node *) copyObject(node);
@@ -2992,6 +3054,20 @@ expression_tree_mutator(Node *node,
 				return (Node *) newnode;
 			}
 			break;
+		case T_TableFunc:
+			{
+				TableFunc  *tf = (TableFunc *) node;
+				TableFunc  *newnode;
+
+				FLATCOPY(newnode, tf, TableFunc);
+				MUTATE(newnode->ns_uris, tf->ns_uris, List *);
+				MUTATE(newnode->docexpr, tf->docexpr, Node *);
+				MUTATE(newnode->rowexpr, tf->rowexpr, Node *);
+				MUTATE(newnode->colexprs, tf->colexprs, List *);
+				MUTATE(newnode->coldefexprs, tf->coldefexprs, List *);
+				return (Node *) newnode;
+			}
+			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d",
 				 (int) nodeTag(node));
@@ -3086,6 +3162,7 @@ range_table_mutator(List *rtable,
 #ifdef PGXC
 			case RTE_REMOTE_DUMMY:
 #endif /* PGXC */
+			case RTE_NAMEDTUPLESTORE:
 				/* nothing to do */
 				break;
 			case RTE_SUBQUERY:
@@ -3111,6 +3188,9 @@ range_table_mutator(List *rtable,
 				break;
 			case RTE_FUNCTION:
 				MUTATE(newrte->functions, rte->functions, List *);
+				break;
+			case RTE_TABLEFUNC:
+				MUTATE(newrte->tablefunc, rte->tablefunc, TableFunc *);
 				break;
 			case RTE_VALUES:
 				MUTATE(newrte->values_lists, rte->values_lists, List *);
@@ -3205,6 +3285,7 @@ raw_expression_tree_walker(Node *node,
 	{
 		case T_SetToDefault:
 		case T_CurrentOfExpr:
+		case T_SQLValueFunction:
 		case T_Integer:
 		case T_Float:
 		case T_String:
@@ -3242,9 +3323,8 @@ raw_expression_tree_walker(Node *node,
 				/* we assume walker doesn't care about CaseWhens, either */
 				foreach(temp, caseexpr->args)
 				{
-					CaseWhen   *when = (CaseWhen *) lfirst(temp);
+					CaseWhen   *when = lfirst_node(CaseWhen, temp);
 
-					Assert(IsA(when, CaseWhen));
 					if (walker(when->expr, context))
 						return true;
 					if (walker(when->result, context))
@@ -3536,6 +3616,32 @@ raw_expression_tree_walker(Node *node,
 					return true;
 			}
 			break;
+		case T_RangeTableFunc:
+			{
+				RangeTableFunc *rtf = (RangeTableFunc *) node;
+
+				if (walker(rtf->docexpr, context))
+					return true;
+				if (walker(rtf->rowexpr, context))
+					return true;
+				if (walker(rtf->namespaces, context))
+					return true;
+				if (walker(rtf->columns, context))
+					return true;
+				if (walker(rtf->alias, context))
+					return true;
+			}
+			break;
+		case T_RangeTableFuncCol:
+			{
+				RangeTableFuncCol *rtfc = (RangeTableFuncCol *) node;
+
+				if (walker(rtfc->colexpr, context))
+					return true;
+				if (walker(rtfc->coldefexpr, context))
+					return true;
+			}
+			break;
 		case T_TypeName:
 			{
 				TypeName   *tn = (TypeName *) node;
@@ -3716,9 +3822,8 @@ planstate_walk_subplans(List *plans,
 
 	foreach(lc, plans)
 	{
-		SubPlanState *sps = (SubPlanState *) lfirst(lc);
+		SubPlanState *sps = lfirst_node(SubPlanState, lc);
 
-		Assert(IsA(sps, SubPlanState));
 		if (walker(sps->planstate, context))
 			return true;
 	}

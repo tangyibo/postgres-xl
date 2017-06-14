@@ -3,7 +3,7 @@
  * dict_thesaurus.c
  *		Thesaurus dictionary: phrase to phrase substitution
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  *
  *
  * IDENTIFICATION
@@ -19,10 +19,11 @@
 #include "tsearch/ts_locale.h"
 #include "tsearch/ts_utils.h"
 #include "utils/builtins.h"
+#include "utils/regproc.h"
 
 
 /*
- * Temporay we use TSLexeme.flags for inner use...
+ * Temporary we use TSLexeme.flags for inner use...
  */
 #define DT_USEASIS		0x1000
 

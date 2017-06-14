@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <poll.h>
+#include <math.h>
 
 #include "postgres.h"
 
@@ -63,9 +64,11 @@
 #include "pgxc/poolutils.h"
 #include "postmaster/postmaster.h"		/* For UnixSocketDir */
 #include "storage/procarray.h"
+#include "utils/varlena.h"
 
 #include "../interfaces/libpq/libpq-fe.h"
 #include "../interfaces/libpq/libpq-int.h"
+
 
 /* Configuration options */
 int			PoolConnKeepAlive = 600;

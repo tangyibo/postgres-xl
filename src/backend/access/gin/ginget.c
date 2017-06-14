@@ -4,7 +4,7 @@
  *	  fetch tuples from a GIN scan.
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -120,7 +120,7 @@ collectMatchBitmap(GinBtreeData *btree, GinBtreeStack *stack,
 	Form_pg_attribute attr;
 
 	/* Initialize empty bitmap result */
-	scanEntry->matchBitmap = tbm_create(work_mem * 1024L);
+	scanEntry->matchBitmap = tbm_create(work_mem * 1024L, NULL);
 
 	/* Null query cannot partial-match anything */
 	if (scanEntry->isPartialMatch &&
@@ -626,8 +626,9 @@ entryLoadMoreItems(GinState *ginstate, GinScanEntry entry,
 		}
 		else
 		{
-			entry->btree.itemptr = advancePast;
-			entry->btree.itemptr.ip_posid++;
+			ItemPointerSet(&entry->btree.itemptr,
+						   GinItemPointerGetBlockNumber(&advancePast),
+			  OffsetNumberNext(GinItemPointerGetOffsetNumber(&advancePast)));
 		}
 		entry->btree.fullScan = false;
 		stack = ginFindLeafPage(&entry->btree, true, snapshot);
@@ -979,15 +980,17 @@ keyGetItem(GinState *ginstate, MemoryContext tempCtx, GinScanKey key,
 		if (GinItemPointerGetBlockNumber(&advancePast) <
 			GinItemPointerGetBlockNumber(&minItem))
 		{
-			advancePast.ip_blkid = minItem.ip_blkid;
-			advancePast.ip_posid = 0;
+			ItemPointerSet(&advancePast,
+						   GinItemPointerGetBlockNumber(&minItem),
+						   InvalidOffsetNumber);
 		}
 	}
 	else
 	{
-		Assert(minItem.ip_posid > 0);
-		advancePast = minItem;
-		advancePast.ip_posid--;
+		Assert(GinItemPointerGetOffsetNumber(&minItem) > 0);
+		ItemPointerSet(&advancePast,
+					   GinItemPointerGetBlockNumber(&minItem),
+				  OffsetNumberPrev(GinItemPointerGetOffsetNumber(&minItem)));
 	}
 
 	/*
@@ -1245,15 +1248,17 @@ scanGetItem(IndexScanDesc scan, ItemPointerData advancePast,
 				if (GinItemPointerGetBlockNumber(&advancePast) <
 					GinItemPointerGetBlockNumber(&key->curItem))
 				{
-					advancePast.ip_blkid = key->curItem.ip_blkid;
-					advancePast.ip_posid = 0;
+					ItemPointerSet(&advancePast,
+								 GinItemPointerGetBlockNumber(&key->curItem),
+								   InvalidOffsetNumber);
 				}
 			}
 			else
 			{
-				Assert(key->curItem.ip_posid > 0);
-				advancePast = key->curItem;
-				advancePast.ip_posid--;
+				Assert(GinItemPointerGetOffsetNumber(&key->curItem) > 0);
+				ItemPointerSet(&advancePast,
+							   GinItemPointerGetBlockNumber(&key->curItem),
+							   OffsetNumberPrev(GinItemPointerGetOffsetNumber(&key->curItem)));
 			}
 
 			/*

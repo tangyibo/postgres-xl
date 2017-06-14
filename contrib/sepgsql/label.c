@@ -4,11 +4,21 @@
  *
  * Routines to support SELinux labels (security context)
  *
- * Copyright (c) 2010-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2010-2017, PostgreSQL Global Development Group
  *
  * -------------------------------------------------------------------------
  */
 #include "postgres.h"
+
+#include <selinux/label.h>
+
+/*
+ * <selinux/label.h> includes <stdbool.h>, which creates an incompatible
+ * #define for bool.  Get rid of that so we can use our own typedef.
+ * (We don't care if <stdbool.h> redefines "true"/"false"; those are close
+ * enough.)
+ */
+#undef bool
 
 #include "access/heapam.h"
 #include "access/htup_details.h"
@@ -36,8 +46,6 @@
 #include "utils/tqual.h"
 
 #include "sepgsql.h"
-
-#include <selinux/label.h>
 
 /*
  * Saved hook entries (if stacked)
@@ -590,7 +598,7 @@ PG_FUNCTION_INFO_V1(sepgsql_mcstrans_in);
 Datum
 sepgsql_mcstrans_in(PG_FUNCTION_ARGS)
 {
-	text	   *label = PG_GETARG_TEXT_P(0);
+	text	   *label = PG_GETARG_TEXT_PP(0);
 	char	   *raw_label;
 	char	   *result;
 
@@ -630,7 +638,7 @@ PG_FUNCTION_INFO_V1(sepgsql_mcstrans_out);
 Datum
 sepgsql_mcstrans_out(PG_FUNCTION_ARGS)
 {
-	text	   *label = PG_GETARG_TEXT_P(0);
+	text	   *label = PG_GETARG_TEXT_PP(0);
 	char	   *qual_label;
 	char	   *result;
 
@@ -779,7 +787,8 @@ exec_object_restorecon(struct selabel_handle * sehnd, Oid catalogId)
 			case RelationRelationId:
 				relForm = (Form_pg_class) GETSTRUCT(tuple);
 
-				if (relForm->relkind == RELKIND_RELATION)
+				if (relForm->relkind == RELKIND_RELATION ||
+					relForm->relkind == RELKIND_PARTITIONED_TABLE)
 					objtype = SELABEL_DB_TABLE;
 				else if (relForm->relkind == RELKIND_SEQUENCE)
 					objtype = SELABEL_DB_SEQUENCE;
@@ -803,7 +812,8 @@ exec_object_restorecon(struct selabel_handle * sehnd, Oid catalogId)
 			case AttributeRelationId:
 				attForm = (Form_pg_attribute) GETSTRUCT(tuple);
 
-				if (get_rel_relkind(attForm->attrelid) != RELKIND_RELATION)
+				if (get_rel_relkind(attForm->attrelid) != RELKIND_RELATION &&
+					get_rel_relkind(attForm->attrelid) != RELKIND_PARTITIONED_TABLE)
 					continue;	/* no need to assign security label */
 
 				objtype = SELABEL_DB_COLUMN;

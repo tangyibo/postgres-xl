@@ -6,7 +6,7 @@
  * Joe Conway <mail@joeconway.com>
  *
  * contrib/fuzzystrmatch/fuzzystrmatch.c
- * Copyright (c) 2001-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2001-2017, PostgreSQL Global Development Group
  * ALL RIGHTS RESERVED;
  *
  * metaphone()
@@ -42,6 +42,7 @@
 
 #include "mb/pg_wchar.h"
 #include "utils/builtins.h"
+#include "utils/varlena.h"
 
 PG_MODULE_MAGIC;
 
@@ -735,7 +736,7 @@ soundex(PG_FUNCTION_ARGS)
 	char		outstr[SOUNDEX_LEN + 1];
 	char	   *arg;
 
-	arg = text_to_cstring(PG_GETARG_TEXT_P(0));
+	arg = text_to_cstring(PG_GETARG_TEXT_PP(0));
 
 	_soundex(arg, outstr);
 
@@ -801,8 +802,8 @@ difference(PG_FUNCTION_ARGS)
 	int			i,
 				result;
 
-	_soundex(text_to_cstring(PG_GETARG_TEXT_P(0)), sndx1);
-	_soundex(text_to_cstring(PG_GETARG_TEXT_P(1)), sndx2);
+	_soundex(text_to_cstring(PG_GETARG_TEXT_PP(0)), sndx1);
+	_soundex(text_to_cstring(PG_GETARG_TEXT_PP(1)), sndx2);
 
 	result = 0;
 	for (i = 0; i < SOUNDEX_LEN; i++)

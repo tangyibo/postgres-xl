@@ -3,7 +3,7 @@
  * parse_type.c
  *		handle type operations for parser
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -478,9 +478,8 @@ TypeNameListToString(List *typenames)
 	initStringInfo(&string);
 	foreach(l, typenames)
 	{
-		TypeName   *typeName = (TypeName *) lfirst(l);
+		TypeName   *typeName = lfirst_node(TypeName, l);
 
-		Assert(IsA(typeName, TypeName));
 		if (l != list_head(typenames))
 			appendStringInfoChar(&string, ',');
 		appendTypeNameToBuffer(typeName, &string);
@@ -720,7 +719,7 @@ typeStringToTypeName(const char *str)
 	 */
 	if (list_length(raw_parsetree_list) != 1)
 		goto fail;
-	stmt = (SelectStmt *) linitial(raw_parsetree_list);
+	stmt = (SelectStmt *) linitial_node(RawStmt, raw_parsetree_list)->stmt;
 	if (stmt == NULL ||
 		!IsA(stmt, SelectStmt) ||
 		stmt->distinctClause != NIL ||

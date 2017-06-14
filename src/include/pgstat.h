@@ -4,7 +4,7 @@
  *	Definitions for the PostgreSQL statistics collector daemon.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- *	Copyright (c) 2001-2016, PostgreSQL Global Development Group
+ *	Copyright (c) 2001-2017, PostgreSQL Global Development Group
  *
  *	src/include/pgstat.h
  * ----------
@@ -15,9 +15,9 @@
 #include "datatype/timestamp.h"
 #include "fmgr.h"
 #include "libpq/pqcomm.h"
+#include "port/atomics.h"
 #include "portability/instr_time.h"
 #include "postmaster/pgarch.h"
-#include "storage/barrier.h"
 #include "storage/proc.h"
 #include "utils/hsearch.h"
 #include "utils/relcache.h"
@@ -697,6 +697,25 @@ typedef struct PgStat_GlobalStats
 
 
 /* ----------
+ * Backend types
+ * ----------
+ */
+typedef enum BackendType
+{
+	B_AUTOVAC_LAUNCHER,
+	B_AUTOVAC_WORKER,
+	B_BACKEND,
+	B_BG_WORKER,
+	B_BG_WRITER,
+	B_CHECKPOINTER,
+	B_STARTUP,
+	B_WAL_RECEIVER,
+	B_WAL_SENDER,
+	B_WAL_WRITER
+} BackendType;
+
+
+/* ----------
  * Backend states
  * ----------
  */
@@ -716,15 +735,177 @@ typedef enum BackendState
  * Wait Classes
  * ----------
  */
-typedef enum WaitClass
-{
-	WAIT_UNDEFINED,
-	WAIT_LWLOCK_NAMED,
-	WAIT_LWLOCK_TRANCHE,
-	WAIT_LOCK,
-	WAIT_BUFFER_PIN
-}	WaitClass;
+#define PG_WAIT_LWLOCK				0x01000000U
+#define PG_WAIT_LOCK				0x03000000U
+#define PG_WAIT_BUFFER_PIN			0x04000000U
+#define PG_WAIT_ACTIVITY			0x05000000U
+#define PG_WAIT_CLIENT				0x06000000U
+#define PG_WAIT_EXTENSION			0x07000000U
+#define PG_WAIT_IPC					0x08000000U
+#define PG_WAIT_TIMEOUT				0x09000000U
+#define PG_WAIT_IO					0x0A000000U
 
+/* ----------
+ * Wait Events - Activity
+ *
+ * Use this category when a process is waiting because it has no work to do,
+ * unless the "Client" or "Timeout" category describes the situation better.
+ * Typically, this should only be used for background processes.
+ * ----------
+ */
+typedef enum
+{
+	WAIT_EVENT_ARCHIVER_MAIN = PG_WAIT_ACTIVITY,
+	WAIT_EVENT_AUTOVACUUM_MAIN,
+	WAIT_EVENT_BGWRITER_HIBERNATE,
+	WAIT_EVENT_BGWRITER_MAIN,
+	WAIT_EVENT_CHECKPOINTER_MAIN,
+	WAIT_EVENT_PGSTAT_MAIN,
+	WAIT_EVENT_RECOVERY_WAL_ALL,
+	WAIT_EVENT_RECOVERY_WAL_STREAM,
+	WAIT_EVENT_SYSLOGGER_MAIN,
+	WAIT_EVENT_WAL_RECEIVER_MAIN,
+	WAIT_EVENT_WAL_SENDER_MAIN,
+	WAIT_EVENT_WAL_WRITER_MAIN,
+	WAIT_EVENT_LOGICAL_LAUNCHER_MAIN,
+	WAIT_EVENT_LOGICAL_APPLY_MAIN,
+	WAIT_EVENT_CLUSTER_MONITOR_MAIN
+} WaitEventActivity;
+
+/* ----------
+ * Wait Events - Client
+ *
+ * Use this category when a process is waiting to send data to or receive data
+ * from the frontend process to which it is connected.  This is never used for
+ * a background process, which has no client connection.
+ * ----------
+ */
+typedef enum
+{
+	WAIT_EVENT_CLIENT_READ = PG_WAIT_CLIENT,
+	WAIT_EVENT_CLIENT_WRITE,
+	WAIT_EVENT_SSL_OPEN_SERVER,
+	WAIT_EVENT_WAL_RECEIVER_WAIT_START,
+	WAIT_EVENT_LIBPQWALRECEIVER,
+	WAIT_EVENT_WAL_SENDER_WAIT_WAL,
+	WAIT_EVENT_WAL_SENDER_WRITE_DATA
+} WaitEventClient;
+
+/* ----------
+ * Wait Events - IPC
+ *
+ * Use this category when a process cannot complete the work it is doing because
+ * it is waiting for a notification from another process.
+ * ----------
+ */
+typedef enum
+{
+	WAIT_EVENT_BGWORKER_SHUTDOWN = PG_WAIT_IPC,
+	WAIT_EVENT_BGWORKER_STARTUP,
+	WAIT_EVENT_BTREE_PAGE,
+	WAIT_EVENT_EXECUTE_GATHER,
+	WAIT_EVENT_MQ_INTERNAL,
+	WAIT_EVENT_MQ_PUT_MESSAGE,
+	WAIT_EVENT_MQ_RECEIVE,
+	WAIT_EVENT_MQ_SEND,
+	WAIT_EVENT_PARALLEL_FINISH,
+	WAIT_EVENT_PARALLEL_BITMAP_SCAN,
+	WAIT_EVENT_PROCARRAY_GROUP_UPDATE,
+	WAIT_EVENT_SAFE_SNAPSHOT,
+	WAIT_EVENT_SYNC_REP,
+	WAIT_EVENT_LOGICAL_SYNC_DATA,
+	WAIT_EVENT_LOGICAL_SYNC_STATE_CHANGE
+} WaitEventIPC;
+
+/* ----------
+ * Wait Events - Timeout
+ *
+ * Use this category when a process is waiting for a timeout to expire.
+ * ----------
+ */
+typedef enum
+{
+	WAIT_EVENT_BASE_BACKUP_THROTTLE = PG_WAIT_TIMEOUT,
+	WAIT_EVENT_PG_SLEEP,
+	WAIT_EVENT_RECOVERY_APPLY_DELAY
+} WaitEventTimeout;
+
+/* ----------
+ * Wait Events - IO
+ *
+ * Use this category when a process is waiting for a IO.
+ * ----------
+ */
+typedef enum
+{
+	WAIT_EVENT_BUFFILE_READ = PG_WAIT_IO,
+	WAIT_EVENT_BUFFILE_WRITE,
+	WAIT_EVENT_CONTROL_FILE_READ,
+	WAIT_EVENT_CONTROL_FILE_SYNC,
+	WAIT_EVENT_CONTROL_FILE_SYNC_UPDATE,
+	WAIT_EVENT_CONTROL_FILE_WRITE,
+	WAIT_EVENT_CONTROL_FILE_WRITE_UPDATE,
+	WAIT_EVENT_COPY_FILE_READ,
+	WAIT_EVENT_COPY_FILE_WRITE,
+	WAIT_EVENT_DATA_FILE_EXTEND,
+	WAIT_EVENT_DATA_FILE_FLUSH,
+	WAIT_EVENT_DATA_FILE_IMMEDIATE_SYNC,
+	WAIT_EVENT_DATA_FILE_PREFETCH,
+	WAIT_EVENT_DATA_FILE_READ,
+	WAIT_EVENT_DATA_FILE_SYNC,
+	WAIT_EVENT_DATA_FILE_TRUNCATE,
+	WAIT_EVENT_DATA_FILE_WRITE,
+	WAIT_EVENT_DSM_FILL_ZERO_WRITE,
+	WAIT_EVENT_LOCK_FILE_ADDTODATADIR_READ,
+	WAIT_EVENT_LOCK_FILE_ADDTODATADIR_SYNC,
+	WAIT_EVENT_LOCK_FILE_ADDTODATADIR_WRITE,
+	WAIT_EVENT_LOCK_FILE_CREATE_READ,
+	WAIT_EVENT_LOCK_FILE_CREATE_SYNC,
+	WAIT_EVENT_LOCK_FILE_CREATE_WRITE,
+	WAIT_EVENT_LOCK_FILE_RECHECKDATADIR_READ,
+	WAIT_EVENT_LOGICAL_REWRITE_CHECKPOINT_SYNC,
+	WAIT_EVENT_LOGICAL_REWRITE_MAPPING_SYNC,
+	WAIT_EVENT_LOGICAL_REWRITE_MAPPING_WRITE,
+	WAIT_EVENT_LOGICAL_REWRITE_SYNC,
+	WAIT_EVENT_LOGICAL_REWRITE_TRUNCATE,
+	WAIT_EVENT_LOGICAL_REWRITE_WRITE,
+	WAIT_EVENT_RELATION_MAP_READ,
+	WAIT_EVENT_RELATION_MAP_SYNC,
+	WAIT_EVENT_RELATION_MAP_WRITE,
+	WAIT_EVENT_REORDER_BUFFER_READ,
+	WAIT_EVENT_REORDER_BUFFER_WRITE,
+	WAIT_EVENT_REORDER_LOGICAL_MAPPING_READ,
+	WAIT_EVENT_REPLICATION_SLOT_READ,
+	WAIT_EVENT_REPLICATION_SLOT_RESTORE_SYNC,
+	WAIT_EVENT_REPLICATION_SLOT_SYNC,
+	WAIT_EVENT_REPLICATION_SLOT_WRITE,
+	WAIT_EVENT_SLRU_FLUSH_SYNC,
+	WAIT_EVENT_SLRU_READ,
+	WAIT_EVENT_SLRU_SYNC,
+	WAIT_EVENT_SLRU_WRITE,
+	WAIT_EVENT_SNAPBUILD_READ,
+	WAIT_EVENT_SNAPBUILD_SYNC,
+	WAIT_EVENT_SNAPBUILD_WRITE,
+	WAIT_EVENT_TIMELINE_HISTORY_FILE_SYNC,
+	WAIT_EVENT_TIMELINE_HISTORY_FILE_WRITE,
+	WAIT_EVENT_TIMELINE_HISTORY_READ,
+	WAIT_EVENT_TIMELINE_HISTORY_SYNC,
+	WAIT_EVENT_TIMELINE_HISTORY_WRITE,
+	WAIT_EVENT_TWOPHASE_FILE_READ,
+	WAIT_EVENT_TWOPHASE_FILE_SYNC,
+	WAIT_EVENT_TWOPHASE_FILE_WRITE,
+	WAIT_EVENT_WALSENDER_TIMELINE_HISTORY_READ,
+	WAIT_EVENT_WAL_BOOTSTRAP_SYNC,
+	WAIT_EVENT_WAL_BOOTSTRAP_WRITE,
+	WAIT_EVENT_WAL_COPY_READ,
+	WAIT_EVENT_WAL_COPY_SYNC,
+	WAIT_EVENT_WAL_COPY_WRITE,
+	WAIT_EVENT_WAL_INIT_SYNC,
+	WAIT_EVENT_WAL_INIT_WRITE,
+	WAIT_EVENT_WAL_READ,
+	WAIT_EVENT_WAL_SYNC_METHOD_ASSIGN,
+	WAIT_EVENT_WAL_WRITE
+} WaitEventIO;
 
 /* ----------
  * Command type for progress reporting purposes
@@ -768,6 +949,9 @@ typedef struct PgBackendSSLStatus
  * showing its current activity.  (The structs are allocated according to
  * BackendId, but that is not critical.)  Note that the collector process
  * has no involvement in, or even access to, these structs.
+ *
+ * Each auxiliary process also maintains a PgBackendStatus struct in shared
+ * memory.
  * ----------
  */
 typedef struct PgBackendStatus
@@ -791,6 +975,9 @@ typedef struct PgBackendStatus
 
 	/* The entry is valid iff st_procpid > 0, unused if st_procpid == 0 */
 	int			st_procpid;
+
+	/* Type of backends */
+	BackendType st_backendType;
 
 	/* Times when current backend, transaction, and activity started */
 	TimestampTz st_proc_start_timestamp;
@@ -820,7 +1007,7 @@ typedef struct PgBackendStatus
 	/*
 	 * Command progress reporting.  Any command which wishes can advertise
 	 * that it is running by setting st_progress_command,
-	 * st_progress_command_target, and st_progress_command[].
+	 * st_progress_command_target, and st_progress_param[].
 	 * st_progress_command_target should be the OID of the relation which the
 	 * command targets (we assume there's just one, as this is meant for
 	 * utility commands), but the meaning of each element in the
@@ -990,6 +1177,7 @@ extern const char *pgstat_get_wait_event_type(uint32 wait_event_info);
 extern const char *pgstat_get_backend_current_activity(int pid, bool checkUser);
 extern const char *pgstat_get_crashed_backend_activity(int pid, char *buffer,
 									int buflen);
+extern const char *pgstat_get_backend_desc(BackendType backendType);
 
 extern void pgstat_progress_start_command(ProgressCommandType cmdtype,
 							  Oid relid);
@@ -1008,9 +1196,9 @@ extern void pgstat_initstats(Relation rel);
  *
  *	Called from places where server process needs to wait.  This is called
  *	to report wait event information.  The wait information is stored
- *	as 4-bytes where first byte repersents the wait event class (type of
+ *	as 4-bytes where first byte represents the wait event class (type of
  *	wait, for different types of wait, refer WaitClass) and the next
- *	3-bytes repersent the actual wait event.  Currently 2-bytes are used
+ *	3-bytes represent the actual wait event.  Currently 2-bytes are used
  *	for wait event which is sufficient for current usage, 1-byte is
  *	reserved for future usage.
  *
@@ -1019,23 +1207,18 @@ extern void pgstat_initstats(Relation rel);
  * ----------
  */
 static inline void
-pgstat_report_wait_start(uint8 classId, uint16 eventId)
+pgstat_report_wait_start(uint32 wait_event_info)
 {
 	volatile PGPROC *proc = MyProc;
-	uint32		wait_event_val;
 
 	if (!pgstat_track_activities || !proc)
 		return;
-
-	wait_event_val = classId;
-	wait_event_val <<= 24;
-	wait_event_val |= eventId;
 
 	/*
 	 * Since this is a four-byte field which is always read and written as
 	 * four-bytes, updates are atomic.
 	 */
-	proc->wait_event_info = wait_event_val;
+	proc->wait_event_info = wait_event_info;
 }
 
 /* ----------
@@ -1104,7 +1287,7 @@ pgstat_report_wait_end(void)
 #define pgstat_count_buffer_write_time(n)							\
 	(pgStatBlockWriteTime += (n))
 
-extern void pgstat_count_heap_insert(Relation rel, int n);
+extern void pgstat_count_heap_insert(Relation rel, PgStat_Counter n);
 extern void pgstat_count_heap_update(Relation rel, bool hot);
 extern void pgstat_count_heap_delete(Relation rel);
 extern void pgstat_count_truncate(Relation rel);

@@ -4,7 +4,7 @@
  *	  POSTGRES primary lock mechanism
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -1174,7 +1174,7 @@ SetupLockInTable(LockMethod lockMethodTable, PGPROC *proc,
 														&found);
 	if (!proclock)
 	{
-		/* Ooops, not enough shmem for the proclock */
+		/* Oops, not enough shmem for the proclock */
 		if (lock->nRequested == 0)
 		{
 			/*
@@ -1800,7 +1800,6 @@ WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
 		set_ps_display(new_status, false);
 		new_status[len] = '\0'; /* truncate off " waiting" */
 	}
-	pgstat_report_wait_start(WAIT_LOCK, locallock->tag.lock.locktag_type);
 
 	awaitedLock = locallock;
 	awaitedOwner = owner;
@@ -1848,7 +1847,6 @@ WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
 		/* In this path, awaitedLock remains set until LockErrorCleanup */
 
 		/* Report change to non-waiting status */
-		pgstat_report_wait_end();
 		if (update_process_title)
 		{
 			set_ps_display(new_status, false);
@@ -1863,7 +1861,6 @@ WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
 	awaitedLock = NULL;
 
 	/* Report change to non-waiting status */
-	pgstat_report_wait_end();
 	if (update_process_title)
 	{
 		set_ps_display(new_status, false);
@@ -2905,7 +2902,7 @@ GetLockConflicts(const LOCKTAG *locktag, LOCKMODE lockmode)
 		vxids = (VirtualTransactionId *)
 			palloc0(sizeof(VirtualTransactionId) * (MaxBackends + 1));
 
-	/* Compute hash code and partiton lock, and look up conflicting modes. */
+	/* Compute hash code and partition lock, and look up conflicting modes. */
 	hashcode = LockTagHashCode(locktag);
 	partitionLock = LockHashPartitionLock(hashcode);
 	conflictMask = lockMethodTable->conflictTab[lockmode];
@@ -4173,7 +4170,7 @@ lock_twophase_recover(TransactionId xid, uint16 info,
 														&found);
 	if (!proclock)
 	{
-		/* Ooops, not enough shmem for the proclock */
+		/* Oops, not enough shmem for the proclock */
 		if (lock->nRequested == 0)
 		{
 			/*

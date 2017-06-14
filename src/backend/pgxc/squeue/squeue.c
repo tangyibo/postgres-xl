@@ -36,6 +36,7 @@
 #include "storage/shmem.h"
 #include "utils/hsearch.h"
 #include "utils/resowner.h"
+#include "pgstat.h"
 
 
 int NSQueues = 64;
@@ -120,7 +121,6 @@ typedef struct SQueueHeader
  */
 static HTAB *SharedQueues = NULL;
 static LWLockPadded *SQueueLocks = NULL;
-static LWLockTranche SharedQueueLocksTranche;
 
 /*
  * Pool of synchronization items
@@ -234,12 +234,8 @@ SharedQueuesInit(void)
 		/* either both syncs and locks, or none of them */
 		Assert(! foundLocks);
 
-		SharedQueueLocksTranche.name = "Shared Queue Locks";
-		SharedQueueLocksTranche.array_base = SQueueLocks;
-		SharedQueueLocksTranche.array_stride = sizeof(LWLockPadded);
-
 		/* Register the trannche tranche in the main tranches array */
-		LWLockRegisterTranche(LWTRANCHE_SHARED_QUEUES, &SharedQueueLocksTranche);
+		LWLockRegisterTranche(LWTRANCHE_SHARED_QUEUES, "Shared Queue Locks");
 
 		l = 0;
 		for (i = 0; i < NUM_SQUEUES; i++)
@@ -1020,7 +1016,9 @@ SharedQueueRead(SharedQueue squeue, int consumerIdx,
 					cstate->cs_node, cstate->cs_pid, cstate->cs_status);
 
 			/* Wait for notification about available info */
-			WaitLatch(&sqsync->sqs_consumer_sync[consumerIdx].cs_latch, WL_LATCH_SET | WL_POSTMASTER_DEATH, -1);
+			WaitLatch(&sqsync->sqs_consumer_sync[consumerIdx].cs_latch,
+					WL_LATCH_SET | WL_POSTMASTER_DEATH, -1,
+					WAIT_EVENT_MQ_INTERNAL);
 			/* got the notification, restore lock and try again */
 			LWLockAcquire(sqsync->sqs_consumer_sync[consumerIdx].cs_lwlock, LW_EXCLUSIVE);
 		}
@@ -1421,7 +1419,7 @@ CHECK:
 		/* wait for a notification */
 		wait_result = WaitLatch(&sqsync->sqs_producer_latch,
 								WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_TIMEOUT,
-								10000L);
+								10000L, WAIT_EVENT_MQ_INTERNAL);
 		if (wait_result & WL_TIMEOUT)
 		{
 			elog(WARNING, "SQueue %s, timeout while waiting for Consumers "
@@ -1776,7 +1774,8 @@ sq_pull_long_tuple(ConsState *cstate, RemoteDataRow datarow,
 			ResetLatch(&sync->cs_latch);
 			LWLockRelease(sync->cs_lwlock);
 			/* Wait for notification about available info */
-			WaitLatch(&sync->cs_latch, WL_LATCH_SET | WL_POSTMASTER_DEATH, -1);
+			WaitLatch(&sync->cs_latch, WL_LATCH_SET | WL_POSTMASTER_DEATH, -1,
+					WAIT_EVENT_MQ_INTERNAL);
 			/* got the notification, restore lock and try again */
 			LWLockAcquire(sync->cs_lwlock, LW_EXCLUSIVE);
 		}

@@ -38,7 +38,7 @@
  * by re-setting the page's page_dirty flag.
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/backend/access/transam/slru.c
@@ -54,6 +54,7 @@
 #include "access/slru.h"
 #include "access/transam.h"
 #include "access/xlog.h"
+#include "pgstat.h"
 #include "storage/fd.h"
 #include "storage/shmem.h"
 #include "miscadmin.h"
@@ -216,9 +217,6 @@ SimpleLruInit(SlruCtl ctl, const char *name, int nslots, int nlsns,
 		Assert(strlen(name) + 1 < SLRU_MAX_NAME_LENGTH);
 		strlcpy(shared->lwlock_tranche_name, name, SLRU_MAX_NAME_LENGTH);
 		shared->lwlock_tranche_id = tranche_id;
-		shared->lwlock_tranche.name = shared->lwlock_tranche_name;
-		shared->lwlock_tranche.array_base = shared->buffer_locks;
-		shared->lwlock_tranche.array_stride = sizeof(LWLockPadded);
 
 		ptr += BUFFERALIGN(offset);
 		for (slotno = 0; slotno < nslots; slotno++)
@@ -237,7 +235,8 @@ SimpleLruInit(SlruCtl ctl, const char *name, int nslots, int nlsns,
 		Assert(found);
 
 	/* Register SLRU tranche in the main tranches array */
-	LWLockRegisterTranche(shared->lwlock_tranche_id, &shared->lwlock_tranche);
+	LWLockRegisterTranche(shared->lwlock_tranche_id,
+						  shared->lwlock_tranche_name);
 
 	/*
 	 * Initialize the unshared control struct, including directory path. We
@@ -691,13 +690,16 @@ SlruPhysicalReadPage(SlruCtl ctl, int pageno, int slotno)
 	}
 
 	errno = 0;
+	pgstat_report_wait_start(WAIT_EVENT_SLRU_READ);
 	if (read(fd, shared->page_buffer[slotno], BLCKSZ) != BLCKSZ)
 	{
+		pgstat_report_wait_end();
 		slru_errcause = SLRU_READ_FAILED;
 		slru_errno = errno;
 		CloseTransientFile(fd);
 		return false;
 	}
+	pgstat_report_wait_end();
 
 	if (CloseTransientFile(fd))
 	{
@@ -850,8 +852,10 @@ SlruPhysicalWritePage(SlruCtl ctl, int pageno, int slotno, SlruFlush fdata)
 	}
 
 	errno = 0;
+	pgstat_report_wait_start(WAIT_EVENT_SLRU_WRITE);
 	if (write(fd, shared->page_buffer[slotno], BLCKSZ) != BLCKSZ)
 	{
+		pgstat_report_wait_end();
 		/* if write didn't set errno, assume problem is no disk space */
 		if (errno == 0)
 			errno = ENOSPC;
@@ -861,6 +865,7 @@ SlruPhysicalWritePage(SlruCtl ctl, int pageno, int slotno, SlruFlush fdata)
 			CloseTransientFile(fd);
 		return false;
 	}
+	pgstat_report_wait_end();
 
 	/*
 	 * If not part of Flush, need to fsync now.  We assume this happens
@@ -868,13 +873,16 @@ SlruPhysicalWritePage(SlruCtl ctl, int pageno, int slotno, SlruFlush fdata)
 	 */
 	if (!fdata)
 	{
+		pgstat_report_wait_start(WAIT_EVENT_SLRU_SYNC);
 		if (ctl->do_fsync && pg_fsync(fd))
 		{
+			pgstat_report_wait_end();
 			slru_errcause = SLRU_FSYNC_FAILED;
 			slru_errno = errno;
 			CloseTransientFile(fd);
 			return false;
 		}
+		pgstat_report_wait_end();
 
 		if (CloseTransientFile(fd))
 		{
@@ -1142,6 +1150,7 @@ SimpleLruFlush(SlruCtl ctl, bool allow_redirtied)
 	ok = true;
 	for (i = 0; i < fdata.num_files; i++)
 	{
+		pgstat_report_wait_start(WAIT_EVENT_SLRU_FLUSH_SYNC);
 		if (ctl->do_fsync && pg_fsync(fdata.fd[i]))
 		{
 			slru_errcause = SLRU_FSYNC_FAILED;
@@ -1149,6 +1158,7 @@ SimpleLruFlush(SlruCtl ctl, bool allow_redirtied)
 			pageno = fdata.segno[i] * SLRU_PAGES_PER_SEGMENT;
 			ok = false;
 		}
+		pgstat_report_wait_end();
 
 		if (CloseTransientFile(fdata.fd[i]))
 		{

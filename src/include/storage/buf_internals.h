@@ -5,7 +5,7 @@
  *	  strategy.
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/storage/buf_internals.h
@@ -64,8 +64,8 @@
 #define BM_JUST_DIRTIED			(1U << 28)		/* dirtied since write started */
 #define BM_PIN_COUNT_WAITER		(1U << 29)		/* have waiter for sole pin */
 #define BM_CHECKPOINT_NEEDED	(1U << 30)		/* must write for checkpoint */
-#define BM_PERMANENT			(1U << 31)		/* permanent relation (not
-												 * unlogged) */
+#define BM_PERMANENT			(1U << 31)		/* permanent buffer (not
+												 * unlogged, or init fork) */
 /*
  * The maximum allowed value of usage_count represents a tradeoff between
  * accuracy and speed of the clock-sweep buffer management algorithm.  A
@@ -168,7 +168,8 @@ typedef struct buftag
  * We use this same struct for local buffer headers, but the locks are not
  * used and not all of the flag bits are useful either. To avoid unnecessary
  * overhead, manipulations of the state field should be done without actual
- * atomic operations (i.e. only pg_atomic_read/write).
+ * atomic operations (i.e. only pg_atomic_read_u32() and
+ * pg_atomic_unlocked_write_u32()).
  *
  * Be careful to avoid increasing the size of the struct when adding or
  * reordering members.  Keeping it below 64 bytes (the most common CPU

@@ -4,7 +4,7 @@
  *	  POSTGRES define and remove index code.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -57,6 +57,7 @@
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
+#include "utils/regproc.h"
 #include "utils/snapmgr.h"
 #include "utils/syscache.h"
 #include "utils/tqual.h"
@@ -75,8 +76,6 @@ static void ComputeIndexAttrs(IndexInfo *indexInfo,
 				  char *accessMethodName, Oid accessMethodId,
 				  bool amcanorder,
 				  bool isconstraint);
-static Oid GetIndexOpClass(List *opclass, Oid attrType,
-				char *accessMethodName, Oid accessMethodId);
 static char *ChooseIndexName(const char *tabname, Oid namespaceId,
 				List *colnames, List *exclusionOpNames,
 				bool primary, bool isconstraint);
@@ -106,7 +105,7 @@ static void RangeVarCallbackForReindexIndex(const RangeVar *relation,
  * Errors arising from the attribute list still apply.
  *
  * Most column type changes that can skip a table rewrite do not invalidate
- * indexes.  We ackowledge this when all operator classes, collations and
+ * indexes.  We acknowledge this when all operator classes, collations and
  * exclusion operators match.  Though we could further permit intra-opfamily
  * changes for btree and hash indexes, that adds subtle complexity with no
  * concrete benefit for core types.
@@ -186,10 +185,12 @@ CheckIndexCompatible(Oid oldId,
 	indexInfo = makeNode(IndexInfo);
 	indexInfo->ii_Expressions = NIL;
 	indexInfo->ii_ExpressionsState = NIL;
-	indexInfo->ii_PredicateState = NIL;
+	indexInfo->ii_PredicateState = NULL;
 	indexInfo->ii_ExclusionOps = NULL;
 	indexInfo->ii_ExclusionProcs = NULL;
 	indexInfo->ii_ExclusionStrats = NULL;
+	indexInfo->ii_AmCache = NULL;
+	indexInfo->ii_Context = CurrentMemoryContext;
 	typeObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	classObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
@@ -298,8 +299,8 @@ CheckIndexCompatible(Oid oldId,
  * 'indexRelationId': normally InvalidOid, but during bootstrap can be
  *		nonzero to specify a preselected OID for the index.
  * 'is_alter_table': this is due to an ALTER rather than a CREATE operation.
- * 'check_rights': check for CREATE rights in the namespace.  (This should
- *		be true except when ALTER is deleting/recreating an index.)
+ * 'check_rights': check for CREATE rights in namespace and tablespace.  (This
+ *		should be true except when ALTER is deleting/recreating an index.)
  * 'skip_build': make the catalog entries but leave the index file empty;
  *		it will be filled later.
  * 'quiet': suppress the NOTICE chatter ordinarily provided for constraints.
@@ -389,6 +390,11 @@ DefineIndex(Oid relationId,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("cannot create index on foreign table \"%s\"",
 							RelationGetRelationName(rel))));
+		else if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
+			ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("cannot create index on partitioned table \"%s\"",
+							RelationGetRelationName(rel))));
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -435,8 +441,9 @@ DefineIndex(Oid relationId,
 		/* note InvalidOid is OK in this case */
 	}
 
-	/* Check permissions except when using database's default */
-	if (OidIsValid(tablespaceId) && tablespaceId != MyDatabaseTableSpace)
+	/* Check tablespace permissions */
+	if (check_rights &&
+		OidIsValid(tablespaceId) && tablespaceId != MyDatabaseTableSpace)
 	{
 		AclResult	aclresult;
 
@@ -504,11 +511,6 @@ DefineIndex(Oid relationId,
 	accessMethodId = HeapTupleGetOid(tuple);
 	accessMethodForm = (Form_pg_am) GETSTRUCT(tuple);
 	amRoutine = GetIndexAmRoutine(accessMethodForm->amhandler);
-
-	if (strcmp(accessMethodName, "hash") == 0 &&
-		RelationNeedsWAL(rel))
-		ereport(WARNING,
-				(errmsg("hash indexes are not WAL-logged and their use is discouraged")));
 
 	if (stmt->unique && !amRoutine->amcanunique)
 		ereport(ERROR,
@@ -597,7 +599,7 @@ DefineIndex(Oid relationId,
 	indexInfo->ii_Expressions = NIL;	/* for now */
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_Predicate = make_ands_implicit((Expr *) stmt->whereClause);
-	indexInfo->ii_PredicateState = NIL;
+	indexInfo->ii_PredicateState = NULL;
 	indexInfo->ii_ExclusionOps = NULL;
 	indexInfo->ii_ExclusionProcs = NULL;
 	indexInfo->ii_ExclusionStrats = NULL;
@@ -606,6 +608,8 @@ DefineIndex(Oid relationId,
 	indexInfo->ii_ReadyForInserts = !stmt->concurrent;
 	indexInfo->ii_Concurrent = stmt->concurrent;
 	indexInfo->ii_BrokenHotChain = false;
+	indexInfo->ii_AmCache = NULL;
+	indexInfo->ii_Context = CurrentMemoryContext;
 
 	typeObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
 	collationObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
@@ -1009,7 +1013,7 @@ CheckMutability(Expr *expr)
  * indxpath.c could do something with.  However, that seems overly
  * restrictive.  One useful application of partial indexes is to apply
  * a UNIQUE constraint across a subset of a table, and in that scenario
- * any evaluatable predicate will work.  So accept any predicate here
+ * any evaluable predicate will work.  So accept any predicate here
  * (except ones requiring a plan), and let indxpath.c fend for itself.
  */
 static void
@@ -1193,10 +1197,10 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 		/*
 		 * Identify the opclass to use.
 		 */
-		classOidP[attn] = GetIndexOpClass(attribute->opclass,
-										  atttype,
-										  accessMethodName,
-										  accessMethodId);
+		classOidP[attn] = ResolveOpClass(attribute->opclass,
+										 atttype,
+										 accessMethodName,
+										 accessMethodId);
 
 		/*
 		 * Identify the exclusion operator, if any.
@@ -1303,10 +1307,13 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 
 /*
  * Resolve possibly-defaulted operator class specification
+ *
+ * Note: This is used to resolve operator class specification in index and
+ * partition key definitions.
  */
-static Oid
-GetIndexOpClass(List *opclass, Oid attrType,
-				char *accessMethodName, Oid accessMethodId)
+Oid
+ResolveOpClass(List *opclass, Oid attrType,
+			   char *accessMethodName, Oid accessMethodId)
 {
 	char	   *schemaname;
 	char	   *opcname;
@@ -1951,9 +1958,7 @@ ReindexMultipleTables(const char *objectName, ReindexObjectType objectKind,
 	 */
 	private_context = AllocSetContextCreate(PortalContext,
 											"ReindexMultipleTables",
-											ALLOCSET_DEFAULT_MINSIZE,
-											ALLOCSET_DEFAULT_INITSIZE,
-											ALLOCSET_DEFAULT_MAXSIZE);
+											ALLOCSET_SMALL_SIZES);
 
 	/*
 	 * Define the search keys to find the objects to reindex. For a schema, we

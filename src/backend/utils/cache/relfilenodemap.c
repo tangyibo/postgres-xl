@@ -3,7 +3,7 @@
  * relfilenodemap.c
  *	  relfilenode to oid mapping cache.
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -123,7 +123,7 @@ InitializeRelfilenodeMap(void)
 	 * error.
 	 */
 	RelfilenodeMapHash =
-		hash_create("RelfilenodeMap cache", 1024, &ctl,
+		hash_create("RelfilenodeMap cache", 64, &ctl,
 					HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
 
 	/* Watch for invalidation events. */

@@ -24,7 +24,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -257,7 +257,7 @@ advance_windowaggregate(WindowAggState *winstate,
 	if (filter)
 	{
 		bool		isnull;
-		Datum		res = ExecEvalExpr(filter, econtext, &isnull, NULL);
+		Datum		res = ExecEvalExpr(filter, econtext, &isnull);
 
 		if (isnull || !DatumGetBool(res))
 		{
@@ -273,7 +273,7 @@ advance_windowaggregate(WindowAggState *winstate,
 		ExprState  *argstate = (ExprState *) lfirst(arg);
 
 		fcinfo->arg[i] = ExecEvalExpr(argstate, econtext,
-									  &fcinfo->argnull[i], NULL);
+									  &fcinfo->argnull[i]);
 		i++;
 	}
 
@@ -355,7 +355,7 @@ advance_windowaggregate(WindowAggState *winstate,
 
 	/*
 	 * We must track the number of rows included in transValue, since to
-	 * remove the last input, advance_windowaggregate_base() musn't call the
+	 * remove the last input, advance_windowaggregate_base() mustn't call the
 	 * inverse transition function, but simply reset transValue back to its
 	 * initial value.
 	 */
@@ -363,8 +363,10 @@ advance_windowaggregate(WindowAggState *winstate,
 
 	/*
 	 * If pass-by-ref datatype, must copy the new value into aggcontext and
-	 * pfree the prior transValue.  But if transfn returned a pointer to its
-	 * first input, we don't need to do anything.
+	 * free the prior transValue.  But if transfn returned a pointer to its
+	 * first input, we don't need to do anything.  Also, if transfn returned a
+	 * pointer to a R/W expanded object that is already a child of the
+	 * aggcontext, assume we can adopt that value without copying it.
 	 */
 	if (!peraggstate->transtypeByVal &&
 		DatumGetPointer(newVal) != DatumGetPointer(peraggstate->transValue))
@@ -372,12 +374,25 @@ advance_windowaggregate(WindowAggState *winstate,
 		if (!fcinfo->isnull)
 		{
 			MemoryContextSwitchTo(peraggstate->aggcontext);
-			newVal = datumCopy(newVal,
-							   peraggstate->transtypeByVal,
-							   peraggstate->transtypeLen);
+			if (DatumIsReadWriteExpandedObject(newVal,
+											   false,
+											   peraggstate->transtypeLen) &&
+				MemoryContextGetParent(DatumGetEOHP(newVal)->eoh_context) == CurrentMemoryContext)
+				 /* do nothing */ ;
+			else
+				newVal = datumCopy(newVal,
+								   peraggstate->transtypeByVal,
+								   peraggstate->transtypeLen);
 		}
 		if (!peraggstate->transValueIsNull)
-			pfree(DatumGetPointer(peraggstate->transValue));
+		{
+			if (DatumIsReadWriteExpandedObject(peraggstate->transValue,
+											   false,
+											   peraggstate->transtypeLen))
+				DeleteExpandedObject(peraggstate->transValue);
+			else
+				pfree(DatumGetPointer(peraggstate->transValue));
+		}
 	}
 
 	MemoryContextSwitchTo(oldContext);
@@ -419,7 +434,7 @@ advance_windowaggregate_base(WindowAggState *winstate,
 	if (filter)
 	{
 		bool		isnull;
-		Datum		res = ExecEvalExpr(filter, econtext, &isnull, NULL);
+		Datum		res = ExecEvalExpr(filter, econtext, &isnull);
 
 		if (isnull || !DatumGetBool(res))
 		{
@@ -435,7 +450,7 @@ advance_windowaggregate_base(WindowAggState *winstate,
 		ExprState  *argstate = (ExprState *) lfirst(arg);
 
 		fcinfo->arg[i] = ExecEvalExpr(argstate, econtext,
-									  &fcinfo->argnull[i], NULL);
+									  &fcinfo->argnull[i]);
 		i++;
 	}
 
@@ -514,8 +529,10 @@ advance_windowaggregate_base(WindowAggState *winstate,
 
 	/*
 	 * If pass-by-ref datatype, must copy the new value into aggcontext and
-	 * pfree the prior transValue.  But if invtransfn returned a pointer to
-	 * its first input, we don't need to do anything.
+	 * free the prior transValue.  But if invtransfn returned a pointer to its
+	 * first input, we don't need to do anything.  Also, if invtransfn
+	 * returned a pointer to a R/W expanded object that is already a child of
+	 * the aggcontext, assume we can adopt that value without copying it.
 	 *
 	 * Note: the checks for null values here will never fire, but it seems
 	 * best to have this stanza look just like advance_windowaggregate.
@@ -526,12 +543,25 @@ advance_windowaggregate_base(WindowAggState *winstate,
 		if (!fcinfo->isnull)
 		{
 			MemoryContextSwitchTo(peraggstate->aggcontext);
-			newVal = datumCopy(newVal,
-							   peraggstate->transtypeByVal,
-							   peraggstate->transtypeLen);
+			if (DatumIsReadWriteExpandedObject(newVal,
+											   false,
+											   peraggstate->transtypeLen) &&
+				MemoryContextGetParent(DatumGetEOHP(newVal)->eoh_context) == CurrentMemoryContext)
+				 /* do nothing */ ;
+			else
+				newVal = datumCopy(newVal,
+								   peraggstate->transtypeByVal,
+								   peraggstate->transtypeLen);
 		}
 		if (!peraggstate->transValueIsNull)
-			pfree(DatumGetPointer(peraggstate->transValue));
+		{
+			if (DatumIsReadWriteExpandedObject(peraggstate->transValue,
+											   false,
+											   peraggstate->transtypeLen))
+				DeleteExpandedObject(peraggstate->transValue);
+			else
+				pfree(DatumGetPointer(peraggstate->transValue));
+		}
 	}
 
 	MemoryContextSwitchTo(oldContext);
@@ -569,7 +599,9 @@ finalize_windowaggregate(WindowAggState *winstate,
 								 numFinalArgs,
 								 perfuncstate->winCollation,
 								 (void *) winstate, NULL);
-		fcinfo.arg[0] = peraggstate->transValue;
+		fcinfo.arg[0] = MakeExpandedObjectReadOnly(peraggstate->transValue,
+											   peraggstate->transValueIsNull,
+												   peraggstate->transtypeLen);
 		fcinfo.argnull[0] = peraggstate->transValueIsNull;
 		anynull = peraggstate->transValueIsNull;
 
@@ -597,6 +629,7 @@ finalize_windowaggregate(WindowAggState *winstate,
 	}
 	else
 	{
+		/* Don't need MakeExpandedObjectReadOnly; datumCopy will copy it */
 		*result = peraggstate->transValue;
 		*isnull = peraggstate->transValueIsNull;
 	}
@@ -1552,38 +1585,18 @@ update_frametailpos(WindowObject winobj, TupleTableSlot *slot)
  *	ExecWindowAgg receives tuples from its outer subplan and
  *	stores them into a tuplestore, then processes window functions.
  *	This node doesn't reduce nor qualify any row so the number of
- *	returned rows is exactly the same as its outer subplan's result
- *	(ignoring the case of SRFs in the targetlist, that is).
+ *	returned rows is exactly the same as its outer subplan's result.
  * -----------------
  */
 TupleTableSlot *
 ExecWindowAgg(WindowAggState *winstate)
 {
-	TupleTableSlot *result;
-	ExprDoneCond isDone;
 	ExprContext *econtext;
 	int			i;
 	int			numfuncs;
 
 	if (winstate->all_done)
 		return NULL;
-
-	/*
-	 * Check to see if we're still projecting out tuples from a previous
-	 * output tuple (because there is a function-returning-set in the
-	 * projection expressions).  If so, try to project another one.
-	 */
-	if (winstate->ss.ps.ps_TupFromTlist)
-	{
-		TupleTableSlot *result;
-		ExprDoneCond isDone;
-
-		result = ExecProject(winstate->ss.ps.ps_ProjInfo, &isDone);
-		if (isDone == ExprMultipleResult)
-			return result;
-		/* Done with that source tuple... */
-		winstate->ss.ps.ps_TupFromTlist = false;
-	}
 
 	/*
 	 * Compute frame offset values, if any, during first call.
@@ -1602,8 +1615,7 @@ ExecWindowAgg(WindowAggState *winstate)
 			Assert(winstate->startOffset != NULL);
 			value = ExecEvalExprSwitchContext(winstate->startOffset,
 											  econtext,
-											  &isnull,
-											  NULL);
+											  &isnull);
 			if (isnull)
 				ereport(ERROR,
 						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
@@ -1628,8 +1640,7 @@ ExecWindowAgg(WindowAggState *winstate)
 			Assert(winstate->endOffset != NULL);
 			value = ExecEvalExprSwitchContext(winstate->endOffset,
 											  econtext,
-											  &isnull,
-											  NULL);
+											  &isnull);
 			if (isnull)
 				ereport(ERROR,
 						(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
@@ -1652,7 +1663,6 @@ ExecWindowAgg(WindowAggState *winstate)
 		winstate->all_first = false;
 	}
 
-restart:
 	if (winstate->buffer == NULL)
 	{
 		/* Initialize for first partition and set current row = 0 */
@@ -1744,17 +1754,8 @@ restart:
 	 * evaluated with respect to that row.
 	 */
 	econtext->ecxt_outertuple = winstate->ss.ss_ScanTupleSlot;
-	result = ExecProject(winstate->ss.ps.ps_ProjInfo, &isDone);
 
-	if (isDone == ExprEndResult)
-	{
-		/* SRF in tlist returned no rows, so advance to next input tuple */
-		goto restart;
-	}
-
-	winstate->ss.ps.ps_TupFromTlist =
-		(isDone == ExprMultipleResult);
-	return result;
+	return ExecProject(winstate->ss.ps.ps_ProjInfo);
 }
 
 /* -----------------
@@ -1802,10 +1803,8 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 	/* Create long-lived context for storage of partition-local memory etc */
 	winstate->partcontext =
 		AllocSetContextCreate(CurrentMemoryContext,
-							  "WindowAgg_Partition",
-							  ALLOCSET_DEFAULT_MINSIZE,
-							  ALLOCSET_DEFAULT_INITSIZE,
-							  ALLOCSET_DEFAULT_MAXSIZE);
+							  "WindowAgg Partition",
+							  ALLOCSET_DEFAULT_SIZES);
 
 	/*
 	 * Create mid-lived context for aggregate trans values etc.
@@ -1815,10 +1814,8 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 	 */
 	winstate->aggcontext =
 		AllocSetContextCreate(CurrentMemoryContext,
-							  "WindowAgg_Aggregates",
-							  ALLOCSET_DEFAULT_MINSIZE,
-							  ALLOCSET_DEFAULT_INITSIZE,
-							  ALLOCSET_DEFAULT_MAXSIZE);
+							  "WindowAgg Aggregates",
+							  ALLOCSET_DEFAULT_SIZES);
 
 	/*
 	 * tuple table initialization
@@ -1830,16 +1827,12 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 	winstate->temp_slot_1 = ExecInitExtraTupleSlot(estate);
 	winstate->temp_slot_2 = ExecInitExtraTupleSlot(estate);
 
-	winstate->ss.ps.targetlist = (List *)
-		ExecInitExpr((Expr *) node->plan.targetlist,
-					 (PlanState *) winstate);
-
 	/*
 	 * WindowAgg nodes never have quals, since they can only occur at the
 	 * logical top level of a query (ie, after any WHERE or HAVING filters)
 	 */
 	Assert(node->plan.qual == NIL);
-	winstate->ss.ps.qual = NIL;
+	winstate->ss.ps.qual = NULL;
 
 	/*
 	 * initialize child nodes
@@ -1867,8 +1860,6 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 	 */
 	ExecAssignResultTypeFromTL(&winstate->ss.ps);
 	ExecAssignProjectionInfo(&winstate->ss.ps, NULL);
-
-	winstate->ss.ps.ps_TupFromTlist = false;
 
 	/* Set up data for comparing tuples */
 	if (node->partNumCols > 0)
@@ -1900,7 +1891,7 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 	foreach(l, winstate->funcs)
 	{
 		WindowFuncExprState *wfuncstate = (WindowFuncExprState *) lfirst(l);
-		WindowFunc *wfunc = (WindowFunc *) wfuncstate->xprstate.expr;
+		WindowFunc *wfunc = wfuncstate->wfunc;
 		WindowStatePerFunc perfuncstate;
 		AclResult	aclresult;
 		int			i;
@@ -2062,8 +2053,6 @@ ExecReScanWindowAgg(WindowAggState *node)
 	ExprContext *econtext = node->ss.ps.ps_ExprContext;
 
 	node->all_done = false;
-
-	node->ss.ps.ps_TupFromTlist = false;
 	node->all_first = true;
 
 	/* release tuplestore et al */
@@ -2223,7 +2212,7 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 								 numArguments,
 								 0,		/* no ordered-set window functions yet */
 								 false, /* no variadic window functions yet */
-								 wfunc->wintype,
+								 aggtranstype,
 								 wfunc->inputcollid,
 								 transfn_oid,
 								 invtransfn_oid,
@@ -2322,10 +2311,8 @@ initialize_peragg(WindowAggState *winstate, WindowFunc *wfunc,
 	if (OidIsValid(invtransfn_oid))
 		peraggstate->aggcontext =
 			AllocSetContextCreate(CurrentMemoryContext,
-								  "WindowAgg_AggregatePrivate",
-								  ALLOCSET_DEFAULT_MINSIZE,
-								  ALLOCSET_DEFAULT_INITSIZE,
-								  ALLOCSET_DEFAULT_MAXSIZE);
+								  "WindowAgg Per Aggregate",
+								  ALLOCSET_DEFAULT_SIZES);
 	else
 		peraggstate->aggcontext = winstate->aggcontext;
 
@@ -2686,7 +2673,7 @@ WinGetFuncArgInPartition(WindowObject winobj, int argno,
 		}
 		econtext->ecxt_outertuple = slot;
 		return ExecEvalExpr((ExprState *) list_nth(winobj->argstates, argno),
-							econtext, isnull, NULL);
+							econtext, isnull);
 	}
 }
 
@@ -2785,7 +2772,7 @@ WinGetFuncArgInFrame(WindowObject winobj, int argno,
 		}
 		econtext->ecxt_outertuple = slot;
 		return ExecEvalExpr((ExprState *) list_nth(winobj->argstates, argno),
-							econtext, isnull, NULL);
+							econtext, isnull);
 	}
 }
 
@@ -2815,5 +2802,5 @@ WinGetFuncArgCurrent(WindowObject winobj, int argno, bool *isnull)
 
 	econtext->ecxt_outertuple = winstate->ss.ss_ScanTupleSlot;
 	return ExecEvalExpr((ExprState *) list_nth(winobj->argstates, argno),
-						econtext, isnull, NULL);
+						econtext, isnull);
 }

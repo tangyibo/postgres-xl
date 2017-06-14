@@ -3,7 +3,7 @@
  * varlena.c
  *	  Functions for the variable-length built-in types.
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -21,8 +21,8 @@
 #include "access/tuptoaster.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_type.h"
+#include "common/md5.h"
 #include "lib/hyperloglog.h"
-#include "libpq/md5.h"
 #include "libpq/pqformat.h"
 #include "miscadmin.h"
 #include "parser/scansup.h"
@@ -34,6 +34,7 @@
 #include "utils/memutils.h"
 #include "utils/pg_locale.h"
 #include "utils/sortsupport.h"
+#include "utils/varlena.h"
 
 
 /* GUC variable */
@@ -68,13 +69,11 @@ typedef struct
 	int			last_returned;	/* Last comparison result (cache) */
 	bool		cache_blob;		/* Does buf2 contain strxfrm() blob, etc? */
 	bool		collate_c;
-	bool		bpchar;			/* Sorting pbchar, not varchar/text/bytea? */
+	bool		bpchar;			/* Sorting bpchar, not varchar/text/bytea? */
 	hyperLogLogState abbr_card; /* Abbreviated key cardinality state */
 	hyperLogLogState full_card; /* Full key cardinality state */
 	double		prop_card;		/* Required cardinality proportion */
-#ifdef HAVE_LOCALE_T
 	pg_locale_t locale;
-#endif
 } VarStringSortSupport;
 
 /*
@@ -294,7 +293,7 @@ byteain(PG_FUNCTION_ARGS)
 			 */
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					 errmsg("invalid input syntax for type bytea")));
+					 errmsg("invalid input syntax for type %s", "bytea")));
 		}
 	}
 
@@ -335,7 +334,7 @@ byteain(PG_FUNCTION_ARGS)
 			 */
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					 errmsg("invalid input syntax for type bytea")));
+					 errmsg("invalid input syntax for type %s", "bytea")));
 		}
 	}
 
@@ -1407,10 +1406,7 @@ varstr_cmp(char *arg1, int len1, char *arg2, int len2, Oid collid)
 		char		a2buf[TEXTBUFLEN];
 		char	   *a1p,
 				   *a2p;
-
-#ifdef HAVE_LOCALE_T
 		pg_locale_t mylocale = 0;
-#endif
 
 		if (collid != DEFAULT_COLLATION_OID)
 		{
@@ -1425,9 +1421,7 @@ varstr_cmp(char *arg1, int len1, char *arg2, int len2, Oid collid)
 						 errmsg("could not determine which collation to use for string comparison"),
 						 errhint("Use the COLLATE clause to set the collation explicitly.")));
 			}
-#ifdef HAVE_LOCALE_T
 			mylocale = pg_newlocale_from_collation(collid);
-#endif
 		}
 
 		/*
@@ -1501,7 +1495,7 @@ varstr_cmp(char *arg1, int len1, char *arg2, int len2, Oid collid)
 			errno = 0;
 #ifdef HAVE_LOCALE_T
 			if (mylocale)
-				result = wcscoll_l((LPWSTR) a1p, (LPWSTR) a2p, mylocale);
+				result = wcscoll_l((LPWSTR) a1p, (LPWSTR) a2p, mylocale->info.lt);
 			else
 #endif
 				result = wcscoll((LPWSTR) a1p, (LPWSTR) a2p);
@@ -1546,11 +1540,56 @@ varstr_cmp(char *arg1, int len1, char *arg2, int len2, Oid collid)
 		memcpy(a2p, arg2, len2);
 		a2p[len2] = '\0';
 
-#ifdef HAVE_LOCALE_T
 		if (mylocale)
-			result = strcoll_l(a1p, a2p, mylocale);
-		else
+		{
+			if (mylocale->provider == COLLPROVIDER_ICU)
+			{
+#ifdef USE_ICU
+#ifdef HAVE_UCOL_STRCOLLUTF8
+				if (GetDatabaseEncoding() == PG_UTF8)
+				{
+					UErrorCode	status;
+
+					status = U_ZERO_ERROR;
+					result = ucol_strcollUTF8(mylocale->info.icu.ucol,
+											  arg1, len1,
+											  arg2, len2,
+											  &status);
+					if (U_FAILURE(status))
+						ereport(ERROR,
+								(errmsg("collation failed: %s", u_errorName(status))));
+				}
+				else
 #endif
+				{
+					int32_t		ulen1,
+								ulen2;
+					UChar	   *uchar1,
+							   *uchar2;
+
+					ulen1 = icu_to_uchar(&uchar1, arg1, len1);
+					ulen2 = icu_to_uchar(&uchar2, arg2, len2);
+
+					result = ucol_strcoll(mylocale->info.icu.ucol,
+										  uchar1, ulen1,
+										  uchar2, ulen2);
+				}
+#else							/* not USE_ICU */
+				/* shouldn't happen */
+				elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
+#endif   /* not USE_ICU */
+			}
+			else
+			{
+#ifdef HAVE_LOCALE_T
+				result = strcoll_l(a1p, a2p, mylocale->info.lt);
+#else
+				/* shouldn't happen */
+				elog(ERROR, "unsupported collprovider: %c", mylocale->provider);
+#endif
+			}
+		}
+		else
 			result = strcoll(a1p, a2p);
 
 		/*
@@ -1772,10 +1811,7 @@ varstr_sortsupport(SortSupport ssup, Oid collid, bool bpchar)
 	bool		abbreviate = ssup->abbreviate;
 	bool		collate_c = false;
 	VarStringSortSupport *sss;
-
-#ifdef HAVE_LOCALE_T
 	pg_locale_t locale = 0;
-#endif
 
 	/*
 	 * If possible, set ssup->comparator to a function which can be used to
@@ -1830,9 +1866,7 @@ varstr_sortsupport(SortSupport ssup, Oid collid, bool bpchar)
 						 errmsg("could not determine which collation to use for string comparison"),
 						 errhint("Use the COLLATE clause to set the collation explicitly.")));
 			}
-#ifdef HAVE_LOCALE_T
 			locale = pg_newlocale_from_collation(collid);
-#endif
 		}
 	}
 
@@ -1849,8 +1883,8 @@ varstr_sortsupport(SortSupport ssup, Oid collid, bool bpchar)
 	 * Even apart from the risk of broken locales, it's possible that there
 	 * are platforms where the use of abbreviated keys should be disabled at
 	 * compile time.  Having only 4 byte datums could make worst-case
-	 * performance drastically more likely, for example.  Moreover, Darwin's
-	 * strxfrm() implementations is known to not effectively concentrate a
+	 * performance drastically more likely, for example.  Moreover, macOS's
+	 * strxfrm() implementation is known to not effectively concentrate a
 	 * significant amount of entropy from the original string in earlier
 	 * transformed blobs.  It's possible that other supported platforms are
 	 * similarly encumbered.  So, if we ever get past disabling this
@@ -1858,7 +1892,7 @@ varstr_sortsupport(SortSupport ssup, Oid collid, bool bpchar)
 	 * platforms.
 	 */
 #ifndef TRUST_STRXFRM
-	if (!collate_c)
+	if (!collate_c && !(locale && locale->provider == COLLPROVIDER_ICU))
 		abbreviate = false;
 #endif
 
@@ -1881,9 +1915,7 @@ varstr_sortsupport(SortSupport ssup, Oid collid, bool bpchar)
 		sss->last_len2 = -1;
 		/* Initialize */
 		sss->last_returned = 0;
-#ifdef HAVE_LOCALE_T
 		sss->locale = locale;
-#endif
 
 		/*
 		 * To avoid somehow confusing a strxfrm() blob and an original string,
@@ -2094,11 +2126,56 @@ varstrfastcmp_locale(Datum x, Datum y, SortSupport ssup)
 		goto done;
 	}
 
-#ifdef HAVE_LOCALE_T
 	if (sss->locale)
-		result = strcoll_l(sss->buf1, sss->buf2, sss->locale);
-	else
+	{
+		if (sss->locale->provider == COLLPROVIDER_ICU)
+		{
+#ifdef USE_ICU
+#ifdef HAVE_UCOL_STRCOLLUTF8
+			if (GetDatabaseEncoding() == PG_UTF8)
+			{
+				UErrorCode	status;
+
+				status = U_ZERO_ERROR;
+				result = ucol_strcollUTF8(sss->locale->info.icu.ucol,
+										  a1p, len1,
+										  a2p, len2,
+										  &status);
+				if (U_FAILURE(status))
+					ereport(ERROR,
+					  (errmsg("collation failed: %s", u_errorName(status))));
+			}
+			else
 #endif
+			{
+				int32_t		ulen1,
+							ulen2;
+				UChar	   *uchar1,
+						   *uchar2;
+
+				ulen1 = icu_to_uchar(&uchar1, a1p, len1);
+				ulen2 = icu_to_uchar(&uchar2, a2p, len2);
+
+				result = ucol_strcoll(sss->locale->info.icu.ucol,
+									  uchar1, ulen1,
+									  uchar2, ulen2);
+			}
+#else							/* not USE_ICU */
+			/* shouldn't happen */
+			elog(ERROR, "unsupported collprovider: %c", sss->locale->provider);
+#endif   /* not USE_ICU */
+		}
+		else
+		{
+#ifdef HAVE_LOCALE_T
+			result = strcoll_l(sss->buf1, sss->buf2, sss->locale->info.lt);
+#else
+			/* shouldn't happen */
+			elog(ERROR, "unsupported collprovider: %c", sss->locale->provider);
+#endif
+		}
+	}
+	else
 		result = strcoll(sss->buf1, sss->buf2);
 
 	/*
@@ -2204,9 +2281,14 @@ varstr_abbrev_convert(Datum original, SortSupport ssup)
 	else
 	{
 		Size		bsize;
+#ifdef USE_ICU
+		int32_t		ulen = -1;
+		UChar	   *uchar;
+#endif
 
 		/*
-		 * We're not using the C collation, so fall back on strxfrm.
+		 * We're not using the C collation, so fall back on strxfrm or ICU
+		 * analogs.
 		 */
 
 		/* By convention, we use buffer 1 to store and NUL-terminate */
@@ -2226,17 +2308,69 @@ varstr_abbrev_convert(Datum original, SortSupport ssup)
 			goto done;
 		}
 
-		/* Just like strcoll(), strxfrm() expects a NUL-terminated string */
 		memcpy(sss->buf1, authoritative_data, len);
+
+		/*
+		 * Just like strcoll(), strxfrm() expects a NUL-terminated string. Not
+		 * necessary for ICU, but doesn't hurt.
+		 */
 		sss->buf1[len] = '\0';
 		sss->last_len1 = len;
 
+#ifdef USE_ICU
+		/* When using ICU and not UTF8, convert string to UChar. */
+		if (sss->locale && sss->locale->provider == COLLPROVIDER_ICU &&
+			GetDatabaseEncoding() != PG_UTF8)
+			ulen = icu_to_uchar(&uchar, sss->buf1, len);
+#endif
+
+		/*
+		 * Loop: Call strxfrm() or ucol_getSortKey(), possibly enlarge buffer,
+		 * and try again.  Both of these functions have the result buffer
+		 * content undefined if the result did not fit, so we need to retry
+		 * until everything fits, even though we only need the first few bytes
+		 * in the end.  When using ucol_nextSortKeyPart(), however, we only
+		 * ask for as many bytes as we actually need.
+		 */
 		for (;;)
 		{
+#ifdef USE_ICU
+			if (sss->locale && sss->locale->provider == COLLPROVIDER_ICU)
+			{
+				/*
+				 * When using UTF8, use the iteration interface so we only
+				 * need to produce as many bytes as we actually need.
+				 */
+				if (GetDatabaseEncoding() == PG_UTF8)
+				{
+					UCharIterator iter;
+					uint32_t	state[2];
+					UErrorCode	status;
+
+					uiter_setUTF8(&iter, sss->buf1, len);
+					state[0] = state[1] = 0;	/* won't need that again */
+					status = U_ZERO_ERROR;
+					bsize = ucol_nextSortKeyPart(sss->locale->info.icu.ucol,
+												 &iter,
+												 state,
+												 (uint8_t *) sss->buf2,
+											Min(sizeof(Datum), sss->buflen2),
+												 &status);
+					if (U_FAILURE(status))
+						ereport(ERROR,
+								(errmsg("sort key generation failed: %s", u_errorName(status))));
+				}
+				else
+					bsize = ucol_getSortKey(sss->locale->info.icu.ucol,
+											uchar, ulen,
+										(uint8_t *) sss->buf2, sss->buflen2);
+			}
+			else
+#endif
 #ifdef HAVE_LOCALE_T
-			if (sss->locale)
+			if (sss->locale && sss->locale->provider == COLLPROVIDER_LIBC)
 				bsize = strxfrm_l(sss->buf2, sss->buf1,
-								  sss->buflen2, sss->locale);
+								  sss->buflen2, sss->locale->info.lt);
 			else
 #endif
 				bsize = strxfrm(sss->buf2, sss->buf1, sss->buflen2);
@@ -2246,8 +2380,7 @@ varstr_abbrev_convert(Datum original, SortSupport ssup)
 				break;
 
 			/*
-			 * The C standard states that the contents of the buffer is now
-			 * unspecified.  Grow buffer, and retry.
+			 * Grow buffer and retry.
 			 */
 			pfree(sss->buf2);
 			sss->buflen2 = Max(bsize + 1,
@@ -2666,7 +2799,7 @@ bytea_catenate(bytea *t1, bytea *t2)
 }
 
 #define PG_STR_GET_BYTEA(str_) \
-	DatumGetByteaP(DirectFunctionCall1(byteain, CStringGetDatum(str_)))
+	DatumGetByteaPP(DirectFunctionCall1(byteain, CStringGetDatum(str_)))
 
 /*
  * bytea_substr()
@@ -2938,25 +3071,18 @@ byteaGetBit(PG_FUNCTION_ARGS)
 Datum
 byteaSetByte(PG_FUNCTION_ARGS)
 {
-	bytea	   *v = PG_GETARG_BYTEA_P(0);
+	bytea	   *res = PG_GETARG_BYTEA_P_COPY(0);
 	int32		n = PG_GETARG_INT32(1);
 	int32		newByte = PG_GETARG_INT32(2);
 	int			len;
-	bytea	   *res;
 
-	len = VARSIZE(v) - VARHDRSZ;
+	len = VARSIZE(res) - VARHDRSZ;
 
 	if (n < 0 || n >= len)
 		ereport(ERROR,
 				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
 				 errmsg("index %d out of valid range, 0..%d",
 						n, len - 1)));
-
-	/*
-	 * Make a copy of the original varlena.
-	 */
-	res = (bytea *) palloc(VARSIZE(v));
-	memcpy((char *) res, (char *) v, VARSIZE(v));
 
 	/*
 	 * Now set the byte.
@@ -2977,17 +3103,16 @@ byteaSetByte(PG_FUNCTION_ARGS)
 Datum
 byteaSetBit(PG_FUNCTION_ARGS)
 {
-	bytea	   *v = PG_GETARG_BYTEA_P(0);
+	bytea	   *res = PG_GETARG_BYTEA_P_COPY(0);
 	int32		n = PG_GETARG_INT32(1);
 	int32		newBit = PG_GETARG_INT32(2);
-	bytea	   *res;
 	int			len;
 	int			oldByte,
 				newByte;
 	int			byteNo,
 				bitNo;
 
-	len = VARSIZE(v) - VARHDRSZ;
+	len = VARSIZE(res) - VARHDRSZ;
 
 	if (n < 0 || n >= len * 8)
 		ereport(ERROR,
@@ -3005,12 +3130,6 @@ byteaSetBit(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("new bit must be 0 or 1")));
-
-	/*
-	 * Make a copy of the original varlena.
-	 */
-	res = (bytea *) palloc(VARSIZE(v));
-	memcpy((char *) res, (char *) v, VARSIZE(v));
 
 	/*
 	 * Update the byte.
@@ -3138,7 +3257,7 @@ SplitIdentifierString(char *rawstring, char separator,
 
 	*namelist = NIL;
 
-	while (isspace((unsigned char) *nextp))
+	while (scanner_isspace(*nextp))
 		nextp++;				/* skip leading whitespace */
 
 	if (*nextp == '\0')
@@ -3176,7 +3295,7 @@ SplitIdentifierString(char *rawstring, char separator,
 
 			curname = nextp;
 			while (*nextp && *nextp != separator &&
-				   !isspace((unsigned char) *nextp))
+				   !scanner_isspace(*nextp))
 				nextp++;
 			endp = nextp;
 			if (curname == nextp)
@@ -3198,13 +3317,13 @@ SplitIdentifierString(char *rawstring, char separator,
 			pfree(downname);
 		}
 
-		while (isspace((unsigned char) *nextp))
+		while (scanner_isspace(*nextp))
 			nextp++;			/* skip trailing whitespace */
 
 		if (*nextp == separator)
 		{
 			nextp++;
-			while (isspace((unsigned char) *nextp))
+			while (scanner_isspace(*nextp))
 				nextp++;		/* skip leading whitespace for next */
 			/* we expect another name, so done remains false */
 		}
@@ -3263,7 +3382,7 @@ SplitDirectoriesString(char *rawstring, char separator,
 
 	*namelist = NIL;
 
-	while (isspace((unsigned char) *nextp))
+	while (scanner_isspace(*nextp))
 		nextp++;				/* skip leading whitespace */
 
 	if (*nextp == '\0')
@@ -3300,7 +3419,7 @@ SplitDirectoriesString(char *rawstring, char separator,
 			while (*nextp && *nextp != separator)
 			{
 				/* trailing whitespace should not be included in name */
-				if (!isspace((unsigned char) *nextp))
+				if (!scanner_isspace(*nextp))
 					endp = nextp + 1;
 				nextp++;
 			}
@@ -3308,13 +3427,13 @@ SplitDirectoriesString(char *rawstring, char separator,
 				return false;	/* empty unquoted name not allowed */
 		}
 
-		while (isspace((unsigned char) *nextp))
+		while (scanner_isspace(*nextp))
 			nextp++;			/* skip trailing whitespace */
 
 		if (*nextp == separator)
 		{
 			nextp++;
-			while (isspace((unsigned char) *nextp))
+			while (scanner_isspace(*nextp))
 				nextp++;		/* skip leading whitespace for next */
 			/* we expect another name, so done remains false */
 		}
@@ -4111,12 +4230,23 @@ text_to_array_internal(PG_FUNCTION_ARGS)
 		 */
 		if (fldsep_len < 1)
 		{
+			Datum		elems[1];
+			bool		nulls[1];
+			int			dims[1];
+			int			lbs[1];
+
 			text_position_cleanup(&state);
 			/* single element can be a NULL too */
 			is_null = null_string ? text_isequal(inputstring, null_string) : false;
-			PG_RETURN_ARRAYTYPE_P(create_singleton_array(fcinfo, TEXTOID,
-												PointerGetDatum(inputstring),
-														 is_null, 1));
+
+			elems[0] = PointerGetDatum(inputstring);
+			nulls[0] = is_null;
+			dims[0] = 1;
+			lbs[0] = 1;
+			/* XXX: this hardcodes assumptions about the text type */
+			PG_RETURN_ARRAYTYPE_P(construct_md_array(elems, nulls,
+													 1, dims, lbs,
+												   TEXTOID, -1, false, 'i'));
 		}
 
 		start_posn = 1;

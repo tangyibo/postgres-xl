@@ -46,7 +46,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -868,6 +868,72 @@ heap_modify_tuple(HeapTuple tuple,
 #ifdef PGXC
 	newTuple->t_xc_node_id = tuple->t_xc_node_id;
 #endif
+	if (tupleDesc->tdhasoid)
+		HeapTupleSetOid(newTuple, HeapTupleGetOid(tuple));
+
+	return newTuple;
+}
+
+/*
+ * heap_modify_tuple_by_cols
+ *		form a new tuple from an old tuple and a set of replacement values.
+ *
+ * This is like heap_modify_tuple, except that instead of specifying which
+ * column(s) to replace by a boolean map, an array of target column numbers
+ * is used.  This is often more convenient when a fixed number of columns
+ * are to be replaced.  The replCols, replValues, and replIsnull arrays must
+ * be of length nCols.  Target column numbers are indexed from 1.
+ *
+ * The result is allocated in the current memory context.
+ */
+HeapTuple
+heap_modify_tuple_by_cols(HeapTuple tuple,
+						  TupleDesc tupleDesc,
+						  int nCols,
+						  int *replCols,
+						  Datum *replValues,
+						  bool *replIsnull)
+{
+	int			numberOfAttributes = tupleDesc->natts;
+	Datum	   *values;
+	bool	   *isnull;
+	HeapTuple	newTuple;
+	int			i;
+
+	/*
+	 * allocate and fill values and isnull arrays from the tuple, then replace
+	 * selected columns from the input arrays.
+	 */
+	values = (Datum *) palloc(numberOfAttributes * sizeof(Datum));
+	isnull = (bool *) palloc(numberOfAttributes * sizeof(bool));
+
+	heap_deform_tuple(tuple, tupleDesc, values, isnull);
+
+	for (i = 0; i < nCols; i++)
+	{
+		int			attnum = replCols[i];
+
+		if (attnum <= 0 || attnum > numberOfAttributes)
+			elog(ERROR, "invalid column number %d", attnum);
+		values[attnum - 1] = replValues[i];
+		isnull[attnum - 1] = replIsnull[i];
+	}
+
+	/*
+	 * create a new tuple from the values and isnull arrays
+	 */
+	newTuple = heap_form_tuple(tupleDesc, values, isnull);
+
+	pfree(values);
+	pfree(isnull);
+
+	/*
+	 * copy the identification info of the old tuple: t_ctid, t_self, and OID
+	 * (if any)
+	 */
+	newTuple->t_data->t_ctid = tuple->t_data->t_ctid;
+	newTuple->t_self = tuple->t_self;
+	newTuple->t_tableOid = tuple->t_tableOid;
 	if (tupleDesc->tdhasoid)
 		HeapTupleSetOid(newTuple, HeapTupleGetOid(tuple));
 

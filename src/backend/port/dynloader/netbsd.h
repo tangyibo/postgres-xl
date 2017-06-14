@@ -4,7 +4,7 @@
  *	  port-specific prototypes for NetBSD
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/backend/port/dynloader/netbsd.h
@@ -14,7 +14,6 @@
 #ifndef PORT_PROTOS_H
 #define PORT_PROTOS_H
 
-#include <sys/types.h>
 #include <nlist.h>
 #include <link.h>
 #include <dlfcn.h>

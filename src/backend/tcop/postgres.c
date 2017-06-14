@@ -4,7 +4,7 @@
  *	  POSTGRES C Backend Interface
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -202,8 +202,8 @@ static int	errdetail_recovery_conflict(void);
 static void start_xact_command(void);
 static void finish_xact_command(void);
 static bool IsTransactionExitStmt(Node *parsetree);
-static bool IsTransactionExitStmtList(List *parseTrees);
-static bool IsTransactionStmtList(List *parseTrees);
+static bool IsTransactionExitStmtList(List *pstmts);
+static bool IsTransactionStmtList(List *pstmts);
 static void drop_unnamed_stmt(void);
 static void SigHupHandler(SIGNAL_ARGS);
 static void log_disconnections(int code, Datum arg);
@@ -732,8 +732,8 @@ ProcessClientWriteInterrupt(bool blocked)
 /*
  * Do raw parsing (only).
  *
- * A list of parsetrees is returned, since there might be multiple
- * commands in the given string.
+ * A list of parsetrees (RawStmt nodes) is returned, since there might be
+ * multiple commands in the given string.
  *
  * NOTE: for interactive queries, it is important to keep this routine
  * separate from the analysis & rewrite stages.  Analysis and rewriting
@@ -760,7 +760,7 @@ pg_parse_query_internal(const char *query_string, List **querysource_list)
 #ifdef COPY_PARSE_PLAN_TREES
 	/* Optional debugging check: pass raw parsetrees through copyObject() */
 	{
-		List	   *new_list = (List *) copyObject(raw_parsetree_list);
+		List	   *new_list = copyObject(raw_parsetree_list);
 
 		/* This checks both copyObject() and the equal() routines... */
 		if (!equal(new_list, raw_parsetree_list))
@@ -797,8 +797,9 @@ pg_parse_query_get_source(const char *query_string, List **querysource_list)
  * NOTE: for reasons mentioned above, this must be separate from raw parsing.
  */
 List *
-pg_analyze_and_rewrite(Node *parsetree, const char *query_string,
-					   Oid *paramTypes, int numParams)
+pg_analyze_and_rewrite(RawStmt *parsetree, const char *query_string,
+					   Oid *paramTypes, int numParams,
+					   QueryEnvironment *queryEnv)
 {
 	Query	   *query;
 	List	   *querytree_list;
@@ -811,7 +812,8 @@ pg_analyze_and_rewrite(Node *parsetree, const char *query_string,
 	if (log_parser_stats)
 		ResetUsage();
 
-	query = parse_analyze(parsetree, query_string, paramTypes, numParams);
+	query = parse_analyze(parsetree, query_string, paramTypes, numParams,
+						  queryEnv);
 
 	if (log_parser_stats)
 		ShowUsage("PARSE ANALYSIS STATISTICS");
@@ -832,10 +834,11 @@ pg_analyze_and_rewrite(Node *parsetree, const char *query_string,
  * hooks instead of a fixed list of parameter datatypes.
  */
 List *
-pg_analyze_and_rewrite_params(Node *parsetree,
+pg_analyze_and_rewrite_params(RawStmt *parsetree,
 							  const char *query_string,
 							  ParserSetupHook parserSetup,
-							  void *parserSetupArg)
+							  void *parserSetupArg,
+							  QueryEnvironment *queryEnv)
 {
 	ParseState *pstate;
 	Query	   *query;
@@ -853,6 +856,7 @@ pg_analyze_and_rewrite_params(Node *parsetree,
 
 	pstate = make_parsestate(NULL);
 	pstate->p_sourcetext = query_string;
+	pstate->p_queryEnv = queryEnv;
 	(*parserSetup) (pstate, parserSetupArg);
 
 	query = transformTopLevelStmt(pstate, parsetree);
@@ -925,7 +929,7 @@ pg_rewrite_query(Query *query)
 	{
 		List	   *new_list;
 
-		new_list = (List *) copyObject(querytree_list);
+		new_list = copyObject(querytree_list);
 		/* This checks both copyObject() and the equal() routines... */
 		if (!equal(new_list, querytree_list))
 			elog(WARNING, "copyObject() failed to produce equal parse tree");
@@ -972,7 +976,7 @@ pg_plan_query(Query *querytree, int cursorOptions, ParamListInfo boundParams)
 #ifdef COPY_PARSE_PLAN_TREES
 	/* Optional debugging check: pass plan output through copyObject() */
 	{
-		PlannedStmt *new_plan = (PlannedStmt *) copyObject(plan);
+		PlannedStmt *new_plan = copyObject(plan);
 
 		/*
 		 * equal() currently does not have routines to compare Plan nodes, so
@@ -1002,8 +1006,10 @@ pg_plan_query(Query *querytree, int cursorOptions, ParamListInfo boundParams)
 /*
  * Generate plans for a list of already-rewritten queries.
  *
- * Normal optimizable statements generate PlannedStmt entries in the result
- * list.  Utility statements are simply represented by their statement nodes.
+ * For normal optimizable statements, invoke the planner.  For utility
+ * statements, just make a wrapper PlannedStmt node.
+ *
+ * The result is a list of PlannedStmt nodes.
  */
 List *
 pg_plan_queries(List *querytrees, int cursorOptions, ParamListInfo boundParams)
@@ -1013,17 +1019,22 @@ pg_plan_queries(List *querytrees, int cursorOptions, ParamListInfo boundParams)
 
 	foreach(query_list, querytrees)
 	{
-		Query	   *query = (Query *) lfirst(query_list);
-		Node	   *stmt;
+		Query	   *query = lfirst_node(Query, query_list);
+		PlannedStmt *stmt;
 
 		if (query->commandType == CMD_UTILITY)
 		{
-			/* Utility commands have no plans. */
-			stmt = query->utilityStmt;
+			/* Utility commands require no planning. */
+			stmt = makeNode(PlannedStmt);
+			stmt->commandType = CMD_UTILITY;
+			stmt->canSetTag = query->canSetTag;
+			stmt->utilityStmt = query->utilityStmt;
+			stmt->stmt_location = query->stmt_location;
+			stmt->stmt_len = query->stmt_len;
 		}
 		else
 		{
-			stmt = (Node *) pg_plan_query(query, cursorOptions, boundParams);
+			stmt = pg_plan_query(query, cursorOptions, boundParams);
 		}
 
 		stmt_list = lappend(stmt_list, stmt);
@@ -1164,7 +1175,7 @@ exec_simple_query(const char *query_string)
 	 */
 	forboth(parsetree_item, parsetree_list, querysource_item, querysource_list)
 	{
-		Node	   *parsetree = (Node *) lfirst(parsetree_item);
+		RawStmt    *parsetree = lfirst_node(RawStmt, parsetree_item);
 		char	   *querysource = (char *) lfirst(querysource_item);
 		bool		snapshot_set = false;
 		const char *commandTag;
@@ -1190,7 +1201,7 @@ exec_simple_query(const char *query_string)
 		 * do any special start-of-SQL-command processing needed by the
 		 * destination.
 		 */
-		commandTag = CreateCommandTag(parsetree);
+		commandTag = CreateCommandTag(parsetree->stmt);
 
 		set_ps_display(commandTag, false);
 
@@ -1205,7 +1216,7 @@ exec_simple_query(const char *query_string)
 		 * state, but not many...)
 		 */
 		if (IsAbortedTransactionBlockState() &&
-			!IsTransactionExitStmt(parsetree))
+			!IsTransactionExitStmt(parsetree->stmt))
 			ereport(ERROR,
 					(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
 					 errmsg("current transaction is aborted, "
@@ -1236,7 +1247,7 @@ exec_simple_query(const char *query_string)
 		oldcontext = MemoryContextSwitchTo(MessageContext);
 
 		querytree_list = pg_analyze_and_rewrite(parsetree, query_string,
-												NULL, 0);
+												NULL, 0, NULL);
 
 		plantree_list = pg_plan_queries(querytree_list,
 										CURSOR_OPT_PARALLEL_OK, NULL);
@@ -1312,9 +1323,9 @@ exec_simple_query(const char *query_string)
 		 * backward compatibility...)
 		 */
 		format = 0;				/* TEXT is default */
-		if (IsA(parsetree, FetchStmt))
+		if (IsA(parsetree->stmt, FetchStmt))
 		{
-			FetchStmt  *stmt = (FetchStmt *) parsetree;
+			FetchStmt  *stmt = (FetchStmt *) parsetree->stmt;
 
 			if (!stmt->ismove)
 			{
@@ -1345,6 +1356,7 @@ exec_simple_query(const char *query_string)
 		(void) PortalRun(portal,
 						 FETCH_ALL,
 						 isTopLevel,
+						 true,
 						 receiver,
 						 receiver,
 						 completionTag);
@@ -1353,7 +1365,7 @@ exec_simple_query(const char *query_string)
 
 		PortalDrop(portal, false);
 
-		if (IsA(parsetree, TransactionStmt))
+		if (IsA(parsetree->stmt, TransactionStmt))
 		{
 			/*
 			 * If this was a transaction control statement, commit it. We will
@@ -1451,7 +1463,7 @@ exec_parse_message(const char *query_string,	/* string to execute */
 	MemoryContext unnamed_stmt_context = NULL;
 	MemoryContext oldcontext;
 	List	   *parsetree_list;
-	Node	   *raw_parse_tree;
+	RawStmt    *raw_parse_tree;
 	const char *commandTag;
 	List	   *querytree_list;
 	CachedPlanSource *psrc;
@@ -1510,9 +1522,7 @@ exec_parse_message(const char *query_string,	/* string to execute */
 		unnamed_stmt_context =
 			AllocSetContextCreate(MessageContext,
 								  "unnamed prepared statement",
-								  ALLOCSET_DEFAULT_MINSIZE,
-								  ALLOCSET_DEFAULT_INITSIZE,
-								  ALLOCSET_DEFAULT_MAXSIZE);
+								  ALLOCSET_DEFAULT_SIZES);
 		oldcontext = MemoryContextSwitchTo(unnamed_stmt_context);
 	}
 
@@ -1555,12 +1565,12 @@ exec_parse_message(const char *query_string,	/* string to execute */
 		bool		snapshot_set = false;
 		int			i;
 
-		raw_parse_tree = (Node *) linitial(parsetree_list);
+		raw_parse_tree = linitial_node(RawStmt, parsetree_list);
 
 		/*
 		 * Get the command name for possible use in status display.
 		 */
-		commandTag = CreateCommandTag(raw_parse_tree);
+		commandTag = CreateCommandTag(raw_parse_tree->stmt);
 
 		/*
 		 * If we are in an aborted transaction, reject all commands except
@@ -1571,7 +1581,7 @@ exec_parse_message(const char *query_string,	/* string to execute */
 		 * state, but not many...)
 		 */
 		if (IsAbortedTransactionBlockState() &&
-			!IsTransactionExitStmt(raw_parse_tree))
+			!IsTransactionExitStmt(raw_parse_tree->stmt))
 			ereport(ERROR,
 					(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
 					 errmsg("current transaction is aborted, "
@@ -1984,7 +1994,8 @@ exec_bind_message(StringInfo input_message)
 	 * functions.
 	 */
 	if (IsAbortedTransactionBlockState() &&
-		(!IsTransactionExitStmt(psrc->raw_parse_tree) ||
+		(!(psrc->raw_parse_tree &&
+		   IsTransactionExitStmt(psrc->raw_parse_tree->stmt)) ||
 		 numParams != 0))
 		ereport(ERROR,
 				(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
@@ -2192,7 +2203,7 @@ exec_bind_message(StringInfo input_message)
 	 * will be generated in MessageContext.  The plan refcount will be
 	 * assigned to the Portal, so it will be released at portal destruction.
 	 */
-	cplan = GetCachedPlan(psrc, params, false);
+	cplan = GetCachedPlan(psrc, params, false, NULL);
 
 	/*
 	 * Now we can define the portal.
@@ -2409,6 +2420,7 @@ exec_execute_message(const char *portal_name, long max_rows)
 	completed = PortalRun(portal,
 						  max_rows,
 						  true, /* always top level */
+						  !execute_is_fetch && max_rows == FETCH_ALL,
 						  receiver,
 						  receiver,
 						  completionTag);
@@ -2576,11 +2588,11 @@ errdetail_execute(List *raw_parsetree_list)
 
 	foreach(parsetree_item, raw_parsetree_list)
 	{
-		Node	   *parsetree = (Node *) lfirst(parsetree_item);
+		RawStmt    *parsetree = lfirst_node(RawStmt, parsetree_item);
 
-		if (IsA(parsetree, ExecuteStmt))
+		if (IsA(parsetree->stmt, ExecuteStmt))
 		{
-			ExecuteStmt *stmt = (ExecuteStmt *) parsetree;
+			ExecuteStmt *stmt = (ExecuteStmt *) parsetree->stmt;
 			PreparedStatement *pstmt;
 
 			pstmt = FetchPreparedStatement(stmt->name, false);
@@ -2793,7 +2805,7 @@ exec_describe_statement_message(const char *stmt_name)
 		List	   *tlist;
 
 		/* Get the plan's primary targetlist */
-		tlist = CachedPlanGetTargetList(psrc);
+		tlist = CachedPlanGetTargetList(psrc, NULL);
 
 		SendRowDescriptionMessage(psrc->resultDesc, tlist, NULL);
 	}
@@ -2863,8 +2875,6 @@ start_xact_command(void)
 {
 	if (!xact_started)
 	{
-		ereport(DEBUG3,
-				(errmsg_internal("StartTransactionCommand")));
 		StartTransactionCommand();
 
 		/* Set statement timeout running, if any */
@@ -2885,10 +2895,6 @@ finish_xact_command(void)
 	{
 		/* Cancel any active statement timeout before committing */
 		disable_timeout(STATEMENT_TIMEOUT, false);
-
-		/* Now commit the command */
-		ereport(DEBUG3,
-				(errmsg_internal("CommitTransactionCommand")));
 
 		CommitTransactionCommand();
 
@@ -2930,45 +2936,31 @@ IsTransactionExitStmt(Node *parsetree)
 	return false;
 }
 
-/* Test a list that might contain Query nodes or bare parsetrees */
+/* Test a list that contains PlannedStmt nodes */
 static bool
-IsTransactionExitStmtList(List *parseTrees)
+IsTransactionExitStmtList(List *pstmts)
 {
-	if (list_length(parseTrees) == 1)
+	if (list_length(pstmts) == 1)
 	{
-		Node	   *stmt = (Node *) linitial(parseTrees);
+		PlannedStmt *pstmt = linitial_node(PlannedStmt, pstmts);
 
-		if (IsA(stmt, Query))
-		{
-			Query	   *query = (Query *) stmt;
-
-			if (query->commandType == CMD_UTILITY &&
-				IsTransactionExitStmt(query->utilityStmt))
-				return true;
-		}
-		else if (IsTransactionExitStmt(stmt))
+		if (pstmt->commandType == CMD_UTILITY &&
+			IsTransactionExitStmt(pstmt->utilityStmt))
 			return true;
 	}
 	return false;
 }
 
-/* Test a list that might contain Query nodes or bare parsetrees */
+/* Test a list that contains PlannedStmt nodes */
 static bool
-IsTransactionStmtList(List *parseTrees)
+IsTransactionStmtList(List *pstmts)
 {
-	if (list_length(parseTrees) == 1)
+	if (list_length(pstmts) == 1)
 	{
-		Node	   *stmt = (Node *) linitial(parseTrees);
+		PlannedStmt *pstmt = linitial_node(PlannedStmt, pstmts);
 
-		if (IsA(stmt, Query))
-		{
-			Query	   *query = (Query *) stmt;
-
-			if (query->commandType == CMD_UTILITY &&
-				IsA(query->utilityStmt, TransactionStmt))
-				return true;
-		}
-		else if (IsA(stmt, TransactionStmt))
+		if (pstmt->commandType == CMD_UTILITY &&
+			IsA(pstmt->utilityStmt, TransactionStmt))
 			return true;
 	}
 	return false;
@@ -4285,8 +4277,7 @@ PostgresMain(int argc, char *argv[],
 	/*
 	 * Send this backend's cancellation info to the frontend.
 	 */
-	if (whereToSendOutput == DestRemote &&
-		PG_PROTOCOL_MAJOR(FrontendProtocol) >= 2)
+	if (whereToSendOutput == DestRemote)
 	{
 		StringInfoData buf;
 
@@ -4309,9 +4300,7 @@ PostgresMain(int argc, char *argv[],
 	 */
 	MessageContext = AllocSetContextCreate(TopMemoryContext,
 										   "MessageContext",
-										   ALLOCSET_DEFAULT_MINSIZE,
-										   ALLOCSET_DEFAULT_INITSIZE,
-										   ALLOCSET_DEFAULT_MAXSIZE);
+										   ALLOCSET_DEFAULT_SIZES);
 
 	/*
 	 * Remember stand-alone backend startup time
@@ -4478,6 +4467,9 @@ PostgresMain(int argc, char *argv[],
 		if (MyReplicationSlot != NULL)
 			ReplicationSlotRelease();
 
+		/* We also want to cleanup temporary slots on error. */
+		ReplicationSlotCleanup();
+
 		/*
 		 * Now return to normal top-level context and clear ErrorContext for
 		 * next time.
@@ -4538,6 +4530,12 @@ PostgresMain(int argc, char *argv[],
 		MemoryContextResetAndDeleteChildren(MessageContext);
 
 		initStringInfo(&input_message);
+
+		/*
+		 * Also consider releasing our catalog snapshot if any, so that it's
+		 * not preventing advance of global xmin while we wait for the client.
+		 */
+		InvalidateCatalogSnapshotConditionally();
 
 		/*
 		 * (1) If we've reached idle state, tell the frontend we're ready for
@@ -4694,7 +4692,10 @@ PostgresMain(int argc, char *argv[],
 					pq_getmsgend(&input_message);
 
 					if (am_walsender)
-						exec_replication_command(query_string);
+					{
+						if (!exec_replication_command(query_string))
+							exec_simple_query(query_string);
+					}
 					else
 						exec_simple_query(query_string);
 
@@ -4831,19 +4832,7 @@ PostgresMain(int argc, char *argv[],
 				/* switch back to message context */
 				MemoryContextSwitchTo(MessageContext);
 
-				if (HandleFunctionRequest(&input_message) == EOF)
-				{
-					/* lost frontend connection during F message input */
-
-					/*
-					 * Reset whereToSendOutput to prevent ereport from
-					 * attempting to send any more messages to client.
-					 */
-					if (whereToSendOutput == DestRemote)
-						whereToSendOutput = DestNone;
-
-					proc_exit(0);
-				}
+				HandleFunctionRequest(&input_message);
 
 				/* commit the function-invocation transaction */
 				finish_xact_command();
@@ -5220,15 +5209,15 @@ ShowUsageCommon(const char *title, struct rusage *save_r, struct timeval *save_t
 
 	appendStringInfoString(&str, "! system usage stats:\n");
 	appendStringInfo(&str,
-				"!\t%ld.%06ld elapsed %ld.%06ld user %ld.%06ld system sec\n",
-					 (long) (elapse_t.tv_sec - save_t->tv_sec),
-					 (long) (elapse_t.tv_usec - save_t->tv_usec),
+			"!\t%ld.%06ld s user, %ld.%06ld s system, %ld.%06ld s elapsed\n",
 					 (long) (r.ru_utime.tv_sec - save_r->ru_utime.tv_sec),
 					 (long) (r.ru_utime.tv_usec - save_r->ru_utime.tv_usec),
 					 (long) (r.ru_stime.tv_sec - save_r->ru_stime.tv_sec),
-					 (long) (r.ru_stime.tv_usec - save_r->ru_stime.tv_usec));
+					 (long) (r.ru_stime.tv_usec - save_r->ru_stime.tv_usec),
+					 (long) (elapse_t.tv_sec - save_t->tv_sec),
+					 (long) (elapse_t.tv_usec - save_t->tv_usec));
 	appendStringInfo(&str,
-					 "!\t[%ld.%06ld user %ld.%06ld sys total]\n",
+					 "!\t[%ld.%06ld s user, %ld.%06ld s system total]\n",
 					 (long) user.tv_sec,
 					 (long) user.tv_usec,
 					 (long) sys.tv_sec,

@@ -8,14 +8,12 @@
  * directory (copy method), or a remote PostgreSQL server (libpq fetch
  * method).
  *
- * Copyright (c) 2013-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2013-2017, PostgreSQL Global Development Group
  *
  *-------------------------------------------------------------------------
  */
 #ifndef FETCH_H
 #define FETCH_H
-
-#include "c.h"
 
 #include "access/xlogdefs.h"
 

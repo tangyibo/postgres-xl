@@ -39,7 +39,7 @@
  * This code is released under the terms of the PostgreSQL License.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/bin/initdb/initdb.c
@@ -53,7 +53,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <locale.h>
 #include <signal.h>
 #include <time.h>
 
@@ -62,26 +61,24 @@
 #endif
 
 #include "catalog/catalog.h"
+#include "catalog/pg_authid.h"
+#include "catalog/pg_class.h"
+#include "catalog/pg_collation.h"
+#include "common/file_utils.h"
 #include "common/restricted_token.h"
 #include "common/username.h"
-#include "mb/pg_wchar.h"
+#include "fe_utils/string_utils.h"
 #include "getaddrinfo.h"
 #include "getopt_long.h"
+#include "mb/pg_wchar.h"
 #include "miscadmin.h"
 
-
-/* Define PG_FLUSH_DATA_WORKS if we have an implementation for pg_flush_data */
-#if defined(HAVE_SYNC_FILE_RANGE)
-#define PG_FLUSH_DATA_WORKS 1
-#elif defined(USE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
-#define PG_FLUSH_DATA_WORKS 1
-#endif
 
 /* Ideally this would be in a .h file, but it hardly seems worth the trouble */
 extern const char *select_default_timezone(const char *share_path);
 
 static const char *const auth_methods_host[] = {
-	"trust", "reject", "md5", "password", "ident", "radius",
+	"trust", "reject", "scram-sha-256", "md5", "password", "ident", "radius",
 #ifdef ENABLE_GSS
 	"gss",
 #endif
@@ -103,7 +100,7 @@ static const char *const auth_methods_host[] = {
 	NULL
 };
 static const char *const auth_methods_local[] = {
-	"trust", "reject", "md5", "password", "peer", "radius",
+	"trust", "reject", "scram-sha-256", "md5", "password", "peer", "radius",
 #ifdef USE_PAM
 	"pam", "pam ",
 #endif
@@ -135,6 +132,7 @@ static const char *default_text_search_config = "";
 static char *username = "";
 static bool pwprompt = false;
 static char *pwfilename = NULL;
+static char *superuser_password = NULL;
 static const char *authmethodhost = "";
 static const char *authmethodlocal = "";
 static bool debug = false;
@@ -210,8 +208,7 @@ static const char *backend_options = "--single "
 
 static const char *const subdirs[] = {
 	"global",
-	"pg_xlog/archive_status",
-	"pg_clog",
+	"pg_wal/archive_status",
 	"pg_commit_ts",
 	"pg_dynshmem",
 	"pg_notify",
@@ -228,6 +225,7 @@ static const char *const subdirs[] = {
 	"pg_tblspc",
 	"pg_stat",
 	"pg_stat_tmp",
+	"pg_xact",
 	"pg_logical",
 	"pg_logical/snapshots",
 	"pg_logical/mappings"
@@ -246,13 +244,6 @@ static char **filter_lines_with_token(char **lines, const char *token);
 #endif
 static char **readfile(const char *path);
 static void writefile(char *path, char **lines);
-static void walkdir(const char *path,
-		void (*action) (const char *fname, bool isdir),
-		bool process_symlinks);
-#ifdef PG_FLUSH_DATA_WORKS
-static void pre_sync_fname(const char *fname, bool isdir);
-#endif
-static void fsync_fname_ext(const char *fname, bool isdir);
 static FILE *popen_check(const char *command, const char *mode);
 static void exit_nicely(void);
 static char *get_id(void);
@@ -265,7 +256,7 @@ static void test_config_settings(void);
 static void setup_config(void);
 static void bootstrap_template1(void);
 static void setup_auth(FILE *cmdfd);
-static void get_set_pwd(FILE *cmdfd);
+static void get_su_pwd(void);
 static void setup_depend(FILE *cmdfd);
 static void setup_sysviews(FILE *cmdfd);
 #ifdef PGXC
@@ -282,7 +273,6 @@ static void load_plpgsql(FILE *cmdfd);
 static void vacuum_db(FILE *cmdfd);
 static void make_template0(FILE *cmdfd);
 static void make_postgres(FILE *cmdfd);
-static void fsync_pgdata(void);
 static void trapsig(int signum);
 static void check_ok(void);
 static char *escape_quotes(const char *src);
@@ -344,14 +334,6 @@ do { \
 	if (fprintf(cmdfd, fmt, arg1, arg2, arg3) < 0 || fflush(cmdfd) < 0) \
 		output_failed = true, output_errno = errno; \
 } while (0)
-
-#ifndef WIN32
-#define QUOTE_PATH	""
-#define DIR_SEP "/"
-#else
-#define QUOTE_PATH	"\""
-#define DIR_SEP "\\"
-#endif
 
 static char *
 escape_quotes(const char *src)
@@ -549,177 +531,6 @@ writefile(char *path, char **lines)
 }
 
 /*
- * walkdir: recursively walk a directory, applying the action to each
- * regular file and directory (including the named directory itself).
- *
- * If process_symlinks is true, the action and recursion are also applied
- * to regular files and directories that are pointed to by symlinks in the
- * given directory; otherwise symlinks are ignored.  Symlinks are always
- * ignored in subdirectories, ie we intentionally don't pass down the
- * process_symlinks flag to recursive calls.
- *
- * Errors are reported but not considered fatal.
- *
- * See also walkdir in fd.c, which is a backend version of this logic.
- */
-static void
-walkdir(const char *path,
-		void (*action) (const char *fname, bool isdir),
-		bool process_symlinks)
-{
-	DIR		   *dir;
-	struct dirent *de;
-
-	dir = opendir(path);
-	if (dir == NULL)
-	{
-		fprintf(stderr, _("%s: could not open directory \"%s\": %s\n"),
-				progname, path, strerror(errno));
-		return;
-	}
-
-	while (errno = 0, (de = readdir(dir)) != NULL)
-	{
-		char		subpath[MAXPGPATH];
-		struct stat fst;
-		int			sret;
-
-		if (strcmp(de->d_name, ".") == 0 ||
-			strcmp(de->d_name, "..") == 0)
-			continue;
-
-		snprintf(subpath, MAXPGPATH, "%s/%s", path, de->d_name);
-
-		if (process_symlinks)
-			sret = stat(subpath, &fst);
-		else
-			sret = lstat(subpath, &fst);
-
-		if (sret < 0)
-		{
-			fprintf(stderr, _("%s: could not stat file \"%s\": %s\n"),
-					progname, subpath, strerror(errno));
-			continue;
-		}
-
-		if (S_ISREG(fst.st_mode))
-			(*action) (subpath, false);
-		else if (S_ISDIR(fst.st_mode))
-			walkdir(subpath, action, false);
-	}
-
-	if (errno)
-		fprintf(stderr, _("%s: could not read directory \"%s\": %s\n"),
-				progname, path, strerror(errno));
-
-	(void) closedir(dir);
-
-	/*
-	 * It's important to fsync the destination directory itself as individual
-	 * file fsyncs don't guarantee that the directory entry for the file is
-	 * synced.  Recent versions of ext4 have made the window much wider but
-	 * it's been an issue for ext3 and other filesystems in the past.
-	 */
-	(*action) (path, true);
-}
-
-/*
- * Hint to the OS that it should get ready to fsync() this file.
- *
- * Ignores errors trying to open unreadable files, and reports other errors
- * non-fatally.
- */
-#ifdef PG_FLUSH_DATA_WORKS
-
-static void
-pre_sync_fname(const char *fname, bool isdir)
-{
-	int			fd;
-
-	fd = open(fname, O_RDONLY | PG_BINARY);
-
-	if (fd < 0)
-	{
-		if (errno == EACCES || (isdir && errno == EISDIR))
-			return;
-		fprintf(stderr, _("%s: could not open file \"%s\": %s\n"),
-				progname, fname, strerror(errno));
-		return;
-	}
-
-	/*
-	 * We do what pg_flush_data() would do in the backend: prefer to use
-	 * sync_file_range, but fall back to posix_fadvise.  We ignore errors
-	 * because this is only a hint.
-	 */
-#if defined(HAVE_SYNC_FILE_RANGE)
-	(void) sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
-#elif defined(USE_POSIX_FADVISE) && defined(POSIX_FADV_DONTNEED)
-	(void) posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
-#else
-#error PG_FLUSH_DATA_WORKS should not have been defined
-#endif
-
-	(void) close(fd);
-}
-
-#endif   /* PG_FLUSH_DATA_WORKS */
-
-/*
- * fsync_fname_ext -- Try to fsync a file or directory
- *
- * Ignores errors trying to open unreadable files, or trying to fsync
- * directories on systems where that isn't allowed/required.  Reports
- * other errors non-fatally.
- */
-static void
-fsync_fname_ext(const char *fname, bool isdir)
-{
-	int			fd;
-	int			flags;
-	int			returncode;
-
-	/*
-	 * Some OSs require directories to be opened read-only whereas other
-	 * systems don't allow us to fsync files opened read-only; so we need both
-	 * cases here.  Using O_RDWR will cause us to fail to fsync files that are
-	 * not writable by our userid, but we assume that's OK.
-	 */
-	flags = PG_BINARY;
-	if (!isdir)
-		flags |= O_RDWR;
-	else
-		flags |= O_RDONLY;
-
-	/*
-	 * Open the file, silently ignoring errors about unreadable files (or
-	 * unsupported operations, e.g. opening a directory under Windows), and
-	 * logging others.
-	 */
-	fd = open(fname, flags);
-	if (fd < 0)
-	{
-		if (errno == EACCES || (isdir && errno == EISDIR))
-			return;
-		fprintf(stderr, _("%s: could not open file \"%s\": %s\n"),
-				progname, fname, strerror(errno));
-		return;
-	}
-
-	returncode = fsync(fd);
-
-	/*
-	 * Some OSes don't allow us to fsync directories at all, so we can ignore
-	 * those errors. Anything else needs to be reported.
-	 */
-	if (returncode != 0 && !(isdir && errno == EBADF))
-		fprintf(stderr, _("%s: could not fsync file \"%s\": %s\n"),
-				progname, fname, strerror(errno));
-
-	(void) close(fd);
-}
-
-/*
  * Open a subcommand with suitable error messaging
  */
 static FILE *
@@ -766,19 +577,19 @@ exit_nicely(void)
 
 		if (made_new_xlogdir)
 		{
-			fprintf(stderr, _("%s: removing transaction log directory \"%s\"\n"),
+			fprintf(stderr, _("%s: removing WAL directory \"%s\"\n"),
 					progname, xlog_dir);
 			if (!rmtree(xlog_dir, true))
-				fprintf(stderr, _("%s: failed to remove transaction log directory\n"),
+				fprintf(stderr, _("%s: failed to remove WAL directory\n"),
 						progname);
 		}
 		else if (found_existing_xlogdir)
 		{
 			fprintf(stderr,
-			_("%s: removing contents of transaction log directory \"%s\"\n"),
+					_("%s: removing contents of WAL directory \"%s\"\n"),
 					progname, xlog_dir);
 			if (!rmtree(xlog_dir, false))
-				fprintf(stderr, _("%s: failed to remove contents of transaction log directory\n"),
+				fprintf(stderr, _("%s: failed to remove contents of WAL directory\n"),
 						progname);
 		}
 		/* otherwise died during startup, do nothing! */
@@ -792,7 +603,7 @@ exit_nicely(void)
 
 		if (made_new_xlogdir || found_existing_xlogdir)
 			fprintf(stderr,
-					_("%s: transaction log directory \"%s\" not removed at user's request\n"),
+			   _("%s: WAL directory \"%s\" not removed at user's request\n"),
 					progname, xlog_dir);
 	}
 
@@ -1307,11 +1118,46 @@ setup_config(void)
 	conflines = replace_token(conflines, "#dynamic_shared_memory_type = posix",
 							  repltok);
 
+#if DEFAULT_BACKEND_FLUSH_AFTER > 0
+	snprintf(repltok, sizeof(repltok), "#backend_flush_after = %dkB",
+			 DEFAULT_BACKEND_FLUSH_AFTER * (BLCKSZ / 1024));
+	conflines = replace_token(conflines, "#backend_flush_after = 0",
+							  repltok);
+#endif
+
+#if DEFAULT_BGWRITER_FLUSH_AFTER > 0
+	snprintf(repltok, sizeof(repltok), "#bgwriter_flush_after = %dkB",
+			 DEFAULT_BGWRITER_FLUSH_AFTER * (BLCKSZ / 1024));
+	conflines = replace_token(conflines, "#bgwriter_flush_after = 0",
+							  repltok);
+#endif
+
+#if DEFAULT_CHECKPOINT_FLUSH_AFTER > 0
+	snprintf(repltok, sizeof(repltok), "#checkpoint_flush_after = %dkB",
+			 DEFAULT_CHECKPOINT_FLUSH_AFTER * (BLCKSZ / 1024));
+	conflines = replace_token(conflines, "#checkpoint_flush_after = 0",
+							  repltok);
+#endif
+
 #ifndef USE_PREFETCH
 	conflines = replace_token(conflines,
 							  "#effective_io_concurrency = 1",
 							  "#effective_io_concurrency = 0");
 #endif
+
+#ifdef WIN32
+	conflines = replace_token(conflines,
+							  "#update_process_title = on",
+							  "#update_process_title = off");
+#endif
+
+	if (strcmp(authmethodlocal, "scram-sha-256") == 0 ||
+		strcmp(authmethodhost, "scram-sha-256") == 0)
+	{
+		conflines = replace_token(conflines,
+								  "#password_encryption = md5",
+								  "password_encryption = scram-sha-256");
+	}
 
 	snprintf(path, sizeof(path), "%s/postgresql.conf", pg_data);
 
@@ -1389,15 +1235,23 @@ setup_config(void)
 
 		if (err != 0 ||
 			getaddrinfo("::1", NULL, &hints, &gai_result) != 0)
+		{
 			conflines = replace_token(conflines,
 							   "host    all             all             ::1",
 							 "#host    all             all             ::1");
+			conflines = replace_token(conflines,
+							   "host    replication     all             ::1",
+							 "#host    replication     all             ::1");
+		}
 	}
 #else							/* !HAVE_IPV6 */
 	/* If we didn't compile IPV6 support at all, always comment it out */
 	conflines = replace_token(conflines,
 							  "host    all             all             ::1",
 							  "#host    all             all             ::1");
+	conflines = replace_token(conflines,
+							  "host    replication     all             ::1",
+							  "#host    replication     all             ::1");
 #endif   /* HAVE_IPV6 */
 
 	/* Replace default authentication methods */
@@ -1411,11 +1265,6 @@ setup_config(void)
 	conflines = replace_token(conflines,
 							  "@authcomment@",
 							  (strcmp(authmethodlocal, "trust") == 0 || strcmp(authmethodhost, "trust") == 0) ? AUTHTRUST_WARNING : "");
-
-	/* Replace username for replication */
-	conflines = replace_token(conflines,
-							  "@default_username@",
-							  username);
 
 	snprintf(path, sizeof(path), "%s/pg_hba.conf", pg_data);
 
@@ -1566,30 +1415,35 @@ setup_auth(FILE *cmdfd)
 
 	for (line = pg_authid_setup; *line != NULL; line++)
 		PG_CMD_PUTS(*line);
+
+	if (superuser_password)
+		PG_CMD_PRINTF2("ALTER USER \"%s\" WITH PASSWORD E'%s';\n\n",
+					   username, escape_quotes(superuser_password));
 }
 
 /*
- * get the superuser password if required, and call postgres to set it
+ * get the superuser password if required
  */
 static void
-get_set_pwd(FILE *cmdfd)
+get_su_pwd(void)
 {
-	char	   *pwd1,
-			   *pwd2;
+	char		pwd1[100];
+	char		pwd2[100];
 
 	if (pwprompt)
 	{
 		/*
 		 * Read password from terminal
 		 */
-		pwd1 = simple_prompt("Enter new superuser password: ", 100, false);
-		pwd2 = simple_prompt("Enter it again: ", 100, false);
+		printf("\n");
+		fflush(stdout);
+		simple_prompt("Enter new superuser password: ", pwd1, sizeof(pwd1), false);
+		simple_prompt("Enter it again: ", pwd2, sizeof(pwd2), false);
 		if (strcmp(pwd1, pwd2) != 0)
 		{
 			fprintf(stderr, _("Passwords didn't match.\n"));
 			exit_nicely();
 		}
-		free(pwd2);
 	}
 	else
 	{
@@ -1602,7 +1456,6 @@ get_set_pwd(FILE *cmdfd)
 		 * for now.
 		 */
 		FILE	   *pwf = fopen(pwfilename, "r");
-		char		pwdbuf[MAXPGPATH];
 		int			i;
 
 		if (!pwf)
@@ -1611,7 +1464,7 @@ get_set_pwd(FILE *cmdfd)
 					progname, pwfilename, strerror(errno));
 			exit_nicely();
 		}
-		if (!fgets(pwdbuf, sizeof(pwdbuf), pwf))
+		if (!fgets(pwd1, sizeof(pwd1), pwf))
 		{
 			if (ferror(pwf))
 				fprintf(stderr, _("%s: could not read password from file \"%s\": %s\n"),
@@ -1623,18 +1476,12 @@ get_set_pwd(FILE *cmdfd)
 		}
 		fclose(pwf);
 
-		i = strlen(pwdbuf);
-		while (i > 0 && (pwdbuf[i - 1] == '\r' || pwdbuf[i - 1] == '\n'))
-			pwdbuf[--i] = '\0';
-
-		pwd1 = pg_strdup(pwdbuf);
-
+		i = strlen(pwd1);
+		while (i > 0 && (pwd1[i - 1] == '\r' || pwd1[i - 1] == '\n'))
+			pwd1[--i] = '\0';
 	}
 
-	PG_CMD_PRINTF2("ALTER USER \"%s\" WITH PASSWORD E'%s';\n\n",
-				   username, escape_quotes(pwd1));
-
-	free(pwd1);
+	superuser_password = pg_strdup(pwd1);
 }
 
 /*
@@ -1815,178 +1662,16 @@ setup_description(FILE *cmdfd)
 	PG_CMD_PUTS("DROP TABLE tmp_pg_shdescription;\n\n");
 }
 
-#ifdef HAVE_LOCALE_T
-/*
- * "Normalize" a locale name, stripping off encoding tags such as
- * ".utf8" (e.g., "en_US.utf8" -> "en_US", but "br_FR.iso885915@euro"
- * -> "br_FR@euro").  Return true if a new, different name was
- * generated.
- */
-static bool
-normalize_locale_name(char *new, const char *old)
-{
-	char	   *n = new;
-	const char *o = old;
-	bool		changed = false;
-
-	while (*o)
-	{
-		if (*o == '.')
-		{
-			/* skip over encoding tag such as ".utf8" or ".UTF-8" */
-			o++;
-			while ((*o >= 'A' && *o <= 'Z')
-				   || (*o >= 'a' && *o <= 'z')
-				   || (*o >= '0' && *o <= '9')
-				   || (*o == '-'))
-				o++;
-			changed = true;
-		}
-		else
-			*n++ = *o++;
-	}
-	*n = '\0';
-
-	return changed;
-}
-#endif   /* HAVE_LOCALE_T */
-
 /*
  * populate pg_collation
  */
 static void
 setup_collation(FILE *cmdfd)
 {
-#if defined(HAVE_LOCALE_T) && !defined(WIN32)
-	int			i;
-	FILE	   *locale_a_handle;
-	char		localebuf[NAMEDATALEN]; /* we assume ASCII so this is fine */
-	int			count = 0;
-
-	locale_a_handle = popen_check("locale -a", "r");
-	if (!locale_a_handle)
-		return;					/* complaint already printed */
-
-	PG_CMD_PUTS("CREATE TEMP TABLE tmp_pg_collation ( "
-				"	collname name, "
-				"	locale name, "
-				"	encoding int) WITHOUT OIDS;\n\n");
-
-	while (fgets(localebuf, sizeof(localebuf), locale_a_handle))
-	{
-		size_t		len;
-		int			enc;
-		bool		skip;
-		char	   *quoted_locale;
-		char		alias[NAMEDATALEN];
-
-		len = strlen(localebuf);
-
-		if (len == 0 || localebuf[len - 1] != '\n')
-		{
-			if (debug)
-				fprintf(stderr, _("%s: locale name too long, skipped: \"%s\"\n"),
-						progname, localebuf);
-			continue;
-		}
-		localebuf[len - 1] = '\0';
-
-		/*
-		 * Some systems have locale names that don't consist entirely of ASCII
-		 * letters (such as "bokm&aring;l" or "fran&ccedil;ais").  This is
-		 * pretty silly, since we need the locale itself to interpret the
-		 * non-ASCII characters. We can't do much with those, so we filter
-		 * them out.
-		 */
-		skip = false;
-		for (i = 0; i < len; i++)
-		{
-			if (IS_HIGHBIT_SET(localebuf[i]))
-			{
-				skip = true;
-				break;
-			}
-		}
-		if (skip)
-		{
-			if (debug)
-				fprintf(stderr, _("%s: locale name has non-ASCII characters, skipped: \"%s\"\n"),
-						progname, localebuf);
-			continue;
-		}
-
-		enc = pg_get_encoding_from_locale(localebuf, debug);
-		if (enc < 0)
-		{
-			/* error message printed by pg_get_encoding_from_locale() */
-			continue;
-		}
-		if (!PG_VALID_BE_ENCODING(enc))
-			continue;			/* ignore locales for client-only encodings */
-		if (enc == PG_SQL_ASCII)
-			continue;			/* C/POSIX are already in the catalog */
-
-		count++;
-
-		quoted_locale = escape_quotes(localebuf);
-
-		PG_CMD_PRINTF3("INSERT INTO tmp_pg_collation VALUES (E'%s', E'%s', %d);\n\n",
-					   quoted_locale, quoted_locale, enc);
-
-		/*
-		 * Generate aliases such as "en_US" in addition to "en_US.utf8" for
-		 * ease of use.  Note that collation names are unique per encoding
-		 * only, so this doesn't clash with "en_US" for LATIN1, say.
-		 */
-		if (normalize_locale_name(alias, localebuf))
-		{
-			char	   *quoted_alias = escape_quotes(alias);
-
-			PG_CMD_PRINTF3("INSERT INTO tmp_pg_collation VALUES (E'%s', E'%s', %d);\n\n",
-						   quoted_alias, quoted_locale, enc);
-			free(quoted_alias);
-		}
-		free(quoted_locale);
-	}
+	PG_CMD_PUTS("SELECT pg_import_system_collations(if_not_exists => false, schema => 'pg_catalog');\n\n");
 
 	/* Add an SQL-standard name */
-	PG_CMD_PRINTF1("INSERT INTO tmp_pg_collation VALUES ('ucs_basic', 'C', %d);\n\n", PG_UTF8);
-
-	/*
-	 * When copying collations to the final location, eliminate aliases that
-	 * conflict with an existing locale name for the same encoding.  For
-	 * example, "br_FR.iso88591" is normalized to "br_FR", both for encoding
-	 * LATIN1.  But the unnormalized locale "br_FR" already exists for LATIN1.
-	 * Prefer the alias that matches the OS locale name, else the first locale
-	 * name by sort order (arbitrary choice to be deterministic).
-	 *
-	 * Also, eliminate any aliases that conflict with pg_collation's
-	 * hard-wired entries for "C" etc.
-	 */
-	PG_CMD_PUTS("INSERT INTO pg_collation (collname, collnamespace, collowner, collencoding, collcollate, collctype) "
-				" SELECT DISTINCT ON (collname, encoding)"
-				"   collname, "
-				"   (SELECT oid FROM pg_namespace WHERE nspname = 'pg_catalog') AS collnamespace, "
-				"   (SELECT relowner FROM pg_class WHERE relname = 'pg_collation') AS collowner, "
-				"   encoding, locale, locale "
-				"  FROM tmp_pg_collation"
-				"  WHERE NOT EXISTS (SELECT 1 FROM pg_collation WHERE collname = tmp_pg_collation.collname)"
-	 "  ORDER BY collname, encoding, (collname = locale) DESC, locale;\n\n");
-
-	/*
-	 * Even though the table is temp, drop it explicitly so it doesn't get
-	 * copied into template0/postgres databases.
-	 */
-	PG_CMD_PUTS("DROP TABLE tmp_pg_collation;\n\n");
-
-	pclose(locale_a_handle);
-
-	if (count == 0 && !debug)
-	{
-		printf(_("No usable system locales were found.\n"));
-		printf(_("Use the option \"--debug\" to see details.\n"));
-	}
-#endif   /* not HAVE_LOCALE_T  && not WIN32 */
+	PG_CMD_PRINTF3("INSERT INTO pg_collation (collname, collnamespace, collowner, collprovider, collencoding, collcollate, collctype) VALUES ('ucs_basic', 'pg_catalog'::regnamespace, %u, '%c', %d, 'C', 'C');\n\n", BOOTSTRAP_SUPERUSERID, COLLPROVIDER_LIBC, PG_UTF8);
 }
 
 /*
@@ -2057,9 +1742,13 @@ setup_privileges(FILE *cmdfd)
 		"  SET relacl = (SELECT array_agg(a.acl) FROM "
 		" (SELECT E'=r/\"$POSTGRES_SUPERUSERNAME\"' as acl "
 		"  UNION SELECT unnest(pg_catalog.acldefault("
-		"    CASE WHEN relkind = 'S' THEN 's' ELSE 'r' END::\"char\",10::oid))"
+		"    CASE WHEN relkind = " CppAsString2(RELKIND_SEQUENCE) " THEN 's' "
+		"         ELSE 'r' END::\"char\"," CppAsString2(BOOTSTRAP_SUPERUSERID) "::oid))"
 		" ) as a) "
-		"  WHERE relkind IN ('r', 'v', 'm', 'S') AND relacl IS NULL;\n\n",
+		"  WHERE relkind IN (" CppAsString2(RELKIND_RELATION) ", "
+		CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
+		CppAsString2(RELKIND_SEQUENCE) ")"
+		"  AND relacl IS NULL;\n\n",
 		"GRANT USAGE ON SCHEMA pg_catalog TO PUBLIC;\n\n",
 		"GRANT CREATE, USAGE ON SCHEMA public TO PUBLIC;\n\n",
 #ifdef XCP
@@ -2078,7 +1767,9 @@ setup_privileges(FILE *cmdfd)
 		"        pg_class"
 		"    WHERE"
 		"        relacl IS NOT NULL"
-		"        AND relkind IN ('r', 'v', 'm', 'S');",
+		"        AND relkind IN (" CppAsString2(RELKIND_RELATION) ", "
+		CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
+		CppAsString2(RELKIND_SEQUENCE) ");",
 		"INSERT INTO pg_init_privs "
 		"  (objoid, classoid, objsubid, initprivs, privtype)"
 		"    SELECT"
@@ -2092,7 +1783,9 @@ setup_privileges(FILE *cmdfd)
 		"        JOIN pg_attribute ON (pg_class.oid = pg_attribute.attrelid)"
 		"    WHERE"
 		"        pg_attribute.attacl IS NOT NULL"
-		"        AND pg_class.relkind IN ('r', 'v', 'm', 'S');",
+		"        AND pg_class.relkind IN (" CppAsString2(RELKIND_RELATION) ", "
+		CppAsString2(RELKIND_VIEW) ", " CppAsString2(RELKIND_MATVIEW) ", "
+		CppAsString2(RELKIND_SEQUENCE) ");",
 		"INSERT INTO pg_init_privs "
 		"  (objoid, classoid, objsubid, initprivs, privtype)"
 		"    SELECT"
@@ -2249,7 +1942,7 @@ setup_schema(FILE *cmdfd)
 }
 
 /*
- * load PL/pgsql server-side language
+ * load PL/pgSQL server-side language
  */
 static void
 load_plpgsql(FILE *cmdfd)
@@ -2357,79 +2050,6 @@ make_postgres(FILE *cmdfd)
 	for (line = postgres_setup; *line; line++)
 		PG_CMD_PUTS(*line);
 }
-
-/*
- * Issue fsync recursively on PGDATA and all its contents.
- *
- * We fsync regular files and directories wherever they are, but we
- * follow symlinks only for pg_xlog and immediately under pg_tblspc.
- * Other symlinks are presumed to point at files we're not responsible
- * for fsyncing, and might not have privileges to write at all.
- *
- * Errors are reported but not considered fatal.
- */
-static void
-fsync_pgdata(void)
-{
-	bool		xlog_is_symlink;
-	char		pg_xlog[MAXPGPATH];
-	char		pg_tblspc[MAXPGPATH];
-
-	fputs(_("syncing data to disk ... "), stdout);
-	fflush(stdout);
-
-	snprintf(pg_xlog, MAXPGPATH, "%s/pg_xlog", pg_data);
-	snprintf(pg_tblspc, MAXPGPATH, "%s/pg_tblspc", pg_data);
-
-	/*
-	 * If pg_xlog is a symlink, we'll need to recurse into it separately,
-	 * because the first walkdir below will ignore it.
-	 */
-	xlog_is_symlink = false;
-
-#ifndef WIN32
-	{
-		struct stat st;
-
-		if (lstat(pg_xlog, &st) < 0)
-			fprintf(stderr, _("%s: could not stat file \"%s\": %s\n"),
-					progname, pg_xlog, strerror(errno));
-		else if (S_ISLNK(st.st_mode))
-			xlog_is_symlink = true;
-	}
-#else
-	if (pgwin32_is_junction(pg_xlog))
-		xlog_is_symlink = true;
-#endif
-
-	/*
-	 * If possible, hint to the kernel that we're soon going to fsync the data
-	 * directory and its contents.
-	 */
-#ifdef PG_FLUSH_DATA_WORKS
-	walkdir(pg_data, pre_sync_fname, false);
-	if (xlog_is_symlink)
-		walkdir(pg_xlog, pre_sync_fname, false);
-	walkdir(pg_tblspc, pre_sync_fname, true);
-#endif
-
-	/*
-	 * Now we do the fsync()s in the same order.
-	 *
-	 * The main call ignores symlinks, so in addition to specially processing
-	 * pg_xlog if it's a symlink, pg_tblspc has to be visited separately with
-	 * process_symlinks = true.  Note that if there are any plain directories
-	 * in pg_tblspc, they'll get fsync'd twice.  That's not an expected case
-	 * so we don't worry about optimizing it.
-	 */
-	walkdir(pg_data, fsync_fname_ext, false);
-	if (xlog_is_symlink)
-		walkdir(pg_xlog, fsync_fname_ext, false);
-	walkdir(pg_tblspc, fsync_fname_ext, true);
-
-	check_ok();
-}
-
 
 /*
  * signal handler in case we are interrupted.
@@ -2738,13 +2358,13 @@ usage(const char *progname)
 		 "                            default text search configuration\n"));
 	printf(_("  -U, --username=NAME       database superuser name\n"));
 	printf(_("  -W, --pwprompt            prompt for a password for the new superuser\n"));
-	printf(_("  -X, --xlogdir=XLOGDIR     location for the transaction log directory\n"));
+	printf(_("  -X, --waldir=WALDIR       location for the write-ahead log directory\n"));
 	printf(_("\nLess commonly used options:\n"));
 	printf(_("  -d, --debug               generate lots of debugging output\n"));
 	printf(_("  -k, --data-checksums      use data page checksums\n"));
 	printf(_("  -L DIRECTORY              where to find the input files\n"));
-	printf(_("  -n, --noclean             do not clean up after errors\n"));
-	printf(_("  -N, --nosync              do not wait for changes to be written safely to disk\n"));
+	printf(_("  -n, --no-clean            do not clean up after errors\n"));
+	printf(_("  -N, --no-sync             do not wait for changes to be written safely to disk\n"));
 	printf(_("  -s, --show                show internal settings\n"));
 	printf(_("  -S, --sync-only           only sync data directory\n"));
 	printf(_("\nOther options:\n"));
@@ -2791,14 +2411,17 @@ static void
 check_need_password(const char *authmethodlocal, const char *authmethodhost)
 {
 	if ((strcmp(authmethodlocal, "md5") == 0 ||
-		 strcmp(authmethodlocal, "password") == 0) &&
+		 strcmp(authmethodlocal, "password") == 0 ||
+		 strcmp(authmethodlocal, "scram-sha-256") == 0) &&
 		(strcmp(authmethodhost, "md5") == 0 ||
-		 strcmp(authmethodhost, "password") == 0) &&
+		 strcmp(authmethodhost, "password") == 0 ||
+		 strcmp(authmethodhost, "scram-sha-256") == 0) &&
 		!(pwprompt || pwfilename))
 	{
 		fprintf(stderr, _("%s: must specify a password for the superuser to enable %s authentication\n"), progname,
 				(strcmp(authmethodlocal, "md5") == 0 ||
-				 strcmp(authmethodlocal, "password") == 0)
+				 strcmp(authmethodlocal, "password") == 0 ||
+				 strcmp(authmethodlocal, "scram-sha-256") == 0)
 				? authmethodlocal
 				: authmethodhost);
 		exit(1);
@@ -3170,14 +2793,14 @@ create_data_directory(void)
 }
 
 
-/* Create transaction log directory, and symlink if required */
+/* Create WAL directory, and symlink if required */
 void
 create_xlog_or_symlink(void)
 {
 	char	   *subdirloc;
 
 	/* form name of the place for the subdirectory or symlink */
-	subdirloc = psprintf("%s/pg_xlog", pg_data);
+	subdirloc = psprintf("%s/pg_wal", pg_data);
 
 	if (strcmp(xlog_dir, "") != 0)
 	{
@@ -3187,7 +2810,7 @@ create_xlog_or_symlink(void)
 		canonicalize_path(xlog_dir);
 		if (!is_absolute_path(xlog_dir))
 		{
-			fprintf(stderr, _("%s: transaction log directory location must be an absolute path\n"), progname);
+			fprintf(stderr, _("%s: WAL directory location must be an absolute path\n"), progname);
 			exit_nicely();
 		}
 
@@ -3241,8 +2864,8 @@ create_xlog_or_symlink(void)
 					warn_on_mount_point(ret);
 				else
 					fprintf(stderr,
-							_("If you want to store the transaction log there, either\n"
-							  "remove or empty the directory \"%s\".\n"),
+							_("If you want to store the WAL there, either remove or empty the directory\n"
+							  "\"%s\".\n"),
 							xlog_dir);
 				exit_nicely();
 
@@ -3310,7 +2933,7 @@ initialize_data_directory(void)
 
 	create_xlog_or_symlink();
 
-	/* Create required subdirectories (other than pg_xlog) */
+	/* Create required subdirectories (other than pg_wal) */
 	printf(_("creating subdirectories ... "));
 	fflush(stdout);
 
@@ -3369,8 +2992,6 @@ initialize_data_directory(void)
 	PG_CMD_OPEN;
 
 	setup_auth(cmdfd);
-	if (pwprompt || pwfilename)
-		get_set_pwd(cmdfd);
 
 	setup_depend(cmdfd);
 
@@ -3437,10 +3058,12 @@ main(int argc, char *argv[])
 		{"version", no_argument, NULL, 'V'},
 		{"debug", no_argument, NULL, 'd'},
 		{"show", no_argument, NULL, 's'},
-		{"noclean", no_argument, NULL, 'n'},
-		{"nosync", no_argument, NULL, 'N'},
+		{"noclean", no_argument, NULL, 'n'},	/* for backwards compatibility */
+		{"no-clean", no_argument, NULL, 'n'},
+		{"nosync", no_argument, NULL, 'N'},		/* for backwards compatibility */
+		{"no-sync", no_argument, NULL, 'N'},
 		{"sync-only", no_argument, NULL, 'S'},
-		{"xlogdir", required_argument, NULL, 'X'},
+		{"waldir", required_argument, NULL, 'X'},
 		{"data-checksums", no_argument, NULL, 'k'},
 #ifdef PGXC
 		{"nodename", required_argument, NULL, 12},
@@ -3455,7 +3078,8 @@ main(int argc, char *argv[])
 	int			c;
 	int			option_index;
 	char	   *effective_user;
-	char		bin_dir[MAXPGPATH];
+	PQExpBuffer start_db_cmd;
+	char		pg_ctl_path[MAXPGPATH];
 
 	/*
 	 * Ensure that buffering behavior of stdout and stderr matches what it is
@@ -3526,7 +3150,7 @@ main(int argc, char *argv[])
 				break;
 			case 'n':
 				noclean = true;
-				printf(_("Running in noclean mode.  Mistakes will not be cleaned up.\n"));
+				printf(_("Running in no-clean mode.  Mistakes will not be cleaned up.\n"));
 				break;
 			case 'N':
 				do_sync = false;
@@ -3622,7 +3246,10 @@ main(int argc, char *argv[])
 			exit_nicely();
 		}
 
-		fsync_pgdata();
+		fputs(_("syncing data to disk ... "), stdout);
+		fflush(stdout);
+		fsync_pgdata(pg_data, progname, PG_VERSION_NUM);
+		check_ok();
 		return 0;
 	}
 
@@ -3686,12 +3313,20 @@ main(int argc, char *argv[])
 	else
 		printf(_("Data page checksums are disabled.\n"));
 
+	if (pwprompt || pwfilename)
+		get_su_pwd();
+
 	printf("\n");
 
 	initialize_data_directory();
 
 	if (do_sync)
-		fsync_pgdata();
+	{
+		fputs(_("syncing data to disk ... "), stdout);
+		fflush(stdout);
+		fsync_pgdata(pg_data, progname, PG_VERSION_NUM);
+		check_ok();
+	}
 	else
 		printf(_("\nSync to disk skipped.\nThe data directory might become corrupt if the operating system crashes.\n"));
 
@@ -3704,9 +3339,28 @@ main(int argc, char *argv[])
 	if (authwarning != NULL)
 		fprintf(stderr, "%s", authwarning);
 
-	/* Get directory specification used to start this executable */
-	strlcpy(bin_dir, argv[0], sizeof(bin_dir));
-	get_parent_directory(bin_dir);
+	/*
+	 * Build up a shell command to tell the user how to start the server
+	 */
+	start_db_cmd = createPQExpBuffer();
+
+	/* Get directory specification used to start initdb ... */
+	strlcpy(pg_ctl_path, argv[0], sizeof(pg_ctl_path));
+	canonicalize_path(pg_ctl_path);
+	get_parent_directory(pg_ctl_path);
+	/* ... and tag on pg_ctl instead */
+	join_path_components(pg_ctl_path, pg_ctl_path, "pg_ctl");
+
+	/* path to pg_ctl, properly quoted */
+	appendShellString(start_db_cmd, pg_ctl_path);
+
+	/* add -D switch, with properly quoted data directory */
+	appendPQExpBufferStr(start_db_cmd, " -D ");
+	appendShellString(start_db_cmd, pgdata_native);
+
+	/* add suggested -l switch and "start" command */
+	/* translator: This is a placeholder in a shell command. */
+	appendPQExpBuffer(start_db_cmd, " -l %s start", _("logfile"));
 
 
 #ifdef PGXC
@@ -3715,30 +3369,22 @@ main(int argc, char *argv[])
 		char *pgxc_ctl_silent = getenv("PGXC_CTL_SILENT");
 		if (!pgxc_ctl_silent || !strlen(pgxc_ctl_silent))
 		{
-			printf(_("You can now start the database server of the Postgres-XL coordinator using:\n\n"
-						"    %s%s%spostgres%s --coordinator -D %s%s%s\n"
+			printf(_("\nSuccess. You can now start the database server of the Postgres-XL coordinator using:\n\n"
+						"    %s -Z coordinator\n\n"
 						"or\n"
-						"    %s%s%spg_ctl%s start -D %s%s%s -Z coordinator -l logfile\n\n"
 						" You can now start the database server of the Postgres-XL datanode using:\n\n"
-						"    %s%s%spostgres%s --datanode -D %s%s%s\n"
-						"or \n"
-						"    %s%s%spg_ctl%s start -D %s%s%s -Z datanode -l logfile\n\n"),
-					QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-					QUOTE_PATH, pgdata_native, QUOTE_PATH,
-					QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-					QUOTE_PATH, pgdata_native, QUOTE_PATH,
-					QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-					QUOTE_PATH, pgdata_native, QUOTE_PATH,
-					QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-					QUOTE_PATH, pgdata_native, QUOTE_PATH);
+						"    %s -Z datanode\n\n"),
+					start_db_cmd->data,
+					start_db_cmd->data);
 		}
 	}
 #else
 	printf(_("\nSuccess. You can now start the database server using:\n\n"
-			 "    %s%s%spg_ctl%s -D %s%s%s -l logfile start\n\n"),
-	   QUOTE_PATH, bin_dir, (strlen(bin_dir) > 0) ? DIR_SEP : "", QUOTE_PATH,
-		   QUOTE_PATH, pgdata_native, QUOTE_PATH);
+			 "    %s\n\n"),
+		   start_db_cmd->data);
 #endif
+
+	destroyPQExpBuffer(start_db_cmd);
 
 	return 0;
 }

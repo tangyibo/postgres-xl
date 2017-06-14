@@ -3,7 +3,7 @@
  *
  * PostgreSQL multi-transaction-log manager
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/access/multixact.h
@@ -127,7 +127,8 @@ extern void StartupMultiXact(void);
 extern void TrimMultiXact(void);
 extern void ShutdownMultiXact(void);
 extern void SetMultiXactIdLimit(MultiXactId oldest_datminmxid,
-					Oid oldest_datoid);
+					Oid oldest_datoid,
+					bool is_startup);
 extern void MultiXactGetCheckptMulti(bool is_shutdown,
 						 MultiXactId *nextMulti,
 						 MultiXactOffset *nextMultiOffset,

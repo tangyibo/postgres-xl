@@ -4,7 +4,7 @@
  *	  parser support routines dealing with relations
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -26,6 +26,7 @@
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "parser/parsetree.h"
+#include "parser/parse_enr.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_type.h"
 #include "utils/builtins.h"
@@ -39,6 +40,7 @@
 #include "pgxc/pgxc.h"
 #include "miscadmin.h"
 #endif
+#include "utils/varlena.h"
 
 
 #define MAX_FUZZY_DISTANCE				3
@@ -291,6 +293,16 @@ isFutureCTE(ParseState *pstate, const char *refname)
 }
 
 /*
+ * Search the query's ephemeral named relation namespace for a relation
+ * matching the given unqualified refname.
+ */
+bool
+scanNameSpaceForENR(ParseState *pstate, const char *refname)
+{
+	return name_matches_visible_ENR(pstate, refname);
+}
+
+/*
  * searchRangeTableForRel
  *	  See if any RangeTblEntry could possibly match the RangeVar.
  *	  If so, return a pointer to the RangeTblEntry; else return NULL.
@@ -311,6 +323,7 @@ searchRangeTableForRel(ParseState *pstate, RangeVar *relation)
 	const char *refname = relation->relname;
 	Oid			relId = InvalidOid;
 	CommonTableExpr *cte = NULL;
+	bool		isenr = false;
 	Index		ctelevelsup = 0;
 	Index		levelsup;
 
@@ -327,11 +340,16 @@ searchRangeTableForRel(ParseState *pstate, RangeVar *relation)
 	 * unlocked.
 	 */
 	if (!relation->schemaname)
+	{
 		cte = scanNameSpaceForCTE(pstate, refname, &ctelevelsup);
-	if (!cte)
+		if (!cte)
+			isenr = scanNameSpaceForENR(pstate, refname);
+	}
+
+	if (!cte && !isenr)
 		relId = RangeVarGetRelid(relation, NoLock, true);
 
-	/* Now look for RTEs matching either the relation/CTE or the alias */
+	/* Now look for RTEs matching either the relation/CTE/ENR or the alias */
 	for (levelsup = 0;
 		 pstate != NULL;
 		 pstate = pstate->parentParseState, levelsup++)
@@ -350,6 +368,10 @@ searchRangeTableForRel(ParseState *pstate, RangeVar *relation)
 				cte != NULL &&
 				rte->ctelevelsup + levelsup == ctelevelsup &&
 				strcmp(rte->ctename, refname) == 0)
+				return rte;
+			if (rte->rtekind == RTE_NAMEDTUPLESTORE &&
+				isenr &&
+				strcmp(rte->enrname, refname) == 0)
 				return rte;
 			if (strcmp(rte->eref->aliasname, refname) == 0)
 				return rte;
@@ -938,12 +960,11 @@ markRTEForSelectPriv(ParseState *pstate, RangeTblEntry *rte,
 			JoinExpr   *j;
 
 			if (rtindex > 0 && rtindex <= list_length(pstate->p_joinexprs))
-				j = (JoinExpr *) list_nth(pstate->p_joinexprs, rtindex - 1);
+				j = list_nth_node(JoinExpr, pstate->p_joinexprs, rtindex - 1);
 			else
 				j = NULL;
 			if (j == NULL)
 				elog(ERROR, "could not find JoinExpr for whole-row reference");
-			Assert(IsA(j, JoinExpr));
 
 			/* Note: we can't see FromExpr here */
 			if (IsA(j->larg, RangeTblRef))
@@ -1168,12 +1189,18 @@ parserOpenTable(ParseState *pstate, const RangeVar *relation, int lockmode)
 		else
 		{
 			/*
+			 * An unqualified name might be a named ephemeral relation.
+			 */
+			if (get_visible_ENR_metadata(pstate->p_queryEnv, relation->relname))
+				rel = NULL;
+
+			/*
 			 * An unqualified name might have been meant as a reference to
 			 * some not-yet-in-scope CTE.  The bare "does not exist" message
 			 * has proven remarkably unhelpful for figuring out such problems,
 			 * so we take pains to offer a specific hint.
 			 */
-			if (isFutureCTE(pstate, relation->relname))
+			else if (isFutureCTE(pstate, relation->relname))
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_TABLE),
 						 errmsg("relation \"%s\" does not exist",
@@ -1719,6 +1746,69 @@ addRangeTableEntryForFunction(ParseState *pstate,
 }
 
 /*
+ * Add an entry for a table function to the pstate's range table (p_rtable).
+ *
+ * This is much like addRangeTableEntry() except that it makes a tablefunc RTE.
+ */
+RangeTblEntry *
+addRangeTableEntryForTableFunc(ParseState *pstate,
+							   TableFunc *tf,
+							   Alias *alias,
+							   bool lateral,
+							   bool inFromCl)
+{
+	RangeTblEntry *rte = makeNode(RangeTblEntry);
+	char	   *refname = alias ? alias->aliasname : pstrdup("xmltable");
+	Alias	   *eref;
+	int			numaliases;
+
+	Assert(pstate != NULL);
+
+	rte->rtekind = RTE_TABLEFUNC;
+	rte->relid = InvalidOid;
+	rte->subquery = NULL;
+	rte->tablefunc = tf;
+	rte->coltypes = tf->coltypes;
+	rte->coltypmods = tf->coltypmods;
+	rte->colcollations = tf->colcollations;
+	rte->alias = alias;
+
+	eref = alias ? copyObject(alias) : makeAlias(refname, NIL);
+	numaliases = list_length(eref->colnames);
+
+	/* fill in any unspecified alias columns */
+	if (numaliases < list_length(tf->colnames))
+		eref->colnames = list_concat(eref->colnames,
+								   list_copy_tail(tf->colnames, numaliases));
+
+	rte->eref = eref;
+
+	/*
+	 * Set flags and access permissions.
+	 *
+	 * Tablefuncs are never checked for access rights (at least, not by the
+	 * RTE permissions mechanism).
+	 */
+	rte->lateral = lateral;
+	rte->inh = false;			/* never true for tablefunc RTEs */
+	rte->inFromCl = inFromCl;
+
+	rte->requiredPerms = 0;
+	rte->checkAsUser = InvalidOid;
+	rte->selectedCols = NULL;
+	rte->insertedCols = NULL;
+	rte->updatedCols = NULL;
+
+	/*
+	 * Add completed RTE to pstate's range table list, but not to join list
+	 * nor namespace --- caller must do that if appropriate.
+	 */
+	pstate->p_rtable = lappend(pstate->p_rtable, rte);
+
+	return rte;
+}
+
+/*
  * Add an entry for a VALUES list to the pstate's range table (p_rtable).
  *
  * This is much like addRangeTableEntry() except that it makes a values RTE.
@@ -1726,7 +1816,9 @@ addRangeTableEntryForFunction(ParseState *pstate,
 RangeTblEntry *
 addRangeTableEntryForValues(ParseState *pstate,
 							List *exprs,
-							List *collations,
+							List *coltypes,
+							List *coltypmods,
+							List *colcollations,
 							Alias *alias,
 							bool lateral,
 							bool inFromCl)
@@ -1743,7 +1835,9 @@ addRangeTableEntryForValues(ParseState *pstate,
 	rte->relid = InvalidOid;
 	rte->subquery = NULL;
 	rte->values_lists = exprs;
-	rte->values_collations = collations;
+	rte->coltypes = coltypes;
+	rte->coltypmods = coltypmods;
+	rte->colcollations = colcollations;
 	rte->alias = alias;
 
 	eref = alias ? copyObject(alias) : makeAlias(refname, NIL);
@@ -1828,7 +1922,7 @@ addRangeTableEntryForJoin(ParseState *pstate,
 	rte->joinaliasvars = aliasvars;
 	rte->alias = alias;
 
-	eref = alias ? (Alias *) copyObject(alias) : makeAlias("unnamed_join", NIL);
+	eref = alias ? copyObject(alias) : makeAlias("unnamed_join", NIL);
 	numaliases = list_length(eref->colnames);
 
 	/* fill in any unspecified alias columns */
@@ -1913,9 +2007,9 @@ addRangeTableEntryForCTE(ParseState *pstate,
 					 parser_errposition(pstate, rv->location)));
 	}
 
-	rte->ctecoltypes = cte->ctecoltypes;
-	rte->ctecoltypmods = cte->ctecoltypmods;
-	rte->ctecolcollations = cte->ctecolcollations;
+	rte->coltypes = cte->ctecoltypes;
+	rte->coltypmods = cte->ctecoltypmods;
+	rte->colcollations = cte->ctecolcollations;
 
 	rte->alias = alias;
 	if (alias)
@@ -1954,6 +2048,102 @@ addRangeTableEntryForCTE(ParseState *pstate,
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
+
+	/*
+	 * Add completed RTE to pstate's range table list, but not to join list
+	 * nor namespace --- caller must do that if appropriate.
+	 */
+	pstate->p_rtable = lappend(pstate->p_rtable, rte);
+
+	return rte;
+}
+
+/*
+ * Add an entry for an ephemeral named relation reference to the pstate's
+ * range table (p_rtable).
+ *
+ * It is expected that the RangeVar, which up until now is only known to be an
+ * ephemeral named relation, will (in conjunction with the QueryEnvironment in
+ * the ParseState), create a RangeTblEntry for a specific *kind* of ephemeral
+ * named relation, based on enrtype.
+ *
+ * This is much like addRangeTableEntry() except that it makes an RTE for an
+ * ephemeral named relation.
+ */
+RangeTblEntry *
+addRangeTableEntryForENR(ParseState *pstate,
+						 RangeVar *rv,
+						 bool inFromCl)
+{
+	RangeTblEntry *rte = makeNode(RangeTblEntry);
+	Alias	   *alias = rv->alias;
+	char	   *refname = alias ? alias->aliasname : rv->relname;
+	EphemeralNamedRelationMetadata enrmd;
+	TupleDesc	tupdesc;
+	int			attno;
+
+	Assert(pstate != NULL);
+	enrmd = get_visible_ENR(pstate, rv->relname);
+	Assert(enrmd != NULL);
+
+	switch (enrmd->enrtype)
+	{
+		case ENR_NAMED_TUPLESTORE:
+			rte->rtekind = RTE_NAMEDTUPLESTORE;
+			break;
+
+		default:
+			elog(ERROR, "unexpected enrtype: %d", enrmd->enrtype);
+			return NULL;		/* for fussy compilers */
+	}
+
+	/*
+	 * Record dependency on a relation.  This allows plans to be invalidated
+	 * if they access transition tables linked to a table that is altered.
+	 */
+	rte->relid = enrmd->reliddesc;
+
+	/*
+	 * Build the list of effective column names using user-supplied aliases
+	 * and/or actual column names.  Also build the cannibalized fields.
+	 */
+	tupdesc = ENRMetadataGetTupDesc(enrmd);
+	rte->eref = makeAlias(refname, NIL);
+	buildRelationAliases(tupdesc, alias, rte->eref);
+	rte->enrname = enrmd->name;
+	rte->enrtuples = enrmd->enrtuples;
+	rte->coltypes = NIL;
+	rte->coltypmods = NIL;
+	rte->colcollations = NIL;
+	for (attno = 1; attno <= tupdesc->natts; ++attno)
+	{
+		if (tupdesc->attrs[attno - 1]->atttypid == InvalidOid &&
+			!(tupdesc->attrs[attno - 1]->attisdropped))
+			elog(ERROR, "atttypid was invalid for column which has not been dropped from \"%s\"",
+				 rv->relname);
+		rte->coltypes =
+			lappend_oid(rte->coltypes,
+						tupdesc->attrs[attno - 1]->atttypid);
+		rte->coltypmods =
+			lappend_int(rte->coltypmods,
+						tupdesc->attrs[attno - 1]->atttypmod);
+		rte->colcollations =
+			lappend_oid(rte->colcollations,
+						tupdesc->attrs[attno - 1]->attcollation);
+	}
+
+	/*
+	 * Set flags and access permissions.
+	 *
+	 * ENRs are never checked for access rights.
+	 */
+	rte->lateral = false;
+	rte->inh = false;			/* never true for ENRs */
+	rte->inFromCl = inFromCl;
+
+	rte->requiredPerms = 0;
+	rte->checkAsUser = InvalidOid;
+	rte->selectedCols = NULL;
 
 	/*
 	 * Add completed RTE to pstate's range table list, but not to join list
@@ -2244,46 +2434,6 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 				}
 			}
 			break;
-		case RTE_VALUES:
-			{
-				/* Values RTE */
-				ListCell   *aliasp_item = list_head(rte->eref->colnames);
-				ListCell   *lcv;
-				ListCell   *lcc;
-
-				varattno = 0;
-				forboth(lcv, (List *) linitial(rte->values_lists),
-						lcc, rte->values_collations)
-				{
-					Node	   *col = (Node *) lfirst(lcv);
-					Oid			colcollation = lfirst_oid(lcc);
-
-					varattno++;
-					if (colnames)
-					{
-						/* Assume there is one alias per column */
-						char	   *label = strVal(lfirst(aliasp_item));
-
-						*colnames = lappend(*colnames,
-											makeString(pstrdup(label)));
-						aliasp_item = lnext(aliasp_item);
-					}
-
-					if (colvars)
-					{
-						Var		   *varnode;
-
-						varnode = makeVar(rtindex, varattno,
-										  exprType(col),
-										  exprTypmod(col),
-										  colcollation,
-										  sublevels_up);
-						varnode->location = location;
-						*colvars = lappend(*colvars, varnode);
-					}
-				}
-			}
-			break;
 		case RTE_JOIN:
 			{
 				/* Join RTE */
@@ -2353,17 +2503,21 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 				}
 			}
 			break;
+		case RTE_TABLEFUNC:
+		case RTE_VALUES:
 		case RTE_CTE:
+		case RTE_NAMEDTUPLESTORE:
 			{
+				/* Tablefunc, Values or CTE RTE */
 				ListCell   *aliasp_item = list_head(rte->eref->colnames);
 				ListCell   *lct;
 				ListCell   *lcm;
 				ListCell   *lcc;
 
 				varattno = 0;
-				forthree(lct, rte->ctecoltypes,
-						 lcm, rte->ctecoltypmods,
-						 lcc, rte->ctecolcollations)
+				forthree(lct, rte->coltypes,
+						 lcm, rte->coltypmods,
+						 lcc, rte->colcollations)
 				{
 					Oid			coltype = lfirst_oid(lct);
 					int32		coltypmod = lfirst_int(lcm);
@@ -2376,7 +2530,8 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 						/* Assume there is one alias per output column */
 						char	   *label = strVal(lfirst(aliasp_item));
 
-						*colnames = lappend(*colnames, makeString(pstrdup(label)));
+						*colnames = lappend(*colnames,
+											makeString(pstrdup(label)));
 						aliasp_item = lnext(aliasp_item);
 					}
 
@@ -2387,6 +2542,8 @@ expandRTE(RangeTblEntry *rte, int rtindex, int sublevels_up,
 						varnode = makeVar(rtindex, varattno,
 										  coltype, coltypmod, colcoll,
 										  sublevels_up);
+						varnode->location = location;
+
 						*colvars = lappend(*colvars, varnode);
 					}
 				}
@@ -2745,22 +2902,6 @@ get_rte_attribute_type(RangeTblEntry *rte, AttrNumber attnum,
 								rte->eref->aliasname)));
 			}
 			break;
-		case RTE_VALUES:
-			{
-				/* Values RTE --- get type info from first sublist */
-				/* collation is stored separately, though */
-				List	   *collist = (List *) linitial(rte->values_lists);
-				Node	   *col;
-
-				if (attnum < 1 || attnum > list_length(collist))
-					elog(ERROR, "values list %s does not have attribute %d",
-						 rte->eref->aliasname, attnum);
-				col = (Node *) list_nth(collist, attnum - 1);
-				*vartype = exprType(col);
-				*vartypmod = exprTypmod(col);
-				*varcollid = list_nth_oid(rte->values_collations, attnum - 1);
-			}
-			break;
 		case RTE_JOIN:
 			{
 				/*
@@ -2776,13 +2917,19 @@ get_rte_attribute_type(RangeTblEntry *rte, AttrNumber attnum,
 				*varcollid = exprCollation(aliasvar);
 			}
 			break;
+		case RTE_TABLEFUNC:
+		case RTE_VALUES:
 		case RTE_CTE:
+		case RTE_NAMEDTUPLESTORE:
 			{
-				/* CTE RTE --- get type info from lists in the RTE */
-				Assert(attnum > 0 && attnum <= list_length(rte->ctecoltypes));
-				*vartype = list_nth_oid(rte->ctecoltypes, attnum - 1);
-				*vartypmod = list_nth_int(rte->ctecoltypmods, attnum - 1);
-				*varcollid = list_nth_oid(rte->ctecolcollations, attnum - 1);
+				/*
+				 * tablefunc, VALUES or CTE RTE --- get type info from lists
+				 * in the RTE
+				 */
+				Assert(attnum > 0 && attnum <= list_length(rte->coltypes));
+				*vartype = list_nth_oid(rte->coltypes, attnum - 1);
+				*vartypmod = list_nth_int(rte->coltypmods, attnum - 1);
+				*varcollid = list_nth_oid(rte->colcollations, attnum - 1);
 			}
 			break;
 		default:
@@ -2821,10 +2968,28 @@ get_rte_attribute_is_dropped(RangeTblEntry *rte, AttrNumber attnum)
 			}
 			break;
 		case RTE_SUBQUERY:
+		case RTE_TABLEFUNC:
 		case RTE_VALUES:
 		case RTE_CTE:
-			/* Subselect, Values, CTE RTEs never have dropped columns */
+
+			/*
+			 * Subselect, Table Functions, Values, CTE RTEs never have dropped
+			 * columns
+			 */
 			result = false;
+			break;
+		case RTE_NAMEDTUPLESTORE:
+			{
+				Assert(rte->enrname);
+
+				/*
+				 * We checked when we loaded coltypes for the tuplestore that
+				 * InvalidOid was only used for dropped columns, so it is safe
+				 * to count on that here.
+				 */
+				result =
+					((list_nth_oid(rte->coltypes, attnum - 1) == InvalidOid));
+			}
 			break;
 		case RTE_JOIN:
 			{

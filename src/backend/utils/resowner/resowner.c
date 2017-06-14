@@ -9,7 +9,7 @@
  * See utils/resowner/README for more info.
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -690,8 +690,6 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 			DropPreparedStatement(stmt, false);
 		}
 
-		/* Clean up index scans too */
-		ReleaseResources_hash();
 	}
 
 	/* Let add-on modules get a chance too */

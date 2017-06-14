@@ -3,7 +3,7 @@
  * hashfunc.c
  *	  Support functions for hash access method.
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -27,6 +27,7 @@
 #include "postgres.h"
 
 #include "access/hash.h"
+#include "utils/builtins.h"
 
 #ifdef PGXC
 #include "catalog/pg_type.h"
@@ -35,6 +36,16 @@
 #include "utils/date.h"
 #include "utils/nabstime.h"
 #endif
+
+/*
+ * Datatype-specific hash functions.
+ *
+ * These support both hash indexes and hash joins.
+ *
+ * NOTE: some of these are also used by catcache operations, without
+ * any direct connection to hash indexes.  Also, the common hash_any
+ * routine is also used by dynahash tables.
+ */
 
 /* Note: this is used for both "char" and boolean datatypes */
 Datum
@@ -138,22 +149,11 @@ hashoidvector(PG_FUNCTION_ARGS)
 }
 
 Datum
-hashint2vector(PG_FUNCTION_ARGS)
-{
-	int2vector *key = (int2vector *) PG_GETARG_POINTER(0);
-
-	return hash_any((unsigned char *) key->values, key->dim1 * sizeof(int16));
-}
-
-Datum
 hashname(PG_FUNCTION_ARGS)
 {
 	char	   *key = NameStr(*PG_GETARG_NAME(0));
-	int			keylen = strlen(key);
 
-	Assert(keylen < NAMEDATALEN);		/* else it's not truncated correctly */
-
-	return hash_any((unsigned char *) key, keylen);
+	return hash_any((unsigned char *) key, strlen(key));
 }
 
 Datum
@@ -581,8 +581,6 @@ compute_hash(Oid type, Datum value, char locator)
 			return DirectFunctionCall1(hashchar, value);
 		case NAMEOID:
 			return DirectFunctionCall1(hashname, value);
-		case INT2VECTOROID:
-			return DirectFunctionCall1(hashint2vector, value);
 
 		case VARCHAROID:
 		case TEXTOID:
@@ -677,8 +675,6 @@ get_compute_hash_function(Oid type, char locator)
 			return "hashchar";
 		case NAMEOID:
 			return "hashname";
-		case INT2VECTOROID:
-			return "hashint2vector";
 		case VARCHAROID:
 		case TEXTOID:
 			return "hashtext";

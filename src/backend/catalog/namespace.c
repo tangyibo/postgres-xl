@@ -10,7 +10,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -39,6 +39,7 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opfamily.h"
 #include "catalog/pg_proc.h"
+#include "catalog/pg_statistic_ext.h"
 #include "catalog/pg_ts_config.h"
 #include "catalog/pg_ts_dict.h"
 #include "catalog/pg_ts_parser.h"
@@ -64,6 +65,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
+#include "utils/varlena.h"
 
 
 /*
@@ -208,22 +210,6 @@ static bool MatchNamedCall(HeapTuple proctup, int nargs, List *argnames,
 #ifdef XCP
 static void FindTemporaryNamespace(void);
 #endif
-
-/* These don't really need to appear in any header file */
-Datum		pg_table_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_type_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_function_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_operator_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_opclass_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_opfamily_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_collation_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_conversion_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_ts_parser_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_ts_dict_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_ts_template_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_ts_config_is_visible(PG_FUNCTION_ARGS);
-Datum		pg_my_temp_schema(PG_FUNCTION_ARGS);
-Datum		pg_is_other_temp_schema(PG_FUNCTION_ARGS);
 
 
 /*
@@ -2144,6 +2130,128 @@ ConversionIsVisible(Oid conid)
 }
 
 /*
+ * get_statistics_object_oid - find a statistics object by possibly qualified name
+ *
+ * If not found, returns InvalidOid if missing_ok, else throws error
+ */
+Oid
+get_statistics_object_oid(List *names, bool missing_ok)
+{
+	char	   *schemaname;
+	char	   *stats_name;
+	Oid			namespaceId;
+	Oid			stats_oid = InvalidOid;
+	ListCell   *l;
+
+	/* deconstruct the name list */
+	DeconstructQualifiedName(names, &schemaname, &stats_name);
+
+	if (schemaname)
+	{
+		/* use exact schema given */
+		namespaceId = LookupExplicitNamespace(schemaname, missing_ok);
+		if (missing_ok && !OidIsValid(namespaceId))
+			stats_oid = InvalidOid;
+		else
+			stats_oid = GetSysCacheOid2(STATEXTNAMENSP,
+										PointerGetDatum(stats_name),
+										ObjectIdGetDatum(namespaceId));
+	}
+	else
+	{
+		/* search for it in search path */
+		recomputeNamespacePath();
+
+		foreach(l, activeSearchPath)
+		{
+			namespaceId = lfirst_oid(l);
+
+			if (namespaceId == myTempNamespace)
+				continue;		/* do not look in temp namespace */
+			stats_oid = GetSysCacheOid2(STATEXTNAMENSP,
+										PointerGetDatum(stats_name),
+										ObjectIdGetDatum(namespaceId));
+			if (OidIsValid(stats_oid))
+				break;
+		}
+	}
+
+	if (!OidIsValid(stats_oid) && !missing_ok)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("statistics object \"%s\" does not exist",
+						NameListToString(names))));
+
+	return stats_oid;
+}
+
+/*
+ * StatisticsObjIsVisible
+ *		Determine whether a statistics object (identified by OID) is visible in
+ *		the current search path.  Visible means "would be found by searching
+ *		for the unqualified statistics object name".
+ */
+bool
+StatisticsObjIsVisible(Oid relid)
+{
+	HeapTuple	stxtup;
+	Form_pg_statistic_ext stxform;
+	Oid			stxnamespace;
+	bool		visible;
+
+	stxtup = SearchSysCache1(STATEXTOID, ObjectIdGetDatum(relid));
+	if (!HeapTupleIsValid(stxtup))
+		elog(ERROR, "cache lookup failed for statistics object %u", relid);
+	stxform = (Form_pg_statistic_ext) GETSTRUCT(stxtup);
+
+	recomputeNamespacePath();
+
+	/*
+	 * Quick check: if it ain't in the path at all, it ain't visible. Items in
+	 * the system namespace are surely in the path and so we needn't even do
+	 * list_member_oid() for them.
+	 */
+	stxnamespace = stxform->stxnamespace;
+	if (stxnamespace != PG_CATALOG_NAMESPACE &&
+		!list_member_oid(activeSearchPath, stxnamespace))
+		visible = false;
+	else
+	{
+		/*
+		 * If it is in the path, it might still not be visible; it could be
+		 * hidden by another statistics object of the same name earlier in the
+		 * path. So we must do a slow check for conflicting objects.
+		 */
+		char	   *stxname = NameStr(stxform->stxname);
+		ListCell   *l;
+
+		visible = false;
+		foreach(l, activeSearchPath)
+		{
+			Oid			namespaceId = lfirst_oid(l);
+
+			if (namespaceId == stxnamespace)
+			{
+				/* Found it first in path */
+				visible = true;
+				break;
+			}
+			if (SearchSysCacheExists2(STATEXTNAMENSP,
+									  PointerGetDatum(stxname),
+									  ObjectIdGetDatum(namespaceId)))
+			{
+				/* Found something else first in path */
+				break;
+			}
+		}
+	}
+
+	ReleaseSysCache(stxtup);
+
+	return visible;
+}
+
+/*
  * get_ts_parser_oid - find a TS parser by possibly qualified name
  *
  * If not found, returns InvalidOid if missing_ok, else throws error
@@ -4013,14 +4121,19 @@ RemoveTempRelations(Oid tempNamespaceId)
 	/*
 	 * We want to get rid of everything in the target namespace, but not the
 	 * namespace itself (deleting it only to recreate it later would be a
-	 * waste of cycles).  We do this by finding everything that has a
-	 * dependency on the namespace.
+	 * waste of cycles).  Hence, specify SKIP_ORIGINAL.  It's also an INTERNAL
+	 * deletion, and we want to not drop any extensions that might happen to
+	 * own temp objects.
 	 */
 	object.classId = NamespaceRelationId;
 	object.objectId = tempNamespaceId;
 	object.objectSubId = 0;
 
-	deleteWhatDependsOn(&object, false);
+	performDeletion(&object, DROP_CASCADE,
+					PERFORM_DELETION_INTERNAL |
+					PERFORM_DELETION_QUIETLY |
+					PERFORM_DELETION_SKIP_ORIGINAL |
+					PERFORM_DELETION_SKIP_EXTENSIONS);
 }
 
 /*
@@ -4377,6 +4490,17 @@ pg_conversion_is_visible(PG_FUNCTION_ARGS)
 		PG_RETURN_NULL();
 
 	PG_RETURN_BOOL(ConversionIsVisible(oid));
+}
+
+Datum
+pg_statistics_obj_is_visible(PG_FUNCTION_ARGS)
+{
+	Oid			oid = PG_GETARG_OID(0);
+
+	if (!SearchSysCacheExists1(STATEXTOID, ObjectIdGetDatum(oid)))
+		PG_RETURN_NULL();
+
+	PG_RETURN_BOOL(StatisticsObjIsVisible(oid));
 }
 
 Datum

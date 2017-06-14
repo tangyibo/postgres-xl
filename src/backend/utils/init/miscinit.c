@@ -4,7 +4,7 @@
  *	  miscellaneous initialization support stuff
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -21,7 +21,6 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <grp.h>
@@ -43,6 +42,7 @@
 #ifdef XCP
 #include "pgxc/execRemote.h"
 #endif
+#include "pgstat.h"
 #include "postmaster/autovacuum.h"
 #include "postmaster/postmaster.h"
 #include "storage/fd.h"
@@ -59,6 +59,7 @@
 #endif
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
+#include "utils/varlena.h"
 
 
 #define DIRECTORY_LOCK_FILE		"postmaster.pid"
@@ -985,11 +986,13 @@ CreateLockFile(const char *filename, bool amPostmaster,
 					 errmsg("could not open lock file \"%s\": %m",
 							filename)));
 		}
+		pgstat_report_wait_start(WAIT_EVENT_LOCK_FILE_CREATE_READ);
 		if ((len = read(fd, buffer, sizeof(buffer) - 1)) < 0)
 			ereport(FATAL,
 					(errcode_for_file_access(),
 					 errmsg("could not read lock file \"%s\": %m",
 							filename)));
+		pgstat_report_wait_end();
 		close(fd);
 
 		if (len == 0)
@@ -1138,6 +1141,7 @@ CreateLockFile(const char *filename, bool amPostmaster,
 		strlcat(buffer, "\n", sizeof(buffer));
 
 	errno = 0;
+	pgstat_report_wait_start(WAIT_EVENT_LOCK_FILE_CREATE_WRITE);
 	if (write(fd, buffer, strlen(buffer)) != strlen(buffer))
 	{
 		int			save_errno = errno;
@@ -1150,6 +1154,9 @@ CreateLockFile(const char *filename, bool amPostmaster,
 				(errcode_for_file_access(),
 				 errmsg("could not write lock file \"%s\": %m", filename)));
 	}
+	pgstat_report_wait_end();
+
+	pgstat_report_wait_start(WAIT_EVENT_LOCK_FILE_CREATE_SYNC);
 	if (pg_fsync(fd) != 0)
 	{
 		int			save_errno = errno;
@@ -1161,6 +1168,7 @@ CreateLockFile(const char *filename, bool amPostmaster,
 				(errcode_for_file_access(),
 				 errmsg("could not write lock file \"%s\": %m", filename)));
 	}
+	pgstat_report_wait_end();
 	if (close(fd) != 0)
 	{
 		int			save_errno = errno;
@@ -1299,7 +1307,9 @@ AddToDataDirLockFile(int target_line, const char *str)
 						DIRECTORY_LOCK_FILE)));
 		return;
 	}
+	pgstat_report_wait_start(WAIT_EVENT_LOCK_FILE_ADDTODATADIR_READ);
 	len = read(fd, srcbuffer, sizeof(srcbuffer) - 1);
+	pgstat_report_wait_end();
 	if (len < 0)
 	{
 		ereport(LOG,
@@ -1352,9 +1362,11 @@ AddToDataDirLockFile(int target_line, const char *str)
 	 */
 	len = strlen(destbuffer);
 	errno = 0;
+	pgstat_report_wait_start(WAIT_EVENT_LOCK_FILE_ADDTODATADIR_WRITE);
 	if (lseek(fd, (off_t) 0, SEEK_SET) != 0 ||
 		(int) write(fd, destbuffer, len) != len)
 	{
+		pgstat_report_wait_end();
 		/* if write didn't set errno, assume problem is no disk space */
 		if (errno == 0)
 			errno = ENOSPC;
@@ -1365,6 +1377,8 @@ AddToDataDirLockFile(int target_line, const char *str)
 		close(fd);
 		return;
 	}
+	pgstat_report_wait_end();
+	pgstat_report_wait_start(WAIT_EVENT_LOCK_FILE_ADDTODATADIR_SYNC);
 	if (pg_fsync(fd) != 0)
 	{
 		ereport(LOG,
@@ -1372,6 +1386,7 @@ AddToDataDirLockFile(int target_line, const char *str)
 				 errmsg("could not write to file \"%s\": %m",
 						DIRECTORY_LOCK_FILE)));
 	}
+	pgstat_report_wait_end();
 	if (close(fd) != 0)
 	{
 		ereport(LOG,
@@ -1428,7 +1443,9 @@ RecheckDataDirLockFile(void)
 				return true;
 		}
 	}
+	pgstat_report_wait_start(WAIT_EVENT_LOCK_FILE_RECHECKDATADIR_READ);
 	len = read(fd, buffer, sizeof(buffer) - 1);
+	pgstat_report_wait_end();
 	if (len < 0)
 	{
 		ereport(LOG,
@@ -1469,16 +1486,13 @@ ValidatePgVersion(const char *path)
 	char		full_path[MAXPGPATH];
 	FILE	   *file;
 	int			ret;
-	long		file_major,
-				file_minor;
-	long		my_major = 0,
-				my_minor = 0;
+	long		file_major;
+	long		my_major;
 	char	   *endptr;
-	const char *version_string = PG_VERSION;
+	char		file_version_string[64];
+	const char *my_version_string = PG_VERSION;
 
-	my_major = strtol(version_string, &endptr, 10);
-	if (*endptr == '.')
-		my_minor = strtol(endptr + 1, NULL, 10);
+	my_major = strtol(my_version_string, &endptr, 10);
 
 	snprintf(full_path, sizeof(full_path), "%s/PG_VERSION", path);
 
@@ -1497,8 +1511,11 @@ ValidatePgVersion(const char *path)
 					 errmsg("could not open file \"%s\": %m", full_path)));
 	}
 
-	ret = fscanf(file, "%ld.%ld", &file_major, &file_minor);
-	if (ret != 2)
+	file_version_string[0] = '\0';
+	ret = fscanf(file, "%63s", file_version_string);
+	file_major = strtol(file_version_string, &endptr, 10);
+
+	if (ret != 1 || endptr == file_version_string)
 		ereport(FATAL,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("\"%s\" is not a valid data directory",
@@ -1509,13 +1526,13 @@ ValidatePgVersion(const char *path)
 
 	FreeFile(file);
 
-	if (my_major != file_major || my_minor != file_minor)
+	if (my_major != file_major)
 		ereport(FATAL,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("database files are incompatible with server"),
-				 errdetail("The data directory was initialized by PostgreSQL version %ld.%ld, "
+				 errdetail("The data directory was initialized by PostgreSQL version %s, "
 						   "which is not compatible with this version %s.",
-						   file_major, file_minor, version_string)));
+						   file_version_string, my_version_string)));
 }
 
 /*-------------------------------------------------------------------------

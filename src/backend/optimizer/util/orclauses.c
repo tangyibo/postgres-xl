@@ -3,7 +3,7 @@
  * orclauses.c
  *	  Routines to extract restriction OR clauses from join OR clauses
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -188,9 +188,8 @@ extract_or_clause(RestrictInfo *or_rinfo, RelOptInfo *rel)
 
 			foreach(lc2, andargs)
 			{
-				RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc2);
+				RestrictInfo *rinfo = lfirst_node(RestrictInfo, lc2);
 
-				Assert(IsA(rinfo, RestrictInfo));
 				if (restriction_is_or_clause(rinfo))
 				{
 					/*
@@ -211,11 +210,11 @@ extract_or_clause(RestrictInfo *or_rinfo, RelOptInfo *rel)
 		}
 		else
 		{
-			Assert(IsA(orarg, RestrictInfo));
-			Assert(!restriction_is_or_clause((RestrictInfo *) orarg));
-			if (is_safe_restriction_clause_for((RestrictInfo *) orarg, rel))
-				subclauses = lappend(subclauses,
-									 ((RestrictInfo *) orarg)->clause);
+			RestrictInfo *rinfo = castNode(RestrictInfo, orarg);
+
+			Assert(!restriction_is_or_clause(rinfo));
+			if (is_safe_restriction_clause_for(rinfo, rel))
+				subclauses = lappend(subclauses, rinfo->clause);
 		}
 
 		/*
@@ -270,6 +269,7 @@ consider_new_or_clause(PlannerInfo *root, RelOptInfo *rel,
 								 true,
 								 false,
 								 false,
+								 join_or_rinfo->security_level,
 								 NULL,
 								 NULL,
 								 NULL);
@@ -296,6 +296,8 @@ consider_new_or_clause(PlannerInfo *root, RelOptInfo *rel,
 	 * OK, add it to the rel's restriction-clause list.
 	 */
 	rel->baserestrictinfo = lappend(rel->baserestrictinfo, or_rinfo);
+	rel->baserestrict_min_security = Min(rel->baserestrict_min_security,
+										 or_rinfo->security_level);
 
 	/*
 	 * Adjust the original join OR clause's cached selectivity to compensate

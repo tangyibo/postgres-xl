@@ -79,9 +79,7 @@ PgxcClassCreate(Oid pcrelid,
 
 	htup = heap_form_tuple(pgxcclassrel->rd_att, values, nulls);
 
-	(void) simple_heap_insert(pgxcclassrel, htup);
-
-	CatalogUpdateIndexes(pgxcclassrel, htup);
+	CatalogTupleInsert(pgxcclassrel, htup);
 
 	heap_close(pgxcclassrel, RowExclusiveLock);
 }
@@ -176,8 +174,7 @@ PgxcClassAlter(Oid pcrelid,
 	newtup = heap_modify_tuple(oldtup, RelationGetDescr(rel),
 							   new_record,
 							   new_record_nulls, new_record_repl);
-	simple_heap_update(rel, &oldtup->t_self, newtup);
-	CatalogUpdateIndexes(rel, newtup);
+	CatalogTupleUpdate(rel, &oldtup->t_self, newtup);
 
 	heap_close(rel, RowExclusiveLock);
 }

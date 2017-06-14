@@ -3,7 +3,7 @@
  *		Database object size functions, and related inquiries
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Copyright (c) 2002-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2002-2017, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *	  src/backend/utils/adt/dbsize.c
@@ -12,13 +12,13 @@
 
 #include "postgres.h"
 
-#include <sys/types.h>
 #include <sys/stat.h>
 
 #include "access/heapam.h"
 #include "access/htup_details.h"
 #include "catalog/catalog.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_authid.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
@@ -73,7 +73,7 @@ db_dir_size(const char *path)
 	int64		dirsize = 0;
 	struct dirent *direntry;
 	DIR		   *dirdesc;
-	char		filename[MAXPGPATH];
+	char		filename[MAXPGPATH * 2];
 
 	dirdesc = AllocateDir(path);
 
@@ -90,7 +90,7 @@ db_dir_size(const char *path)
 			strcmp(direntry->d_name, "..") == 0)
 			continue;
 
-		snprintf(filename, MAXPGPATH, "%s/%s", path, direntry->d_name);
+		snprintf(filename, sizeof(filename), "%s/%s", path, direntry->d_name);
 
 		if (stat(filename, &fst) < 0)
 		{
@@ -118,19 +118,25 @@ calculate_database_size(Oid dbOid)
 	DIR		   *dirdesc;
 	struct dirent *direntry;
 	char		dirpath[MAXPGPATH];
-	char		pathname[MAXPGPATH];
+	char		pathname[MAXPGPATH + 12 + sizeof(TABLESPACE_VERSION_DIRECTORY)];
 	AclResult	aclresult;
 
-	/* User must have connect privilege for target database */
+	/*
+	 * User must have connect privilege for target database or be a member of
+	 * pg_read_all_stats
+	 */
 	aclresult = pg_database_aclcheck(dbOid, GetUserId(), ACL_CONNECT);
-	if (aclresult != ACLCHECK_OK)
+	if (aclresult != ACLCHECK_OK &&
+		!is_member_of_role(GetUserId(), DEFAULT_ROLE_READ_ALL_STATS))
+	{
 		aclcheck_error(aclresult, ACL_KIND_DATABASE,
 					   get_database_name(dbOid));
+	}
 
 	/* Shared storage in pg_global is not counted */
 
 	/* Include pg_default storage */
-	snprintf(pathname, MAXPGPATH, "base/%u", dbOid);
+	snprintf(pathname, sizeof(pathname), "base/%u", dbOid);
 	totalsize = db_dir_size(pathname);
 
 	/* Scan the non-default tablespaces */
@@ -152,10 +158,10 @@ calculate_database_size(Oid dbOid)
 
 #ifdef PGXC
 		/* Postgres-XC tablespaces include node name in path */
-		snprintf(pathname, MAXPGPATH, "pg_tblspc/%s/%s_%s/%u",
+		snprintf(pathname, sizeof(pathname), "pg_tblspc/%s/%s_%s/%u",
 				 direntry->d_name, TABLESPACE_VERSION_DIRECTORY, PGXCNodeName, dbOid);
 #else
-		snprintf(pathname, MAXPGPATH, "pg_tblspc/%s/%s/%u",
+		snprintf(pathname, sizeof(pathname), "pg_tblspc/%s/%s/%u",
 				 direntry->d_name, TABLESPACE_VERSION_DIRECTORY, dbOid);
 #endif
 		totalsize += db_dir_size(pathname);
@@ -214,18 +220,19 @@ static int64
 calculate_tablespace_size(Oid tblspcOid)
 {
 	char		tblspcPath[MAXPGPATH];
-	char		pathname[MAXPGPATH];
+	char		pathname[MAXPGPATH * 2];
 	int64		totalsize = 0;
 	DIR		   *dirdesc;
 	struct dirent *direntry;
 	AclResult	aclresult;
 
 	/*
-	 * User must have CREATE privilege for target tablespace, either
-	 * explicitly granted or implicitly because it is default for current
-	 * database.
+	 * User must be a member of pg_read_all_stats or have CREATE privilege for
+	 * target tablespace, either explicitly granted or implicitly because it
+	 * is default for current database.
 	 */
-	if (tblspcOid != MyDatabaseTableSpace)
+	if (tblspcOid != MyDatabaseTableSpace &&
+		!is_member_of_role(GetUserId(), DEFAULT_ROLE_READ_ALL_STATS))
 	{
 		aclresult = pg_tablespace_aclcheck(tblspcOid, GetUserId(), ACL_CREATE);
 		if (aclresult != ACLCHECK_OK)
@@ -262,7 +269,7 @@ calculate_tablespace_size(Oid tblspcOid)
 			strcmp(direntry->d_name, "..") == 0)
 			continue;
 
-		snprintf(pathname, MAXPGPATH, "%s/%s", tblspcPath, direntry->d_name);
+		snprintf(pathname, sizeof(pathname), "%s/%s", tblspcPath, direntry->d_name);
 
 		if (stat(pathname, &fst) < 0)
 		{
@@ -373,7 +380,7 @@ Datum
 pg_relation_size(PG_FUNCTION_ARGS)
 {
 	Oid			relOid = PG_GETARG_OID(0);
-	text	   *forkName = PG_GETARG_TEXT_P(1);
+	text	   *forkName = PG_GETARG_TEXT_PP(1);
 	Relation	rel;
 	int64		size;
 
@@ -846,13 +853,15 @@ pg_size_bytes(PG_FUNCTION_ARGS)
 	/* Part (4): optional exponent */
 	if (*endptr == 'e' || *endptr == 'E')
 	{
+		long		exponent;
 		char	   *cp;
 
 		/*
 		 * Note we might one day support EB units, so if what follows 'E'
 		 * isn't a number, just treat it all as a unit to be parsed.
 		 */
-		(void) strtol(endptr + 1, &cp, 10);
+		exponent = strtol(endptr + 1, &cp, 10);
+		(void) exponent;		/* Silence -Wunused-result warnings */
 		if (cp > endptr + 1)
 			endptr = cp;
 	}

@@ -5,7 +5,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -35,5 +35,7 @@ extern List *transformCreateSchemaStmt(CreateSchemaStmt *stmt);
 #ifdef PGXC
 extern bool CheckLocalIndexColumn (char loctype, char *partcolname, char *indexcolname);
 #endif
+extern PartitionBoundSpec *transformPartitionBound(ParseState *pstate, Relation parent,
+						PartitionBoundSpec *spec);
 
 #endif   /* PARSE_UTILCMD_H */

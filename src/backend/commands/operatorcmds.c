@@ -4,7 +4,7 @@
  *
  *	  Routines for operator manipulation commands
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -368,7 +368,7 @@ RemoveOperatorById(Oid operOid)
 		}
 	}
 
-	simple_heap_delete(relation, &tup->t_self);
+	CatalogTupleDelete(relation, &tup->t_self);
 
 	ReleaseSysCache(tup);
 
@@ -402,10 +402,7 @@ AlterOperator(AlterOperatorStmt *stmt)
 	Oid			joinOid;
 
 	/* Look up the operator */
-	oprId = LookupOperNameTypeNames(NULL, stmt->opername,
-									(TypeName *) linitial(stmt->operargs),
-									(TypeName *) lsecond(stmt->operargs),
-									false, -1);
+	oprId = LookupOperWithArgs(stmt->opername, false);
 	catalog = heap_open(OperatorRelationId, RowExclusiveLock);
 	tup = SearchSysCacheCopy1(OPEROID, ObjectIdGetDatum(oprId));
 	if (tup == NULL)
@@ -518,8 +515,7 @@ AlterOperator(AlterOperatorStmt *stmt)
 	tup = heap_modify_tuple(tup, RelationGetDescr(catalog),
 							values, nulls, replaces);
 
-	simple_heap_update(catalog, &tup->t_self, tup);
-	CatalogUpdateIndexes(catalog, tup);
+	CatalogTupleUpdate(catalog, &tup->t_self, tup);
 
 	address = makeOperatorDependencies(tup, true);
 

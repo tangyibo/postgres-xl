@@ -4,7 +4,7 @@
  *	   Win32 open() replacement
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  *
  * src/port/open.c
  *
@@ -19,7 +19,6 @@
 #include "postgres_fe.h"
 #endif
 
-#include <windows.h>
 #include <fcntl.h>
 #include <assert.h>
 

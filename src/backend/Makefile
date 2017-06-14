@@ -2,7 +2,7 @@
 #
 # Makefile for the postgres backend
 #
-# Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+# Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
 # Portions Copyright (c) 1994, Regents of the University of California
 #
 # src/backend/Makefile
@@ -23,15 +23,15 @@ endif
 
 SUBDIRS = access bootstrap catalog parser commands executor foreign lib libpq \
 	pgxc main nodes optimizer port postmaster regex replication rewrite \
-	storage tcop tsearch utils $(top_builddir)/src/timezone $(top_builddir)/src/interfaces/libpq
+	statistics storage tcop tsearch utils $(top_builddir)/src/timezone $(top_builddir)/src/interfaces/libpq
 
 include $(srcdir)/common.mk
 
 # As of 1/2010:
 # The probes.o file is necessary for dtrace support on Solaris, and on recent
 # versions of systemtap.  (Older systemtap releases just produce an empty
-# file, but that's okay.)  However, OS X's dtrace doesn't use it and doesn't
-# even recognize the -G option.  So, build probes.o except on Darwin.
+# file, but that's okay.)  However, macOS's dtrace doesn't use it and doesn't
+# even recognize the -G option.  So, build probes.o except on macOS.
 # This might need adjustment as other platforms add dtrace support.
 ifneq ($(PORTNAME), darwin)
 ifeq ($(enable_dtrace), yes)
@@ -50,6 +50,7 @@ OBJS = $(SUBDIROBJS) $(LOCALOBJS) \
 	$(top_builddir)/src/interfaces/libpq/fe-exec.o \
 	$(top_builddir)/src/interfaces/libpq/fe-auth.o \
 	$(top_builddir)/src/interfaces/libpq/pqexpbuffer.o \
+	$(top_builddir)/src/interfaces/libpq/fe-auth-scram.o \
 	$(top_builddir)/src/gtm/client/libgtmclient.a \
 	$(top_builddir)/src/gtm/common/libgtm.a \
 	$(top_builddir)/src/gtm/libpq/libpqcomm.a
@@ -78,7 +79,7 @@ ifneq ($(PORTNAME), win32)
 ifneq ($(PORTNAME), aix)
 
 postgres: $(OBJS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) -L$(top_builddir)/src/gtm/libpg $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(LDFLAGS_EX) -L$(top_builddir)/src/gtm/libpg $(export_dynamic) $(call expand_subsys,$^) $(LIBS) $(ICU_LIBS) -o $@
 
 endif
 endif
@@ -159,8 +160,11 @@ storage/lmgr/lwlocknames.h: storage/lmgr/generate-lwlocknames.pl storage/lmgr/lw
 utils/errcodes.h: utils/generate-errcodes.pl utils/errcodes.txt
 	$(MAKE) -C utils errcodes.h
 
+# see explanation in parser/Makefile
+utils/fmgrprotos.h: utils/fmgroids.h ;
+
 utils/fmgroids.h: utils/Gen_fmgrtab.pl catalog/Catalog.pm $(top_srcdir)/src/include/catalog/pg_proc.h
-	$(MAKE) -C utils fmgroids.h
+	$(MAKE) -C utils $(notdir $@)
 
 utils/probes.h: utils/probes.d
 	$(MAKE) -C utils probes.h
@@ -186,7 +190,7 @@ submake-schemapg:
 
 .PHONY: generated-headers
 
-generated-headers: $(top_builddir)/src/include/parser/gram.h $(top_builddir)/src/include/catalog/schemapg.h $(top_builddir)/src/include/storage/lwlocknames.h $(top_builddir)/src/include/utils/errcodes.h $(top_builddir)/src/include/utils/fmgroids.h $(top_builddir)/src/include/utils/probes.h
+generated-headers: $(top_builddir)/src/include/parser/gram.h $(top_builddir)/src/include/catalog/schemapg.h $(top_builddir)/src/include/storage/lwlocknames.h $(top_builddir)/src/include/utils/errcodes.h $(top_builddir)/src/include/utils/fmgroids.h $(top_builddir)/src/include/utils/fmgrprotos.h $(top_builddir)/src/include/utils/probes.h
 
 $(top_builddir)/src/include/parser/gram.h: parser/gram.h
 	prereqdir=`cd '$(dir $<)' >/dev/null && pwd` && \
@@ -213,6 +217,11 @@ $(top_builddir)/src/include/utils/fmgroids.h: utils/fmgroids.h
 	  cd '$(dir $@)' && rm -f $(notdir $@) && \
 	  $(LN_S) "$$prereqdir/$(notdir $<)" .
 
+$(top_builddir)/src/include/utils/fmgrprotos.h: utils/fmgrprotos.h
+	prereqdir=`cd '$(dir $<)' >/dev/null && pwd` && \
+	  cd '$(dir $@)' && rm -f $(notdir $@) && \
+	  $(LN_S) "$$prereqdir/$(notdir $<)" .
+
 $(top_builddir)/src/include/utils/probes.h: utils/probes.h
 	cd '$(dir $@)' && rm -f $(notdir $@) && \
 	    $(LN_S) "../../../$(subdir)/utils/probes.h" .
@@ -231,7 +240,7 @@ distprep:
 	$(MAKE) -C catalog	schemapg.h postgres.bki postgres.description postgres.shdescription
 	$(MAKE) -C replication	repl_gram.c repl_scanner.c syncrep_gram.c syncrep_scanner.c
 	$(MAKE) -C storage/lmgr	lwlocknames.h
-	$(MAKE) -C utils	fmgrtab.c fmgroids.h errcodes.h
+	$(MAKE) -C utils	fmgrtab.c fmgroids.h fmgrprotos.h errcodes.h
 	$(MAKE) -C utils/misc	guc-file.c
 	$(MAKE) -C utils/sort	qsort_tuple.c
 
@@ -323,6 +332,7 @@ clean:
 		$(top_builddir)/src/include/catalog/schemapg.h \
 		$(top_builddir)/src/include/storage/lwlocknames.h \
 		$(top_builddir)/src/include/utils/fmgroids.h \
+		$(top_builddir)/src/include/utils/fmgrprotos.h \
 		$(top_builddir)/src/include/utils/probes.h
 ifeq ($(PORTNAME), cygwin)
 	rm -f postgres.dll libpostgres.a
@@ -351,6 +361,7 @@ maintainer-clean: distclean
 	      storage/lmgr/lwlocknames.c \
 	      storage/lmgr/lwlocknames.h \
 	      utils/fmgroids.h \
+	      utils/fmgrprotos.h \
 	      utils/fmgrtab.c \
 	      utils/errcodes.h \
 	      utils/misc/guc-file.c \

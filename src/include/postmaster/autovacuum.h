@@ -4,7 +4,7 @@
  *	  header file for integrated autovacuum daemon
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -14,6 +14,17 @@
  */
 #ifndef AUTOVACUUM_H
 #define AUTOVACUUM_H
+
+#include "storage/block.h"
+
+/*
+ * Other processes can request specific work from autovacuum, identified by
+ * AutoVacuumWorkItem elements.
+ */
+typedef enum
+{
+	AVW_BRINSummarizeRange
+} AutoVacuumWorkItemType;
 
 
 
@@ -65,6 +76,9 @@ extern void AutoVacWorkerMain(int argc, char *argv[]) pg_attribute_noreturn();
 extern void AutovacuumWorkerIAm(void);
 extern void AutovacuumLauncherIAm(void);
 #endif
+
+extern void AutoVacuumRequestWork(AutoVacuumWorkItemType type,
+					  Oid relationId, BlockNumber blkno);
 
 /* shared memory stuff */
 extern Size AutoVacuumShmemSize(void);

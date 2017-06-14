@@ -3,7 +3,7 @@
  * parse_oper.c
  *		handle operator things for parser
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -132,32 +132,34 @@ LookupOperName(ParseState *pstate, List *opername, Oid oprleft, Oid oprright,
 }
 
 /*
- * LookupOperNameTypeNames
+ * LookupOperWithArgs
  *		Like LookupOperName, but the argument types are specified by
- *		TypeName nodes.
- *
- * Pass oprleft = NULL for a prefix op, oprright = NULL for a postfix op.
+ *		a ObjectWithArg node.
  */
 Oid
-LookupOperNameTypeNames(ParseState *pstate, List *opername,
-						TypeName *oprleft, TypeName *oprright,
-						bool noError, int location)
+LookupOperWithArgs(ObjectWithArgs *oper, bool noError)
 {
+	TypeName   *oprleft,
+			   *oprright;
 	Oid			leftoid,
 				rightoid;
+
+	Assert(list_length(oper->objargs) == 2);
+	oprleft = linitial(oper->objargs);
+	oprright = lsecond(oper->objargs);
 
 	if (oprleft == NULL)
 		leftoid = InvalidOid;
 	else
-		leftoid = LookupTypeNameOid(pstate, oprleft, noError);
+		leftoid = LookupTypeNameOid(NULL, oprleft, noError);
 
 	if (oprright == NULL)
 		rightoid = InvalidOid;
 	else
-		rightoid = LookupTypeNameOid(pstate, oprright, noError);
+		rightoid = LookupTypeNameOid(NULL, oprright, noError);
 
-	return LookupOperName(pstate, opername, leftoid, rightoid,
-						  noError, location);
+	return LookupOperName(NULL, oper->objname, leftoid, rightoid,
+						  noError, -1);
 }
 
 /*
@@ -838,6 +840,10 @@ make_op(ParseState *pstate, List *opname, Node *ltree, Node *rtree,
 	/* opcollid and inputcollid will be set by parse_collate.c */
 	result->args = args;
 	result->location = location;
+
+	/* if it returns a set, check that's OK */
+	if (result->opretset)
+		check_srf_call_placement(pstate, location);
 
 	ReleaseSysCache(tup);
 

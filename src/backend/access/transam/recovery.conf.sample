@@ -67,10 +67,10 @@
 # must set a recovery target.
 #
 # You may set a recovery target either by transactionId, by name,
-# or by timestamp or by barrier. Recovery may either include or exclude the
-# transaction(s) with the recovery target value (ie, stop either
-# just after or just before the given target, respectively). In case of
-# barrier, the recovery stops exactly at that point.
+# or by timestamp or by WAL location (LSN) or by barrier. Recovery may either
+# include or exclude the transaction(s) with the recovery target value (ie,
+# stop either just after or just before the given target, respectively). In
+# case of barrier, the recovery stops exactly at that point.
 #
 #
 #recovery_target_name = ''	# e.g. 'daily backup 2011-01-26'
@@ -80,6 +80,8 @@
 #recovery_target_xid = ''
 #
 #recovery_target_barrier = ''
+#
+#recovery_target_lsn = ''	# e.g. '0/70006B8'
 #
 #recovery_target_inclusive = true
 #
@@ -99,7 +101,7 @@
 #
 # If recovery_target_action = 'pause', recovery will pause when the
 # recovery target is reached. The pause state will continue until
-# pg_xlog_replay_resume() is called. This setting has no effect if
+# pg_wal_replay_resume() is called. This setting has no effect if
 # no recovery target is set. If hot_standby is not enabled then the
 # server will shutdown instead, though you may request this in
 # any case by specifying 'shutdown'.

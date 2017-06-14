@@ -5,7 +5,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -34,6 +34,7 @@
 #include "utils/syscache.h"
 #include "utils/snapmgr.h"
 #include "utils/timestamp.h"
+#include "utils/varlena.h"
 #include "mb/pg_wchar.h"
 
 /*
@@ -311,11 +312,7 @@ check_timezone(char **newval, void **extra, GucSource source)
 		}
 
 		/* Here we change from SQL to Unix sign convention */
-#ifdef HAVE_INT64_TIMESTAMP
 		gmtoffset = -(interval->time / USECS_PER_SEC);
-#else
-		gmtoffset = -interval->time;
-#endif
 		new_tz = pg_tzset_offset(gmtoffset);
 
 		pfree(interval);

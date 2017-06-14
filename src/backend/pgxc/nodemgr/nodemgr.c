@@ -28,6 +28,8 @@
 #include "pgxc/locator.h"
 #include "pgxc/nodemgr.h"
 #include "pgxc/pgxc.h"
+#include "storage/lwlock.h"
+#include "storage/shmem.h"
 
 /*
  * How many times should we try to find a unique indetifier
@@ -838,10 +840,7 @@ PgxcNodeCreate(CreateNodeStmt *stmt)
 
 	htup = heap_form_tuple(pgxcnodesrel->rd_att, values, nulls);
 
-	/* Insert tuple in catalog */
-	simple_heap_insert(pgxcnodesrel, htup);
-
-	CatalogUpdateIndexes(pgxcnodesrel, htup);
+	CatalogTupleInsert(pgxcnodesrel, htup);
 
 	heap_close(pgxcnodesrel, AccessExclusiveLock);
 }
@@ -964,10 +963,7 @@ PgxcNodeAlter(AlterNodeStmt *stmt)
 	newtup = heap_modify_tuple(oldtup, RelationGetDescr(rel),
 							   new_record,
 							   new_record_nulls, new_record_repl);
-	simple_heap_update(rel, &oldtup->t_self, newtup);
-
-	/* Update indexes */
-	CatalogUpdateIndexes(rel, newtup);
+	CatalogTupleUpdate(rel, &oldtup->t_self, newtup);
 
 	/* Release lock at Commit */
 	heap_close(rel, NoLock);

@@ -5,7 +5,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/storage/smgr.h
@@ -65,8 +65,12 @@ typedef struct SMgrRelationData
 	 */
 	int			smgr_which;		/* storage manager selector */
 
-	/* for md.c; NULL for forks that are not open */
-	struct _MdfdVec *md_fd[MAX_FORKNUM + 1];
+	/*
+	 * for md.c; per-fork arrays of the number of open segments
+	 * (md_num_open_segs) and the segments themselves (md_seg_fds).
+	 */
+	int			md_num_open_segs[MAX_FORKNUM + 1];
+	struct _MdfdVec *md_seg_fds[MAX_FORKNUM + 1];
 
 	/* if unowned, list link in list of all unowned SMgrRelations */
 	struct SMgrRelationData *next_unowned_reln;
@@ -146,11 +150,5 @@ extern void RememberFsyncRequest(RelFileNode rnode, ForkNumber forknum,
 					 BlockNumber segno);
 extern void ForgetRelationFsyncRequests(RelFileNode rnode, ForkNumber forknum);
 extern void ForgetDatabaseFsyncRequests(Oid dbid);
-
-/* smgrtype.c */
-extern Datum smgrout(PG_FUNCTION_ARGS);
-extern Datum smgrin(PG_FUNCTION_ARGS);
-extern Datum smgreq(PG_FUNCTION_ARGS);
-extern Datum smgrne(PG_FUNCTION_ARGS);
 
 #endif   /* SMGR_H */

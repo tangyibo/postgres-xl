@@ -44,7 +44,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -134,6 +134,7 @@ struct Tuplestorestate
 	bool		truncated;		/* tuplestore_trim has removed tuples? */
 	int64		availMem;		/* remaining memory available, in bytes */
 	int64		allowedMem;		/* total memory allowed, in bytes */
+	int64		tuples;			/* number of tuples added */
 	BufFile    *myfile;			/* underlying file, or NULL if none */
 	MemoryContext context;		/* memory context for holding tuples */
 #ifdef XCP
@@ -308,6 +309,7 @@ tuplestore_begin_common(int eflags, bool interXact, int maxKBytes)
 
 	state->memtupdeleted = 0;
 	state->memtupcount = 0;
+	state->tuples = 0;
 
 	/*
 	 * Initial size of array must be more than ALLOCSET_SEPARATE_THRESHOLD;
@@ -486,6 +488,7 @@ tuplestore_clear(Tuplestorestate *state)
 	state->truncated = false;
 	state->memtupdeleted = 0;
 	state->memtupcount = 0;
+	state->tuples = 0;
 	readptr = state->readptrs;
 	for (i = 0; i < state->readptrcount; readptr++, i++)
 	{
@@ -594,6 +597,18 @@ tuplestore_select_read_pointer(Tuplestorestate *state, int ptr)
 	}
 
 	state->activeptr = ptr;
+}
+
+/*
+ * tuplestore_tuple_count
+ *
+ * Returns the number of tuples added since creation or the last
+ * tuplestore_clear().
+ */
+int64
+tuplestore_tuple_count(Tuplestorestate *state)
+{
+	return state->tuples;
 }
 
 /*
@@ -844,6 +859,7 @@ tuplestore_puttuple_common(Tuplestorestate *state, void *tuple)
 
 	if (state->stat_name)
 		state->stat_write_count++;
+	state->tuples++;
 
 	switch (state->status)
 	{

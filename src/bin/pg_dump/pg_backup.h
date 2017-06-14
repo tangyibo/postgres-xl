@@ -74,7 +74,9 @@ typedef struct _restoreOptions
 	int			dump_inserts;
 	int			column_inserts;
 	int			if_exists;
+	int			no_publications;	/* Skip publication entries */
 	int			no_security_labels;		/* Skip security label entries */
+	int			no_subscriptions;		/* Skip subscription entries */
 	int			strict_names;
 
 	const char *filename;
@@ -99,6 +101,7 @@ typedef struct _restoreOptions
 	SimpleStringList indexNames;
 	SimpleStringList functionNames;
 	SimpleStringList schemaNames;
+	SimpleStringList schemaExcludeNames;
 	SimpleStringList triggerNames;
 	SimpleStringList tableNames;
 
@@ -117,6 +120,8 @@ typedef struct _restoreOptions
 
 	bool	   *idWanted;		/* array showing which dump IDs to emit */
 	int			enable_row_security;
+	int			sequence_data;	/* dump sequence data even in schema-only mode */
+	int			binary_upgrade;
 } RestoreOptions;
 
 typedef struct _dumpOptions
@@ -142,6 +147,8 @@ typedef struct _dumpOptions
 	int			column_inserts;
 	int			if_exists;
 	int			no_security_labels;
+	int			no_publications;
+	int			no_subscriptions;
 	int			no_synchronized_snapshots;
 	int			no_unlogged_table_data;
 	int			serializable_deferrable;
@@ -157,8 +164,11 @@ typedef struct _dumpOptions
 	int			outputClean;
 	int			outputCreateDB;
 	bool		outputBlobs;
+	bool		dontOutputBlobs;
 	int			outputNoOwner;
 	char	   *outputSuperuser;
+
+	int			sequence_data;	/* dump sequence data even in schema-only mode */
 } DumpOptions;
 
 /*
@@ -222,7 +232,7 @@ typedef int DumpId;
 
 typedef int (*DataDumperPtr) (Archive *AH, void *userArg);
 
-typedef void (*SetupWorkerPtr) (Archive *AH);
+typedef void (*SetupWorkerPtrType) (Archive *AH);
 
 /*
  * Main archiver interface.
@@ -268,8 +278,8 @@ extern Archive *OpenArchive(const char *FileSpec, const ArchiveFormat fmt);
 
 /* Create a new archive */
 extern Archive *CreateArchive(const char *FileSpec, const ArchiveFormat fmt,
-			  const int compression, ArchiveMode mode,
-			  SetupWorkerPtr setupDumpWorker);
+			  const int compression, bool dosync, ArchiveMode mode,
+			  SetupWorkerPtrType setupDumpWorker);
 
 /* The --list option */
 extern void PrintTOCSummary(Archive *AH);

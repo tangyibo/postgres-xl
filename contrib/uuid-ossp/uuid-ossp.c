@@ -2,7 +2,7 @@
  *
  * UUID generation functions using the BSD, E2FS or OSSP UUID library
  *
- * Copyright (c) 2007-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2007-2017, PostgreSQL Global Development Group
  *
  * Portions Copyright (c) 2009 Andrew Gierth
  *
@@ -17,6 +17,10 @@
 #include "utils/builtins.h"
 #include "utils/uuid.h"
 
+/* for ntohl/htonl */
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 /*
  * It's possible that there's more than one uuid.h header file present.
  * We expect configure to set the HAVE_ symbol for only the one we want.
@@ -26,14 +30,14 @@
  */
 #define uuid_hash bsd_uuid_hash
 
-#ifdef HAVE_UUID_H
+#if defined(HAVE_UUID_H)
 #include <uuid.h>
-#endif
-#ifdef HAVE_OSSP_UUID_H
+#elif defined(HAVE_OSSP_UUID_H)
 #include <ossp/uuid.h>
-#endif
-#ifdef HAVE_UUID_UUID_H
+#elif defined(HAVE_UUID_UUID_H)
 #include <uuid/uuid.h>
+#else
+#error "please use configure's --with-uuid switch to select a UUID library"
 #endif
 
 #undef uuid_hash
@@ -499,13 +503,13 @@ Datum
 uuid_generate_v3(PG_FUNCTION_ARGS)
 {
 	pg_uuid_t  *ns = PG_GETARG_UUID_P(0);
-	text	   *name = PG_GETARG_TEXT_P(1);
+	text	   *name = PG_GETARG_TEXT_PP(1);
 
 #ifdef HAVE_UUID_OSSP
 	return uuid_generate_v35_internal(UUID_MAKE_V3, ns, name);
 #else
 	return uuid_generate_internal(UUID_MAKE_V3, (unsigned char *) ns,
-								  VARDATA(name), VARSIZE(name) - VARHDRSZ);
+								  VARDATA_ANY(name), VARSIZE_ANY_EXHDR(name));
 #endif
 }
 
@@ -521,12 +525,12 @@ Datum
 uuid_generate_v5(PG_FUNCTION_ARGS)
 {
 	pg_uuid_t  *ns = PG_GETARG_UUID_P(0);
-	text	   *name = PG_GETARG_TEXT_P(1);
+	text	   *name = PG_GETARG_TEXT_PP(1);
 
 #ifdef HAVE_UUID_OSSP
 	return uuid_generate_v35_internal(UUID_MAKE_V5, ns, name);
 #else
 	return uuid_generate_internal(UUID_MAKE_V5, (unsigned char *) ns,
-								  VARDATA(name), VARSIZE(name) - VARHDRSZ);
+								  VARDATA_ANY(name), VARSIZE_ANY_EXHDR(name));
 #endif
 }

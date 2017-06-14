@@ -6,7 +6,7 @@
 # runs the regression tests (to put in some data), runs pg_dumpall,
 # runs pg_upgrade, runs pg_dumpall again, compares the dumps.
 #
-# Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+# Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
 # Portions Copyright (c) 1994, Regents of the University of California
 
 set -e
@@ -83,6 +83,8 @@ if [ "$1" = '--install' ]; then
 	export DYLD_LIBRARY_PATH
 	LIBPATH=$libdir:$LIBPATH
 	export LIBPATH
+	SHLIB_PATH=$libdir:$SHLIB_PATH
+	export SHLIB_PATH
 	PATH=$libdir:$PATH
 
 	# We need to make it use psql from our temporary installation,
@@ -168,7 +170,7 @@ createdb "$dbname2" || createdb_status=$?
 createdb "$dbname3" || createdb_status=$?
 
 if "$MAKE" -C "$oldsrc" installcheck; then
-	pg_dumpall -f "$temp_root"/dump1.sql || pg_dumpall1_status=$?
+	pg_dumpall --no-sync -f "$temp_root"/dump1.sql || pg_dumpall1_status=$?
 	if [ "$newsrc" != "$oldsrc" ]; then
 		oldpgversion=`psql -X -A -t -d regression -c "SHOW server_version_num"`
 		fix_sql=""
@@ -219,7 +221,7 @@ case $testhost in
 	*)		sh ./analyze_new_cluster.sh ;;
 esac
 
-pg_dumpall -f "$temp_root"/dump2.sql || pg_dumpall2_status=$?
+pg_dumpall --no-sync -f "$temp_root"/dump2.sql || pg_dumpall2_status=$?
 pg_ctl -m fast stop
 
 # no need to echo commands anymore

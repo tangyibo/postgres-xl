@@ -4,7 +4,7 @@
  *	  Support routines for external and compressed storage of
  *	  variable size attributes.
  *
- * Copyright (c) 2000-2016, PostgreSQL Global Development Group
+ * Copyright (c) 2000-2017, PostgreSQL Global Development Group
  *
  *
  * IDENTIFICATION
@@ -67,7 +67,7 @@ typedef struct toast_compress_header
 #define TOAST_COMPRESS_SET_RAWSIZE(ptr, len) \
 	(((toast_compress_header *) (ptr))->rawsize = (len))
 
-static void toast_delete_datum(Relation rel, Datum value);
+static void toast_delete_datum(Relation rel, Datum value, bool is_speculative);
 static Datum toast_save_datum(Relation rel, Datum value,
 				 struct varlena * oldexternal, int options);
 static bool toastrel_valueid_exists(Relation toastrel, Oid valueid);
@@ -461,7 +461,7 @@ toast_datum_size(Datum value)
  * ----------
  */
 void
-toast_delete(Relation rel, HeapTuple oldtup)
+toast_delete(Relation rel, HeapTuple oldtup, bool is_speculative)
 {
 	TupleDesc	tupleDesc;
 	Form_pg_attribute *att;
@@ -508,7 +508,7 @@ toast_delete(Relation rel, HeapTuple oldtup)
 			if (toast_isnull[i])
 				continue;
 			else if (VARATT_IS_EXTERNAL_ONDISK(PointerGetDatum(value)))
-				toast_delete_datum(rel, value);
+				toast_delete_datum(rel, value, is_speculative);
 		}
 	}
 }
@@ -1068,7 +1068,7 @@ toast_insert_or_update(Relation rel, HeapTuple newtup, HeapTuple oldtup,
 	if (need_delold)
 		for (i = 0; i < numAttrs; i++)
 			if (toast_delold[i])
-				toast_delete_datum(rel, toast_oldvalues[i]);
+				toast_delete_datum(rel, toast_oldvalues[i], false);
 
 	return result_tuple;
 }
@@ -1292,6 +1292,74 @@ toast_flatten_tuple_to_datum(HeapTupleHeader tup,
 			pfree(DatumGetPointer(toast_values[i]));
 
 	return PointerGetDatum(new_data);
+}
+
+
+/* ----------
+ * toast_build_flattened_tuple -
+ *
+ *	Build a tuple containing no out-of-line toasted fields.
+ *	(This does not eliminate compressed or short-header datums.)
+ *
+ *	This is essentially just like heap_form_tuple, except that it will
+ *	expand any external-data pointers beforehand.
+ *
+ *	It's not very clear whether it would be preferable to decompress
+ *	in-line compressed datums while at it.  For now, we don't.
+ * ----------
+ */
+HeapTuple
+toast_build_flattened_tuple(TupleDesc tupleDesc,
+							Datum *values,
+							bool *isnull)
+{
+	HeapTuple	new_tuple;
+	Form_pg_attribute *att = tupleDesc->attrs;
+	int			numAttrs = tupleDesc->natts;
+	int			num_to_free;
+	int			i;
+	Datum		new_values[MaxTupleAttributeNumber];
+	Pointer		freeable_values[MaxTupleAttributeNumber];
+
+	/*
+	 * We can pass the caller's isnull array directly to heap_form_tuple, but
+	 * we potentially need to modify the values array.
+	 */
+	Assert(numAttrs <= MaxTupleAttributeNumber);
+	memcpy(new_values, values, numAttrs * sizeof(Datum));
+
+	num_to_free = 0;
+	for (i = 0; i < numAttrs; i++)
+	{
+		/*
+		 * Look at non-null varlena attributes
+		 */
+		if (!isnull[i] && att[i]->attlen == -1)
+		{
+			struct varlena *new_value;
+
+			new_value = (struct varlena *) DatumGetPointer(new_values[i]);
+			if (VARATT_IS_EXTERNAL(new_value))
+			{
+				new_value = heap_tuple_fetch_attr(new_value);
+				new_values[i] = PointerGetDatum(new_value);
+				freeable_values[num_to_free++] = (Pointer) new_value;
+			}
+		}
+	}
+
+	/*
+	 * Form the reconfigured tuple.
+	 */
+	new_tuple = heap_form_tuple(tupleDesc, new_values, isnull);
+
+	/*
+	 * Free allocated temp values
+	 */
+	for (i = 0; i < num_to_free; i++)
+		pfree(freeable_values[i]);
+
+	return new_tuple;
 }
 
 
@@ -1611,7 +1679,9 @@ toast_save_datum(Relation rel, Datum value,
 		 * Create the index entry.  We cheat a little here by not using
 		 * FormIndexDatum: this relies on the knowledge that the index columns
 		 * are the same as the initial columns of the table for all the
-		 * indexes.
+		 * indexes.  We also cheat by not providing an IndexInfo: this is okay
+		 * for now because btree doesn't need one, but we might have to be
+		 * more honest someday.
 		 *
 		 * Note also that there had better not be any user-created index on
 		 * the TOAST table, since we don't bother to update anything else.
@@ -1624,7 +1694,8 @@ toast_save_datum(Relation rel, Datum value,
 							 &(toasttup->t_self),
 							 toastrel,
 							 toastidxs[i]->rd_index->indisunique ?
-							 UNIQUE_CHECK_YES : UNIQUE_CHECK_NO);
+							 UNIQUE_CHECK_YES : UNIQUE_CHECK_NO,
+							 NULL);
 		}
 
 		/*
@@ -1663,7 +1734,7 @@ toast_save_datum(Relation rel, Datum value,
  * ----------
  */
 static void
-toast_delete_datum(Relation rel, Datum value)
+toast_delete_datum(Relation rel, Datum value, bool is_speculative)
 {
 	struct varlena *attr = (struct varlena *) DatumGetPointer(value);
 	struct varatt_external toast_pointer;
@@ -1714,7 +1785,10 @@ toast_delete_datum(Relation rel, Datum value)
 		/*
 		 * Have a chunk, delete it
 		 */
-		simple_heap_delete(toastrel, &toasttup->t_self);
+		if (is_speculative)
+			heap_abort_speculative(toastrel, toasttup);
+		else
+			simple_heap_delete(toastrel, &toasttup->t_self);
 	}
 
 	/*

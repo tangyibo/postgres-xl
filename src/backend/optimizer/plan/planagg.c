@@ -18,7 +18,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -102,6 +102,14 @@ preprocess_minmax_aggregates(PlannerInfo *root, List *tlist)
 	 */
 	if (parse->groupClause || list_length(parse->groupingSets) > 1 ||
 		parse->hasWindowFuncs)
+		return;
+
+	/*
+	 * Reject if query contains any CTEs; there's no way to build an indexscan
+	 * on one so we couldn't succeed here.  (If the CTEs are unreferenced,
+	 * that's not true, but it doesn't seem worth expending cycles to check.)
+	 */
+	if (parse->cteList)
 		return;
 
 	/*
@@ -361,13 +369,12 @@ build_minmax_path(PlannerInfo *root, MinMaxAggInfo *mminfo,
 	subroot->plan_params = NIL;
 	subroot->outer_params = NULL;
 	subroot->init_plans = NIL;
-	subroot->cte_plan_ids = NIL;
 
-	subroot->parse = parse = (Query *) copyObject(root->parse);
+	subroot->parse = parse = copyObject(root->parse);
 	IncrementVarSublevelsUp((Node *) parse, 1, 1);
 
 	/* append_rel_list might contain outer Vars? */
-	subroot->append_rel_list = (List *) copyObject(root->append_rel_list);
+	subroot->append_rel_list = copyObject(root->append_rel_list);
 	IncrementVarSublevelsUp((Node *) subroot->append_rel_list, 1, 1);
 	/* There shouldn't be any OJ info to translate, as yet */
 	Assert(subroot->join_info_list == NIL);

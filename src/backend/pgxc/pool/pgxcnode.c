@@ -48,6 +48,7 @@
 #include "pgxc/pgxc.h"
 #include "pgxc/poolmgr.h"
 #include "tcop/dest.h"
+#include "storage/lwlock.h"
 #include "utils/builtins.h"
 #include "utils/elog.h"
 #include "utils/memutils.h"
@@ -2509,7 +2510,7 @@ PGXCNodeGetNodeOid(int nodeid, char node_type)
 Datum
 pgxc_node_str(PG_FUNCTION_ARGS)
 {
-	PG_RETURN_NAME(PGXCNodeName);
+	PG_RETURN_TEXT_P(cstring_to_text(PGXCNodeName));
 }
 
 /*

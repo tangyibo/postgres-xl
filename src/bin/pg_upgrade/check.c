@@ -3,7 +3,7 @@
  *
  *	server checks and output routines
  *
- *	Copyright (c) 2010-2016, PostgreSQL Global Development Group
+ *	Copyright (c) 2010-2017, PostgreSQL Global Development Group
  *	src/bin/pg_upgrade/check.c
  */
 
@@ -26,7 +26,6 @@ static void check_for_isn_and_int8_passing_mismatch(ClusterInfo *cluster);
 static void check_for_reg_data_type_usage(ClusterInfo *cluster);
 static void check_for_jsonb_9_4_usage(ClusterInfo *cluster);
 static void check_for_pg_role_prefix(ClusterInfo *cluster);
-static void get_bin_version(ClusterInfo *cluster);
 static char *get_canonical_locale_name(int category, const char *locale);
 
 
@@ -98,6 +97,17 @@ check_and_dump_old_cluster(bool live_check)
 	check_for_prepared_transactions(&old_cluster);
 	check_for_reg_data_type_usage(&old_cluster);
 	check_for_isn_and_int8_passing_mismatch(&old_cluster);
+
+	/*
+	 * Pre-PG 10 allowed tables with 'unknown' type columns and non WAL logged
+	 * hash indexes
+	 */
+	if (GET_MAJOR_VERSION(old_cluster.major_version) <= 906)
+	{
+		old_9_6_check_for_unknown_data_type_usage(&old_cluster);
+		if (user_opts.check)
+			old_9_6_invalidate_hash_indexes(&old_cluster, true);
+	}
 
 	/* 9.5 and below should not have roles starting with pg_ */
 	if (GET_MAJOR_VERSION(old_cluster.major_version) <= 905)
@@ -173,6 +183,14 @@ issue_warnings(void)
 		new_9_0_populate_pg_largeobject_metadata(&new_cluster, false);
 		stop_postmaster(false);
 	}
+
+	/* Reindex hash indexes for old < 10.0 */
+	if (GET_MAJOR_VERSION(old_cluster.major_version) <= 906)
+	{
+		start_postmaster(&new_cluster, true);
+		old_9_6_invalidate_hash_indexes(&new_cluster, false);
+		stop_postmaster(false);
+	}
 }
 
 
@@ -236,10 +254,6 @@ check_cluster_versions(void)
 	 */
 	if (old_cluster.major_version > new_cluster.major_version)
 		pg_fatal("This utility cannot be used to downgrade to older major PostgreSQL versions.\n");
-
-	/* get old and new binary versions */
-	get_bin_version(&old_cluster);
-	get_bin_version(&new_cluster);
 
 	/* Ensure binaries match the designated data directories */
 	if (GET_MAJOR_VERSION(old_cluster.major_version) !=
@@ -431,8 +445,8 @@ create_script_for_cluster_analyze(char **analyze_script_file_name)
 										 SCRIPT_PREFIX, SCRIPT_EXT);
 
 	if ((script = fopen_priv(*analyze_script_file_name, "w")) == NULL)
-		pg_fatal("Could not open file \"%s\": %s\n",
-				 *analyze_script_file_name, getErrorText());
+		pg_fatal("could not open file \"%s\": %s\n",
+				 *analyze_script_file_name, strerror(errno));
 
 #ifndef WIN32
 	/* add shebang header */
@@ -486,8 +500,8 @@ create_script_for_cluster_analyze(char **analyze_script_file_name)
 
 #ifndef WIN32
 	if (chmod(*analyze_script_file_name, S_IRWXU) != 0)
-		pg_fatal("Could not add execute permission to file \"%s\": %s\n",
-				 *analyze_script_file_name, getErrorText());
+		pg_fatal("could not add execute permission to file \"%s\": %s\n",
+				 *analyze_script_file_name, strerror(errno));
 #endif
 
 	termPQExpBuffer(&user_specification);
@@ -559,8 +573,8 @@ create_script_for_old_cluster_deletion(char **deletion_script_file_name)
 	prep_status("Creating script to delete old cluster");
 
 	if ((script = fopen_priv(*deletion_script_file_name, "w")) == NULL)
-		pg_fatal("Could not open file \"%s\": %s\n",
-				 *deletion_script_file_name, getErrorText());
+		pg_fatal("could not open file \"%s\": %s\n",
+				 *deletion_script_file_name, strerror(errno));
 
 #ifndef WIN32
 	/* add shebang header */
@@ -615,8 +629,8 @@ create_script_for_old_cluster_deletion(char **deletion_script_file_name)
 
 #ifndef WIN32
 	if (chmod(*deletion_script_file_name, S_IRWXU) != 0)
-		pg_fatal("Could not add execute permission to file \"%s\": %s\n",
-				 *deletion_script_file_name, getErrorText());
+		pg_fatal("could not add execute permission to file \"%s\": %s\n",
+				 *deletion_script_file_name, strerror(errno));
 #endif
 
 	check_ok();
@@ -819,8 +833,8 @@ check_for_isn_and_int8_passing_mismatch(ClusterInfo *cluster)
 		{
 			found = true;
 			if (script == NULL && (script = fopen_priv(output_path, "w")) == NULL)
-				pg_fatal("Could not open file \"%s\": %s\n",
-						 output_path, getErrorText());
+				pg_fatal("could not open file \"%s\": %s\n",
+						 output_path, strerror(errno));
 			if (!db_used)
 			{
 				fprintf(script, "Database: %s\n", active_db->db_name);
@@ -922,8 +936,8 @@ check_for_reg_data_type_usage(ClusterInfo *cluster)
 		{
 			found = true;
 			if (script == NULL && (script = fopen_priv(output_path, "w")) == NULL)
-				pg_fatal("Could not open file \"%s\": %s\n",
-						 output_path, getErrorText());
+				pg_fatal("could not open file \"%s\": %s\n",
+						 output_path, strerror(errno));
 			if (!db_used)
 			{
 				fprintf(script, "Database: %s\n", active_db->db_name);
@@ -1013,8 +1027,8 @@ check_for_jsonb_9_4_usage(ClusterInfo *cluster)
 		{
 			found = true;
 			if (script == NULL && (script = fopen_priv(output_path, "w")) == NULL)
-				pg_fatal("Could not open file \"%s\": %s\n",
-						 output_path, getErrorText());
+				pg_fatal("could not open file \"%s\": %s\n",
+						 output_path, strerror(errno));
 			if (!db_used)
 			{
 				fprintf(script, "Database: %s\n", active_db->db_name);
@@ -1074,34 +1088,6 @@ check_for_pg_role_prefix(ClusterInfo *cluster)
 	PQfinish(conn);
 
 	check_ok();
-}
-
-static void
-get_bin_version(ClusterInfo *cluster)
-{
-	char		cmd[MAXPGPATH],
-				cmd_output[MAX_STRING];
-	FILE	   *output;
-	int			pre_dot,
-				post_dot;
-
-	snprintf(cmd, sizeof(cmd), "\"%s/pg_ctl\" --version", cluster->bindir);
-
-	if ((output = popen(cmd, "r")) == NULL ||
-		fgets(cmd_output, sizeof(cmd_output), output) == NULL)
-		pg_fatal("Could not get pg_ctl version data using %s: %s\n",
-				 cmd, getErrorText());
-
-	pclose(output);
-
-	/* Remove trailing newline */
-	if (strchr(cmd_output, '\n') != NULL)
-		*strchr(cmd_output, '\n') = '\0';
-
-	if (sscanf(cmd_output, "%*s %*s %d.%d", &pre_dot, &post_dot) != 2)
-		pg_fatal("could not get version from %s\n", cmd);
-
-	cluster->bin_version = (pre_dot * 100 + post_dot) * 100;
 }
 
 

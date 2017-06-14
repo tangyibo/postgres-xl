@@ -5,7 +5,7 @@
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
@@ -30,6 +30,42 @@ typedef enum GlobalSnapshotSourceType
 	GLOBAL_SNAPSHOT_SOURCE_COORDINATOR
 } GlobalSnapshotSourceType;
 #endif
+
+/*
+ * These are to implement PROCARRAY_FLAGS_XXX
+ *
+ * Note: These flags are cloned from PROC_XXX flags in src/include/storage/proc.h
+ * to avoid forcing to include proc.h when including procarray.h. So if you modify
+ * PROC_XXX flags, you need to modify these flags.
+ */
+#define		PROCARRAY_VACUUM_FLAG			0x02		/* currently running
+														 * lazy vacuum */
+#define		PROCARRAY_ANALYZE_FLAG			0x04		/* currently running
+														 * analyze */
+#define		PROCARRAY_LOGICAL_DECODING_FLAG 0x10		/* currently doing
+														 * logical decoding
+														 * outside xact */
+
+#define		PROCARRAY_SLOTS_XMIN			0x20		/* replication slot
+														 * xmin, catalog_xmin */
+/*
+ * Only flags in PROCARRAY_PROC_FLAGS_MASK are considered when matching
+ * PGXACT->vacuumFlags. Other flags are used for different purposes and
+ * have no corresponding PROC flag equivalent.
+ */
+#define		PROCARRAY_PROC_FLAGS_MASK	(PROCARRAY_VACUUM_FLAG | \
+										 PROCARRAY_ANALYZE_FLAG | \
+										 PROCARRAY_LOGICAL_DECODING_FLAG)
+
+/* Use the following flags as an input "flags" to GetOldestXmin function */
+/* Consider all backends except for logical decoding ones which manage xmin separately */
+#define		PROCARRAY_FLAGS_DEFAULT			PROCARRAY_LOGICAL_DECODING_FLAG
+/* Ignore vacuum backends */
+#define		PROCARRAY_FLAGS_VACUUM			PROCARRAY_FLAGS_DEFAULT | PROCARRAY_VACUUM_FLAG
+/* Ignore analyze backends */
+#define		PROCARRAY_FLAGS_ANALYZE			PROCARRAY_FLAGS_DEFAULT | PROCARRAY_ANALYZE_FLAG
+/* Ignore both vacuum and analyze backends */
+#define		PROCARRAY_FLAGS_VACUUM_ANALYZE	PROCARRAY_FLAGS_DEFAULT | PROCARRAY_VACUUM_FLAG | PROCARRAY_ANALYZE_FLAG
 
 extern Size ProcArrayShmemSize(void);
 extern void CreateSharedProcArray(void);
@@ -81,11 +117,11 @@ extern RunningTransactions GetRunningTransactionData(void);
 
 extern bool TransactionIdIsInProgress(TransactionId xid);
 extern bool TransactionIdIsActive(TransactionId xid);
-extern TransactionId GetOldestXmin(Relation rel, bool ignoreVacuum);
-extern TransactionId GetOldestXminInternal(Relation rel, bool ignoreVacuum,
+extern TransactionId GetOldestXmin(Relation rel, int flags);
+extern TransactionId GetOldestXminInternal(Relation rel, int flags,
 		bool computeLocal, TransactionId lastGlobalXmin);
 extern TransactionId GetOldestActiveTransactionId(void);
-extern TransactionId GetOldestSafeDecodingTransactionId(void);
+extern TransactionId GetOldestSafeDecodingTransactionId(bool catalogOnly);
 
 extern VirtualTransactionId *GetVirtualXIDsDelayingChkpt(int *nvxids);
 extern bool HaveVirtualXIDsDelayingChkpt(VirtualTransactionId *vxids, int nvxids);
@@ -103,6 +139,7 @@ extern pid_t CancelVirtualTransaction(VirtualTransactionId vxid, ProcSignalReaso
 
 extern bool MinimumActiveBackends(int min);
 extern int	CountDBBackends(Oid databaseid);
+extern int	CountDBConnections(Oid databaseid);
 extern void CancelDBBackends(Oid databaseid, ProcSignalReason sigmode, bool conflictPending);
 extern int	CountUserBackends(Oid roleid);
 extern bool CountOtherDBBackends(Oid databaseId,

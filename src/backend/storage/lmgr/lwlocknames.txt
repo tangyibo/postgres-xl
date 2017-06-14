@@ -51,3 +51,6 @@ BarrierLock							43
 NodeTableLock						44
 SQueuesLock							45
 ClusterMonitorLock					46
+BackendRandomLock					47
+LogicalRepWorkerLock				48
+CLogTruncationLock					49

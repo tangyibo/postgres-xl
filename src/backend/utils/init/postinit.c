@@ -4,7 +4,7 @@
  *	  postgres initialization utilities
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -206,9 +206,7 @@ PerformAuthentication(Port *port)
 	if (PostmasterContext == NULL)
 		PostmasterContext = AllocSetContextCreate(TopMemoryContext,
 												  "Postmaster",
-												  ALLOCSET_DEFAULT_MINSIZE,
-												  ALLOCSET_DEFAULT_INITSIZE,
-												  ALLOCSET_DEFAULT_MAXSIZE);
+												  ALLOCSET_DEFAULT_SIZES);
 
 	if (!load_hba())
 	{
@@ -360,7 +358,7 @@ CheckMyDatabase(const char *name, bool am_superuser)
 			IS_PGXC_COORDINATOR &&
 #endif
 			!am_superuser &&
-			CountDBBackends(MyDatabaseId) > dbform->datconnlimit)
+			CountDBConnections(MyDatabaseId) > dbform->datconnlimit)
 			ereport(FATAL,
 					(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
 					 errmsg("too many connections for database \"%s\"",
@@ -675,7 +673,12 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 
 	/* The autovacuum launcher is done here */
 	if (IsAutoVacuumLauncherProcess() || IsClusterMonitorProcess())
+	{
+		/* report this backend in the PgBackendStatus array */
+		pgstat_bestart();
+
 		return;
+	}
 
 	/*
 	 * Start a new transaction here before first access to db, and get a
@@ -884,7 +887,10 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		 * transaction we started before returning.
 		 */
 		if (!bootstrap)
+		{
+			pgstat_bestart();
 			CommitTransactionCommand();
+		}
 		return;
 	}
 
@@ -1118,7 +1124,7 @@ process_settings(Oid databaseid, Oid roleid)
 
 	relsetting = heap_open(DbRoleSettingRelationId, AccessShareLock);
 
-	/* read all the settings under the same snapsot for efficiency */
+	/* read all the settings under the same snapshot for efficiency */
 	snapshot = RegisterSnapshot(GetCatalogSnapshot(DbRoleSettingRelationId));
 
 	/* Later settings are ignored if set earlier. */

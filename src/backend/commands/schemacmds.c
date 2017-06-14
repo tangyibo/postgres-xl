@@ -4,7 +4,7 @@
  *	  schema creation/manipulation commands
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -45,13 +45,17 @@ static void AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerI
 
 /*
  * CREATE SCHEMA
+ *
+ * Note: caller should pass in location information for the whole
+ * CREATE SCHEMA statement, which in turn we pass down as the location
+ * of the component commands.  This comports with our general plan of
+ * reporting location/len for the whole command even when executing
+ * a subquery.
  */
 Oid
-#ifdef PGXC
-CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString, bool sentToRemote)
-#else
-CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
-#endif
+CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
+					bool sentToRemote,
+					int stmt_location, int stmt_len)
 {
 	const char *schemaName = stmt->schemaname;
 	Oid			namespaceId;
@@ -191,17 +195,28 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 	foreach(parsetree_item, parsetree_list)
 	{
 		Node	   *stmt = (Node *) lfirst(parsetree_item);
+		PlannedStmt *wrapper;
+
+		/* need to make a wrapper PlannedStmt */
+		wrapper = makeNode(PlannedStmt);
+		wrapper->commandType = CMD_UTILITY;
+		wrapper->canSetTag = false;
+		wrapper->utilityStmt = stmt;
+		wrapper->stmt_location = stmt_location;
+		wrapper->stmt_len = stmt_len;
 
 		/* do this step */
-		ProcessUtility(stmt,
+		ProcessUtility(wrapper,
 					   queryString,
 					   PROCESS_UTILITY_SUBCOMMAND,
+					   NULL,
 					   NULL,
 					   None_Receiver,
 #ifdef PGXC
 					   true,
 #endif /* PGXC */
 					   NULL);
+
 		/* make sure later steps can see the object created here */
 		CommandCounterIncrement();
 	}
@@ -231,7 +246,7 @@ RemoveSchemaById(Oid schemaOid)
 	if (!HeapTupleIsValid(tup)) /* should not happen */
 		elog(ERROR, "cache lookup failed for namespace %u", schemaOid);
 
-	simple_heap_delete(relation, &tup->t_self);
+	CatalogTupleDelete(relation, &tup->t_self);
 
 	ReleaseSysCache(tup);
 
@@ -286,8 +301,7 @@ RenameSchema(const char *oldname, const char *newname)
 
 	/* rename */
 	namestrcpy(&(((Form_pg_namespace) GETSTRUCT(tup))->nspname), newname);
-	simple_heap_update(rel, &tup->t_self, tup);
-	CatalogUpdateIndexes(rel, tup);
+	CatalogTupleUpdate(rel, &tup->t_self, tup);
 
 	InvokeObjectPostAlterHook(NamespaceRelationId, HeapTupleGetOid(tup), 0);
 
@@ -442,8 +456,7 @@ AlterSchemaOwner_internal(HeapTuple tup, Relation rel, Oid newOwnerId)
 
 		newtuple = heap_modify_tuple(tup, RelationGetDescr(rel), repl_val, repl_null, repl_repl);
 
-		simple_heap_update(rel, &newtuple->t_self, newtuple);
-		CatalogUpdateIndexes(rel, newtuple);
+		CatalogTupleUpdate(rel, &newtuple->t_self, newtuple);
 
 		heap_freetuple(newtuple);
 

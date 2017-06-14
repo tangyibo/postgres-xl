@@ -4,7 +4,7 @@
  *	  POSTGRES inter-process communication initialization code.
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -34,6 +34,7 @@
 #include "postmaster/bgworker_internals.h"
 #include "postmaster/bgwriter.h"
 #include "postmaster/postmaster.h"
+#include "replication/logicallauncher.h"
 #include "replication/slot.h"
 #include "replication/walreceiver.h"
 #include "replication/walsender.h"
@@ -54,6 +55,7 @@
 #include "pgxc/squeue.h"
 #include "pgxc/pause.h"
 #endif
+#include "utils/backend_random.h"
 #include "utils/snapmgr.h"
 
 shmem_startup_hook_type shmem_startup_hook = NULL;
@@ -111,6 +113,10 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		Size		size;
 		int			numSemas;
 
+		/* Compute number of semaphores we'll need */
+		numSemas = ProcGlobalSemas();
+		numSemas += SpinlockSemas();
+
 		/*
 		 * Size of the Postgres shared-memory block is estimated via
 		 * moderately-accurate estimates for the big hogs, plus 100K for the
@@ -121,6 +127,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		 * need to be so careful during the actual allocation phase.
 		 */
 		size = 100000;
+		size = add_size(size, PGSemaphoreShmemSize(numSemas));
 		size = add_size(size, SpinlockSemaSize());
 		size = add_size(size, hash_estimate_size(SHMEM_INDEX_SIZE,
 												 sizeof(ShmemIndexEnt)));
@@ -154,6 +161,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 			size = add_size(size, ClusterLockShmemSize());
 		size = add_size(size, ClusterMonitorShmemSize());
 #endif
+		size = add_size(size, ApplyLauncherShmemSize());
 		size = add_size(size, SnapMgrShmemSize());
 		size = add_size(size, BTreeShmemSize());
 		size = add_size(size, SyncScanShmemSize());
@@ -162,6 +170,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		size = add_size(size, NodeTablesShmemSize());
 #endif
 
+		size = add_size(size, BackendRandomShmemSize());
 #ifdef EXEC_BACKEND
 		size = add_size(size, ShmemBackendArraySize());
 #endif
@@ -189,9 +198,15 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		/*
 		 * Create semaphores
 		 */
-		numSemas = ProcGlobalSemas();
-		numSemas += SpinlockSemas();
 		PGReserveSemaphores(numSemas, port);
+
+		/*
+		 * If spinlocks are disabled, initialize emulation layer (which
+		 * depends on semaphores, so the order is important here).
+		 */
+#ifndef HAVE_SPINLOCKS
+		SpinlockSemaInit();
+#endif
 	}
 	else
 	{
@@ -270,6 +285,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	ReplicationOriginShmemInit();
 	WalSndShmemInit();
 	WalRcvShmemInit();
+	ApplyLauncherShmemInit();
 
 #ifdef XCP
 	/*
@@ -289,6 +305,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	BTreeShmemInit();
 	SyncScanShmemInit();
 	AsyncShmemInit();
+	BackendRandomShmemInit();
 
 #ifdef PGXC
 	NodeTablesShmemInit();

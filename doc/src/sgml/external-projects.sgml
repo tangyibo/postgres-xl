@@ -72,7 +72,7 @@
       <entry>JDBC</entry>
       <entry>JDBC</entry>
       <entry>Type 4 JDBC driver</entry>
-      <entry><ulink url="http://jdbc.postgresql.org/"></ulink></entry>
+      <entry><ulink url="https://jdbc.postgresql.org/"></ulink></entry>
      </row>
 
      <row>
@@ -190,7 +190,7 @@
      <row>
       <entry>PL/R</entry>
       <entry>R</entry>
-      <entry><ulink url="http://www.joeconway.com/plr/"></ulink></entry>
+      <entry><ulink url="http://www.joeconway.com/plr.html"></ulink></entry>
      </row>
 
      <row>

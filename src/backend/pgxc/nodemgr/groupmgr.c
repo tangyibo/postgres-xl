@@ -106,10 +106,7 @@ PgxcGroupCreate(CreateGroupStmt *stmt)
 	rel = heap_open(PgxcGroupRelationId, RowExclusiveLock);
 	tup = heap_form_tuple(rel->rd_att, values, nulls);
 
-	/* Do the insertion */
-	(void) simple_heap_insert(rel, tup);
-
-	CatalogUpdateIndexes(rel, tup);
+	CatalogTupleInsert(rel, tup);
 
 	heap_close(rel, RowExclusiveLock);
 }

@@ -216,6 +216,10 @@ ERROR:  server "s1" does not exist
 CREATE USER MAPPING FOR current_user SERVER s1;
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
+CREATE USER MAPPING FOR current_user SERVER s1;				-- ERROR
+ERROR:  user mapping for "regress_foreign_data_user" already exists for server s1
+CREATE USER MAPPING IF NOT EXISTS FOR current_user SERVER s1; -- NOTICE
+NOTICE:  user mapping for "regress_foreign_data_user" already exists for server s1, skipping
 \dew+
                            List of foreign-data wrappers
  Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
@@ -1058,7 +1062,62 @@ ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
 DROP SERVER s9 CASCADE;                                         -- ERROR
 ERROR:  server "s9" does not exist
+ERROR:  must be owner of foreign server s9
+-- Check visibility of user mapping data
+SET ROLE regress_test_role;
+CREATE SERVER s10 FOREIGN DATA WRAPPER foo;
+CREATE USER MAPPING FOR public SERVER s10 OPTIONS (user 'secret');
+GRANT USAGE ON FOREIGN SERVER s10 TO regress_unprivileged_role;
+-- owner of server can see option fields
+\deu+
+                 List of user mappings
+ Server |         User name         |    FDW Options    
+--------+---------------------------+-------------------
+ s10    | public                    | ("user" 'secret')
+ s4     | regress_foreign_data_user | 
+ s5     | regress_test_role         | (modified '1')
+ s6     | regress_test_role         | 
+ s8     | public                    | 
+ s8     | regress_foreign_data_user | 
+ s9     | regress_unprivileged_role | 
+ t1     | public                    | (modified '1')
+(8 rows)
+
 RESET ROLE;
+-- superuser can see option fields
+\deu+
+                  List of user mappings
+ Server |         User name         |     FDW Options     
+--------+---------------------------+---------------------
+ s10    | public                    | ("user" 'secret')
+ s4     | regress_foreign_data_user | 
+ s5     | regress_test_role         | (modified '1')
+ s6     | regress_test_role         | 
+ s8     | public                    | 
+ s8     | regress_foreign_data_user | (password 'public')
+ s9     | regress_unprivileged_role | 
+ t1     | public                    | (modified '1')
+(8 rows)
+
+-- unprivileged user cannot see option fields
+SET ROLE regress_unprivileged_role;
+\deu+
+              List of user mappings
+ Server |         User name         | FDW Options 
+--------+---------------------------+-------------
+ s10    | public                    | 
+ s4     | regress_foreign_data_user | 
+ s5     | regress_test_role         | 
+ s6     | regress_test_role         | 
+ s8     | public                    | 
+ s8     | regress_foreign_data_user | 
+ s9     | regress_unprivileged_role | 
+ t1     | public                    | 
+(8 rows)
+
+RESET ROLE;
+DROP SERVER s10 CASCADE;
+NOTICE:  drop cascades to user mapping for public on server s10
 -- Triggers
 CREATE FUNCTION dummy_trigger() RETURNS TRIGGER AS $$
   BEGIN
@@ -1077,6 +1136,13 @@ FOR EACH STATEMENT
 EXECUTE PROCEDURE dummy_trigger();
 ERROR:  Postgres-XL does not support TRIGGER yet
 DETAIL:  The feature is not currently supported
+CREATE TRIGGER trigtest_after_stmt_tt AFTER INSERT OR UPDATE OR DELETE -- ERROR
+ON foreign_schema.foreign_table_1
+REFERENCING NEW TABLE AS new_table
+FOR EACH STATEMENT
+EXECUTE PROCEDURE dummy_trigger();
+ERROR:  "foreign_table_1" is a foreign table
+DETAIL:  Triggers on foreign tables cannot have transition tables.
 CREATE TRIGGER trigtest_before_row BEFORE INSERT OR UPDATE OR DELETE
 ON foreign_schema.foreign_table_1
 FOR EACH ROW
@@ -1133,12 +1199,12 @@ Location Nodes: ALL DATANODES
 DROP FOREIGN TABLE ft2;
 ERROR:  foreign table "ft2" does not exist
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    |              | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Distribute By: HASH(c1)
 Location Nodes: ALL DATANODES
 
@@ -1152,16 +1218,26 @@ ERROR:  server "s0" does not exist
 ALTER FOREIGN TABLE ft2 INHERIT pt1;
 ERROR:  relation "ft2" does not exist
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    |              | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Distribute By: HASH(c1)
 Location Nodes: ALL DATANODES
 
 \d+ ft2
+                                       Foreign table "public.ft2"
+ Column |  Type   | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer |           | not null |         |             | plain    |              | 
+ c2     | text    |           |          |         |             | extended |              | 
+ c3     | date    |           |          |         |             | plain    |              | 
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+Inherits: pt1
+
 CREATE TABLE ct3() INHERITS(ft2);
 ERROR:  relation "ft2" does not exist
 CREATE FOREIGN TABLE ft3 (
@@ -1259,12 +1335,12 @@ SELECT relname, conname, contype, conislocal, coninhcount, connoinherit
 
 -- child does not inherit NO INHERIT constraints
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Check constraints:
     "pt1chk1" CHECK (c1 > 0) NO INHERIT
     "pt1chk2" CHECK (c2 <> ''::text)
@@ -1291,12 +1367,12 @@ ALTER FOREIGN TABLE ft2 INHERIT pt1;
 ERROR:  relation "ft2" does not exist
 -- child does not inherit NO INHERIT constraints
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Check constraints:
     "pt1chk1" CHECK (c1 > 0) NO INHERIT
     "pt1chk2" CHECK (c2 <> ''::text)
@@ -1311,12 +1387,12 @@ ALTER TABLE pt1 DROP CONSTRAINT pt1chk2 CASCADE;
 INSERT INTO pt1 VALUES (1, 'pt1'::text, '1994-01-01'::date);
 ALTER TABLE pt1 ADD CONSTRAINT pt1chk3 CHECK (c2 <> '') NOT VALID;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text) NOT VALID
 Distribute By: HASH(c1)
@@ -1326,12 +1402,12 @@ Location Nodes: ALL DATANODES
 -- VALIDATE CONSTRAINT need do nothing on foreign tables
 ALTER TABLE pt1 VALIDATE CONSTRAINT pt1chk3;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text)
 Distribute By: HASH(c1)
@@ -1341,12 +1417,12 @@ Location Nodes: ALL DATANODES
 -- OID system column
 ALTER TABLE pt1 SET WITH OIDS;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text)
 Has OIDs: yes
@@ -1358,12 +1434,12 @@ ALTER TABLE ft2 SET WITHOUT OIDS;  -- ERROR
 ERROR:  relation "ft2" does not exist
 ALTER TABLE pt1 SET WITHOUT OIDS;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Check constraints:
     "pt1chk3" CHECK (c2 <> ''::text)
 Distribute By: HASH(c1)
@@ -1377,12 +1453,12 @@ ALTER TABLE pt1 RENAME COLUMN c3 TO f3;
 -- changes name of a constraint recursively
 ALTER TABLE pt1 RENAME CONSTRAINT pt1chk3 TO f2_check;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- f1     | integer | not null  | plain    | 10000        | 
- f2     | text    |           | extended |              | 
- f3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ f1     | integer |           | not null |         | plain    | 10000        | 
+ f2     | text    |           |          |         | extended |              | 
+ f3     | date    |           |          |         | plain    |              | 
 Check constraints:
     "f2_check" CHECK (f2 <> ''::text)
 Distribute By: HASH(f1)
@@ -1415,6 +1491,205 @@ ERROR:  foreign table "foreign_table_1" does not exist
 REASSIGN OWNED BY regress_test_role TO regress_test_role2;
 DROP OWNED BY regress_test_role2;
 DROP OWNED BY regress_test_role2 CASCADE;
+NOTICE:  drop cascades to user mapping for regress_test_role on server s5
+-- Foreign partition DDL stuff
+CREATE TABLE pt2 (
+	c1 integer NOT NULL,
+	c2 text,
+	c3 date
+) PARTITION BY LIST (c1);
+CREATE FOREIGN TABLE pt2_1 PARTITION OF pt2 FOR VALUES IN (1)
+  SERVER s0 OPTIONS (delimiter ',', quote '"', "be quoted" 'value');
+\d+ pt2
+                                    Table "public.pt2"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+Partition key: LIST (c1)
+Partitions: pt2_1 FOR VALUES IN (1)
+
+\d+ pt2_1
+                                      Foreign table "public.pt2_1"
+ Column |  Type   | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer |           | not null |         |             | plain    |              | 
+ c2     | text    |           |          |         |             | extended |              | 
+ c3     | date    |           |          |         |             | plain    |              | 
+Partition of: pt2 FOR VALUES IN (1)
+Partition constraint: ((c1 IS NOT NULL) AND (c1 = ANY (ARRAY[1])))
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+
+-- partition cannot have additional columns
+DROP FOREIGN TABLE pt2_1;
+CREATE FOREIGN TABLE pt2_1 (
+	c1 integer NOT NULL,
+	c2 text,
+	c3 date,
+	c4 char
+) SERVER s0 OPTIONS (delimiter ',', quote '"', "be quoted" 'value');
+\d+ pt2_1
+                                         Foreign table "public.pt2_1"
+ Column |     Type     | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+--------------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer      |           | not null |         |             | plain    |              | 
+ c2     | text         |           |          |         |             | extended |              | 
+ c3     | date         |           |          |         |             | plain    |              | 
+ c4     | character(1) |           |          |         |             | extended |              | 
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+
+ALTER TABLE pt2 ATTACH PARTITION pt2_1 FOR VALUES IN (1);       -- ERROR
+ERROR:  table "pt2_1" contains column "c4" not found in parent "pt2"
+DETAIL:  New partition should contain only the columns present in parent.
+DROP FOREIGN TABLE pt2_1;
+\d+ pt2
+                                    Table "public.pt2"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+Partition key: LIST (c1)
+
+CREATE FOREIGN TABLE pt2_1 (
+	c1 integer NOT NULL,
+	c2 text,
+	c3 date
+) SERVER s0 OPTIONS (delimiter ',', quote '"', "be quoted" 'value');
+\d+ pt2_1
+                                      Foreign table "public.pt2_1"
+ Column |  Type   | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer |           | not null |         |             | plain    |              | 
+ c2     | text    |           |          |         |             | extended |              | 
+ c3     | date    |           |          |         |             | plain    |              | 
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+
+-- no attach partition validation occurs for foreign tables
+ALTER TABLE pt2 ATTACH PARTITION pt2_1 FOR VALUES IN (1);
+\d+ pt2
+                                    Table "public.pt2"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+Partition key: LIST (c1)
+Partitions: pt2_1 FOR VALUES IN (1)
+
+\d+ pt2_1
+                                      Foreign table "public.pt2_1"
+ Column |  Type   | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer |           | not null |         |             | plain    |              | 
+ c2     | text    |           |          |         |             | extended |              | 
+ c3     | date    |           |          |         |             | plain    |              | 
+Partition of: pt2 FOR VALUES IN (1)
+Partition constraint: ((c1 IS NOT NULL) AND (c1 = ANY (ARRAY[1])))
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+
+-- cannot add column to a partition
+ALTER TABLE pt2_1 ADD c4 char;
+ERROR:  cannot add column to a partition
+-- ok to have a partition's own constraints though
+ALTER TABLE pt2_1 ALTER c3 SET NOT NULL;
+ALTER TABLE pt2_1 ADD CONSTRAINT p21chk CHECK (c2 <> '');
+\d+ pt2
+                                    Table "public.pt2"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+Partition key: LIST (c1)
+Partitions: pt2_1 FOR VALUES IN (1)
+
+\d+ pt2_1
+                                      Foreign table "public.pt2_1"
+ Column |  Type   | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer |           | not null |         |             | plain    |              | 
+ c2     | text    |           |          |         |             | extended |              | 
+ c3     | date    |           | not null |         |             | plain    |              | 
+Partition of: pt2 FOR VALUES IN (1)
+Partition constraint: ((c1 IS NOT NULL) AND (c1 = ANY (ARRAY[1])))
+Check constraints:
+    "p21chk" CHECK (c2 <> ''::text)
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+
+-- cannot drop inherited NOT NULL constraint from a partition
+ALTER TABLE pt2_1 ALTER c1 DROP NOT NULL;
+ERROR:  column "c1" is marked NOT NULL in parent table
+-- partition must have parent's constraints
+ALTER TABLE pt2 DETACH PARTITION pt2_1;
+ALTER TABLE pt2 ALTER c2 SET NOT NULL;
+\d+ pt2
+                                    Table "public.pt2"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           | not null |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+Partition key: LIST (c1)
+
+\d+ pt2_1
+                                      Foreign table "public.pt2_1"
+ Column |  Type   | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer |           | not null |         |             | plain    |              | 
+ c2     | text    |           |          |         |             | extended |              | 
+ c3     | date    |           | not null |         |             | plain    |              | 
+Check constraints:
+    "p21chk" CHECK (c2 <> ''::text)
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+
+ALTER TABLE pt2 ATTACH PARTITION pt2_1 FOR VALUES IN (1);       -- ERROR
+ERROR:  column "c2" in child table must be marked NOT NULL
+ALTER FOREIGN TABLE pt2_1 ALTER c2 SET NOT NULL;
+ALTER TABLE pt2 ATTACH PARTITION pt2_1 FOR VALUES IN (1);
+ALTER TABLE pt2 DETACH PARTITION pt2_1;
+ALTER TABLE pt2 ADD CONSTRAINT pt2chk1 CHECK (c1 > 0);
+\d+ pt2
+                                    Table "public.pt2"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           | not null |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+Partition key: LIST (c1)
+Check constraints:
+    "pt2chk1" CHECK (c1 > 0)
+
+\d+ pt2_1
+                                      Foreign table "public.pt2_1"
+ Column |  Type   | Collation | Nullable | Default | FDW Options | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+-------------+----------+--------------+-------------
+ c1     | integer |           | not null |         |             | plain    |              | 
+ c2     | text    |           | not null |         |             | extended |              | 
+ c3     | date    |           | not null |         |             | plain    |              | 
+Check constraints:
+    "p21chk" CHECK (c2 <> ''::text)
+Server: s0
+FDW Options: (delimiter ',', quote '"', "be quoted" 'value')
+
+ALTER TABLE pt2 ATTACH PARTITION pt2_1 FOR VALUES IN (1);       -- ERROR
+ERROR:  child table is missing constraint "pt2chk1"
+ALTER FOREIGN TABLE pt2_1 ADD CONSTRAINT pt2chk1 CHECK (c1 > 0);
+ALTER TABLE pt2 ATTACH PARTITION pt2_1 FOR VALUES IN (1);
+-- TRUNCATE doesn't work on foreign tables, either directly or recursively
+TRUNCATE pt2_1;  -- ERROR
+ERROR:  "pt2_1" is not a table
+TRUNCATE pt2;  -- ERROR
+ERROR:  "pt2_1" is not a table
+DROP FOREIGN TABLE pt2_1;
+DROP TABLE pt2;
 -- Cleanup
 DROP SCHEMA foreign_schema CASCADE;
 DROP ROLE regress_test_role;                                -- ERROR

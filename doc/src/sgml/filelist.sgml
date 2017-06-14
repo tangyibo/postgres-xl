@@ -12,9 +12,6 @@
 <!ENTITY query      SYSTEM "query.sgml">
 <!ENTITY start      SYSTEM "start.sgml">
 
-<!-- currently unused, but contains some interesting information -->
-<!ENTITY sql        SYSTEM "sql.sgml">
-
 <!-- user's guide -->
 <!ENTITY array      SYSTEM "array.sgml">
 <!ENTITY datatype   SYSTEM "datatype.sgml">
@@ -24,6 +21,7 @@
 <!ENTITY indices    SYSTEM "indices.sgml">
 <!ENTITY json       SYSTEM "json.sgml">
 <!ENTITY mvcc       SYSTEM "mvcc.sgml">
+<!ENTITY parallel   SYSTEM "parallel.sgml">
 <!ENTITY perform    SYSTEM "perform.sgml">
 <!ENTITY queries    SYSTEM "queries.sgml">
 <!ENTITY rangetypes SYSTEM "rangetypes.sgml">
@@ -51,6 +49,7 @@
 <!ENTITY wal           SYSTEM "wal.sgml">
 <!ENTITY add-node      SYSTEM "add-node.sgml">
 <!ENTITY remove-node   SYSTEM "remove-node.sgml">
+<!ENTITY logical-replication    SYSTEM "logical-replication.sgml">
 
 <!-- programmer's guide -->
 <!ENTITY bgworker   SYSTEM "bgworker.sgml">
@@ -107,6 +106,7 @@
 <!-- contrib information -->
 <!ENTITY contrib         SYSTEM "contrib.sgml">
 <!ENTITY adminpack       SYSTEM "adminpack.sgml">
+<!ENTITY amcheck         SYSTEM "amcheck.sgml">
 <!ENTITY auth-delay      SYSTEM "auth-delay.sgml">
 <!ENTITY auto-explain    SYSTEM "auto-explain.sgml">
 <!ENTITY bloom           SYSTEM "bloom.sgml">
@@ -155,7 +155,6 @@
 <!ENTITY test-decoding   SYSTEM "test-decoding.sgml">
 <!ENTITY test-parser     SYSTEM "test-parser.sgml">
 <!ENTITY test-shm-mq     SYSTEM "test-shm-mq.sgml">
-<!ENTITY tsearch2        SYSTEM "tsearch2.sgml">
 <!ENTITY tsm-system-rows SYSTEM "tsm-system-rows.sgml">
 <!ENTITY tsm-system-time SYSTEM "tsm-system-time.sgml">
 <!ENTITY unaccent      SYSTEM "unaccent.sgml">
@@ -173,6 +172,7 @@
 <!ENTITY sourcerepo SYSTEM "sourcerepo.sgml">
 
 <!ENTITY release    SYSTEM "release.sgml">
+<!ENTITY release-10     SYSTEM "release-10.sgml">
 <!ENTITY release-9.6    SYSTEM "release-9.6.sgml">
 <!ENTITY release-xl-9.5r1    SYSTEM "release-xl-9.5r1.sgml">
 <!ENTITY release-9.5    SYSTEM "release-9.5.sgml">
@@ -198,7 +198,6 @@
 
 <!-- back matter -->
 <!ENTITY biblio     SYSTEM "biblio.sgml">
-<!ENTITY bookindex  SYSTEM "bookindex.sgml">
 
 <!--
  Some parts of the documentation are also source for some plain-text
@@ -208,14 +207,3 @@
  -->
 <!ENTITY % standalone-ignore  "INCLUDE">
 <!ENTITY % standalone-include "IGNORE">
-
-<!--
- By default, no index is included.  Use -i include-index on the command line
- to include it.
- -->
-<!ENTITY % include-index "IGNORE">
-
-<!--
- Create empty index element for processing by XSLT stylesheet.
- -->
-<!ENTITY % include-xslt-index "IGNORE">

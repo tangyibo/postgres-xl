@@ -3,7 +3,7 @@
  * connection.c
  *		  Connection management functions for postgres_fdw
  *
- * Portions Copyright (c) 2012-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2012-2017, PostgreSQL Global Development Group
  *
  * IDENTIFICATION
  *		  contrib/postgres_fdw/connection.c
@@ -17,6 +17,7 @@
 #include "access/xact.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
+#include "pgstat.h"
 #include "storage/latch.h"
 #include "utils/hsearch.h"
 #include "utils/memutils.h"
@@ -225,21 +226,11 @@ connect_pg_server(ForeignServer *server, UserMapping *user)
 
 		conn = PQconnectdbParams(keywords, values, false);
 		if (!conn || PQstatus(conn) != CONNECTION_OK)
-		{
-			char	   *connmessage;
-			int			msglen;
-
-			/* libpq typically appends a newline, strip that */
-			connmessage = pstrdup(PQerrorMessage(conn));
-			msglen = strlen(connmessage);
-			if (msglen > 0 && connmessage[msglen - 1] == '\n')
-				connmessage[msglen - 1] = '\0';
 			ereport(ERROR,
 			   (errcode(ERRCODE_SQLCLIENT_UNABLE_TO_ESTABLISH_SQLCONNECTION),
 				errmsg("could not connect to server \"%s\"",
 					   server->servername),
-				errdetail_internal("%s", connmessage)));
-		}
+				errdetail_internal("%s", pchomp(PQerrorMessage(conn)))));
 
 		/*
 		 * Check that non-superuser has used password to establish connection;
@@ -496,7 +487,7 @@ pgfdw_get_result(PGconn *conn, const char *query)
 			wc = WaitLatchOrSocket(MyLatch,
 								   WL_LATCH_SET | WL_SOCKET_READABLE,
 								   PQsocket(conn),
-								   -1L);
+								   -1L, PG_WAIT_EXTENSION);
 			ResetLatch(MyLatch);
 
 			CHECK_FOR_INTERRUPTS();
@@ -562,12 +553,12 @@ pgfdw_report_error(int elevel, PGresult *res, PGconn *conn,
 		 * return NULL, not a PGresult at all.
 		 */
 		if (message_primary == NULL)
-			message_primary = PQerrorMessage(conn);
+			message_primary = pchomp(PQerrorMessage(conn));
 
 		ereport(elevel,
 				(errcode(sqlstate),
 				 message_primary ? errmsg_internal("%s", message_primary) :
-				 errmsg("unknown error"),
+				 errmsg("could not obtain message string for remote error"),
 			   message_detail ? errdetail_internal("%s", message_detail) : 0,
 				 message_hint ? errhint("%s", message_hint) : 0,
 				 message_context ? errcontext("%s", message_context) : 0,

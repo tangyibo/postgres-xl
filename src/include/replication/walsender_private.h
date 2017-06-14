@@ -3,7 +3,7 @@
  * walsender_private.h
  *	  Private definitions from replication/walsender.c.
  *
- * Portions Copyright (c) 2010-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 2010-2017, PostgreSQL Global Development Group
  *
  * src/include/replication/walsender_private.h
  *
@@ -24,7 +24,8 @@ typedef enum WalSndState
 	WALSNDSTATE_STARTUP = 0,
 	WALSNDSTATE_BACKUP,
 	WALSNDSTATE_CATCHUP,
-	WALSNDSTATE_STREAMING
+	WALSNDSTATE_STREAMING,
+	WALSNDSTATE_STOPPING
 } WalSndState;
 
 /*
@@ -46,6 +47,11 @@ typedef struct WalSnd
 	XLogRecPtr	write;
 	XLogRecPtr	flush;
 	XLogRecPtr	apply;
+
+	/* Measured lag times, or -1 for unknown/none. */
+	TimeOffset	writeLag;
+	TimeOffset	flushLag;
+	TimeOffset	applyLag;
 
 	/* Protects shared variables shown above. */
 	slock_t		mutex;

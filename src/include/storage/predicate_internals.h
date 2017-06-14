@@ -4,7 +4,7 @@
  *	  POSTGRES internal predicate locking definitions.
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/include/storage/predicate_internals.h
@@ -474,5 +474,7 @@ typedef struct TwoPhasePredicateRecord
  * locking internals.
  */
 extern PredicateLockData *GetPredicateLockStatusData(void);
+extern int GetSafeSnapshotBlockingPids(int blocked_pid,
+							int *output, int output_size);
 
 #endif   /* PREDICATE_INTERNALS_H */

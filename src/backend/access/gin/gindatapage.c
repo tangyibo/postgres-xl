@@ -4,7 +4,7 @@
  *	  routines for handling GIN posting tree pages.
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -15,6 +15,7 @@
 #include "postgres.h"
 
 #include "access/gin_private.h"
+#include "access/ginxlog.h"
 #include "access/xloginsert.h"
 #include "lib/ilist.h"
 #include "miscadmin.h"
@@ -86,7 +87,7 @@ typedef struct
 	char		action;
 
 	ItemPointerData *modifieditems;
-	int			nmodifieditems;
+	uint16		nmodifieditems;
 
 	/*
 	 * The following fields represent the items in this segment. If 'items' is

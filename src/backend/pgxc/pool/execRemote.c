@@ -3142,8 +3142,7 @@ get_exec_connections(RemoteQueryState *planstate,
 											 (PlanState *) planstate);
 			Datum partvalue = ExecEvalExpr(estate,
 										   planstate->combiner.ss.ps.ps_ExprContext,
-										   &isnull,
-										   NULL);
+										   &isnull);
 			RelationLocInfo *rel_loc_info = GetRelationLocInfo(exec_nodes->en_relid);
 			/* PGXCTODO what is the type of partvalue here */
 			ExecNodes *nodes = GetRelationNodes(rel_loc_info,
@@ -3922,7 +3921,8 @@ PreCommit_Remote(char *prepareGID, char *nodestring, bool preparedLocalNode)
 	 * table finally aborts - remote connections are not holding temporary
 	 * objects in this case.
 	 */
-	if (IS_PGXC_LOCAL_COORDINATOR && MyXactAccessedTempRel)
+	if (IS_PGXC_LOCAL_COORDINATOR &&
+		(MyXactFlags & XACT_FLAGS_ACCESSEDTEMPREL))
 		temp_object_included = true;
 
 
@@ -4194,7 +4194,7 @@ IsTwoPhaseCommitRequired(bool localWrite)
 	if (IS_PGXC_DATANODE)
 		return false;
 
-	if (MyXactAccessedTempRel)
+	if (MyXactFlags & XACT_FLAGS_ACCESSEDTEMPREL)
 	{
 		elog(DEBUG1, "Transaction accessed temporary objects - "
 				"2PC will not be used and that can lead to data inconsistencies "
@@ -4492,7 +4492,7 @@ ExecInitRemoteQuery(RemoteQuery *node, EState *estate, int eflags)
 	combiner->ss.ps.plan = (Plan *) node;
 	combiner->ss.ps.state = estate;
 
-	combiner->ss.ps.qual = NIL;
+	combiner->ss.ps.qual = NULL;
 
 	combiner->request_type = REQUEST_TYPE_QUERY;
 
@@ -4713,7 +4713,7 @@ ExecRemoteQuery(RemoteQueryState *node)
 	if (combiner->tuplesortstate)
 	{
 		if (tuplesort_gettupleslot((Tuplesortstate *) combiner->tuplesortstate,
-									  true, resultslot, NULL))
+									  true, true, resultslot, NULL))
 			return resultslot;
 		else
 			ExecClearTuple(resultslot);
@@ -5244,7 +5244,7 @@ ExecInitRemoteSubplan(RemoteSubplan *node, EState *estate, int eflags)
 	combiner->ss.ps.plan = (Plan *) node;
 	combiner->ss.ps.state = estate;
 
-	combiner->ss.ps.qual = NIL;
+	combiner->ss.ps.qual = NULL;
 
 	combiner->request_type = REQUEST_TYPE_QUERY;
 
@@ -6049,7 +6049,7 @@ primary_mode_phase_two:
 	if (combiner->tuplesortstate)
 	{
 		if (tuplesort_gettupleslot((Tuplesortstate *) combiner->tuplesortstate,
-								   true, resultslot, NULL))
+								   true, true, resultslot, NULL))
 		{
 			if (log_remotesubplan_stats)
 				ShowUsageCommon("ExecRemoteSubplan", &start_r, &start_t);

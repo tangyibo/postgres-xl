@@ -23,11 +23,13 @@ SUBDIRS = \
 	backend/snowball \
 	include \
 	backend/replication/libpqwalreceiver \
+	backend/replication/pgoutput \
 	fe_utils \
 	bin \
 	pl \
 	makefiles \
-	test/regress
+	test/regress \
+	test/perl
 
 # There are too many interdependencies between the subdirectories, so
 # don't attempt parallel make here.
@@ -68,17 +70,6 @@ distclean maintainer-clean:
 	$(MAKE) -C test/isolation $@
 	$(MAKE) -C test/thread $@
 	rm -f Makefile.port Makefile.global
-
-coverage:
-	$(MAKE) -C timezone $@
-	$(MAKE) -C gtm $@
-	$(MAKE) -C backend $@
-	$(MAKE) -C backend/utils/mb/conversion_procs $@
-	$(MAKE) -C backend/snowball $@
-	$(MAKE) -C interfaces $@
-	$(MAKE) -C backend/replication/libpqwalreceiver $@
-	$(MAKE) -C bin $@
-	$(MAKE) -C pl $@
 
 
 .PHONY: install-local installdirs-local uninstall-local

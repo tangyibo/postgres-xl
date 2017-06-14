@@ -4,7 +4,7 @@
  *	  WAL replay logic for SP-GiST
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * IDENTIFICATION
@@ -14,7 +14,9 @@
  */
 #include "postgres.h"
 
+#include "access/bufmask.h"
 #include "access/spgist_private.h"
+#include "access/spgxlog.h"
 #include "access/transam.h"
 #include "access/xlog.h"
 #include "access/xlogutils.h"
@@ -1014,9 +1016,7 @@ spg_xlog_startup(void)
 {
 	opCtx = AllocSetContextCreate(CurrentMemoryContext,
 								  "SP-GiST temporary context",
-								  ALLOCSET_DEFAULT_MINSIZE,
-								  ALLOCSET_DEFAULT_INITSIZE,
-								  ALLOCSET_DEFAULT_MAXSIZE);
+								  ALLOCSET_DEFAULT_SIZES);
 }
 
 void
@@ -1024,4 +1024,24 @@ spg_xlog_cleanup(void)
 {
 	MemoryContextDelete(opCtx);
 	opCtx = NULL;
+}
+
+/*
+ * Mask a SpGist page before performing consistency checks on it.
+ */
+void
+spg_mask(char *pagedata, BlockNumber blkno)
+{
+	Page		page = (Page) pagedata;
+
+	mask_page_lsn(page);
+
+	mask_page_hint_bits(page);
+
+	/*
+	 * Any SpGist page other than meta contains unused space which needs to be
+	 * masked.
+	 */
+	if (!SpGistPageIsMeta(page))
+		mask_unused_space(page);
 }

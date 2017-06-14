@@ -3,7 +3,7 @@
  * parse_func.c
  *		handle function calls in parser
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -25,6 +25,7 @@
 #include "parser/parse_agg.h"
 #include "parser/parse_clause.h"
 #include "parser/parse_coerce.h"
+#include "parser/parse_expr.h"
 #include "parser/parse_func.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_target.h"
@@ -624,6 +625,10 @@ ParseFuncOrColumn(ParseState *pstate, List *funcname, List *fargs,
 					 parser_errposition(pstate,
 									  exprLocation((Node *) llast(fargs)))));
 	}
+
+	/* if it returns a set, check that's OK */
+	if (retset)
+		check_srf_call_placement(pstate, location);
 
 	/* build the appropriate output structure */
 	if (fdresult == FUNCDETAIL_NORMAL)
@@ -1510,8 +1515,7 @@ func_get_detail(List *funcname,
 											 &isnull);
 			Assert(!isnull);
 			str = TextDatumGetCString(proargdefaults);
-			defaults = (List *) stringToNode(str);
-			Assert(IsA(defaults, List));
+			defaults = castNode(List, stringToNode(str));
 			pfree(str);
 
 			/* Delete any unused defaults from the returned list */
@@ -1891,8 +1895,10 @@ func_signature_string(List *funcname, int nargs,
 
 /*
  * LookupFuncName
- *		Given a possibly-qualified function name and a set of argument types,
- *		look up the function.
+ *
+ * Given a possibly-qualified function name and optionally a set of argument
+ * types, look up the function.  Pass nargs == -1 to indicate that no argument
+ * types are specified.
  *
  * If the function name is not schema-qualified, it is sought in the current
  * namespace search path.
@@ -1909,6 +1915,35 @@ LookupFuncName(List *funcname, int nargs, const Oid *argtypes, bool noError)
 	Assert(argtypes);
 
 	clist = FuncnameGetCandidates(funcname, nargs, NIL, false, false, noError);
+
+	/*
+	 * If no arguments were specified, the name must yield a unique candidate.
+	 */
+	if (nargs == -1)
+	{
+		if (clist)
+		{
+			if (clist->next)
+			{
+				if (!noError)
+					ereport(ERROR,
+							(errcode(ERRCODE_AMBIGUOUS_FUNCTION),
+							 errmsg("function name \"%s\" is not unique",
+									NameListToString(funcname)),
+							 errhint("Specify the argument list to select the function unambiguously.")));
+			}
+			else
+				return clist->oid;
+		}
+		else
+		{
+			if (!noError)
+				ereport(ERROR,
+						(errcode(ERRCODE_UNDEFINED_FUNCTION),
+						 errmsg("could not find a function named \"%s\"",
+								NameListToString(funcname))));
+		}
+	}
 
 	while (clist)
 	{
@@ -1928,19 +1963,19 @@ LookupFuncName(List *funcname, int nargs, const Oid *argtypes, bool noError)
 }
 
 /*
- * LookupFuncNameTypeNames
+ * LookupFuncWithArgs
  *		Like LookupFuncName, but the argument types are specified by a
- *		list of TypeName nodes.
+ *		ObjectWithArgs node.
  */
 Oid
-LookupFuncNameTypeNames(List *funcname, List *argtypes, bool noError)
+LookupFuncWithArgs(ObjectWithArgs *func, bool noError)
 {
 	Oid			argoids[FUNC_MAX_ARGS];
 	int			argcount;
 	int			i;
 	ListCell   *args_item;
 
-	argcount = list_length(argtypes);
+	argcount = list_length(func->objargs);
 	if (argcount > FUNC_MAX_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
@@ -1949,7 +1984,7 @@ LookupFuncNameTypeNames(List *funcname, List *argtypes, bool noError)
 							   FUNC_MAX_ARGS,
 							   FUNC_MAX_ARGS)));
 
-	args_item = list_head(argtypes);
+	args_item = list_head(func->objargs);
 	for (i = 0; i < argcount; i++)
 	{
 		TypeName   *t = (TypeName *) lfirst(args_item);
@@ -1958,19 +1993,19 @@ LookupFuncNameTypeNames(List *funcname, List *argtypes, bool noError)
 		args_item = lnext(args_item);
 	}
 
-	return LookupFuncName(funcname, argcount, argoids, noError);
+	return LookupFuncName(func->objname, func->args_unspecified ? -1 : argcount, argoids, noError);
 }
 
 /*
- * LookupAggNameTypeNames
- *		Find an aggregate function given a name and list of TypeName nodes.
+ * LookupAggWithArgs
+ *		Find an aggregate function from a given ObjectWithArgs node.
  *
- * This is almost like LookupFuncNameTypeNames, but the error messages refer
+ * This is almost like LookupFuncWithArgs, but the error messages refer
  * to aggregates rather than plain functions, and we verify that the found
  * function really is an aggregate.
  */
 Oid
-LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
+LookupAggWithArgs(ObjectWithArgs *agg, bool noError)
 {
 	Oid			argoids[FUNC_MAX_ARGS];
 	int			argcount;
@@ -1980,7 +2015,7 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 	HeapTuple	ftup;
 	Form_pg_proc pform;
 
-	argcount = list_length(argtypes);
+	argcount = list_length(agg->objargs);
 	if (argcount > FUNC_MAX_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
@@ -1990,7 +2025,7 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 							   FUNC_MAX_ARGS)));
 
 	i = 0;
-	foreach(lc, argtypes)
+	foreach(lc, agg->objargs)
 	{
 		TypeName   *t = (TypeName *) lfirst(lc);
 
@@ -1998,7 +2033,7 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 		i++;
 	}
 
-	oid = LookupFuncName(aggname, argcount, argoids, true);
+	oid = LookupFuncName(agg->objname, argcount, argoids, true);
 
 	if (!OidIsValid(oid))
 	{
@@ -2008,12 +2043,12 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_FUNCTION),
 					 errmsg("aggregate %s(*) does not exist",
-							NameListToString(aggname))));
+							NameListToString(agg->objname))));
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_FUNCTION),
 					 errmsg("aggregate %s does not exist",
-							func_signature_string(aggname, argcount,
+							func_signature_string(agg->objname, argcount,
 												  NIL, argoids))));
 	}
 
@@ -2032,11 +2067,162 @@ LookupAggNameTypeNames(List *aggname, List *argtypes, bool noError)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("function %s is not an aggregate",
-						func_signature_string(aggname, argcount,
+						func_signature_string(agg->objname, argcount,
 											  NIL, argoids))));
 	}
 
 	ReleaseSysCache(ftup);
 
 	return oid;
+}
+
+
+/*
+ * check_srf_call_placement
+ *		Verify that a set-returning function is called in a valid place,
+ *		and throw a nice error if not.
+ *
+ * A side-effect is to set pstate->p_hasTargetSRFs true if appropriate.
+ */
+void
+check_srf_call_placement(ParseState *pstate, int location)
+{
+	const char *err;
+	bool		errkind;
+
+	/*
+	 * Check to see if the set-returning function is in an invalid place
+	 * within the query.  Basically, we don't allow SRFs anywhere except in
+	 * the targetlist (which includes GROUP BY/ORDER BY expressions), VALUES,
+	 * and functions in FROM.
+	 *
+	 * For brevity we support two schemes for reporting an error here: set
+	 * "err" to a custom message, or set "errkind" true if the error context
+	 * is sufficiently identified by what ParseExprKindName will return, *and*
+	 * what it will return is just a SQL keyword.  (Otherwise, use a custom
+	 * message to avoid creating translation problems.)
+	 */
+	err = NULL;
+	errkind = false;
+	switch (pstate->p_expr_kind)
+	{
+		case EXPR_KIND_NONE:
+			Assert(false);		/* can't happen */
+			break;
+		case EXPR_KIND_OTHER:
+			/* Accept SRF here; caller must throw error if wanted */
+			break;
+		case EXPR_KIND_JOIN_ON:
+		case EXPR_KIND_JOIN_USING:
+			err = _("set-returning functions are not allowed in JOIN conditions");
+			break;
+		case EXPR_KIND_FROM_SUBSELECT:
+			/* can't get here, but just in case, throw an error */
+			errkind = true;
+			break;
+		case EXPR_KIND_FROM_FUNCTION:
+			/* okay ... but we can't check nesting here */
+			break;
+		case EXPR_KIND_WHERE:
+			errkind = true;
+			break;
+		case EXPR_KIND_POLICY:
+			err = _("set-returning functions are not allowed in policy expressions");
+			break;
+		case EXPR_KIND_HAVING:
+			errkind = true;
+			break;
+		case EXPR_KIND_FILTER:
+			errkind = true;
+			break;
+		case EXPR_KIND_WINDOW_PARTITION:
+		case EXPR_KIND_WINDOW_ORDER:
+			/* okay, these are effectively GROUP BY/ORDER BY */
+			pstate->p_hasTargetSRFs = true;
+			break;
+		case EXPR_KIND_WINDOW_FRAME_RANGE:
+		case EXPR_KIND_WINDOW_FRAME_ROWS:
+			err = _("set-returning functions are not allowed in window definitions");
+			break;
+		case EXPR_KIND_SELECT_TARGET:
+		case EXPR_KIND_INSERT_TARGET:
+			/* okay */
+			pstate->p_hasTargetSRFs = true;
+			break;
+		case EXPR_KIND_UPDATE_SOURCE:
+		case EXPR_KIND_UPDATE_TARGET:
+			/* disallowed because it would be ambiguous what to do */
+			errkind = true;
+			break;
+		case EXPR_KIND_GROUP_BY:
+		case EXPR_KIND_ORDER_BY:
+			/* okay */
+			pstate->p_hasTargetSRFs = true;
+			break;
+		case EXPR_KIND_DISTINCT_ON:
+			/* okay */
+			pstate->p_hasTargetSRFs = true;
+			break;
+		case EXPR_KIND_LIMIT:
+		case EXPR_KIND_OFFSET:
+			errkind = true;
+			break;
+		case EXPR_KIND_RETURNING:
+			errkind = true;
+			break;
+		case EXPR_KIND_VALUES:
+			/* SRFs are presently not supported by nodeValuesscan.c */
+			errkind = true;
+			break;
+		case EXPR_KIND_VALUES_SINGLE:
+			/* okay, since we process this like a SELECT tlist */
+			pstate->p_hasTargetSRFs = true;
+			break;
+		case EXPR_KIND_CHECK_CONSTRAINT:
+		case EXPR_KIND_DOMAIN_CHECK:
+			err = _("set-returning functions are not allowed in check constraints");
+			break;
+		case EXPR_KIND_COLUMN_DEFAULT:
+		case EXPR_KIND_FUNCTION_DEFAULT:
+			err = _("set-returning functions are not allowed in DEFAULT expressions");
+			break;
+		case EXPR_KIND_INDEX_EXPRESSION:
+			err = _("set-returning functions are not allowed in index expressions");
+			break;
+		case EXPR_KIND_INDEX_PREDICATE:
+			err = _("set-returning functions are not allowed in index predicates");
+			break;
+		case EXPR_KIND_ALTER_COL_TRANSFORM:
+			err = _("set-returning functions are not allowed in transform expressions");
+			break;
+		case EXPR_KIND_EXECUTE_PARAMETER:
+			err = _("set-returning functions are not allowed in EXECUTE parameters");
+			break;
+		case EXPR_KIND_TRIGGER_WHEN:
+			err = _("set-returning functions are not allowed in trigger WHEN conditions");
+			break;
+		case EXPR_KIND_PARTITION_EXPRESSION:
+			err = _("set-returning functions are not allowed in partition key expression");
+			break;
+
+			/*
+			 * There is intentionally no default: case here, so that the
+			 * compiler will warn if we add a new ParseExprKind without
+			 * extending this switch.  If we do see an unrecognized value at
+			 * runtime, the behavior will be the same as for EXPR_KIND_OTHER,
+			 * which is sane anyway.
+			 */
+	}
+	if (err)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg_internal("%s", err),
+				 parser_errposition(pstate, location)));
+	if (errkind)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		/* translator: %s is name of a SQL construct, eg GROUP BY */
+				 errmsg("set-returning functions are not allowed in %s",
+						ParseExprKindName(pstate->p_expr_kind)),
+				 parser_errposition(pstate, location)));
 }

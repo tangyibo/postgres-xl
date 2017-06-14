@@ -889,8 +889,6 @@ hash_func_ptr(Oid dataType)
 			return hashchar;
 		case NAMEOID:
 			return hashname;
-		case INT2VECTOROID:
-			return hashint2vector;
 		case VARCHAROID:
 		case TEXTOID:
 			return hashtext;

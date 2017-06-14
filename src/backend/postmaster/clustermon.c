@@ -42,6 +42,7 @@
 #include "utils/ps_status.h"
 #include "utils/timeout.h"
 #include "utils/timestamp.h"
+#include "pgstat.h"
 
 /* Flags to tell if we are in a clustermon process */
 static bool am_clustermon = false;
@@ -208,7 +209,8 @@ ClusterMonitorInit(void)
 		 */
 		rc = WaitLatch(MyLatch,
 					   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
-					   (nap.tv_sec * 1000L) + (nap.tv_usec / 1000L));
+					   (nap.tv_sec * 1000L) + (nap.tv_usec / 1000L),
+					   WAIT_EVENT_CLUSTER_MONITOR_MAIN);
 
 		ResetLatch(MyLatch);
 
@@ -238,7 +240,7 @@ ClusterMonitorInit(void)
 		 */
 		lastGlobalXmin = ClusterMonitorGetGlobalXmin();
  		LWLockAcquire(ClusterMonitorLock, LW_EXCLUSIVE);
-		oldestXmin = GetOldestXminInternal(NULL, false, true, lastGlobalXmin);
+		oldestXmin = GetOldestXminInternal(NULL, 0, true, lastGlobalXmin);
 		ClusterMonitorSetReportingGlobalXmin(oldestXmin);
 		LWLockRelease(ClusterMonitorLock);
 

@@ -2,7 +2,7 @@
  *
  * vacuumdb
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  * src/bin/scripts/vacuumdb.c
@@ -11,6 +11,12 @@
  */
 
 #include "postgres_fe.h"
+
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
+
+#include "catalog/pg_class.h"
 
 #include "common.h"
 #include "fe_utils/simple_list.h"
@@ -384,8 +390,12 @@ vacuum_one_database(const char *dbname, vacuumingOptions *vacopts,
 		initPQExpBuffer(&buf);
 
 		res = executeQuery(conn,
-			"SELECT c.relname, ns.nspname FROM pg_class c, pg_namespace ns\n"
-			 " WHERE relkind IN (\'r\', \'m\') AND c.relnamespace = ns.oid\n"
+						   "SELECT c.relname, ns.nspname"
+						   " FROM pg_class c, pg_namespace ns\n"
+						   " WHERE relkind IN ("
+						   CppAsString2(RELKIND_RELATION) ", "
+						   CppAsString2(RELKIND_MATVIEW) ")"
+						   " AND c.relnamespace = ns.oid\n"
 						   " ORDER BY c.relpages DESC;",
 						   progname, echo);
 
@@ -850,7 +860,7 @@ DisconnectDatabase(ParallelSlot *slot)
 
 		if ((cancel = PQgetCancel(slot->connection)))
 		{
-			PQcancel(cancel, errbuf, sizeof(errbuf));
+			(void) PQcancel(cancel, errbuf, sizeof(errbuf));
 			PQfreeCancel(cancel);
 		}
 	}

@@ -7,6 +7,7 @@ SET client_min_messages TO 'warning';
 DROP USER IF EXISTS regress_rls_alice;
 DROP USER IF EXISTS regress_rls_bob;
 DROP USER IF EXISTS regress_rls_carol;
+DROP USER IF EXISTS regress_rls_dave;
 DROP USER IF EXISTS regress_rls_exempt_user;
 DROP ROLE IF EXISTS regress_rls_group1;
 DROP ROLE IF EXISTS regress_rls_group2;
@@ -16,6 +17,7 @@ RESET client_min_messages;
 CREATE USER regress_rls_alice NOLOGIN;
 CREATE USER regress_rls_bob NOLOGIN;
 CREATE USER regress_rls_carol NOLOGIN;
+CREATE USER regress_rls_dave NOLOGIN;
 CREATE USER regress_rls_exempt_user BYPASSRLS NOLOGIN;
 CREATE ROLE regress_rls_group1 NOLOGIN;
 CREATE ROLE regress_rls_group2 NOLOGIN;
@@ -71,11 +73,84 @@ INSERT INTO document VALUES
     ( 5, 44, 2, 'regress_rls_bob', 'my second manga'),
     ( 6, 22, 1, 'regress_rls_carol', 'great science fiction'),
     ( 7, 33, 2, 'regress_rls_carol', 'great technology book'),
-    ( 8, 44, 1, 'regress_rls_carol', 'great manga');
+    ( 8, 44, 1, 'regress_rls_carol', 'great manga'),
+    ( 9, 22, 1, 'regress_rls_dave', 'awesome science fiction'),
+    (10, 33, 2, 'regress_rls_dave', 'awesome technology book');
 ALTER TABLE document ENABLE ROW LEVEL SECURITY;
 -- user's security level must be higher than or equal to document's
-CREATE POLICY p1 ON document
+CREATE POLICY p1 ON document AS PERMISSIVE
     USING (dlevel <= (SELECT seclv FROM uaccount WHERE pguser = current_user));
+-- try to create a policy of bogus type
+CREATE POLICY p1 ON document AS UGLY
+    USING (dlevel <= (SELECT seclv FROM uaccount WHERE pguser = current_user));
+ERROR:  unrecognized row security option "ugly"
+LINE 1: CREATE POLICY p1 ON document AS UGLY
+                                        ^
+HINT:  Only PERMISSIVE or RESTRICTIVE policies are supported currently.
+-- but Dave isn't allowed to anything at cid 50 or above
+-- this is to make sure that we sort the policies by name first
+-- when applying WITH CHECK, a later INSERT by Dave should fail due
+-- to p1r first
+CREATE POLICY p2r ON document AS RESTRICTIVE TO regress_rls_dave
+    USING (cid <> 44 AND cid < 50);
+-- and Dave isn't allowed to see manga documents
+CREATE POLICY p1r ON document AS RESTRICTIVE TO regress_rls_dave
+    USING (cid <> 44);
+\dp
+                                                                  Access privileges
+       Schema       |   Name   | Type  |              Access privileges              | Column privileges |                  Policies                  
+--------------------+----------+-------+---------------------------------------------+-------------------+--------------------------------------------
+ regress_rls_schema | category | table | regress_rls_alice=arwdDxt/regress_rls_alice+|                   | 
+                    |          |       | =arwdDxt/regress_rls_alice                  |                   | 
+ regress_rls_schema | document | table | regress_rls_alice=arwdDxt/regress_rls_alice+|                   | p1:                                       +
+                    |          |       | =arwdDxt/regress_rls_alice                  |                   |   (u): (dlevel <= ( SELECT uaccount.seclv +
+                    |          |       |                                             |                   |    FROM uaccount                          +
+                    |          |       |                                             |                   |   WHERE (uaccount.pguser = CURRENT_USER)))+
+                    |          |       |                                             |                   | p2r (RESTRICTIVE):                        +
+                    |          |       |                                             |                   |   (u): ((cid <> 44) AND (cid < 50))       +
+                    |          |       |                                             |                   |   to: regress_rls_dave                    +
+                    |          |       |                                             |                   | p1r (RESTRICTIVE):                        +
+                    |          |       |                                             |                   |   (u): (cid <> 44)                        +
+                    |          |       |                                             |                   |   to: regress_rls_dave
+ regress_rls_schema | uaccount | table | regress_rls_alice=arwdDxt/regress_rls_alice+|                   | 
+                    |          |       | =r/regress_rls_alice                        |                   | 
+(3 rows)
+
+\d document
+        Table "regress_rls_schema.document"
+ Column  |  Type   | Collation | Nullable | Default 
+---------+---------+-----------+----------+---------
+ did     | integer |           | not null | 
+ cid     | integer |           |          | 
+ dlevel  | integer |           | not null | 
+ dauthor | name    |           |          | 
+ dtitle  | text    |           |          | 
+Indexes:
+    "document_pkey" PRIMARY KEY, btree (did)
+Foreign-key constraints:
+    "document_cid_fkey" FOREIGN KEY (cid) REFERENCES category(cid)
+Policies:
+    POLICY "p1"
+      USING ((dlevel <= ( SELECT uaccount.seclv
+   FROM uaccount
+  WHERE (uaccount.pguser = CURRENT_USER))))
+    POLICY "p1r" AS RESTRICTIVE
+      TO regress_rls_dave
+      USING ((cid <> 44))
+    POLICY "p2r" AS RESTRICTIVE
+      TO regress_rls_dave
+      USING (((cid <> 44) AND (cid < 50)))
+
+SELECT * FROM pg_policies WHERE schemaname = 'regress_rls_schema' AND tablename = 'document' ORDER BY policyname;
+     schemaname     | tablename | policyname | permissive  |       roles        | cmd |                    qual                    | with_check 
+--------------------+-----------+------------+-------------+--------------------+-----+--------------------------------------------+------------
+ regress_rls_schema | document  | p1         | PERMISSIVE  | {public}           | ALL | (dlevel <= ( SELECT uaccount.seclv        +| 
+                    |           |            |             |                    |     |    FROM uaccount                          +| 
+                    |           |            |             |                    |     |   WHERE (uaccount.pguser = CURRENT_USER))) | 
+ regress_rls_schema | document  | p1r        | RESTRICTIVE | {regress_rls_dave} | ALL | (cid <> 44)                                | 
+ regress_rls_schema | document  | p2r        | RESTRICTIVE | {regress_rls_dave} | ALL | ((cid <> 44) AND (cid < 50))               | 
+(3 rows)
+
 -- viewpoint from regress_rls_bob
 SET SESSION AUTHORIZATION regress_rls_bob;
 SET row_security TO ON;
@@ -86,7 +161,8 @@ SELECT * FROM document WHERE f_leak(dtitle) ORDER BY did;
    4 |  44 |      1 | regress_rls_bob   | my first manga
    6 |  22 |      1 | regress_rls_carol | great science fiction
    8 |  44 |      1 | regress_rls_carol | great manga
-(4 rows)
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+(5 rows)
 
 SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
  cid | did | dlevel |      dauthor      |        dtitle         |      cname      
@@ -119,7 +195,9 @@ SELECT * FROM document WHERE f_leak(dtitle) ORDER BY did;
    6 |  22 |      1 | regress_rls_carol | great science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book
    8 |  44 |      1 | regress_rls_carol | great manga
-(8 rows)
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+  10 |  33 |      2 | regress_rls_dave  | awesome technology book
+(10 rows)
 
 SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
  cid | did | dlevel |      dauthor      |        dtitle         |      cname      
@@ -175,6 +253,13 @@ EXPLAIN (COSTS OFF) SELECT * FROM document NATURAL JOIN category WHERE f_leak(dt
                                          Index Cond: (pguser = "current_user"())
 (13 rows)
 
+-- 44 would technically fail for both p2r and p1r, but we should get an error
+-- back from p1r for this because it sorts first
+INSERT INTO document VALUES (100, 44, 1, 'regress_rls_dave', 'testing sorting of policies'); -- fail
+ERROR:  new row violates row-level security policy "p1r" for table "document"
+-- Just to see a p2r error
+INSERT INTO document VALUES (100, 55, 1, 'regress_rls_dave', 'testing sorting of policies'); -- fail
+ERROR:  new row violates row-level security policy "p2r" for table "document"
 -- only owner can change policies
 ALTER POLICY p1 ON document USING (true);    --fail
 ERROR:  must be owner of relation document
@@ -254,7 +339,7 @@ CREATE POLICY p2 ON category
 ALTER TABLE category ENABLE ROW LEVEL SECURITY;
 -- cannot delete PK referenced by invisible FK
 SET SESSION AUTHORIZATION regress_rls_bob;
-SELECT * FROM document d FULL OUTER JOIN category c on d.cid = c.cid;
+SELECT * FROM document d FULL OUTER JOIN category c on d.cid = c.cid ORDER BY d.did, c.cid;
  did | cid | dlevel |     dauthor     |       dtitle       | cid |   cname    
 -----+-----+--------+-----------------+--------------------+-----+------------
    4 |  44 |      1 | regress_rls_bob | my first manga     |     | 
@@ -263,6 +348,9 @@ SELECT * FROM document d FULL OUTER JOIN category c on d.cid = c.cid;
    1 |  11 |      1 | regress_rls_bob | my first novel     |  11 | novel
      |     |        |                 |                    |  33 | technology
    3 |  22 |      2 | regress_rls_bob | my science fiction |     | 
+   4 |  44 |      1 | regress_rls_bob | my first manga     |     | 
+   5 |  44 |      2 | regress_rls_bob | my second manga    |     | 
+     |     |        |                 |                    |  33 | technology
 (6 rows)
 
 DELETE FROM category WHERE cid = 33;    -- fails with FK violation
@@ -270,15 +358,16 @@ ERROR:  update or delete on table "category" violates foreign key constraint "do
 DETAIL:  Key is still referenced from table "document".
 -- can insert FK referencing invisible PK
 SET SESSION AUTHORIZATION regress_rls_carol;
-SELECT * FROM document d FULL OUTER JOIN category c on d.cid = c.cid;
+SELECT * FROM document d FULL OUTER JOIN category c on d.cid = c.cid ORDER BY d.did, c.cid;
  did | cid | dlevel |      dauthor      |        dtitle         | cid |      cname      
 -----+-----+--------+-------------------+-----------------------+-----+-----------------
    8 |  44 |      1 | regress_rls_carol | great manga           |  44 | manga
    6 |  22 |      1 | regress_rls_carol | great science fiction |  22 | science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book |     | 
+   8 |  44 |      1 | regress_rls_carol | great manga           |  44 | manga
 (3 rows)
 
-INSERT INTO document VALUES (10, 33, 1, current_user, 'hoge');
+INSERT INTO document VALUES (11, 33, 1, current_user, 'hoge');
 -- UNIQUE or PRIMARY KEY constraint violation DOES reveal presence of row
 SET SESSION AUTHORIZATION regress_rls_bob;
 INSERT INTO document VALUES (8, 44, 1, 'regress_rls_bob', 'my third manga'); -- Must fail with unique violation, revealing presence of did we can't see
@@ -298,8 +387,8 @@ DETAIL:  correlated UPDATE or updating distribution column currently not support
 RESET SESSION AUTHORIZATION;
 SET row_security TO ON;
 SELECT * FROM document;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
    5 |  44 |      2 | regress_rls_bob   | my second manga
@@ -324,8 +413,8 @@ SELECT * FROM category;
 RESET SESSION AUTHORIZATION;
 SET row_security TO OFF;
 SELECT * FROM document;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
    5 |  44 |      2 | regress_rls_bob   | my second manga
@@ -350,8 +439,8 @@ SELECT * FROM category;
 SET SESSION AUTHORIZATION regress_rls_exempt_user;
 SET row_security TO OFF;
 SELECT * FROM document;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
    5 |  44 |      2 | regress_rls_bob   | my second manga
@@ -376,8 +465,8 @@ SELECT * FROM category;
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security TO ON;
 SELECT * FROM document;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
    5 |  44 |      2 | regress_rls_bob   | my second manga
@@ -402,8 +491,8 @@ SELECT * FROM category;
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security TO OFF;
 SELECT * FROM document;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
    5 |  44 |      2 | regress_rls_bob   | my second manga
@@ -1322,6 +1411,7 @@ SELECT * FROM b1;
 --
 SET SESSION AUTHORIZATION regress_rls_alice;
 DROP POLICY p1 ON document;
+DROP POLICY p1r ON document;
 CREATE POLICY p1 ON document FOR SELECT USING (true);
 CREATE POLICY p2 ON document FOR INSERT WITH CHECK (dauthor = current_user);
 CREATE POLICY p3 ON document FOR UPDATE
@@ -1777,7 +1867,6 @@ EXPLAIN (COSTS OFF) SELECT * FROM rls_view;
          ->  Seq Scan on z1 z1_1
                Filter: ((a % 2) = 0)
 (5 rows)
-
 -- Query as role that is not owner of table but is owner of view.
 -- Should return records based on view owner policies.
 SET SESSION AUTHORIZATION regress_rls_bob;
@@ -3161,6 +3250,7 @@ RESET client_min_messages;
 DROP USER regress_rls_alice;
 DROP USER regress_rls_bob;
 DROP USER regress_rls_carol;
+DROP USER regress_rls_dave;
 DROP USER regress_rls_exempt_user;
 DROP ROLE regress_rls_group1;
 DROP ROLE regress_rls_group2;

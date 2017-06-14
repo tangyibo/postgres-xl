@@ -12,7 +12,7 @@
  *		reduce_outer_joins
  *
  *
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -916,6 +916,7 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	subroot->processed_tlist = NIL;
 	subroot->grouping_map = NULL;
 	subroot->minmax_aggs = NIL;
+	subroot->qual_security_level = 0;
 	subroot->hasInheritedTarget = false;
 	subroot->hasRecursion = false;
 	subroot->wt_param_id = -1;
@@ -1121,6 +1122,7 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 				case RTE_SUBQUERY:
 				case RTE_FUNCTION:
 				case RTE_VALUES:
+				case RTE_TABLEFUNC:
 					child_rte->lateral = true;
 					break;
 				case RTE_JOIN:
@@ -1128,6 +1130,7 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 #ifdef XCP	
 				case RTE_REMOTE_DUMMY:
 #endif
+				case RTE_NAMEDTUPLESTORE:
 					/* these can't contain any lateral references */
 					break;
 			}
@@ -1194,9 +1197,12 @@ pull_up_simple_subquery(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte,
 	 */
 	parse->hasSubLinks |= subquery->hasSubLinks;
 
+	/* If subquery had any RLS conditions, now main query does too */
+	parse->hasRowSecurity |= subquery->hasRowSecurity;
+
 	/*
-	 * subquery won't be pulled up if it hasAggs or hasWindowFuncs, so no work
-	 * needed on those flags
+	 * subquery won't be pulled up if it hasAggs, hasWindowFuncs, or
+	 * hasTargetSRFs, so no work needed on those flags
 	 */
 
 	/*
@@ -1413,8 +1419,7 @@ is_simple_subquery(Query *subquery, RangeTblEntry *rte,
 	 * Let's just make sure it's a valid subselect ...
 	 */
 	if (!IsA(subquery, Query) ||
-		subquery->commandType != CMD_SELECT ||
-		subquery->utilityStmt != NULL)
+		subquery->commandType != CMD_SELECT)
 		elog(ERROR, "subquery is bogus");
 
 	/*
@@ -1426,8 +1431,8 @@ is_simple_subquery(Query *subquery, RangeTblEntry *rte,
 		return false;
 
 	/*
-	 * Can't pull up a subquery involving grouping, aggregation, sorting,
-	 * limiting, or WITH.  (XXX WITH could possibly be allowed later)
+	 * Can't pull up a subquery involving grouping, aggregation, SRFs,
+	 * sorting, limiting, or WITH.  (XXX WITH could possibly be allowed later)
 	 *
 	 * We also don't pull up a subquery that has explicit FOR UPDATE/SHARE
 	 * clauses, because pullup would cause the locking to occur semantically
@@ -1437,6 +1442,7 @@ is_simple_subquery(Query *subquery, RangeTblEntry *rte,
 	 */
 	if (subquery->hasAggs ||
 		subquery->hasWindowFuncs ||
+		subquery->hasTargetSRFs ||
 		subquery->groupClause ||
 		subquery->groupingSets ||
 		subquery->havingQual ||
@@ -1550,15 +1556,6 @@ is_simple_subquery(Query *subquery, RangeTblEntry *rte,
 	}
 
 	/*
-	 * Don't pull up a subquery that has any set-returning functions in its
-	 * targetlist.  Otherwise we might well wind up inserting set-returning
-	 * functions into places where they mustn't go, such as quals of higher
-	 * queries.  This also ensures deletion of an empty jointree is valid.
-	 */
-	if (expression_returns_set((Node *) subquery->targetList))
-		return false;
-
-	/*
 	 * Don't pull up a subquery that has any volatile functions in its
 	 * targetlist.  Otherwise we might introduce multiple evaluations of these
 	 * functions, if they get copied to multiple places in the upper query,
@@ -1603,7 +1600,7 @@ pull_up_simple_values(PlannerInfo *root, Node *jtnode, RangeTblEntry *rte)
 	 * Need a modifiable copy of the VALUES list to hack on, just in case it's
 	 * multiply referenced.
 	 */
-	values_list = (List *) copyObject(linitial(rte->values_lists));
+	values_list = copyObject(linitial(rte->values_lists));
 
 	/*
 	 * The VALUES RTE can't contain any Vars of level zero, let alone any that
@@ -1756,15 +1753,13 @@ is_simple_union_all(Query *subquery)
 
 	/* Let's just make sure it's a valid subselect ... */
 	if (!IsA(subquery, Query) ||
-		subquery->commandType != CMD_SELECT ||
-		subquery->utilityStmt != NULL)
+		subquery->commandType != CMD_SELECT)
 		elog(ERROR, "subquery is bogus");
 
 	/* Is it a set-operation query at all? */
-	topop = (SetOperationStmt *) subquery->setOperations;
+	topop = castNode(SetOperationStmt, subquery->setOperations);
 	if (!topop)
 		return false;
-	Assert(IsA(topop, SetOperationStmt));
 
 	/* Can't handle ORDER BY, LIMIT/OFFSET, locking, or WITH */
 	if (subquery->sortClause ||
@@ -1978,6 +1973,11 @@ replace_vars_in_jointree(Node *jtnode,
 							pullup_replace_vars((Node *) rte->functions,
 												context);
 						break;
+					case RTE_TABLEFUNC:
+						rte->tablefunc = (TableFunc *)
+							pullup_replace_vars((Node *) rte->tablefunc,
+												context);
+						break;
 					case RTE_VALUES:
 						rte->values_lists = (List *)
 							pullup_replace_vars((Node *) rte->values_lists,
@@ -1988,6 +1988,7 @@ replace_vars_in_jointree(Node *jtnode,
 #ifdef XCP
 					case RTE_REMOTE_DUMMY:
 #endif					
+					case RTE_NAMEDTUPLESTORE:
 						/* these shouldn't be marked LATERAL */
 						Assert(false);
 						break;
@@ -2146,7 +2147,7 @@ pullup_replace_vars_callback(Var *var,
 				 varattno);
 
 		/* Make a copy of the tlist item to return */
-		newnode = copyObject(tle->expr);
+		newnode = (Node *) copyObject(tle->expr);
 
 		/* Insert PlaceHolderVar if needed */
 		if (rcon->need_phvs)
@@ -2346,8 +2347,8 @@ flatten_simple_union_all(PlannerInfo *root)
 	RangeTblRef *rtr;
 
 	/* Shouldn't be called unless query has setops */
-	topop = (SetOperationStmt *) parse->setOperations;
-	Assert(topop && IsA(topop, SetOperationStmt));
+	topop = castNode(SetOperationStmt, parse->setOperations);
+	Assert(topop);
 
 	/* Can't optimize away a recursive UNION */
 	if (root->hasRecursion)

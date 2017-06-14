@@ -279,7 +279,8 @@ make prefix=/usr/local/pgsql.new install
      into the new cluster, e.g. <filename>pgcrypto.so</filename>,
      whether they are from <filename>contrib</filename>
      or some other source. Do not install the schema definitions, e.g.
-     <filename>pgcrypto.sql</>, because these will be upgraded from the old cluster.
+     <command>CREATE EXTENSION pgcrypto</>, because these will be upgraded
+     from the old cluster.
      Also, any custom full text search files (dictionary, synonym,
      thesaurus, stop words) must also be copied to the new cluster.
     </para>
@@ -341,8 +342,8 @@ NET STOP postgresql-9.0
      Always run the <application>pg_upgrade</> binary of the new server, not the old one.
      <application>pg_upgrade</> requires the specification of the old and new cluster's
      data and executable (<filename>bin</>) directories. You can also specify
-     user and port values, and whether you want the data linked instead of
-     copied (the default).
+     user and port values, and whether you want the data files linked
+     instead of the default copy behavior.
     </para>
 
     <para>
@@ -351,7 +352,7 @@ NET STOP postgresql-9.0
      your old cluster
      once you start the new cluster after the upgrade.  Link mode also
      requires that the old and new cluster data directories be in the
-     same file system.  (Tablespaces and <filename>pg_xlog</> can be on
+     same file system.  (Tablespaces and <filename>pg_wal</> can be on
      different file systems.)  See <literal>pg_upgrade --help</> for a full
      list of options.
     </para>
@@ -514,7 +515,7 @@ rsync --archive --delete --hard-links --size-only old_pgdata new_pgdata remote_d
       <para>
        If you have tablespaces, you will need to run a similar
        <application>rsync</> command for each tablespace directory.  If you
-       have relocated <filename>pg_xlog</> outside the data directories,
+       have relocated <filename>pg_wal</> outside the data directories,
        <application>rsync</> must be run on those directories too.
       </para>
      </step>
@@ -564,7 +565,7 @@ rsync --archive --delete --hard-links --size-only old_pgdata new_pgdata remote_d
      run using:
 
 <programlisting>
-psql --username postgres --file script.sql postgres
+psql --username=postgres --file=script.sql postgres
 </programlisting>
 
      The scripts can be run in any order and can be deleted once they have

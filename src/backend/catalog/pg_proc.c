@@ -4,7 +4,7 @@
  *	  routines to support manipulation of the pg_proc relation
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
- * Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+ * Portions Copyright (c) 1996-2017, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
  *
@@ -38,6 +38,7 @@
 #include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/lsyscache.h"
+#include "utils/regproc.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
 #ifdef PGXC
@@ -46,10 +47,6 @@
 #include "pgxc/planner.h"
 #endif
 
-
-Datum		fmgr_internal_validator(PG_FUNCTION_ARGS);
-Datum		fmgr_c_validator(PG_FUNCTION_ARGS);
-Datum		fmgr_sql_validator(PG_FUNCTION_ARGS);
 
 typedef struct
 {
@@ -519,8 +516,7 @@ ProcedureCreate(const char *procedureName,
 											 Anum_pg_proc_proargdefaults,
 											 &isnull);
 			Assert(!isnull);
-			oldDefaults = (List *) stringToNode(TextDatumGetCString(proargdefaults));
-			Assert(IsA(oldDefaults, List));
+			oldDefaults = castNode(List, stringToNode(TextDatumGetCString(proargdefaults)));
 			Assert(list_length(oldDefaults) == oldproc->pronargdefaults);
 
 			/* new list can have more defaults than old, advance over 'em */
@@ -582,7 +578,7 @@ ProcedureCreate(const char *procedureName,
 
 		/* Okay, do it... */
 		tup = heap_modify_tuple(oldtup, tupDesc, values, nulls, replaces);
-		simple_heap_update(rel, &tup->t_self, tup);
+		CatalogTupleUpdate(rel, &tup->t_self, tup);
 
 		ReleaseSysCache(oldtup);
 		is_update = true;
@@ -600,12 +596,10 @@ ProcedureCreate(const char *procedureName,
 			nulls[Anum_pg_proc_proacl - 1] = true;
 
 		tup = heap_form_tuple(tupDesc, values, nulls);
-		simple_heap_insert(rel, tup);
+		CatalogTupleInsert(rel, tup);
 		is_update = false;
 	}
 
-	/* Need to update indexes for either the insert or update case */
-	CatalogUpdateIndexes(rel, tup);
 
 	retval = HeapTupleGetOid(tup);
 
@@ -940,7 +934,7 @@ fmgr_sql_validator(PG_FUNCTION_ARGS)
 			querytree_list = NIL;
 			foreach(lc, raw_parsetree_list)
 			{
-				Node	   *parsetree = (Node *) lfirst(lc);
+				RawStmt    *parsetree = lfirst_node(RawStmt, lc);
 				List	   *querytree_sublist;
 
 #ifdef PGXC
@@ -954,9 +948,8 @@ fmgr_sql_validator(PG_FUNCTION_ARGS)
 				querytree_sublist = pg_analyze_and_rewrite_params(parsetree,
 																  prosrc,
 									   (ParserSetupHook) sql_fn_parser_setup,
-																  pinfo);
-
-
+																  pinfo,
+																  NULL);
 				querytree_list = list_concat(querytree_list,
 											 querytree_sublist);
 			}

@@ -696,14 +696,13 @@ static void
 execute_sql_string(const char *sql, const char *filename)
 {
 	List	   *raw_parsetree_list;
-	List	   *querysource_list;
 	DestReceiver *dest;
-	ListCell   *lc1, *lc3;
+	ListCell   *lc1;
 
 	/*
 	 * Parse the SQL string into a list of raw parse trees.
 	 */
-	raw_parsetree_list = pg_parse_query_get_source(sql, &querysource_list);
+	raw_parsetree_list = pg_parse_query(sql);
 
 	/* All output from SELECTs goes to the bit bucket */
 	dest = CreateDestReceiver(DestNone);
@@ -713,10 +712,9 @@ execute_sql_string(const char *sql, const char *filename)
 	 * parsetree.  We must fully execute each query before beginning parse
 	 * analysis on the next one, since there may be interdependencies.
 	 */
-	forboth(lc1, raw_parsetree_list, lc3, querysource_list)
+	foreach(lc1, raw_parsetree_list)
 	{
 		RawStmt    *parsetree = lfirst_node(RawStmt, lc1);
-		char	   *querysource = (char *) lfirst(lc3);
 		List	   *stmt_list;
 		ListCell   *lc2;
 
@@ -724,7 +722,7 @@ execute_sql_string(const char *sql, const char *filename)
 		CommandCounterIncrement();
 
 		stmt_list = pg_analyze_and_rewrite(parsetree,
-										   querysource,
+										   sql,
 										   NULL,
 										   0,
 										   NULL);
@@ -743,7 +741,7 @@ execute_sql_string(const char *sql, const char *filename)
 				QueryDesc  *qdesc;
 
 				qdesc = CreateQueryDesc(stmt,
-										querysource,
+										sql,
 										GetActiveSnapshot(), NULL,
 										dest, NULL, NULL, 0);
 
@@ -762,7 +760,7 @@ execute_sql_string(const char *sql, const char *filename)
 							 errmsg("transaction control statements are not allowed within an extension script")));
 
 				ProcessUtility(stmt,
-							   querysource,
+							   sql,
 							   PROCESS_UTILITY_QUERY,
 							   NULL,
 							   NULL,

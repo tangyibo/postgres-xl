@@ -51,7 +51,6 @@ static Portal SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
 
 #ifdef PGXC
 static void _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
-				  List *query_source,
                   SPIPlanPtr plan);
 #endif
 static void _SPI_prepare_plan(const char *src, SPIPlanPtr plan);
@@ -341,8 +340,7 @@ SPI_execute_direct(const char *remote_sql, char *nodename)
 	plan.cursor_options = 0;
 
 	/* Now pass the ExecDirectStmt parsetree node */
-	_SPI_pgxc_prepare_plan(execdirect.data, list_make1(stmt),
-			list_make1(execdirect.data), &plan);
+	_SPI_pgxc_prepare_plan(execdirect.data, list_make1(stmt), &plan);
 
 	res = _SPI_execute_plan(&plan, NULL,
 							InvalidSnapshot, InvalidSnapshot, false, true, 0);
@@ -1802,7 +1800,7 @@ static void
 _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
 {
 #ifdef PGXC
-	_SPI_pgxc_prepare_plan(src, NULL, NULL, plan);
+	_SPI_pgxc_prepare_plan(src, NULL, plan);
 }
 
 /*
@@ -1812,14 +1810,12 @@ _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
  * transparent to the user.
  */
 static void
-_SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
-		List *query_source, SPIPlanPtr plan)
+_SPI_pgxc_prepare_plan(const char *src, List *src_parsetree, SPIPlanPtr plan)
 {
 #endif
 	List	   *raw_parsetree_list;
-	List	   *querysource_list;
 	List	   *plancache_list;
-	ListCell   *list_item, *list_item2;
+	ListCell   *list_item;
 	ErrorContextCallback spierrcontext;
 
 	/*
@@ -1836,23 +1832,19 @@ _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
 #ifdef PGXC
 	/* Parse it only if there isn't an already parsed tree passed */
 	if (src_parsetree)
-	{
 		raw_parsetree_list = src_parsetree;
-		querysource_list = query_source;
-	}
 	else
 #endif
-		raw_parsetree_list = pg_parse_query_get_source(src, &querysource_list);
+		raw_parsetree_list = pg_parse_query(src);
 	/*
 	 * Do parse analysis and rule rewrite for each raw parsetree, storing the
 	 * results into unsaved plancache entries.
 	 */
 	plancache_list = NIL;
 
-	forboth(list_item, raw_parsetree_list, list_item2, querysource_list)
+	foreach(list_item, raw_parsetree_list)
 	{
 		RawStmt    *parsetree = lfirst_node(RawStmt, list_item);
-		char	   *querysource = (char *) lfirst (list_item2);
 		List	   *stmt_list;
 		CachedPlanSource *plansource;
 
@@ -1861,7 +1853,7 @@ _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
 		 * needs to see the unmodified raw parse tree.
 		 */
 		plansource = CreateCachedPlan(parsetree,
-									  querysource,
+									  src,
 #ifdef PGXC
 									  NULL,
 #endif
@@ -1875,7 +1867,7 @@ _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
 		{
 			Assert(plan->nargs == 0);
 			stmt_list = pg_analyze_and_rewrite_params(parsetree,
-													  querysource,
+													  src,
 													  plan->parserSetup,
 													  plan->parserSetupArg,
 													  _SPI_current->queryEnv);
@@ -1883,7 +1875,7 @@ _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree,
 		else
 		{
 			stmt_list = pg_analyze_and_rewrite(parsetree,
-											   querysource,
+											   src,
 											   plan->argtypes,
 											   plan->nargs,
 											   _SPI_current->queryEnv);
@@ -1935,9 +1927,8 @@ static void
 _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan)
 {
 	List	   *raw_parsetree_list;
-	List	   *querysource_list;
 	List	   *plancache_list;
-	ListCell   *list_item, *list_item2;
+	ListCell   *list_item;
 	ErrorContextCallback spierrcontext;
 
 	/*
@@ -1951,22 +1942,21 @@ _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan)
 	/*
 	 * Parse the request string into a list of raw parse trees.
 	 */
-	raw_parsetree_list = pg_parse_query_get_source(src, &querysource_list);
+	raw_parsetree_list = pg_parse_query(src);
 
 	/*
 	 * Construct plancache entries, but don't do parse analysis yet.
 	 */
 	plancache_list = NIL;
 
-	forboth(list_item, raw_parsetree_list, list_item2, querysource_list)
+	foreach(list_item, raw_parsetree_list)
 	{
 		RawStmt    *parsetree = lfirst_node(RawStmt, list_item);
-		char	   *querysource = (char *) lfirst (list_item2);
 		CachedPlanSource *plansource;
 
 
 		plansource = CreateOneShotCachedPlan(parsetree,
-											 querysource,
+											 src,
 										  CreateCommandTag(parsetree->stmt));
 
 		plancache_list = lappend(plancache_list, plansource);

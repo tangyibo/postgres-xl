@@ -1221,6 +1221,13 @@ tuplesort_begin_merge(TupleDesc tupDesc,
 		PrepareSortSupportFromOrderingOp(sortOperators[i], sortKey);
 	}
 
+	/*
+	 * logical tape in this case is a sorted stream
+	 */
+	state->maxTapes = combiner->conn_count;
+	state->tapeRange = combiner->conn_count;
+
+	state->mergeactive = (bool *) palloc0(combiner->conn_count * sizeof(bool));
 	state->tp_runs = (int *) palloc0(combiner->conn_count * sizeof(int));
 	state->tp_dummy = (int *) palloc0(combiner->conn_count * sizeof(int));
 	state->tp_tapenum = (int *) palloc0(combiner->conn_count * sizeof(int));
@@ -1230,6 +1237,9 @@ tuplesort_begin_merge(TupleDesc tupDesc,
 		state->tp_runs[i] = 1;
 		state->tp_tapenum[i] = i;
 	}
+
+	init_slab_allocator(state, 0);
+
 	beginmerge(state);
 	state->status = TSS_FINALMERGE;
 

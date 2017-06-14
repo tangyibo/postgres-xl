@@ -711,7 +711,9 @@ typedef enum BackendType
 	B_STARTUP,
 	B_WAL_RECEIVER,
 	B_WAL_SENDER,
-	B_WAL_WRITER
+	B_WAL_WRITER,
+	B_PGXL_CLUSTER_MONITOR,
+	B_PGXL_POOLER
 } BackendType;
 
 

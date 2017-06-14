@@ -2931,6 +2931,12 @@ pgstat_bestart(void)
 			case WalReceiverProcess:
 				beentry->st_backendType = B_WAL_RECEIVER;
 				break;
+			case PoolerProcess:
+				beentry->st_backendType = B_PGXL_POOLER;
+				break;
+			case ClusterMonitorProcess:
+				beentry->st_backendType = B_PGXL_CLUSTER_MONITOR;
+				break;
 			default:
 				elog(FATAL, "unrecognized process type: %d",
 					 (int) MyAuxProcType);
@@ -4120,6 +4126,12 @@ pgstat_get_backend_desc(BackendType backendType)
 			break;
 		case B_WAL_WRITER:
 			backendDesc = "walwriter";
+			break;
+		case B_PGXL_POOLER:
+			backendDesc = "pooler";
+			break;
+		case B_PGXL_CLUSTER_MONITOR:
+			backendDesc = "cluster monitor";
 			break;
 	}
 

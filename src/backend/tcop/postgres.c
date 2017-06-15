@@ -1251,11 +1251,11 @@ exec_simple_query(const char *query_string)
 		 */
 		if (IS_PGXC_DATANODE && IsPostmasterEnvironment)
 		{
-			if (IsA(parsetree, VacuumStmt) || IsA(parsetree, ClusterStmt))
+			if (IsA(parsetree->stmt, VacuumStmt) || IsA(parsetree->stmt, ClusterStmt))
 				 SetForceXidFromGTM(true);
-			else if (IsA(parsetree, ReindexStmt))
+			else if (IsA(parsetree->stmt, ReindexStmt))
 			{
-				ReindexStmt *stmt = (ReindexStmt *) parsetree;
+				ReindexStmt *stmt = (ReindexStmt *) parsetree->stmt;
 				if (stmt->kind == REINDEX_OBJECT_SCHEMA ||
 					stmt->kind == REINDEX_OBJECT_DATABASE)
 					SetForceXidFromGTM(true);

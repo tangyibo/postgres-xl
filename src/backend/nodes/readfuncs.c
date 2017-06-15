@@ -175,64 +175,6 @@ set_portable_input(bool value)
 	local_node->fldname = _readBitmapset()
 
 #ifdef XCP
-/* Read fields of a Plan node */
-#define READ_PLAN_FIELDS(nodeTypeName) \
-	Plan *plan_node; \
-	READ_LOCALS(nodeTypeName); \
-	plan_node = (Plan *) local_node; \
-	token = pg_strtok(&length);		/* skip :startup_cost */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	plan_node->startup_cost = atof(token); \
-	token = pg_strtok(&length);		/* skip :total_cost */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	plan_node->total_cost = atof(token); \
-	token = pg_strtok(&length);		/* skip :plan_rows */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	plan_node->plan_rows = atof(token); \
-	token = pg_strtok(&length);		/* skip :plan_width */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	plan_node->plan_width = atoi(token); \
-	token = pg_strtok(&length);		/* skip :parallel_aware */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	plan_node->parallel_aware = strtobool(token); \
-	token = pg_strtok(&length);		/* skip :plan_node_id */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	plan_node->plan_node_id = atoi(token); \
-	token = pg_strtok(&length);		/* skip :targetlist */ \
-	plan_node->targetlist = nodeRead(NULL, 0); \
-	token = pg_strtok(&length);		/* skip :qual */ \
-	plan_node->qual = nodeRead(NULL, 0); \
-	token = pg_strtok(&length);		/* skip :lefttree */ \
-	plan_node->lefttree = nodeRead(NULL, 0); \
-	token = pg_strtok(&length);		/* skip :righttree */ \
-	plan_node->righttree = nodeRead(NULL, 0); \
-	token = pg_strtok(&length);		/* skip :initPlan */ \
-	plan_node->initPlan = nodeRead(NULL, 0); \
-	token = pg_strtok(&length);		/* skip :extParam */ \
-	plan_node->extParam = _readBitmapset(); \
-	token = pg_strtok(&length);		/* skip :allParam */ \
-	plan_node->allParam = _readBitmapset()
-
-/* Read fields of a Scan node */
-#define READ_SCAN_FIELDS(nodeTypeName) \
-	Scan *scan_node; \
-	READ_PLAN_FIELDS(nodeTypeName); \
-	scan_node = (Scan *) local_node; \
-	token = pg_strtok(&length);		/* skip :scanrelid */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	scan_node->scanrelid = atoi(token)
-
-/* Read fields of a Join node */
-#define READ_JOIN_FIELDS(nodeTypeName) \
-	Join *join_node; \
-	READ_PLAN_FIELDS(nodeTypeName); \
-	join_node = (Join *) local_node; \
-	token = pg_strtok(&length);		/* skip :jointype */ \
-	token = pg_strtok(&length);		/* get field value */ \
-	join_node->jointype = (JoinType) atoi(token); \
-	token = pg_strtok(&length);		/* skip :joinqual */ \
-	join_node->joinqual = nodeRead(NULL, 0)
-
 /*
  * Macros to read an identifier and lookup the OID
  * The identifier depends on object type.
@@ -2139,6 +2081,7 @@ ReadCommonPlan(Plan *local_node)
 	READ_FLOAT_FIELD(plan_rows);
 	READ_INT_FIELD(plan_width);
 	READ_BOOL_FIELD(parallel_aware);
+	READ_BOOL_FIELD(parallel_safe);
 	READ_INT_FIELD(plan_node_id);
 	READ_NODE_FIELD(targetlist);
 	READ_NODE_FIELD(qual);
@@ -2865,7 +2808,9 @@ static Sort *
 _readSort(void)
 {
 	int i;
-	READ_PLAN_FIELDS(Sort);
+	READ_LOCALS(Sort);
+
+	ReadCommonPlan(&local_node->plan);
 
 	READ_INT_FIELD(numCols);
 
@@ -3113,7 +3058,9 @@ _readWindowAgg(void)
 {
 	int i;
 
-	READ_PLAN_FIELDS(WindowAgg);
+	READ_LOCALS(WindowAgg);
+
+	ReadCommonPlan(&local_node->plan);
 
 	READ_UINT_FIELD(winref);
 	READ_INT_FIELD(partNumCols);
@@ -3607,7 +3554,8 @@ _readExtensibleNode(void)
 static RemoteSubplan *
 _readRemoteSubplan(void)
 {
-	READ_SCAN_FIELDS(RemoteSubplan);
+	READ_LOCALS(RemoteSubplan);
+	ReadCommonScan(&local_node->scan);
 
 	READ_CHAR_FIELD(distributionType);
 	READ_INT_FIELD(distributionKey);

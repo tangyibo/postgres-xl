@@ -22,7 +22,7 @@ PostgreSQL documentation
  <refsynopsisdiv>
 <synopsis>
 ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> CONNECTION '<replaceable>conninfo</replaceable>'
-ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> SET PUBLICATION <replaceable class="PARAMETER">publication_name</replaceable> [, ...] { REFRESH [ WITH ( <replaceable class="PARAMETER">refresh_option</replaceable> [= <replaceable class="PARAMETER">value</replaceable>] [, ... ] ) ] | SKIP REFRESH }
+ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> SET PUBLICATION <replaceable class="PARAMETER">publication_name</replaceable> [, ...] [ WITH ( <replaceable class="PARAMETER">set_publication_option</replaceable> [= <replaceable class="PARAMETER">value</replaceable>] [, ... ] ) ]
 ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> REFRESH PUBLICATION [ WITH ( <replaceable class="PARAMETER">refresh_option</replaceable> [= <replaceable class="PARAMETER">value</replaceable>] [, ... ] ) ]
 ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> ENABLE
 ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> DISABLE
@@ -42,8 +42,11 @@ ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> RENAME TO <
   </para>
 
   <para>
+   You must own the subscription to use <command>ALTER SUBSCRIPTION</>.
    To alter the owner, you must also be a direct or indirect member of the
    new owning role. The new owner has to be a superuser.
+   (Currently, all subscription owners must be superusers, so the owner checks
+   will be bypassed in practice.  But this might change in the future.)
   </para>
  </refsect1>
 
@@ -77,18 +80,29 @@ ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> RENAME TO <
      <para>
       Changes list of subscribed publications. See
       <xref linkend="SQL-CREATESUBSCRIPTION"> for more information.
+      By default this command will also act like <literal>REFRESH
+      PUBLICATION</literal>.
      </para>
 
      <para>
-      When <literal>REFRESH</literal> is specified, this command will also act
-      like <literal>REFRESH
-      PUBLICATION</literal>.  <literal>refresh_option</literal> specifies
-      additional options for the refresh operation, as described
-      under <literal>REFRESH PUBLICATION</literal>.  When
-      <literal>SKIP REFRESH</literal> is specified, the command will not try
-      to refresh table information.  Note that
-      either <literal>REFRESH</literal> or <literal>SKIP REFRESH</literal>
-      must be specified.
+      <replaceable>set_publication_option</replaceable> specifies additional
+      options for this operation.  The supported options are:
+
+      <variablelist>
+       <varlistentry>
+        <term><literal>refresh</literal> (<type>boolean</type>)</term>
+        <listitem>
+         <para>
+          When false, the command will not try to refresh table information.
+          <literal>REFRESH PUBLICATION</literal> should then be executed separately.
+          The default is <literal>true</literal>.
+         </para>
+        </listitem>
+       </varlistentry>
+      </variablelist>
+
+      Additionally, refresh options as described
+      under <literal>REFRESH PUBLICATION</literal> may be specified.
      </para>
     </listitem>
    </varlistentry>
@@ -104,7 +118,7 @@ ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> RENAME TO <
      </para>
 
      <para>
-      <literal>refresh_option</literal> specifies additional options for the
+      <replaceable>refresh_option</replaceable> specifies additional options for the
       refresh operation.  The supported options are:
 
       <variablelist>
@@ -182,7 +196,7 @@ ALTER SUBSCRIPTION <replaceable class="PARAMETER">name</replaceable> RENAME TO <
    Change the publication subscribed by a subscription to
    <literal>insert_only</literal>:
 <programlisting>
-ALTER SUBSCRIPTION mysub SET PUBLICATION insert_only REFRESH;
+ALTER SUBSCRIPTION mysub SET PUBLICATION insert_only;
 </programlisting>
   </para>
 
@@ -190,8 +204,7 @@ ALTER SUBSCRIPTION mysub SET PUBLICATION insert_only REFRESH;
    Disable (stop) the subscription:
 <programlisting>
 ALTER SUBSCRIPTION mysub DISABLE;
-</programlisting>
-  </para>
+</programlisting></para>
  </refsect1>
 
  <refsect1>

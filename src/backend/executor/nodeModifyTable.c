@@ -415,6 +415,16 @@ ExecInsert(ModifyTableState *mtstate,
 	else
 	{
 		/*
+		 * We always check the partition constraint, including when the tuple
+		 * got here via tuple-routing.  However we don't need to in the latter
+		 * case if no BR trigger is defined on the partition.  Note that a BR
+		 * trigger might modify the tuple such that the partition constraint
+		 * is no longer satisfied, so we need to check in that case.
+		 */
+		bool		check_partition_constr =
+		(resultRelInfo->ri_PartitionCheck != NIL);
+
+		/*
 		 * Constraints might reference the tableoid column, so initialize
 		 * t_tableOid before evaluating them.
 		 */
@@ -431,9 +441,16 @@ ExecInsert(ModifyTableState *mtstate,
 								 resultRelInfo, slot, estate);
 
 		/*
-		 * Check the constraints of the tuple
+		 * No need though if the tuple has been routed, and a BR trigger
+		 * doesn't exist.
 		 */
-		if (resultRelationDesc->rd_att->constr || resultRelInfo->ri_PartitionCheck)
+		if (saved_resultRelInfo != NULL &&
+			!(resultRelInfo->ri_TrigDesc &&
+			  resultRelInfo->ri_TrigDesc->trig_insert_before_row))
+			check_partition_constr = false;
+
+		/* Check the constraints of the tuple */
+		if (resultRelationDesc->rd_att->constr || check_partition_constr)
 			ExecConstraints(resultRelInfo, slot, estate);
 
 		if (onconflict != ONCONFLICT_NONE && resultRelInfo->ri_NumIndices > 0)
@@ -1826,10 +1843,21 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	if (node->withCheckOptionLists != NIL && mtstate->mt_num_partitions > 0)
 	{
 		List	   *wcoList;
+		PlanState  *plan;
 
-		Assert(operation == CMD_INSERT);
-		resultRelInfo = mtstate->mt_partitions;
+		/*
+		 * In case of INSERT on partitioned tables, there is only one plan.
+		 * Likewise, there is only one WITH CHECK OPTIONS list, not one per
+		 * partition.  We make a copy of the WCO qual for each partition; note
+		 * that, if there are SubPlans in there, they all end up attached to
+		 * the one parent Plan node.
+		 */
+		Assert(operation == CMD_INSERT &&
+			   list_length(node->withCheckOptionLists) == 1 &&
+			   mtstate->mt_nplans == 1);
 		wcoList = linitial(node->withCheckOptionLists);
+		plan = mtstate->mt_plans[0];
+		resultRelInfo = mtstate->mt_partitions;
 		for (i = 0; i < mtstate->mt_num_partitions; i++)
 		{
 			Relation	partrel = resultRelInfo->ri_RelationDesc;
@@ -1843,9 +1871,9 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 													 partrel, rel);
 			foreach(ll, mapped_wcoList)
 			{
-				WithCheckOption *wco = (WithCheckOption *) lfirst(ll);
-				ExprState  *wcoExpr = ExecInitQual((List *) wco->qual,
-												   mtstate->mt_plans[i]);
+				WithCheckOption *wco = castNode(WithCheckOption, lfirst(ll));
+				ExprState  *wcoExpr = ExecInitQual(castNode(List, wco->qual),
+												   plan);
 
 				wcoExprs = lappend(wcoExprs, wcoExpr);
 			}

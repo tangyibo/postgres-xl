@@ -8402,6 +8402,11 @@ ShutdownXLOG(int code, Datum arg)
 			(errmsg("shutting down")));
 
 	/*
+	 * Signal walsenders to move to stopping state.
+	 */
+	WalSndInitStopping();
+
+	/*
 	 * Wait for WAL senders to be in stopping state.  This prevents commands
 	 * from writing new WAL.
 	 */

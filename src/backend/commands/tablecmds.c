@@ -299,6 +299,14 @@ struct DropRelationCallbackState
 #define		ATT_COMPOSITE_TYPE		0x0010
 #define		ATT_FOREIGN_TABLE		0x0020
 
+/*
+ * Partition tables are expected to be dropped when the parent partitioned
+ * table gets dropped. Hence for partitioning we use AUTO dependency.
+ * Otherwise, for regular inheritance use NORMAL dependency.
+ */
+#define child_dependency_type(child_is_partition)	\
+	((child_is_partition) ? DEPENDENCY_AUTO : DEPENDENCY_NORMAL)
+
 static void truncate_check_rel(Relation rel);
 static List *MergeAttributes(List *schema, List *supers, char relpersistence,
 				bool is_partition, List **supOids, List **supconstr,
@@ -455,7 +463,8 @@ static void ATExecEnableDisableRule(Relation rel, char *rulename,
 static void ATPrepAddInherit(Relation child_rel);
 static ObjectAddress ATExecAddInherit(Relation child_rel, RangeVar *parent, LOCKMODE lockmode);
 static ObjectAddress ATExecDropInherit(Relation rel, RangeVar *parent, LOCKMODE lockmode);
-static void drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid);
+static void drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
+					   DependencyType deptype);
 static ObjectAddress ATExecAddOf(Relation rel, const TypeName *ofTypename, LOCKMODE lockmode);
 static void ATExecDropOf(Relation rel, LOCKMODE lockmode);
 static void ATExecReplicaIdentity(Relation rel, ReplicaIdentityStmt *stmt, LOCKMODE lockmode);
@@ -2428,14 +2437,8 @@ StoreCatalogInheritance1(Oid relationId, Oid parentOid,
 	childobject.objectId = relationId;
 	childobject.objectSubId = 0;
 
-	/*
-	 * Partition tables are expected to be dropped when the parent partitioned
-	 * table gets dropped.
-	 */
-	if (child_is_partition)
-		recordDependencyOn(&childobject, &parentobject, DEPENDENCY_AUTO);
-	else
-		recordDependencyOn(&childobject, &parentobject, DEPENDENCY_NORMAL);
+	recordDependencyOn(&childobject, &parentobject,
+					   child_dependency_type(child_is_partition));
 
 	/*
 	 * Post creation hook of this inheritance. Since object_access_hook
@@ -6904,6 +6907,7 @@ ATExecAddIndex(AlteredTableInfo *tab, Relation rel,
 						  InvalidOid,	/* no predefined OID */
 						  true, /* is_alter_table */
 						  check_rights,
+						  false,	/* check_not_in_use - we did it already */
 						  skip_build,
 						  quiet);
 
@@ -11900,7 +11904,8 @@ RemoveInheritance(Relation child_rel, Relation parent_rel)
 
 	drop_parent_dependency(RelationGetRelid(child_rel),
 						   RelationRelationId,
-						   RelationGetRelid(parent_rel));
+						   RelationGetRelid(parent_rel),
+						   child_dependency_type(child_is_partition));
 
 	/*
 	 * Post alter hook of this inherits. Since object_access_hook doesn't take
@@ -11920,7 +11925,8 @@ RemoveInheritance(Relation child_rel, Relation parent_rel)
  * through pg_depend.
  */
 static void
-drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid)
+drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid,
+					   DependencyType deptype)
 {
 	Relation	catalogRelation;
 	SysScanDesc scan;
@@ -11952,7 +11958,7 @@ drop_parent_dependency(Oid relid, Oid refclassid, Oid refobjid)
 		if (dep->refclassid == refclassid &&
 			dep->refobjid == refobjid &&
 			dep->refobjsubid == 0 &&
-			dep->deptype == DEPENDENCY_NORMAL)
+			dep->deptype == deptype)
 			CatalogTupleDelete(catalogRelation, &depTuple->t_self);
 	}
 
@@ -12073,7 +12079,8 @@ ATExecAddOf(Relation rel, const TypeName *ofTypename, LOCKMODE lockmode)
 
 	/* If the table was already typed, drop the existing dependency. */
 	if (rel->rd_rel->reloftype)
-		drop_parent_dependency(relid, TypeRelationId, rel->rd_rel->reloftype);
+		drop_parent_dependency(relid, TypeRelationId, rel->rd_rel->reloftype,
+							   DEPENDENCY_NORMAL);
 
 	/* Record a dependency on the new type. */
 	tableobj.classId = RelationRelationId;
@@ -12126,7 +12133,8 @@ ATExecDropOf(Relation rel, LOCKMODE lockmode)
 	 * table is presumed enough rights.  No lock required on the type, either.
 	 */
 
-	drop_parent_dependency(relid, TypeRelationId, rel->rd_rel->reloftype);
+	drop_parent_dependency(relid, TypeRelationId, rel->rd_rel->reloftype,
+						   DEPENDENCY_NORMAL);
 
 	/* Clear pg_class.reloftype */
 	relationRelation = heap_open(RelationRelationId, RowExclusiveLock);
@@ -14227,7 +14235,6 @@ ComputePartitionAttrs(Relation rel, List *partParams, AttrNumber *partattrs,
 static ObjectAddress
 ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 {
-	PartitionKey key = RelationGetPartitionKey(rel);
 	Relation	attachRel,
 				catalog;
 	List	   *childrels;
@@ -14413,11 +14420,6 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	{
 		int			num_check = attachRel_constr->num_check;
 		int			i;
-		Bitmapset  *not_null_attrs = NULL;
-		List	   *part_constr;
-		ListCell   *lc;
-		bool		partition_accepts_null = true;
-		int			partnatts;
 
 		if (attachRel_constr->has_not_null)
 		{
@@ -14447,7 +14449,6 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 					ntest->argisrow = false;
 					ntest->location = -1;
 					existConstraint = lappend(existConstraint, ntest);
-					not_null_attrs = bms_add_member(not_null_attrs, i);
 				}
 			}
 		}
@@ -14481,59 +14482,8 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 		existConstraint = list_make1(make_ands_explicit(existConstraint));
 
 		/* And away we go ... */
-		if (predicate_implied_by(partConstraint, existConstraint))
+		if (predicate_implied_by(partConstraint, existConstraint, true))
 			skip_validate = true;
-
-		/*
-		 * We choose to err on the safer side, i.e., give up on skipping the
-		 * validation scan, if the partition key column doesn't have the NOT
-		 * NULL constraint and the table is to become a list partition that
-		 * does not accept nulls.  In this case, the partition predicate
-		 * (partConstraint) does include an 'key IS NOT NULL' expression,
-		 * however, because of the way predicate_implied_by_simple_clause() is
-		 * designed to handle IS NOT NULL predicates in the absence of a IS
-		 * NOT NULL clause, we cannot rely on just the above proof.
-		 *
-		 * That is not an issue in case of a range partition, because if there
-		 * were no NOT NULL constraint defined on the key columns, an error
-		 * would be thrown before we get here anyway.  That is not true,
-		 * however, if any of the partition keys is an expression, which is
-		 * handled below.
-		 */
-		part_constr = linitial(partConstraint);
-		part_constr = make_ands_implicit((Expr *) part_constr);
-
-		/*
-		 * part_constr contains an IS NOT NULL expression, if this is a list
-		 * partition that does not accept nulls (in fact, also if this is a
-		 * range partition and some partition key is an expression, but we
-		 * never skip validation in that case anyway; see below)
-		 */
-		foreach(lc, part_constr)
-		{
-			Node	   *expr = lfirst(lc);
-
-			if (IsA(expr, NullTest) &&
-				((NullTest *) expr)->nulltesttype == IS_NOT_NULL)
-			{
-				partition_accepts_null = false;
-				break;
-			}
-		}
-
-		partnatts = get_partition_natts(key);
-		for (i = 0; i < partnatts; i++)
-		{
-			AttrNumber	partattno;
-
-			partattno = get_partition_col_attnum(key, i);
-
-			/* If partition key is an expression, must not skip validation */
-			if (!partition_accepts_null &&
-				(partattno == 0 ||
-				 !bms_is_member(partattno, not_null_attrs)))
-				skip_validate = false;
-		}
 	}
 
 	/* It's safe to skip the validation scan after all */

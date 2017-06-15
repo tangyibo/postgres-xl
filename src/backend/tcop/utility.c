@@ -2019,6 +2019,7 @@ ProcessUtilitySlow(ParseState *pstate,
 									InvalidOid, /* no predefined OID */
 									false,		/* is_alter_table */
 									true,		/* check_rights */
+									true,		/* check_not_in_use */
 									false,		/* skip_build */
 									false);		/* quiet */
 

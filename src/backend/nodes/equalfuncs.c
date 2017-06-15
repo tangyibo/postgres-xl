@@ -2664,6 +2664,8 @@ _equalRangeTblEntry(const RangeTblEntry *a, const RangeTblEntry *b)
 	COMPARE_NODE_FIELD(coltypes);
 	COMPARE_NODE_FIELD(coltypmods);
 	COMPARE_NODE_FIELD(colcollations);
+	COMPARE_STRING_FIELD(enrname);
+	COMPARE_SCALAR_FIELD(enrtuples);
 	COMPARE_NODE_FIELD(alias);
 	COMPARE_NODE_FIELD(eref);
 	COMPARE_SCALAR_FIELD(lateral);

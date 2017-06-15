@@ -406,15 +406,59 @@ pqDropConnection(PGconn *conn, bool flushInput)
 {
 	/* Drop any SSL state */
 	pqsecure_close(conn);
+
 	/* Close the socket itself */
 	if (conn->sock != PGINVALID_SOCKET)
 		closesocket(conn->sock);
 	conn->sock = PGINVALID_SOCKET;
+
 	/* Optionally discard any unread data */
 	if (flushInput)
 		conn->inStart = conn->inCursor = conn->inEnd = 0;
+
 	/* Always discard any unsent data */
 	conn->outCount = 0;
+
+	/* Free authentication state */
+#ifdef ENABLE_GSS
+	{
+		OM_uint32	min_s;
+
+		if (conn->gctx)
+			gss_delete_sec_context(&min_s, &conn->gctx, GSS_C_NO_BUFFER);
+		if (conn->gtarg_nam)
+			gss_release_name(&min_s, &conn->gtarg_nam);
+	}
+#endif
+#ifdef ENABLE_SSPI
+	if (conn->sspitarget)
+	{
+		free(conn->sspitarget);
+		conn->sspitarget = NULL;
+	}
+	if (conn->sspicred)
+	{
+		FreeCredentialsHandle(conn->sspicred);
+		free(conn->sspicred);
+		conn->sspicred = NULL;
+	}
+	if (conn->sspictx)
+	{
+		DeleteSecurityContext(conn->sspictx);
+		free(conn->sspictx);
+		conn->sspictx = NULL;
+	}
+	conn->usesspi = 0;
+#endif
+	if (conn->sasl_state)
+	{
+		/*
+		 * XXX: if support for more authentication mechanisms is added, this
+		 * needs to call the right 'free' function.
+		 */
+		pg_fe_scram_free(conn->sasl_state);
+		conn->sasl_state = NULL;
+	}
 }
 
 
@@ -1598,7 +1642,6 @@ connectDBStart(PGconn *conn)
 	for (i = 0; i < conn->nconnhost; ++i)
 	{
 		pg_conn_host *ch = &conn->connhost[i];
-		char	   *node = ch->host;
 		struct addrinfo hint;
 		int			thisport;
 
@@ -1624,17 +1667,29 @@ connectDBStart(PGconn *conn)
 		}
 		snprintf(portstr, sizeof(portstr), "%d", thisport);
 
-		/* Set up for name resolution. */
+		/* Use pg_getaddrinfo_all() to resolve the address */
+		ret = 1;
 		switch (ch->type)
 		{
 			case CHT_HOST_NAME:
+				ret = pg_getaddrinfo_all(ch->host, portstr, &hint, &ch->addrlist);
+				if (ret || !ch->addrlist)
+					appendPQExpBuffer(&conn->errorMessage,
+									  libpq_gettext("could not translate host name \"%s\" to address: %s\n"),
+									  ch->host, gai_strerror(ret));
 				break;
+
 			case CHT_HOST_ADDRESS:
 				hint.ai_flags = AI_NUMERICHOST;
+				ret = pg_getaddrinfo_all(ch->host, portstr, &hint, &ch->addrlist);
+				if (ret || !ch->addrlist)
+					appendPQExpBuffer(&conn->errorMessage,
+									  libpq_gettext("could not parse network address \"%s\": %s\n"),
+									  ch->host, gai_strerror(ret));
 				break;
+
 			case CHT_UNIX_SOCKET:
 #ifdef HAVE_UNIX_SOCKETS
-				node = NULL;
 				hint.ai_family = AF_UNIX;
 				UNIXSOCK_PATH(portstr, thisport, ch->host);
 				if (strlen(portstr) >= UNIXSOCK_PATH_BUFLEN)
@@ -1646,24 +1701,25 @@ connectDBStart(PGconn *conn)
 					conn->options_valid = false;
 					goto connect_errReturn;
 				}
+
+				/*
+				 * NULL hostname tells pg_getaddrinfo_all to parse the service
+				 * name as a Unix-domain socket path.
+				 */
+				ret = pg_getaddrinfo_all(NULL, portstr, &hint, &ch->addrlist);
+				if (ret || !ch->addrlist)
+					appendPQExpBuffer(&conn->errorMessage,
+									  libpq_gettext("could not translate Unix-domain socket path \"%s\" to address: %s\n"),
+									  portstr, gai_strerror(ret));
+				break;
 #else
 				Assert(false);
+				conn->options_valid = false;
+				goto connect_errReturn;
 #endif
-				break;
 		}
-
-		/* Use pg_getaddrinfo_all() to resolve the address */
-		ret = pg_getaddrinfo_all(node, portstr, &hint, &ch->addrlist);
 		if (ret || !ch->addrlist)
 		{
-			if (node)
-				appendPQExpBuffer(&conn->errorMessage,
-								  libpq_gettext("could not translate host name \"%s\" to address: %s\n"),
-								  node, gai_strerror(ret));
-			else
-				appendPQExpBuffer(&conn->errorMessage,
-								  libpq_gettext("could not translate Unix-domain socket path \"%s\" to address: %s\n"),
-								  portstr, gai_strerror(ret));
 			if (ch->addrlist)
 			{
 				pg_freeaddrinfo_all(hint.ai_family, ch->addrlist);
@@ -1786,16 +1842,23 @@ connectDBComplete(PGconn *conn)
 				return 0;
 		}
 
-		if (ret == 1)	/* connect_timeout elapsed */
+		if (ret == 1)			/* connect_timeout elapsed */
 		{
-			/* If there are no more hosts, return (the error message is already set) */
+			/*
+			 * If there are no more hosts, return (the error message is
+			 * already set)
+			 */
 			if (++conn->whichhost >= conn->nconnhost)
 			{
 				conn->whichhost = 0;
 				conn->status = CONNECTION_BAD;
 				return 0;
 			}
-			/* Attempt connection to the next host, starting the connect_timeout timer */
+
+			/*
+			 * Attempt connection to the next host, starting the
+			 * connect_timeout timer
+			 */
 			pqDropConnection(conn, true);
 			conn->addr_cur = conn->connhost[conn->whichhost].addrlist;
 			conn->status = CONNECTION_NEEDED;
@@ -3043,7 +3106,7 @@ keep_going:						/* We will come back to here until there is
 				restoreErrorMessage(conn, &savedMessage);
 				appendPQExpBuffer(&conn->errorMessage,
 				  libpq_gettext("test \"SHOW transaction_read_only\" failed "
-								" on \"%s:%s\"\n"),
+								"on server \"%s:%s\"\n"),
 								  conn->connhost[conn->whichhost].host,
 								  conn->connhost[conn->whichhost].port);
 				conn->status = CONNECTION_OK;
@@ -3475,42 +3538,6 @@ closePGconn(PGconn *conn)
 	if (conn->lobjfuncs)
 		free(conn->lobjfuncs);
 	conn->lobjfuncs = NULL;
-#ifdef ENABLE_GSS
-	{
-		OM_uint32	min_s;
-
-		if (conn->gctx)
-			gss_delete_sec_context(&min_s, &conn->gctx, GSS_C_NO_BUFFER);
-		if (conn->gtarg_nam)
-			gss_release_name(&min_s, &conn->gtarg_nam);
-	}
-#endif
-#ifdef ENABLE_SSPI
-	if (conn->sspitarget)
-		free(conn->sspitarget);
-	conn->sspitarget = NULL;
-	if (conn->sspicred)
-	{
-		FreeCredentialsHandle(conn->sspicred);
-		free(conn->sspicred);
-		conn->sspicred = NULL;
-	}
-	if (conn->sspictx)
-	{
-		DeleteSecurityContext(conn->sspictx);
-		free(conn->sspictx);
-		conn->sspictx = NULL;
-	}
-#endif
-	if (conn->sasl_state)
-	{
-		/*
-		 * XXX: if support for more authentication mechanisms is added, this
-		 * needs to call the right 'free' function.
-		 */
-		pg_fe_scram_free(conn->sasl_state);
-		conn->sasl_state = NULL;
-	}
 }
 
 /*

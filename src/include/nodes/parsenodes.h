@@ -957,6 +957,11 @@ typedef struct RangeTblEntry
 
 	/*
 	 * Fields valid for a plain relation RTE (else zero):
+	 *
+	 * As a special case, RTE_NAMEDTUPLESTORE can also set relid to indicate
+	 * that the tuple format of the tuplestore is the same as the referenced
+	 * relation.  This allows plans referencing AFTER trigger transition
+	 * tables to be invalidated if the underlying table is altered.
 	 */
 	Oid			relid;			/* OID of the relation */
 	char		relkind;		/* relation kind (see pg_class.relkind) */
@@ -1017,16 +1022,23 @@ typedef struct RangeTblEntry
 	bool		self_reference; /* is this a recursive self-reference? */
 
 	/*
-	 * Fields valid for values and CTE RTEs (else NIL):
+	 * Fields valid for table functions, values, CTE and ENR RTEs (else NIL):
 	 *
 	 * We need these for CTE RTEs so that the types of self-referential
 	 * columns are well-defined.  For VALUES RTEs, storing these explicitly
 	 * saves having to re-determine the info by scanning the values_lists.
+	 * For ENRs, we store the types explicitly here (we could get the
+	 * information from the catalogs if 'relid' was supplied, but we'd still
+	 * need these for TupleDesc-based ENRs, so we might as well always store
+	 * the type info here).
 	 */
 	List	   *coltypes;		/* OID list of column type OIDs */
 	List	   *coltypmods;		/* integer list of column typmods */
 	List	   *colcollations;	/* OID list of column collation OIDs */
 
+	/*
+	 * Fields valid for ENR RTEs (else NULL/zero):
+	 */
 	char	   *enrname;		/* name of ephemeral named relation */
 	double		enrtuples;		/* estimated or actual from caller */
 
@@ -3520,7 +3532,6 @@ typedef enum AlterSubscriptionType
 	ALTER_SUBSCRIPTION_OPTIONS,
 	ALTER_SUBSCRIPTION_CONNECTION,
 	ALTER_SUBSCRIPTION_PUBLICATION,
-	ALTER_SUBSCRIPTION_PUBLICATION_REFRESH,
 	ALTER_SUBSCRIPTION_REFRESH,
 	ALTER_SUBSCRIPTION_ENABLED
 } AlterSubscriptionType;

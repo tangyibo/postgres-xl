@@ -454,6 +454,7 @@ RelationBuildPartitionDesc(Relation rel)
 			palloc0(sizeof(PartitionBoundInfoData));
 		boundinfo->strategy = key->strategy;
 		boundinfo->ndatums = ndatums;
+		boundinfo->null_index = -1;
 		boundinfo->datums = (Datum **) palloc0(ndatums * sizeof(Datum *));
 
 		/* Initialize mapping array with invalid values */
@@ -503,8 +504,6 @@ RelationBuildPartitionDesc(Relation rel)
 							mapping[null_index] = next_index++;
 						boundinfo->null_index = mapping[null_index];
 					}
-					else
-						boundinfo->null_index = -1;
 
 					/* All partition must now have a valid mapping */
 					Assert(next_index == nparts);
@@ -874,7 +873,8 @@ get_partition_parent(Oid relid)
 							  NULL, 2, key);
 
 	tuple = systable_getnext(scan);
-	Assert(HeapTupleIsValid(tuple));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "could not find tuple for parent of relation %u", relid);
 
 	form = (Form_pg_inherits) GETSTRUCT(tuple);
 	result = form->inhparent;

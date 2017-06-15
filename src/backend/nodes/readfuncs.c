@@ -1991,6 +1991,7 @@ _readRangeTblEntry(void)
 			break;
 		case RTE_NAMEDTUPLESTORE:
 			READ_STRING_FIELD(enrname);
+			READ_FLOAT_FIELD(enrtuples);
 			READ_OID_FIELD(relid);
 			READ_NODE_FIELD(coltypes);
 			READ_NODE_FIELD(coltypmods);
@@ -3761,8 +3762,7 @@ _readPartitionBoundSpec(void)
 	READ_NODE_FIELD(listdatums);
 	READ_NODE_FIELD(lowerdatums);
 	READ_NODE_FIELD(upperdatums);
-	/* XXX somebody forgot location field; too late to change for v10 */
-	local_node->location = -1;
+	READ_LOCATION_FIELD(location);
 
 	READ_DONE();
 }
@@ -3777,8 +3777,7 @@ _readPartitionRangeDatum(void)
 
 	READ_BOOL_FIELD(infinite);
 	READ_NODE_FIELD(value);
-	/* XXX somebody forgot location field; too late to change for v10 */
-	local_node->location = -1;
+	READ_LOCATION_FIELD(location);
 
 	READ_DONE();
 }
@@ -4029,9 +4028,9 @@ parseNodeString(void)
 		return_value = _readRemoteStmt();
 	else if (MATCH("SIMPLESORT", 10))
 		return_value = _readSimpleSort();
-	else if (MATCH("PARTITIONBOUND", 14))
+	else if (MATCH("PARTITIONBOUNDSPEC", 18))
 		return_value = _readPartitionBoundSpec();
-	else if (MATCH("PARTRANGEDATUM", 14))
+	else if (MATCH("PARTITIONRANGEDATUM", 19))
 		return_value = _readPartitionRangeDatum();
 	else
 	{

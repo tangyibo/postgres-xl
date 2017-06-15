@@ -1436,19 +1436,33 @@ psql_completion(const char *text, int start, int end)
 
 	/* psql's backslash commands. */
 	static const char *const backslash_commands[] = {
-		"\\a", "\\connect", "\\conninfo", "\\C", "\\cd", "\\copy",
+		"\\a",
+		"\\connect", "\\conninfo", "\\C", "\\cd", "\\copy",
 		"\\copyright", "\\crosstabview",
 		"\\d", "\\da", "\\dA", "\\db", "\\dc", "\\dC", "\\dd", "\\ddp", "\\dD",
 		"\\des", "\\det", "\\deu", "\\dew", "\\dE", "\\df",
 		"\\dF", "\\dFd", "\\dFp", "\\dFt", "\\dg", "\\di", "\\dl", "\\dL",
-		"\\dm", "\\dn", "\\do", "\\dO", "\\dp", "\\drds", "\\ds", "\\dS",
+		"\\dm", "\\dn", "\\do", "\\dO", "\\dp",
+		"\\drds", "\\dRs", "\\dRp", "\\ds", "\\dS",
 		"\\dt", "\\dT", "\\dv", "\\du", "\\dx", "\\dy",
-		"\\e", "\\echo", "\\ef", "\\encoding", "\\errverbose", "\\ev",
-		"\\f", "\\g", "\\gexec", "\\gset", "\\gx", "\\h", "\\help", "\\H",
-		"\\i", "\\ir", "\\l", "\\lo_import", "\\lo_export", "\\lo_list",
-		"\\lo_unlink", "\\o", "\\p", "\\password", "\\prompt", "\\pset", "\\q",
-		"\\qecho", "\\r", "\\s", "\\set", "\\setenv", "\\sf", "\\sv", "\\t",
-		"\\T", "\\timing", "\\unset", "\\x", "\\w", "\\watch", "\\z", "\\!",
+		"\\e", "\\echo", "\\ef", "\\elif", "\\else", "\\encoding",
+		"\\endif", "\\errverbose", "\\ev",
+		"\\f",
+		"\\g", "\\gexec", "\\gset", "\\gx",
+		"\\h", "\\help", "\\H",
+		"\\i", "\\if", "\\ir",
+		"\\l", "\\lo_import", "\\lo_export", "\\lo_list", "\\lo_unlink",
+		"\\o",
+		"\\p", "\\password", "\\prompt", "\\pset",
+		"\\q", "\\qecho",
+		"\\r",
+		"\\s", "\\set", "\\setenv", "\\sf", "\\sv",
+		"\\t", "\\T", "\\timing",
+		"\\unset",
+		"\\x",
+		"\\w", "\\watch",
+		"\\z",
+		"\\!", "\\?",
 		NULL
 	};
 
@@ -1591,6 +1605,18 @@ psql_completion(const char *text, int start, int end)
 	else if (HeadMatches3("ALTER", "SUBSCRIPTION", MatchAny) && TailMatches2("SET", "PUBLICATION"))
 	{
 		/* complete with nothing here as this refers to remote publications */
+	}
+	/* ALTER SUBSCRIPTION <name> SET PUBLICATION <name> */
+	else if (HeadMatches3("ALTER", "SUBSCRIPTION", MatchAny) &&
+			 TailMatches3("SET", "PUBLICATION", MatchAny))
+	{
+		COMPLETE_WITH_CONST("WITH (");
+	}
+	/* ALTER SUBSCRIPTION <name> SET PUBLICATION <name> WITH ( */
+	else if (HeadMatches3("ALTER", "SUBSCRIPTION", MatchAny) &&
+			 TailMatches5("SET", "PUBLICATION", MatchAny, "WITH", "("))
+	{
+		COMPLETE_WITH_LIST2("copy_data", "refresh");
 	}
 	/* ALTER SCHEMA <name> */
 	else if (Matches3("ALTER", "SCHEMA", MatchAny))

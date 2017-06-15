@@ -8042,7 +8042,7 @@ getTableAttrs(Archive *fout, TableInfo *tblinfo, int numTables)
 		tbinfo->attstattarget = (int *) pg_malloc(ntups * sizeof(int));
 		tbinfo->attstorage = (char *) pg_malloc(ntups * sizeof(char));
 		tbinfo->typstorage = (char *) pg_malloc(ntups * sizeof(char));
-		tbinfo->attidentity = (char *) pg_malloc(ntups * sizeof(bool));
+		tbinfo->attidentity = (char *) pg_malloc(ntups * sizeof(char));
 		tbinfo->attisdropped = (bool *) pg_malloc(ntups * sizeof(bool));
 		tbinfo->attlen = (int *) pg_malloc(ntups * sizeof(int));
 		tbinfo->attalign = (char *) pg_malloc(ntups * sizeof(char));
@@ -13162,6 +13162,9 @@ dumpCollation(Archive *fout, CollInfo *collinfo)
 		appendPQExpBufferStr(q, "libc");
 	else if (collprovider[0] == 'i')
 		appendPQExpBufferStr(q, "icu");
+	else if (collprovider[0] == 'd')
+		/* to allow dumping pg_catalog; not accepted on input */
+		appendPQExpBufferStr(q, "default");
 	else
 		exit_horribly(NULL,
 					  "unrecognized collation provider: %s\n",

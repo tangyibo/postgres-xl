@@ -392,6 +392,7 @@ sql_fn_post_column_ref(ParseState *pstate, ColumnRef *cref, Node *var)
 		param = ParseFuncOrColumn(pstate,
 								  list_make1(subfield),
 								  list_make1(param),
+								  pstate->p_last_srf,
 								  NULL,
 								  cref->location);
 	}

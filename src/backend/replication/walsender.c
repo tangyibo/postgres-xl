@@ -24,12 +24,15 @@
  * are treated as not a crash but approximately normal termination;
  * the walsender will exit quickly without sending any more XLOG records.
  *
- * If the server is shut down, postmaster sends us SIGUSR2 after all regular
- * backends have exited. This causes the walsender to switch to the "stopping"
- * state. In this state, the walsender will reject any replication command
- * that may generate WAL activity. The checkpointer begins the shutdown
+ * If the server is shut down, checkpointer sends us
+ * PROCSIG_WALSND_INIT_STOPPING after all regular backends have exited.  If
+ * the backend is idle or runs an SQL query this causes the backend to
+ * shutdown, if logical replication is in progress all existing WAL records
+ * are processed followed by a shutdown.  Otherwise this causes the walsender
+ * to switch to the "stopping" state. In this state, the walsender will reject
+ * any further replication commands. The checkpointer begins the shutdown
  * checkpoint once all walsenders are confirmed as stopping. When the shutdown
- * checkpoint finishes, the postmaster sends us SIGINT. This instructs
+ * checkpoint finishes, the postmaster sends us SIGUSR2. This instructs
  * walsender to send any outstanding WAL, including the shutdown checkpoint
  * record, wait for it to be replicated to the standby, and then exit.
  *
@@ -179,15 +182,14 @@ static bool streamingDoneReceiving;
 static bool WalSndCaughtUp = false;
 
 /* Flags set by signal handlers for later service in main loop */
-static volatile sig_atomic_t got_SIGHUP = false;
-static volatile sig_atomic_t got_SIGINT = false;
 static volatile sig_atomic_t got_SIGUSR2 = false;
+static volatile sig_atomic_t got_STOPPING = false;
 
 /*
- * This is set while we are streaming. When not set, SIGINT signal will be
- * handled like SIGTERM. When set, the main loop is responsible for checking
- * got_SIGINT and terminating when it's set (after streaming any remaining
- * WAL).
+ * This is set while we are streaming. When not set
+ * PROCSIG_WALSND_INIT_STOPPING signal will be handled like SIGTERM. When set,
+ * the main loop is responsible for checking got_STOPPING and terminating when
+ * it's set (after streaming any remaining WAL).
  */
 static volatile sig_atomic_t replication_active = false;
 
@@ -215,9 +217,6 @@ static struct
 }	LagTracker;
 
 /* Signal handlers */
-static void WalSndSigHupHandler(SIGNAL_ARGS);
-static void WalSndXLogSendHandler(SIGNAL_ARGS);
-static void WalSndSwitchStopping(SIGNAL_ARGS);
 static void WalSndLastCycleHandler(SIGNAL_ARGS);
 
 /* Prototypes for private functions */
@@ -306,14 +305,12 @@ WalSndErrorCleanup(void)
 	ReplicationSlotCleanup();
 
 	replication_active = false;
-	if (got_SIGINT)
+
+	if (got_STOPPING || got_SIGUSR2)
 		proc_exit(0);
 
 	/* Revert back to startup state */
 	WalSndSetState(WALSNDSTATE_STARTUP);
-
-	if (got_SIGUSR2)
-		WalSndSetState(WALSNDSTATE_STOPPING);
 }
 
 /*
@@ -686,7 +683,7 @@ StartReplication(StartReplicationCmd *cmd)
 		WalSndLoop(XLogSendPhysical);
 
 		replication_active = false;
-		if (got_SIGINT)
+		if (got_STOPPING)
 			proc_exit(0);
 		WalSndSetState(WALSNDSTATE_STARTUP);
 
@@ -1064,7 +1061,7 @@ StartLogicalReplication(StartReplicationCmd *cmd)
 	{
 		ereport(LOG,
 				(errmsg("terminating walsender process after promotion")));
-		got_SIGINT = true;
+		got_STOPPING = true;
 	}
 
 	WalSndSetState(WALSNDSTATE_CATCHUP);
@@ -1115,7 +1112,7 @@ StartLogicalReplication(StartReplicationCmd *cmd)
 	ReplicationSlotRelease();
 
 	replication_active = false;
-	if (got_SIGINT)
+	if (got_STOPPING)
 		proc_exit(0);
 	WalSndSetState(WALSNDSTATE_STARTUP);
 
@@ -1202,9 +1199,9 @@ WalSndWriteData(LogicalDecodingContext *ctx, XLogRecPtr lsn, TransactionId xid,
 		CHECK_FOR_INTERRUPTS();
 
 		/* Process any requests or signals received recently */
-		if (got_SIGHUP)
+		if (ConfigReloadPending)
 		{
-			got_SIGHUP = false;
+			ConfigReloadPending = false;
 			ProcessConfigFile(PGC_SIGHUP);
 			SyncRepInitConfig();
 		}
@@ -1310,9 +1307,9 @@ WalSndWaitForWal(XLogRecPtr loc)
 		CHECK_FOR_INTERRUPTS();
 
 		/* Process any requests or signals received recently */
-		if (got_SIGHUP)
+		if (ConfigReloadPending)
 		{
-			got_SIGHUP = false;
+			ConfigReloadPending = false;
 			ProcessConfigFile(PGC_SIGHUP);
 			SyncRepInitConfig();
 		}
@@ -1320,19 +1317,19 @@ WalSndWaitForWal(XLogRecPtr loc)
 		/* Check for input from the client */
 		ProcessRepliesIfAny();
 
+		/*
+		 * If we're shutting down, trigger pending WAL to be written out,
+		 * otherwise we'd possibly end up waiting for WAL that never gets
+		 * written, because walwriter has shut down already.
+		 */
+		if (got_STOPPING)
+			XLogBackgroundFlush();
+
 		/* Update our idea of the currently flushed position. */
 		if (!RecoveryInProgress())
 			RecentFlushPtr = GetFlushRecPtr();
 		else
 			RecentFlushPtr = GetXLogReplayRecPtr(NULL);
-
-		/*
-		 * If postmaster asked us to switch to the stopping state, do so.
-		 * Shutdown is in progress and this will allow the checkpointer to
-		 * move on with the shutdown checkpoint.
-		 */
-		if (got_SIGUSR2)
-			WalSndSetState(WALSNDSTATE_STOPPING);
 
 		/*
 		 * If postmaster asked us to stop, don't wait here anymore. This will
@@ -1343,7 +1340,7 @@ WalSndWaitForWal(XLogRecPtr loc)
 		 * RecentFlushPtr, so we can send all remaining data before shutting
 		 * down.
 		 */
-		if (got_SIGINT)
+		if (got_STOPPING)
 			break;
 
 		/*
@@ -1421,7 +1418,7 @@ exec_replication_command(const char *cmd_string)
 	 * If WAL sender has been told that shutdown is getting close, switch its
 	 * status accordingly to handle the next replication commands correctly.
 	 */
-	if (got_SIGUSR2)
+	if (got_STOPPING)
 		WalSndSetState(WALSNDSTATE_STOPPING);
 
 	/*
@@ -2102,9 +2099,9 @@ WalSndLoop(WalSndSendDataCallback send_data)
 		CHECK_FOR_INTERRUPTS();
 
 		/* Process any requests or signals received recently */
-		if (got_SIGHUP)
+		if (ConfigReloadPending)
 		{
-			got_SIGHUP = false;
+			ConfigReloadPending = false;
 			ProcessConfigFile(PGC_SIGHUP);
 			SyncRepInitConfig();
 		}
@@ -2155,20 +2152,13 @@ WalSndLoop(WalSndSendDataCallback send_data)
 			}
 
 			/*
-			 * At the reception of SIGUSR2, switch the WAL sender to the
-			 * stopping state.
-			 */
-			if (got_SIGUSR2)
-				WalSndSetState(WALSNDSTATE_STOPPING);
-
-			/*
-			 * When SIGINT arrives, we send any outstanding logs up to the
+			 * When SIGUSR2 arrives, we send any outstanding logs up to the
 			 * shutdown checkpoint record (i.e., the latest record), wait for
 			 * them to be replicated to the standby, and exit. This may be a
 			 * normal termination at shutdown, or a promotion, the walsender
 			 * is not sure which.
 			 */
-			if (got_SIGINT)
+			if (got_SIGUSR2)
 				WalSndDone(send_data);
 		}
 
@@ -2483,6 +2473,10 @@ XLogSendPhysical(void)
 	XLogRecPtr	endptr;
 	Size		nbytes;
 
+	/* If requested switch the WAL sender to the stopping state. */
+	if (got_STOPPING)
+		WalSndSetState(WALSNDSTATE_STOPPING);
+
 	if (streamingDoneSending)
 	{
 		WalSndCaughtUp = true;
@@ -2773,7 +2767,16 @@ XLogSendLogical(void)
 		 * point, then we're caught up.
 		 */
 		if (logical_decoding_ctx->reader->EndRecPtr >= GetFlushRecPtr())
+		{
 			WalSndCaughtUp = true;
+
+			/*
+			 * Have WalSndLoop() terminate the connection in an orderly
+			 * manner, after writing out all the pending data.
+			 */
+			if (got_STOPPING)
+				got_SIGUSR2 = true;
+		}
 	}
 
 	/* Update shared memory status */
@@ -2883,51 +2886,13 @@ WalSndRqstFileReload(void)
 	}
 }
 
-/* SIGHUP: set flag to re-read config file at next convenient time */
-static void
-WalSndSigHupHandler(SIGNAL_ARGS)
-{
-	int			save_errno = errno;
-
-	got_SIGHUP = true;
-
-	SetLatch(MyLatch);
-
-	errno = save_errno;
-}
-
-/* SIGUSR1: set flag to send WAL records */
-static void
-WalSndXLogSendHandler(SIGNAL_ARGS)
-{
-	int			save_errno = errno;
-
-	latch_sigusr1_handler();
-
-	errno = save_errno;
-}
-
-/* SIGUSR2: set flag to switch to stopping state */
-static void
-WalSndSwitchStopping(SIGNAL_ARGS)
-{
-	int			save_errno = errno;
-
-	got_SIGUSR2 = true;
-	SetLatch(MyLatch);
-
-	errno = save_errno;
-}
-
 /*
- * SIGINT: set flag to do a last cycle and shut down afterwards. The WAL
- * sender should already have been switched to WALSNDSTATE_STOPPING at
- * this point.
+ * Handle PROCSIG_WALSND_INIT_STOPPING signal.
  */
-static void
-WalSndLastCycleHandler(SIGNAL_ARGS)
+void
+HandleWalSndInitStopping(void)
 {
-	int			save_errno = errno;
+	Assert(am_walsender);
 
 	/*
 	 * If replication has not yet started, die like with SIGTERM. If
@@ -2937,8 +2902,21 @@ WalSndLastCycleHandler(SIGNAL_ARGS)
 	 */
 	if (!replication_active)
 		kill(MyProcPid, SIGTERM);
+	else
+		got_STOPPING = true;
+}
 
-	got_SIGINT = true;
+/*
+ * SIGUSR2: set flag to do a last cycle and shut down afterwards. The WAL
+ * sender should already have been switched to WALSNDSTATE_STOPPING at
+ * this point.
+ */
+static void
+WalSndLastCycleHandler(SIGNAL_ARGS)
+{
+	int			save_errno = errno;
+
+	got_SIGUSR2 = true;
 	SetLatch(MyLatch);
 
 	errno = save_errno;
@@ -2949,16 +2927,16 @@ void
 WalSndSignals(void)
 {
 	/* Set up signal handlers */
-	pqsignal(SIGHUP, WalSndSigHupHandler);		/* set flag to read config
+	pqsignal(SIGHUP, PostgresSigHupHandler);	/* set flag to read config
 												 * file */
-	pqsignal(SIGINT, WalSndLastCycleHandler);	/* request a last cycle and
-												 * shutdown */
+	pqsignal(SIGINT, StatementCancelHandler);	/* query cancel */
 	pqsignal(SIGTERM, die);		/* request shutdown */
 	pqsignal(SIGQUIT, quickdie);	/* hard crash time */
 	InitializeTimeouts();		/* establishes SIGALRM handler */
 	pqsignal(SIGPIPE, SIG_IGN);
-	pqsignal(SIGUSR1, WalSndXLogSendHandler);	/* request WAL sending */
-	pqsignal(SIGUSR2, WalSndSwitchStopping);	/* switch to stopping state */
+	pqsignal(SIGUSR1, procsignal_sigusr1_handler);
+	pqsignal(SIGUSR2, WalSndLastCycleHandler);	/* request a last cycle and
+												 * shutdown */
 
 	/* Reset some signals that are accepted by postmaster but not here */
 	pqsignal(SIGCHLD, SIG_DFL);
@@ -3037,9 +3015,36 @@ WalSndWakeup(void)
 }
 
 /*
- * Wait that all the WAL senders have reached the stopping state. This is
- * used by the checkpointer to control when shutdown checkpoints can
- * safely begin.
+ * Signal all walsenders to move to stopping state.
+ *
+ * This will trigger walsenders to move to a state where no further WAL can be
+ * generated. See this file's header for details.
+ */
+void
+WalSndInitStopping(void)
+{
+	int			i;
+
+	for (i = 0; i < max_wal_senders; i++)
+	{
+		WalSnd	   *walsnd = &WalSndCtl->walsnds[i];
+		pid_t		pid;
+
+		SpinLockAcquire(&walsnd->mutex);
+		pid = walsnd->pid;
+		SpinLockRelease(&walsnd->mutex);
+
+		if (pid == 0)
+			continue;
+
+		SendProcSignal(pid, PROCSIG_WALSND_INIT_STOPPING, InvalidBackendId);
+	}
+}
+
+/*
+ * Wait that all the WAL senders have quit or reached the stopping state. This
+ * is used by the checkpointer to control when the shutdown checkpoint can
+ * safely be performed.
  */
 void
 WalSndWaitStopping(void)

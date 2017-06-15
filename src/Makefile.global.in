@@ -233,6 +233,8 @@ PTHREAD_LIBS		= @PTHREAD_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 
+override CPPFLAGS := $(CPPFLAGS) $(ICU_CFLAGS)
+
 ifdef PGXS
 override CPPFLAGS := -I$(includedir_server) -I$(includedir_internal) $(CPPFLAGS)
 else # not PGXS
@@ -343,7 +345,7 @@ PROVE = @PROVE@
 # extra perl modules in their own directory.
 PG_PROVE_FLAGS = -I $(top_srcdir)/src/test/perl/ -I $(srcdir)
 # User-supplied prove flags such as --verbose can be provided in PROVE_FLAGS.
-
+PROVE_FLAGS =
 
 # prepend to path if already set, else just set it
 define add_to_path

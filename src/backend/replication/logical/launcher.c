@@ -80,8 +80,7 @@ static void logicalrep_worker_detach(void);
 static void logicalrep_worker_cleanup(LogicalRepWorker *worker);
 
 /* Flags set by signal handlers */
-volatile sig_atomic_t got_SIGHUP = false;
-volatile sig_atomic_t got_SIGTERM = false;
+static volatile sig_atomic_t got_SIGHUP = false;
 
 static bool on_commit_launcher_wakeup = false;
 
@@ -208,10 +207,15 @@ WaitForReplicationWorkerAttach(LogicalRepWorker *worker,
 					   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
 					   1000L, WAIT_EVENT_BGWORKER_STARTUP);
 
+		/* emergency bailout if postmaster has died */
 		if (rc & WL_POSTMASTER_DEATH)
 			proc_exit(1);
 
-		ResetLatch(MyLatch);
+		if (rc & WL_LATCH_SET)
+		{
+			ResetLatch(MyLatch);
+			CHECK_FOR_INTERRUPTS();
+		}
 	}
 
 	return;
@@ -440,10 +444,8 @@ logicalrep_worker_stop(Oid subid, Oid relid)
 
 		LWLockRelease(LogicalRepWorkerLock);
 
-		CHECK_FOR_INTERRUPTS();
-
 		/* Wait for signal. */
-		rc = WaitLatch(&MyProc->procLatch,
+		rc = WaitLatch(MyLatch,
 					   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
 					   1000L, WAIT_EVENT_BGWORKER_STARTUP);
 
@@ -451,7 +453,11 @@ logicalrep_worker_stop(Oid subid, Oid relid)
 		if (rc & WL_POSTMASTER_DEATH)
 			proc_exit(1);
 
-		ResetLatch(&MyProc->procLatch);
+		if (rc & WL_LATCH_SET)
+		{
+			ResetLatch(MyLatch);
+			CHECK_FOR_INTERRUPTS();
+		}
 
 		/* Check worker status. */
 		LWLockAcquire(LogicalRepWorkerLock, LW_SHARED);
@@ -492,7 +498,7 @@ logicalrep_worker_stop(Oid subid, Oid relid)
 		CHECK_FOR_INTERRUPTS();
 
 		/* Wait for more work. */
-		rc = WaitLatch(&MyProc->procLatch,
+		rc = WaitLatch(MyLatch,
 					   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
 					   1000L, WAIT_EVENT_BGWORKER_SHUTDOWN);
 
@@ -500,7 +506,11 @@ logicalrep_worker_stop(Oid subid, Oid relid)
 		if (rc & WL_POSTMASTER_DEATH)
 			proc_exit(1);
 
-		ResetLatch(&MyProc->procLatch);
+		if (rc & WL_LATCH_SET)
+		{
+			ResetLatch(MyLatch);
+			CHECK_FOR_INTERRUPTS();
+		}
 	}
 }
 
@@ -614,26 +624,18 @@ logicalrep_launcher_onexit(int code, Datum arg)
 static void
 logicalrep_worker_onexit(int code, Datum arg)
 {
+	/* Disconnect gracefully from the remote side. */
+	if (wrconn)
+		walrcv_disconnect(wrconn);
+
 	logicalrep_worker_detach();
-}
 
-/* SIGTERM: set flag to exit at next convenient time */
-void
-logicalrep_worker_sigterm(SIGNAL_ARGS)
-{
-	int			save_errno = errno;
-
-	got_SIGTERM = true;
-
-	/* Waken anything waiting on the process latch */
-	SetLatch(MyLatch);
-
-	errno = save_errno;
+	ApplyLauncherWakeup();
 }
 
 /* SIGHUP: set flag to reload configuration at next convenient time */
-void
-logicalrep_worker_sighup(SIGNAL_ARGS)
+static void
+logicalrep_launcher_sighup(SIGNAL_ARGS)
 {
 	int			save_errno = errno;
 
@@ -792,16 +794,13 @@ ApplyLauncherMain(Datum main_arg)
 
 	before_shmem_exit(logicalrep_launcher_onexit, (Datum) 0);
 
-	/* Establish signal handlers. */
-	pqsignal(SIGHUP, logicalrep_worker_sighup);
-	pqsignal(SIGTERM, logicalrep_worker_sigterm);
-	BackgroundWorkerUnblockSignals();
-
-	/* Make it easy to identify our processes. */
-	SetConfigOption("application_name", MyBgworkerEntry->bgw_name,
-					PGC_USERSET, PGC_S_SESSION);
-
+	Assert(LogicalRepCtx->launcher_pid == 0);
 	LogicalRepCtx->launcher_pid = MyProcPid;
+
+	/* Establish signal handlers. */
+	pqsignal(SIGHUP, logicalrep_launcher_sighup);
+	pqsignal(SIGTERM, die);
+	BackgroundWorkerUnblockSignals();
 
 	/*
 	 * Establish connection to nailed catalogs (we only ever access
@@ -810,7 +809,7 @@ ApplyLauncherMain(Datum main_arg)
 	BackgroundWorkerInitializeConnection(NULL, NULL);
 
 	/* Enter main loop */
-	while (!got_SIGTERM)
+	for (;;)
 	{
 		int			rc;
 		List	   *sublist;
@@ -819,6 +818,8 @@ ApplyLauncherMain(Datum main_arg)
 		MemoryContext oldctx;
 		TimestampTz now;
 		long		wait_time = DEFAULT_NAPTIME_PER_CYCLE;
+
+		CHECK_FOR_INTERRUPTS();
 
 		now = GetCurrentTimestamp();
 
@@ -874,7 +875,7 @@ ApplyLauncherMain(Datum main_arg)
 		}
 
 		/* Wait for more work. */
-		rc = WaitLatch(&MyProc->procLatch,
+		rc = WaitLatch(MyLatch,
 					   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
 					   wait_time,
 					   WAIT_EVENT_LOGICAL_LAUNCHER_MAIN);
@@ -883,22 +884,29 @@ ApplyLauncherMain(Datum main_arg)
 		if (rc & WL_POSTMASTER_DEATH)
 			proc_exit(1);
 
+		if (rc & WL_LATCH_SET)
+		{
+			ResetLatch(MyLatch);
+			CHECK_FOR_INTERRUPTS();
+		}
+
 		if (got_SIGHUP)
 		{
 			got_SIGHUP = false;
 			ProcessConfigFile(PGC_SIGHUP);
 		}
-
-		ResetLatch(&MyProc->procLatch);
 	}
 
-	LogicalRepCtx->launcher_pid = 0;
+	/* Not reachable */
+}
 
-	/* ... and if it returns, we're done */
-	ereport(DEBUG1,
-			(errmsg("logical replication launcher shutting down")));
-
-	proc_exit(0);
+/*
+ * Is current process the logical replication launcher?
+ */
+bool
+IsLogicalLauncher(void)
+{
+	return LogicalRepCtx->launcher_pid == MyProcPid;
 }
 
 /*

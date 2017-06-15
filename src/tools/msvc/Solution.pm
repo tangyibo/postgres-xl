@@ -220,6 +220,10 @@ s{PG_VERSION_STR "[^"]+"}{PG_VERSION_STR "PostgreSQL $self->{strver}$extraver, c
 		{
 			print $o "#define ENABLE_GSS 1\n";
 		}
+		if ($self->{options}->{icu})
+		{
+			print $o "#define USE_ICU 1\n";
+		}
 		if (my $port = $self->{options}->{"--with-pgport"})
 		{
 			print $o "#undef DEF_PGPORT\n";
@@ -523,10 +527,20 @@ sub AddProject
 	if ($self->{options}->{openssl})
 	{
 		$proj->AddIncludeDir($self->{options}->{openssl} . '\include');
-		$proj->AddLibrary(
-			$self->{options}->{openssl} . '\lib\VC\ssleay32.lib', 1);
-		$proj->AddLibrary(
-			$self->{options}->{openssl} . '\lib\VC\libeay32.lib', 1);
+		if (-e "$self->{options}->{openssl}/lib/VC/ssleay32MD.lib")
+		{
+			$proj->AddLibrary(
+				$self->{options}->{openssl} . '\lib\VC\ssleay32.lib', 1);
+			$proj->AddLibrary(
+				$self->{options}->{openssl} . '\lib\VC\libeay32.lib', 1);
+		}
+		else
+		{
+			$proj->AddLibrary(
+				$self->{options}->{openssl} . '\lib\ssleay32.lib', 1);
+			$proj->AddLibrary(
+				$self->{options}->{openssl} . '\lib\libeay32.lib', 1);
+		}
 	}
 	if ($self->{options}->{nls})
 	{
@@ -544,6 +558,22 @@ sub AddProject
 	{
 		$proj->AddIncludeDir($self->{options}->{iconv} . '\include');
 		$proj->AddLibrary($self->{options}->{iconv} . '\lib\iconv.lib');
+	}
+	if ($self->{options}->{icu})
+	{
+		$proj->AddIncludeDir($self->{options}->{icu} . '\include');
+		if ($self->{platform} eq 'Win32')
+		{
+			$proj->AddLibrary($self->{options}->{icu} . '\lib\icuin.lib');
+			$proj->AddLibrary($self->{options}->{icu} . '\lib\icuuc.lib');
+			$proj->AddLibrary($self->{options}->{icu} . '\lib\icudt.lib');
+		}
+		else
+		{
+			$proj->AddLibrary($self->{options}->{icu} . '\lib64\icuin.lib');
+			$proj->AddLibrary($self->{options}->{icu} . '\lib64\icuuc.lib');
+			$proj->AddLibrary($self->{options}->{icu} . '\lib64\icudt.lib');
+		}
 	}
 	if ($self->{options}->{xml})
 	{
@@ -667,6 +697,7 @@ sub GetFakeConfigure
 	$cfg .= ' --with-libxml'        if ($self->{options}->{xml});
 	$cfg .= ' --with-libxslt'       if ($self->{options}->{xslt});
 	$cfg .= ' --with-gssapi'        if ($self->{options}->{gss});
+	$cfg .= ' --with-icu'           if ($self->{options}->{icu});
 	$cfg .= ' --with-tcl'           if ($self->{options}->{tcl});
 	$cfg .= ' --with-perl'          if ($self->{options}->{perl});
 	$cfg .= ' --with-python'        if ($self->{options}->{python});

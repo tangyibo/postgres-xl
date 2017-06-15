@@ -108,7 +108,7 @@ extern int	GetMaxSnapshotSubxidCount(void);
 extern Snapshot GetSnapshotData(Snapshot snapshot, bool latest);
 
 extern bool ProcArrayInstallImportedXmin(TransactionId xmin,
-							 TransactionId sourcexid);
+							 VirtualTransactionId *sourcevxid);
 extern bool ProcArrayInstallRestoredXmin(TransactionId xmin, PGPROC *proc);
 extern void ProcArrayCheckXminConsistency(TransactionId global_xmin);
 extern void SetLatestCompletedXid(TransactionId latestCompletedXid);

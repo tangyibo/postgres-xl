@@ -1849,8 +1849,13 @@ get_object_address_defacl(List *object, bool missing_ok)
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				  errmsg("unrecognized default ACL object type %c", objtype),
-					 errhint("Valid object types are \"r\", \"S\", \"f\", \"T\" and \"s\".")));
+				  errmsg("unrecognized default ACL object type \"%c\"", objtype),
+					 errhint("Valid object types are \"%c\", \"%c\", \"%c\", \"%c\", \"%c\".",
+							 DEFACLOBJ_RELATION,
+							 DEFACLOBJ_SEQUENCE,
+							 DEFACLOBJ_FUNCTION,
+							 DEFACLOBJ_TYPE,
+							 DEFACLOBJ_NAMESPACE)));
 	}
 
 	/*
@@ -3345,7 +3350,7 @@ getObjectDescription(const ObjectAddress *object)
 				tuple = systable_getnext(sscan);
 
 				if (!HeapTupleIsValid(tuple))
-					elog(ERROR, "cache lookup failed for policy %u",
+					elog(ERROR, "could not find tuple for policy %u",
 						 object->objectId);
 
 				form_policy = (Form_pg_policy) GETSTRUCT(tuple);

@@ -120,6 +120,18 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 		collprovider = ((Form_pg_collation) GETSTRUCT(tp))->collprovider;
 
 		ReleaseSysCache(tp);
+
+		/*
+		 * Copying the "default" collation is not allowed because most code
+		 * checks for DEFAULT_COLLATION_OID instead of COLLPROVIDER_DEFAULT,
+		 * and so having a second collation with COLLPROVIDER_DEFAULT would
+		 * not work and potentially confuse or crash some code.  This could be
+		 * fixed with some legwork.
+		 */
+		if (collprovider == COLLPROVIDER_DEFAULT)
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("collation \"default\" cannot be copied")));
 	}
 
 	if (localeEl)
@@ -411,10 +423,10 @@ get_icu_locale_comment(const char *localename)
 Datum
 pg_import_system_collations(PG_FUNCTION_ARGS)
 {
-#if defined(HAVE_LOCALE_T) && !defined(WIN32)
 	bool		if_not_exists = PG_GETARG_BOOL(0);
 	Oid			nspid = PG_GETARG_OID(1);
 
+#if defined(HAVE_LOCALE_T) && !defined(WIN32)
 	FILE	   *locale_a_handle;
 	char		localebuf[NAMEDATALEN]; /* we assume ASCII so this is fine */
 	int			count = 0;
@@ -430,6 +442,12 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 (errmsg("must be superuser to import system collations"))));
+
+#if !(defined(HAVE_LOCALE_T) && !defined(WIN32)) && !defined(USE_ICU)
+	/* silence compiler warnings */
+	(void) if_not_exists;
+	(void) nspid;
+#endif
 
 #if defined(HAVE_LOCALE_T) && !defined(WIN32)
 	locale_a_handle = OpenPipeStream("locale -a", "r");

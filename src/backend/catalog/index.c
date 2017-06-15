@@ -3477,8 +3477,8 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 		ereport(INFO,
 				(errmsg("index \"%s\" was reindexed",
 						get_rel_name(indexId)),
-				 errdetail("%s.",
-						   pg_rusage_show(&ru0))));
+				 errdetail_internal("%s",
+									pg_rusage_show(&ru0))));
 
 	/* Close rels, but keep locks */
 	index_close(iRel, NoLock);

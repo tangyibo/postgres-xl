@@ -2169,9 +2169,14 @@ ALTER TABLE list_parted2 ATTACH PARTITION part_5 FOR VALUES IN (5);
 
 -- delete the faulting row and also add a constraint to skip the scan
 DELETE FROM part_5_a WHERE a NOT IN (3);
+ALTER TABLE part_5 ADD CONSTRAINT check_a CHECK (a IS NOT NULL AND a = 5);
+ALTER TABLE list_parted2 ATTACH PARTITION part_5 FOR VALUES IN (5);
+ALTER TABLE list_parted2 DETACH PARTITION part_5;
+ALTER TABLE part_5 DROP CONSTRAINT check_a;
+
+-- scan should again be skipped, even though NOT NULL is now a column property
 ALTER TABLE part_5 ADD CONSTRAINT check_a CHECK (a IN (5)), ALTER a SET NOT NULL;
 ALTER TABLE list_parted2 ATTACH PARTITION part_5 FOR VALUES IN (5);
-
 
 -- check that the table being attached is not already a partition
 ALTER TABLE list_parted2 ATTACH PARTITION part_2 FOR VALUES IN (2);
@@ -2203,6 +2208,16 @@ ALTER TABLE list_parted2 DETACH PARTITION part_3_4;
 SELECT attinhcount, attislocal FROM pg_attribute WHERE attrelid = 'part_3_4'::regclass AND attnum > 0;
 SELECT coninhcount, conislocal FROM pg_constraint WHERE conrelid = 'part_3_4'::regclass AND conname = 'check_a';
 DROP TABLE part_3_4;
+
+-- check that a detached partition is not dropped on dropping a partitioned table
+CREATE TABLE range_parted2 (
+    a int
+) PARTITION BY RANGE(a);
+CREATE TABLE part_rp PARTITION OF range_parted2 FOR VALUES FROM (0) to (100);
+ALTER TABLE range_parted2 DETACH PARTITION part_rp;
+DROP TABLE range_parted2;
+SELECT * from part_rp;
+DROP TABLE part_rp;
 
 -- Check ALTER TABLE commands for partitioned tables and partitions
 

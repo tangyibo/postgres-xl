@@ -493,7 +493,7 @@ LogStreamerMain(logstreamer_param *param)
 	stream.replication_slot = replication_slot;
 	stream.temp_slot = param->temp_slot;
 	if (stream.temp_slot && !stream.replication_slot)
-		stream.replication_slot = psprintf("pg_basebackup_%d", (int) getpid());
+		stream.replication_slot = psprintf("pg_basebackup_%d", (int) PQbackendPID(param->bgconn));
 
 	if (format == 'p')
 		stream.walmethod = CreateWalDirectoryMethod(param->xlog, 0, do_sync);
@@ -2183,7 +2183,7 @@ main(int argc, char **argv)
 				else
 				{
 					fprintf(stderr,
-							_("%s: invalid wal-method option \"%s\", must be \"fetch\", \"stream\" or \"none\"\n"),
+							_("%s: invalid wal-method option \"%s\", must be \"fetch\", \"stream\", or \"none\"\n"),
 							progname, optarg);
 					exit(1);
 				}

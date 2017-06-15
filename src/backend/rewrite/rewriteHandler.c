@@ -1987,7 +1987,8 @@ fireRIRrules(Query *parsetree, List *activeRIRs, bool forUpdatePushedDown)
 
 		/* Only normal relations can have RLS policies */
 		if (rte->rtekind != RTE_RELATION ||
-			rte->relkind != RELKIND_RELATION)
+			(rte->relkind != RELKIND_RELATION &&
+			 rte->relkind != RELKIND_PARTITIONED_TABLE))
 			continue;
 
 		rel = heap_open(rte->relid, NoLock);
@@ -2605,7 +2606,8 @@ relation_is_updatable(Oid reloid,
 		return 0;
 
 	/* If the relation is a table, it is always updatable */
-	if (rel->rd_rel->relkind == RELKIND_RELATION)
+	if (rel->rd_rel->relkind == RELKIND_RELATION ||
+		rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
 	{
 		relation_close(rel, AccessShareLock);
 		return ALL_EVENTS;
@@ -2719,7 +2721,8 @@ relation_is_updatable(Oid reloid,
 			base_rte = rt_fetch(rtr->rtindex, viewquery->rtable);
 			Assert(base_rte->rtekind == RTE_RELATION);
 
-			if (base_rte->relkind != RELKIND_RELATION)
+			if (base_rte->relkind != RELKIND_RELATION &&
+				base_rte->relkind != RELKIND_PARTITIONED_TABLE)
 			{
 				baseoid = base_rte->relid;
 				include_cols = adjust_view_column_set(updatable_cols,

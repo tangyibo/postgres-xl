@@ -57,7 +57,8 @@ typedef struct GTM_ThreadInfo
 	uint32				thr_client_id;		/* unique client identifier */
 
 	GTM_RWLock			thr_lock;
-	gtm_List				*thr_cached_txninfo;
+	gtm_List			*thr_cached_txninfo;
+	GTM_SnapshotData    thr_snapshot;
 } GTM_ThreadInfo;
 
 typedef struct GTM_Threads

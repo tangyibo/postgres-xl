@@ -1657,7 +1657,10 @@ _readSQLValueFunction(void)
 	READ_LOCALS(SQLValueFunction);
 
 	READ_ENUM_FIELD(op, SQLValueFunctionOp);
-	READ_OID_FIELD(type);
+	if (portable_input)
+		READ_TYPID_FIELD(type);
+	else
+		READ_OID_FIELD(type);
 	READ_INT_FIELD(typmod);
 	READ_LOCATION_FIELD(location);
 

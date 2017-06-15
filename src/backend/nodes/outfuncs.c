@@ -2524,7 +2524,10 @@ _outSQLValueFunction(StringInfo str, const SQLValueFunction *node)
 	WRITE_NODE_TYPE("SQLVALUEFUNCTION");
 
 	WRITE_ENUM_FIELD(op, SQLValueFunctionOp);
-	WRITE_OID_FIELD(type);
+	if (portable_output)
+		WRITE_TYPID_FIELD(type);
+	else
+		WRITE_OID_FIELD(type);
 	WRITE_INT_FIELD(typmod);
 	WRITE_LOCATION_FIELD(location);
 }

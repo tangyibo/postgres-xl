@@ -5367,6 +5367,7 @@ exec_for_query(PLpgSQL_execstate *estate, PLpgSQL_stmt_forq *stmt,
 	 */
 #define MAX_REMOTE_QUERY_FETCH	10000	
 	if (IsA(linitial(portal->stmts), PlannedStmt) &&
+		(((PlannedStmt *) linitial(portal->stmts))->commandType != CMD_UTILITY) &&
 		IsA(((PlannedStmt *) linitial(portal->stmts))->planTree, RemoteQuery))
 		count = MAX_REMOTE_QUERY_FETCH;
 	else

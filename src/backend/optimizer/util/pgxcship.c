@@ -807,6 +807,14 @@ pgxc_shippability_walker(Node *node, Shippability_context *sc_context)
 		}
 		break;
 
+		case T_SQLValueFunction:
+			/*
+			 * XXX PG10MERGE: Do we really need to do any checks here?
+			 * Shouldn't all SQLValueFunctions be shippable?
+			 */
+			pgxc_set_exprtype_shippability(exprType(node), sc_context);
+			break;
+
 		case T_Aggref:
 		{
 			Aggref *aggref = (Aggref *)node;

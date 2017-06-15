@@ -182,6 +182,7 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 	GTM_Sequence	increment = 1;
 	bool		cycle = false;
 	bool		is_restart;
+	char		*seqname;
 #endif
 
 	/* Unlogged sequences are not implemented -- not clear if useful. */
@@ -279,6 +280,8 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 	if (owned_by)
 		process_owned_by(rel, owned_by, seq->for_identity);
 
+	seqname = GetGlobalSeqName(rel, NULL, NULL);
+
 	heap_close(rel, NoLock);
 
 	/* fill in pg_sequence */
@@ -309,8 +312,6 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 	 */
 	if (IS_PGXC_LOCAL_COORDINATOR)
 	{
-		char *seqname = GetGlobalSeqName(rel, NULL, NULL);
-
 		/* We also need to create it on the GTM */
 		if (CreateSequenceGTM(seqname,
 							  increment,
@@ -1212,6 +1213,7 @@ do_setval(Oid relid, int64 next, bool iscalled)
 	{
 		xl_seq_rec	xlrec;
 		XLogRecPtr	recptr;
+		Page		page = BufferGetPage(buf);
 
 		XLogBeginInsert();
 		XLogRegisterBuffer(0, buf, REGBUF_WILL_INIT);
@@ -1222,8 +1224,11 @@ do_setval(Oid relid, int64 next, bool iscalled)
 
 		recptr = XLogInsert(RM_SEQ_ID, XLOG_SEQ_LOG);
 
+		PageSetLSN(page, recptr);
 		elm->cached = elm->last;
 	}
+
+	END_CRIT_SECTION();
 
 	UnlockReleaseBuffer(buf);
 

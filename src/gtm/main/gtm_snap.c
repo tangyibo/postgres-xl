@@ -23,7 +23,6 @@
 #include "gtm/libpq-int.h"
 #include "gtm/pqformat.h"
 
-static GTM_SnapshotData localSnapshot;
 /*
  * Get snapshot for the given transactions. If this is the first call in the
  * transaction, a fresh snapshot is taken and returned back. For a serializable
@@ -91,10 +90,16 @@ GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[], int txn_count, int *s
 
 	/*
 	 * If no valid transaction exists in the array, we record the snapshot in a
-	 * local strucure and still send it out to the caller
+	 * thread-specific structure. This allows us to avoid repeated
+	 * allocation/freeing of the structure.
+	 *
+	 * Note that we must use a thread-specific variable and not a global
+	 * variable because a concurrent thread might compute a new snapshot and
+	 * overwrite the snapshot information while we are still sending this copy
+	 * to the client. Using a thread-specific storage avoids that problem.
 	 */
 	if (snapshot == NULL)
-		snapshot = &localSnapshot;
+		snapshot = &GetMyThreadInfo->thr_snapshot;
 
 	Assert(snapshot != NULL);
 

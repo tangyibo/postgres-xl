@@ -2354,7 +2354,8 @@ AdvanceProducingPortal(Portal portal, bool can_wait)
 				/* Execute query and dispatch tuples via dest receiver */
 #define PRODUCE_TUPLES 100
 				PushActiveSnapshot(queryDesc->snapshot);
-				ExecutorRun(queryDesc, ForwardScanDirection, PRODUCE_TUPLES, true);
+				ExecutorRun(queryDesc, ForwardScanDirection, PRODUCE_TUPLES,
+						portal->run_once);
 				PopActiveSnapshot();
 
 				if (queryDesc->estate->es_processed < PRODUCE_TUPLES)

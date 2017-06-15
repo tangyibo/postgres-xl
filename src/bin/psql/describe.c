@@ -2945,7 +2945,7 @@ describeOneTableDetails(const char *schemaname,
 							  true);
 #ifdef PGXC
 		/* print distribution information */
-		if (verbose && tableinfo.relkind == 'r')
+		if (verbose && (tableinfo.relkind == 'r' || tableinfo.relkind == 'p'))
 		{
 			printfPQExpBuffer(&buf,
 						"SELECT CASE pclocatortype \n"

@@ -2216,8 +2216,14 @@ tuplesort_gettuple_common(Tuplesortstate *state, bool forward,
 					 * Rewind to free the read buffer.  It'd go away at the
 					 * end of the sort anyway, but better to release the
 					 * memory early.
+					 *
+					 * XXX PG10MERGE: In XL, we use tuplesort_begin_merge() to
+					 * merge tuples from datanode connections. We don't use
+					 * tapeset in that code path. The following fix helps that
+					 * case.
 					 */
-					LogicalTapeRewindForWrite(state->tapeset, srcTape);
+					if (state->tapeset)
+						LogicalTapeRewindForWrite(state->tapeset, srcTape);
 					return true;
 				}
 				newtup.tupindex = srcTape;

@@ -427,7 +427,8 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 
 			Assert(IsA(inh, RangeVar));
 			rel = heap_openrv(inh, AccessShareLock);
-			if (rel->rd_rel->relkind != RELKIND_RELATION)
+			if ((rel->rd_rel->relkind != RELKIND_RELATION) &&
+				(rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE))
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("inherited relation \"%s\" is not a table",

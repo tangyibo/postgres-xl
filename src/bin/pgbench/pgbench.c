@@ -335,6 +335,7 @@ typedef struct BuiltinScript
 	const char *name;			/* very short name for -b ... */
 	const char *desc;			/* short description */
 	const char *script;			/* actual pgbench script */
+	const bool	branch;			/* additional branch conditions */
 } BuiltinScript;
 
 
@@ -349,12 +350,50 @@ static const BuiltinScript builtin_script[] =
 		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
 		"\\set delta random(-5000, 5000)\n"
 		"BEGIN;\n"
+		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid;\n"
+		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
+		"UPDATE pgbench_tellers SET tbalance = tbalance + :delta WHERE tid = :tid;\n"
+		"UPDATE pgbench_branches SET bbalance = bbalance + :delta WHERE bid = :bid;\n"
+		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
+		"END;\n",
+		false
+	},
+	{
+		"simple-update",
+		"<builtin: simple update>",
+		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
+		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
+		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
+		"\\set delta random(-5000, 5000)\n"
+		"BEGIN;\n"
+		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid;\n"
+		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
+		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
+		"END;\n",
+		false
+	},
+	{
+		"select-only",
+		"<builtin: select only>",
+		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
+		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n",
+		false
+	},
+	{
+		"tpcb-like",
+		"<builtin: TPC-B (sort of)>",
+		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
+		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
+		"\\set tid random(1, " CppAsString2(ntellers) " * :scale)\n"
+		"\\set delta random(-5000, 5000)\n"
+		"BEGIN;\n"
 		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid AND bid = :bid;\n"
 		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid AND bid = :bid;\n"
 		"UPDATE pgbench_tellers SET tbalance = tbalance + :delta WHERE tid = :tid AND bid = :bid;\n"
 		"UPDATE pgbench_branches SET bbalance = bbalance + :delta WHERE bid = :bid;\n"
 		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
-		"END;\n"
+		"END;\n",
+		true
 	},
 	{
 		"simple-update",
@@ -367,13 +406,16 @@ static const BuiltinScript builtin_script[] =
 		"UPDATE pgbench_accounts SET abalance = abalance + :delta WHERE aid = :aid AND bid = :bid;\n"
 		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid AND bid = :bid;\n"
 		"INSERT INTO pgbench_history (tid, bid, aid, delta, mtime) VALUES (:tid, :bid, :aid, :delta, CURRENT_TIMESTAMP);\n"
-		"END;\n"
+		"END;\n",
+		true
 	},
 	{
 		"select-only",
 		"<builtin: select only>",
 		"\\set aid random(1, " CppAsString2(naccounts) " * :scale)\n"
-		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid;\n"
+		"\\set bid random(1, " CppAsString2(nbranches) " * :scale)\n"
+		"SELECT abalance FROM pgbench_accounts WHERE aid = :aid AND bid = :bid;\n",
+		true
 	}
 };
 
@@ -409,7 +451,7 @@ usage(void)
 		   "  -i, --initialize         invokes initialization mode\n"
 		   "  -F, --fillfactor=NUM     set fill factor\n"
 #ifdef PGXC
-		   "  -k           distribute by primary key branch id - bid\n"
+		   "  -k                       distribute tables by branch id (bid)\n"
 #endif
 		"  -n, --no-vacuum          do not run VACUUM after initialization\n"
 	"  -q, --quiet              quiet logging (one message each 5 seconds)\n"
@@ -431,9 +473,9 @@ usage(void)
 		   "  -c, --client=NUM         number of concurrent database clients (default: 1)\n"
 		   "  -C, --connect            establish new connection for each transaction\n"
 		   "  -D, --define=VARNAME=VALUE\n"
-	  "                           define variable for use by custom script\n"
+		   "                           define variable for use by custom script\n"
 #ifdef PGXC
-		   "  -k           query with default key and additional key branch id (bid)\n"
+		   "  -k                       query with additional branch id (bid) key\n"
 #endif
 		   "  -j, --jobs=NUM           number of threads (default: 1)\n"
 		   "  -l, --log                write transaction times to log file\n"
@@ -3190,19 +3232,20 @@ process_builtin(const BuiltinScript *bi, int weight)
 
 /* show available builtin scripts */
 static void
-listAvailableScripts(void)
+listAvailableScripts(bool branch)
 {
 	int			i;
 
 	fprintf(stderr, "Available builtin scripts:\n");
 	for (i = 0; i < lengthof(builtin_script); i++)
-		fprintf(stderr, "\t%s\n", builtin_script[i].name);
+		if (builtin_script[i].branch == branch)
+			fprintf(stderr, "\t%s\n", builtin_script[i].name);
 	fprintf(stderr, "\n");
 }
 
 /* return builtin script "name" if unambiguous, fails if not found */
 static const BuiltinScript *
-findBuiltin(const char *name)
+findBuiltin(const char *name, const bool branch)
 {
 	int			i,
 				found = 0,
@@ -3211,6 +3254,9 @@ findBuiltin(const char *name)
 
 	for (i = 0; i < lengthof(builtin_script); i++)
 	{
+		if (builtin_script[i].branch != branch)
+			continue;
+
 		if (strncmp(builtin_script[i].name, name, len) == 0)
 		{
 			result = &builtin_script[i];
@@ -3229,7 +3275,7 @@ findBuiltin(const char *name)
 		fprintf(stderr,
 				"ambiguous builtin name: %d builtin scripts found for prefix \"%s\"\n", found, name);
 
-	listAvailableScripts();
+	listAvailableScripts(branch);
 	exit(1);
 }
 
@@ -3482,6 +3528,7 @@ main(int argc, char **argv)
 	bool		benchmarking_option_set = false;
 	bool		initialization_option_set = false;
 	bool		internal_script_used = false;
+	bool		list_scripts = false;
 
 	CState	   *state;			/* status of clients */
 	TState	   *threads;		/* array of thread */
@@ -3492,6 +3539,10 @@ main(int argc, char **argv)
 	int64		latency_late = 0;
 	StatsData	stats;
 	int			weight;
+
+	int			nscripts = 0;
+	int			weights[1024];
+	char	   *scripts[1024];
 
 	int			i;
 	int			nclients_dealt;
@@ -3675,23 +3726,30 @@ main(int argc, char **argv)
 			case 'b':
 				if (strcmp(optarg, "list") == 0)
 				{
-					listAvailableScripts();
-					exit(0);
+					list_scripts = true;
+					break;
 				}
 
-				weight = parseScriptWeight(optarg, &script);
-				process_builtin(findBuiltin(script), weight);
+				weights[nscripts] = parseScriptWeight(optarg, &scripts[nscripts]);
+				nscripts++;
+
 				benchmarking_option_set = true;
 				internal_script_used = true;
 				break;
 
 			case 'S':
-				process_builtin(findBuiltin("select-only"), 1);
+				weights[nscripts] = 1;
+				scripts[nscripts] = "select-only";
+				nscripts++;
+
 				benchmarking_option_set = true;
 				internal_script_used = true;
 				break;
 			case 'N':
-				process_builtin(findBuiltin("simple-update"), 1);
+				weights[nscripts] = 1;
+				scripts[nscripts] = "simple-update";
+				nscripts++;
+
 				benchmarking_option_set = true;
 				internal_script_used = true;
 				break;
@@ -3832,10 +3890,21 @@ main(int argc, char **argv)
 		}
 	}
 
+	/* requested to list available scripts */
+	if (list_scripts)
+	{
+		listAvailableScripts(use_branch);
+		exit(0);
+	}
+
+	/* process the collected scripts */
+	for (i = 0; i < nscripts; i++)
+		process_builtin(findBuiltin(scripts[i], use_branch), weights[i]);
+
 	/* set default script if none */
 	if (num_scripts == 0 && !is_init_mode)
 	{
-		process_builtin(findBuiltin("tpcb-like"), 1);
+		process_builtin(findBuiltin("tpcb-like", use_branch), 1);
 		benchmarking_option_set = true;
 		internal_script_used = true;
 	}

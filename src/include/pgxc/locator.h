@@ -162,8 +162,6 @@ extern RelationLocInfo *CopyRelationLocInfo(RelationLocInfo *src_info);
 extern char GetRelationLocType(Oid relid);
 extern bool IsTableDistOnPrimary(RelationLocInfo *rel_loc_info);
 extern bool IsLocatorInfoEqual(RelationLocInfo *rel_loc_info1, RelationLocInfo *rel_loc_info2);
-extern bool IsHashColumn(RelationLocInfo *rel_loc_info, char *part_col_name);
-extern bool IsHashColumnForRelId(Oid relid, char *part_col_name);
 extern int	GetRoundRobinNode(Oid relid);
 extern ExecNodes *GetRelationNodes(RelationLocInfo *rel_loc_info,
 								   Datum valueForDistCol,
@@ -184,8 +182,6 @@ extern void FreeRelationLocInfo(RelationLocInfo *relationLocInfo);
 
 extern bool IsTypeModuloDistributable(Oid col_type);
 extern char *GetRelationModuloColumn(RelationLocInfo *rel_loc_info);
-extern bool IsModuloColumn(RelationLocInfo *rel_loc_info, char *part_col_name);
-extern bool IsModuloColumnForRelId(Oid relid, char *part_col_name);
 extern char *GetRelationDistColumn(RelationLocInfo *rel_loc_info);
 extern bool IsDistColumnForRelId(Oid relid, char *part_col_name);
 extern void FreeExecNodes(ExecNodes **exec_nodes);

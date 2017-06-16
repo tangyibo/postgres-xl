@@ -8859,6 +8859,22 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
+		case T_NextValueExpr:
+			{
+				/*
+				 * This gets invoked by Fast Query Shipping code to deparse a
+				 * query. It seems enough to just generate a "DEFAULT" clause
+				 * and let the remote datanode handle finding the correct
+				 * sequence for replica identity.
+				 *
+				 * XXX PG10MERGE: If we do see issues with this, it might be
+				 * worthwhile to consider generating an expression such as,
+				 * nextval('sequence_name'::regclass)
+				 */
+				appendStringInfoString(buf, "DEFAULT");
+			}
+			break;
+
 		case T_XmlExpr:
 			{
 				XmlExpr    *xexpr = (XmlExpr *) node;

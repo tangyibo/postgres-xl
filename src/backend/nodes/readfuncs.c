@@ -1668,6 +1668,27 @@ _readSQLValueFunction(void)
 }
 
 /*
+ * _readNextValueExpr
+ */
+static NextValueExpr *
+_readNextValueExpr(void)
+{
+	READ_LOCALS(NextValueExpr);
+
+	if (portable_input)
+	{
+		READ_RELID_FIELD(seqid);
+		READ_TYPID_FIELD(typeId);
+	}
+	else
+	{
+		READ_OID_FIELD(seqid);
+		READ_OID_FIELD(typeId);
+	}
+	READ_DONE();
+}
+
+/*
  * _readXmlExpr
  */
 static XmlExpr *
@@ -3888,6 +3909,8 @@ parseNodeString(void)
 		return_value = _readMinMaxExpr();
 	else if (MATCH("SQLVALUEFUNCTION", 16))
 		return_value = _readSQLValueFunction();
+	else if (MATCH("NEXTVALUEEXPR", 13))
+		return_value = _readNextValueExpr();
 	else if (MATCH("XMLEXPR", 7))
 		return_value = _readXmlExpr();
 	else if (MATCH("NULLTEST", 8))

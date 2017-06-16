@@ -2533,6 +2533,22 @@ _outSQLValueFunction(StringInfo str, const SQLValueFunction *node)
 }
 
 static void
+_outNextValueExpr(StringInfo str, const NextValueExpr *node)
+{
+	WRITE_NODE_TYPE("NEXTVALUEEXPR");
+
+	if (portable_output)
+	{
+		WRITE_RELID_FIELD(seqid);
+		WRITE_TYPID_FIELD(typeId);
+	}
+	else
+	{
+		WRITE_OID_FIELD(seqid);
+		WRITE_OID_FIELD(typeId);
+	}
+}
+static void
 _outXmlExpr(StringInfo str, const XmlExpr *node)
 {
 	WRITE_NODE_TYPE("XMLEXPR");
@@ -4958,6 +4974,9 @@ outNode(StringInfo str, const void *obj)
 				break;
 			case T_SQLValueFunction:
 				_outSQLValueFunction(str, obj);
+				break;
+			case T_NextValueExpr:
+				_outNextValueExpr(str, obj);
 				break;
 			case T_XmlExpr:
 				_outXmlExpr(str, obj);

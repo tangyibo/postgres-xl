@@ -815,6 +815,14 @@ pgxc_shippability_walker(Node *node, Shippability_context *sc_context)
 			pgxc_set_exprtype_shippability(exprType(node), sc_context);
 			break;
 
+		case T_NextValueExpr:
+			/*
+			 * XXX PG10MERGE: Is it Ok to ship nextval when it's used for
+			 * replica identity?
+			 */
+			pgxc_set_exprtype_shippability(exprType(node), sc_context);
+			break;
+
 		case T_Aggref:
 		{
 			Aggref *aggref = (Aggref *)node;

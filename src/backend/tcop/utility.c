@@ -2565,6 +2565,10 @@ ProcessUtilitySlow(ParseState *pstate,
 
 			case T_CreateStatsStmt:
 				address = CreateStatistics((CreateStatsStmt *) parsetree);
+#ifdef PGXC
+				if (IS_PGXC_LOCAL_COORDINATOR)
+					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
+#endif
 				break;
 
 			case T_AlterCollationStmt:

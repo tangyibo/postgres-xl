@@ -137,6 +137,8 @@ CREATE TABLE xl_at2m (
     product_id INT2
 ) DISTRIBUTE BY MODULO (product_id); 
 
+ALTER TABLE xl_at2m DROP COLUMN product_id;--fail - distribution column cannot be dropped. 
+
 ALTER TABLE xl_at2m DISTRIBUTE BY HASH(product_id);
 
 ALTER TABLE xl_at2m DISTRIBUTE BY MODULO(product_id);

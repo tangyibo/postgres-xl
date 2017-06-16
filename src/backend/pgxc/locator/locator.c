@@ -261,54 +261,28 @@ GetRelationHashColumn(RelationLocInfo * rel_loc_info)
 }
 
 /*
- * IsHashColumn - return whether or not column for relation is hashed.
- *
- */
-bool
-IsHashColumn(RelationLocInfo *rel_loc_info, char *part_col_name)
-{
-	bool		ret_value = false;
-
-	if (!rel_loc_info || !part_col_name)
-		ret_value = false;
-	else if (rel_loc_info->locatorType != LOCATOR_TYPE_HASH)
-		ret_value = false;
-	else
-		ret_value = !strcmp(part_col_name, rel_loc_info->partAttrName);
-
-	return ret_value;
-}
-
-
-/*
- * IsHashColumnForRelId - return whether or not column for relation is hashed.
- *
- */
-bool
-IsHashColumnForRelId(Oid relid, char *part_col_name)
-{
-	RelationLocInfo *rel_loc_info = GetRelationLocInfo(relid);
-
-	return IsHashColumn(rel_loc_info, part_col_name);
-}
-
-/*
  * IsDistColumnForRelId - return whether or not column for relation is used for hash or modulo distribution
  *
  */
 bool
 IsDistColumnForRelId(Oid relid, char *part_col_name)
 {
-	bool bRet;
 	RelationLocInfo *rel_loc_info;
 
-	rel_loc_info = GetRelationLocInfo(relid);
-	bRet = false;
+	/* if no column is specified, we're done */
+	if (!part_col_name)
+		return false;
 
-	bRet = IsHashColumn(rel_loc_info, part_col_name);
-	if (bRet == false)
-		IsModuloColumn(rel_loc_info, part_col_name);
-	return bRet;
+	/* if no locator, we're done too */
+	if (!(rel_loc_info = GetRelationLocInfo(relid)))
+		return false;
+
+	/* is the table distributed by column value */
+	if (!IsRelationDistributedByValue(rel_loc_info))
+		return false;
+
+	/* does the column name match the distribution column */
+	return !strcmp(part_col_name, rel_loc_info->partAttrName);
 }
 
 
@@ -345,37 +319,6 @@ GetRelationModuloColumn(RelationLocInfo * rel_loc_info)
 	}
 
 	return column_str;
-}
-
-/*
- * IsModuloColumn - return whether or not column for relation is used for modulo distribution.
- *
- */
-bool
-IsModuloColumn(RelationLocInfo *rel_loc_info, char *part_col_name)
-{
-	bool		ret_value = false;
-
-	if (!rel_loc_info || !part_col_name)
-		ret_value = false;
-	else if (rel_loc_info->locatorType != LOCATOR_TYPE_MODULO)
-		ret_value = false;
-	else
-		ret_value = !strcmp(part_col_name, rel_loc_info->partAttrName);
-
-	return ret_value;
-}
-
-
-/*
- * IsModuloColumnForRelId - return whether or not column for relation is used for modulo distribution.
- */
-bool
-IsModuloColumnForRelId(Oid relid, char *part_col_name)
-{
-	RelationLocInfo *rel_loc_info = GetRelationLocInfo(relid);
-
-	return IsModuloColumn(rel_loc_info, part_col_name);
 }
 
 /*

@@ -210,7 +210,7 @@ static FormData_pg_attribute a7 = {
 static FormData_pg_attribute a8 = {
 	0, {"xc_node_id"}, INT4OID, 0, sizeof(int32),
 	XC_NodeIdAttributeNumber, 0, -1, -1,
-	true, 'p', 'i', true, false, false, true, 0
+	true, 'p', 'i', true, false, '\0', false, true, 0
 };
 
 static const Form_pg_attribute SysAtt[] = {&a1, &a2, &a3, &a4, &a5, &a6, &a7, &a8};

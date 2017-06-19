@@ -283,6 +283,11 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 		process_owned_by(rel, owned_by, seq->for_identity);
 
 	seqname = GetGlobalSeqName(rel, NULL, NULL);
+	increment = seqform.seqincrement;
+	min_value = seqform.seqmin;
+	max_value = seqform.seqmax;
+	start_value = seqform.seqstart;
+	cycle = seqform.seqcycle;
 
 	heap_close(rel, NoLock);
 
@@ -319,7 +324,7 @@ DefineSequence(ParseState *pstate, CreateSeqStmt *seq)
 							  increment,
 							  min_value,
 							  max_value,
-				start_value, cycle) < 0)
+							  start_value, cycle) < 0)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_CONNECTION_FAILURE),
@@ -571,7 +576,7 @@ AlterSequence(ParseState *pstate, AlterSeqStmt *stmt)
 	min_value = seqform->seqmin;
 	max_value = seqform->seqmax;
 	start_value = seqform->seqstart;
-	last_value = elm->last;
+	last_value = newdataform->last_value;
 	cycle = seqform->seqcycle;
 #endif
 
@@ -1808,7 +1813,6 @@ init_params(ParseState *pstate, List *options, bool for_identity,
 #ifdef PGXC
 		*is_restart = true;
 #endif
-		seqdataform->last_value = seqform->seqstart;
 		seqdataform->is_called = false;
 		seqdataform->log_cnt = 0;
 	}

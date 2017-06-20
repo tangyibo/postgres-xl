@@ -388,28 +388,31 @@ explain (verbose on, nodes off, costs off) select val, val2 from tab1_rr where v
                Filter: (tab1_rr.val = 7)
 (8 rows)
 
-select distinct val2 from tab1_rr where val = 7;
+select distinct val2 from tab1_rr where val = 7 order by val2;
  val2 
 ------
-    8
     2
+    8
 (2 rows)
 
-explain (verbose on, nodes off, costs off) select distinct val2 from tab1_rr where val = 7;
-                  QUERY PLAN                   
------------------------------------------------
- HashAggregate
+explain (verbose on, nodes off, costs off) select distinct val2 from tab1_rr where val = 7 order by val2;
+                     QUERY PLAN                      
+-----------------------------------------------------
+ Sort
    Output: val2
-   Group Key: tab1_rr.val2
-   ->  Remote Subquery Scan on all
+   Sort Key: tab1_rr.val2
+   ->  HashAggregate
          Output: val2
-         ->  HashAggregate
+         Group Key: tab1_rr.val2
+         ->  Remote Subquery Scan on all
                Output: val2
-               Group Key: tab1_rr.val2
-               ->  Seq Scan on public.tab1_rr
+               ->  HashAggregate
                      Output: val2
-                     Filter: (tab1_rr.val = 7)
-(11 rows)
+                     Group Key: tab1_rr.val2
+                     ->  Seq Scan on public.tab1_rr
+                           Output: val2
+                           Filter: (tab1_rr.val = 7)
+(14 rows)
 
 -- DMLs
 update tab1_rr set val2 = 1000 where val = 7; 

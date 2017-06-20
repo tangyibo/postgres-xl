@@ -643,12 +643,12 @@ set enable_seqscan = on;
 set enable_bitmapscan = off;
 select * from nestjsonb where j @> '{"a":[[{"x":2}]]}'::jsonb;
 select * from nestjsonb where j @> '{"c":3}';
-select * from nestjsonb where j @> '[[14]]';
+select * from nestjsonb where j @> '[[14]]' order by j;
 set enable_seqscan = off;
 set enable_bitmapscan = on;
 select * from nestjsonb where j @> '{"a":[[{"x":2}]]}'::jsonb;
 select * from nestjsonb where j @> '{"c":3}';
-select * from nestjsonb where j @> '[[14]]';
+select * from nestjsonb where j @> '[[14]]' order by j;
 reset enable_seqscan;
 reset enable_bitmapscan;
 

@@ -29,7 +29,7 @@ vacuum analyze gist_point_tbl;
 -- Test Index-only plans on GiST indexes
 --
 
-create table gist_tbl (b box, p point, c circle);
+create table gist_tbl (b box, p point, c circle) distribute by replication;
 
 insert into gist_tbl
 select box(point(0.05*i, 0.05*i), point(0.05*i, 0.05*i)),

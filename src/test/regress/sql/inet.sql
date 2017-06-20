@@ -60,7 +60,7 @@ SELECT max(i) AS max, min(i) AS min FROM INET_TBL;
 SELECT max(c) AS max, min(c) AS min FROM INET_TBL;
 
 -- check the conversion to/from text and set_netmask
-SELECT '' AS ten, set_masklen(inet(text(i)), 24) FROM INET_TBL;
+SELECT '' AS ten, set_masklen(inet(text(i)), 24) FROM INET_TBL ORDER BY 1, 2;
 
 -- check that btree index works correctly
 CREATE INDEX inet_idx1 ON inet_tbl(i);
@@ -78,12 +78,12 @@ SELECT * FROM inet_tbl WHERE i <<= '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i && '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i >>= '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i >> '192.168.1.0/24'::cidr ORDER BY i;
-SELECT * FROM inet_tbl WHERE i < '192.168.1.0/24'::cidr ORDER BY i;
-SELECT * FROM inet_tbl WHERE i <= '192.168.1.0/24'::cidr ORDER BY i;
+SELECT * FROM inet_tbl WHERE i < '192.168.1.0/24'::cidr ORDER BY i, c;
+SELECT * FROM inet_tbl WHERE i <= '192.168.1.0/24'::cidr ORDER BY i, c;
 SELECT * FROM inet_tbl WHERE i = '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i >= '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i > '192.168.1.0/24'::cidr ORDER BY i;
-SELECT * FROM inet_tbl WHERE i <> '192.168.1.0/24'::cidr ORDER BY i;
+SELECT * FROM inet_tbl WHERE i <> '192.168.1.0/24'::cidr ORDER BY i, c;
 
 -- test index-only scans
 EXPLAIN (COSTS OFF)
@@ -122,4 +122,4 @@ INSERT INTO INET_TBL (c, i) VALUES ('10', '10::/8');
 -- now, this one should fail
 SELECT inet_merge(c, i) FROM INET_TBL;
 -- fix it by inet_same_family() condition
-SELECT inet_merge(c, i) FROM INET_TBL WHERE inet_same_family(c, i);
+SELECT inet_merge(c, i) FROM INET_TBL WHERE inet_same_family(c, i) ORDER BY 1;

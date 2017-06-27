@@ -182,10 +182,10 @@ statapprox_heap(Relation rel, output_type *stat)
 		UnlockReleaseBuffer(buf);
 	}
 
-	stat->table_len = (uint64) nblocks *BLCKSZ;
+	stat->table_len = (uint64) nblocks * BLCKSZ;
 
 	stat->tuple_count = vac_estimate_reltuples(rel, false, nblocks, scanned,
-											 stat->tuple_count + misc_count);
+											   stat->tuple_count + misc_count);
 
 	/*
 	 * Calculate percentages if the relation has one or more pages.

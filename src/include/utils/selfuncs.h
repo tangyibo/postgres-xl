@@ -126,10 +126,10 @@ typedef struct
 typedef struct
 {
 	/* These are the values the cost estimator must return to the planner */
-	Cost		indexStartupCost;		/* index-related startup cost */
+	Cost		indexStartupCost;	/* index-related startup cost */
 	Cost		indexTotalCost; /* total index-related scan cost */
-	Selectivity indexSelectivity;		/* selectivity of index */
-	double		indexCorrelation;		/* order correlation of index */
+	Selectivity indexSelectivity;	/* selectivity of index */
+	double		indexCorrelation;	/* order correlation of index */
 
 	/* Intermediate values we obtain along the way */
 	double		numIndexPages;	/* number of leaf pages visited */
@@ -140,14 +140,14 @@ typedef struct
 
 /* Hooks for plugins to get control when we ask for stats */
 typedef bool (*get_relation_stats_hook_type) (PlannerInfo *root,
-														  RangeTblEntry *rte,
-														  AttrNumber attnum,
-												  VariableStatData *vardata);
+											  RangeTblEntry *rte,
+											  AttrNumber attnum,
+											  VariableStatData *vardata);
 extern PGDLLIMPORT get_relation_stats_hook_type get_relation_stats_hook;
 typedef bool (*get_index_stats_hook_type) (PlannerInfo *root,
-													   Oid indexOid,
-													   AttrNumber indexattnum,
-												  VariableStatData *vardata);
+										   Oid indexOid,
+										   AttrNumber indexattnum,
+										   VariableStatData *vardata);
 extern PGDLLIMPORT get_index_stats_hook_type get_index_stats_hook;
 
 /* Functions in selfuncs.c */
@@ -222,4 +222,4 @@ extern Selectivity scalararraysel_containment(PlannerInfo *root,
 						   Oid elemtype, bool isEquality, bool useOr,
 						   int varRelid);
 
-#endif   /* SELFUNCS_H */
+#endif							/* SELFUNCS_H */

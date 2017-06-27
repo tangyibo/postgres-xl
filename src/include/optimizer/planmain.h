@@ -27,7 +27,7 @@ typedef enum
 	FORCE_PARALLEL_OFF,
 	FORCE_PARALLEL_ON,
 	FORCE_PARALLEL_REGRESS
-}	ForceParallelMode;
+}			ForceParallelMode;
 
 /* GUC parameters */
 #define DEFAULT_CURSOR_TUPLE_FRACTION 0.1
@@ -130,4 +130,4 @@ extern void extract_query_dependencies(Node *query,
 						   List **invalItems,
 						   bool *hasRowSecurity);
 
-#endif   /* PLANMAIN_H */
+#endif							/* PLANMAIN_H */

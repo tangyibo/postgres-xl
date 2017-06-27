@@ -48,4 +48,4 @@ extern int	AdvanceProducingPortal(Portal portal, bool can_wait);
 extern void cleanupClosedProducers(void);
 #endif
 
-#endif   /* PQUERY_H */
+#endif							/* PQUERY_H */

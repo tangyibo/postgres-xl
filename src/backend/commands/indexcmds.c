@@ -528,18 +528,18 @@ DefineIndex(Oid relationId,
 	if (stmt->unique && !amRoutine->amcanunique)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			   errmsg("access method \"%s\" does not support unique indexes",
-					  accessMethodName)));
+				 errmsg("access method \"%s\" does not support unique indexes",
+						accessMethodName)));
 	if (numberOfAttributes > 1 && !amRoutine->amcanmulticol)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		  errmsg("access method \"%s\" does not support multicolumn indexes",
-				 accessMethodName)));
+				 errmsg("access method \"%s\" does not support multicolumn indexes",
+						accessMethodName)));
 	if (stmt->excludeOpNames && amRoutine->amgettuple == NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		errmsg("access method \"%s\" does not support exclusion constraints",
-			   accessMethodName)));
+				 errmsg("access method \"%s\" does not support exclusion constraints",
+						accessMethodName)));
 
 	amcanorder = amRoutine->amcanorder;
 	amoptions = amRoutine->amoptions;
@@ -652,7 +652,7 @@ DefineIndex(Oid relationId,
 		if (attno < 0 && attno != ObjectIdAttributeNumber)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			   errmsg("index creation on system columns is not supported")));
+					 errmsg("index creation on system columns is not supported")));
 	}
 
 	/*
@@ -672,7 +672,7 @@ DefineIndex(Oid relationId,
 							  indexattrs))
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("index creation on system columns is not supported")));
+						 errmsg("index creation on system columns is not supported")));
 		}
 	}
 
@@ -693,14 +693,14 @@ DefineIndex(Oid relationId,
 		else
 		{
 			elog(ERROR, "unknown constraint type");
-			constraint_type = NULL;		/* keep compiler quiet */
+			constraint_type = NULL; /* keep compiler quiet */
 		}
 
 		ereport(DEBUG1,
-		  (errmsg("%s %s will create implicit index \"%s\" for table \"%s\"",
-				  is_alter_table ? "ALTER TABLE / ADD" : "CREATE TABLE /",
-				  constraint_type,
-				  indexRelationName, RelationGetRelationName(rel))));
+				(errmsg("%s %s will create implicit index \"%s\" for table \"%s\"",
+						is_alter_table ? "ALTER TABLE / ADD" : "CREATE TABLE /",
+						constraint_type,
+						indexRelationName, RelationGetRelationName(rel))));
 	}
 
 	/*
@@ -945,7 +945,7 @@ DefineIndex(Oid relationId,
 
 			newer_snapshots = GetCurrentVirtualXIDs(limitXmin,
 													true, false,
-										 PROC_IS_AUTOVACUUM | PROC_IN_VACUUM,
+													PROC_IS_AUTOVACUUM | PROC_IN_VACUUM,
 													&n_newer_snapshots);
 			for (j = i; j < n_old_snapshots; j++)
 			{
@@ -957,7 +957,7 @@ DefineIndex(Oid relationId,
 												   newer_snapshots[k]))
 						break;
 				}
-				if (k >= n_newer_snapshots)		/* not there anymore */
+				if (k >= n_newer_snapshots) /* not there anymore */
 					SetInvalidVirtualTransactionId(old_snapshots[j]);
 			}
 			pfree(newer_snapshots);
@@ -1044,7 +1044,7 @@ CheckPredicate(Expr *predicate)
 	if (CheckMutability(predicate))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-		   errmsg("functions in index predicate must be marked IMMUTABLE")));
+				 errmsg("functions in index predicate must be marked IMMUTABLE")));
 }
 
 /*
@@ -1110,8 +1110,8 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 				if (isconstraint)
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
-						  errmsg("column \"%s\" named in key does not exist",
-								 attribute->name)));
+							 errmsg("column \"%s\" named in key does not exist",
+									attribute->name)));
 				else
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
@@ -1422,7 +1422,7 @@ ResolveOpClass(List *opclass, Oid attrType,
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("operator class \"%s\" does not accept data type %s",
-					  NameListToString(opclass), format_type_be(attrType))));
+						NameListToString(opclass), format_type_be(attrType))));
 
 	ReleaseSysCache(tuple);
 
@@ -1511,8 +1511,8 @@ GetDefaultOpClass(Oid type_id, Oid am_id)
 	if (nexact > 1)
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
-		errmsg("there are multiple default operator classes for data type %s",
-			   format_type_be(type_id))));
+				 errmsg("there are multiple default operator classes for data type %s",
+						format_type_be(type_id))));
 
 	if (nexact == 1 ||
 		ncompatiblepreferred == 1 ||
@@ -1752,9 +1752,9 @@ ChooseIndexColumnNames(List *indexElems)
 
 		/* Get the preliminary name from the IndexElem */
 		if (ielem->indexcolname)
-			origname = ielem->indexcolname;		/* caller-specified name */
+			origname = ielem->indexcolname; /* caller-specified name */
 		else if (ielem->name)
-			origname = ielem->name;		/* simple column reference */
+			origname = ielem->name; /* simple column reference */
 		else
 			origname = "expr";	/* default name for expression */
 

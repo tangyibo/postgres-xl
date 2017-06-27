@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "access/xlog_internal.h"		/* for pg_start/stop_backup */
+#include "access/xlog_internal.h"	/* for pg_start/stop_backup */
 #include "catalog/catalog.h"
 #include "catalog/pg_type.h"
 #include "lib/stringinfo.h"
@@ -54,11 +54,11 @@ typedef struct
 static int64 sendDir(char *path, int basepathlen, bool sizeonly,
 		List *tablespaces, bool sendtblspclinks);
 static bool sendFile(char *readfilename, char *tarfilename,
-		 struct stat * statbuf, bool missing_ok);
+		 struct stat *statbuf, bool missing_ok);
 static void sendFileWithContent(const char *filename, const char *content);
 static int64 _tarWriteHeader(const char *filename, const char *linktarget,
-				struct stat * statbuf, bool sizeonly);
-static int64 _tarWriteDir(const char *pathbuf, int basepathlen, struct stat * statbuf,
+				struct stat *statbuf, bool sizeonly);
+static int64 _tarWriteDir(const char *pathbuf, int basepathlen, struct stat *statbuf,
 			 bool sizeonly);
 static void send_int8_string(StringInfoData *buf, int64 intval);
 static void SendBackupHeader(List *tablespaces);
@@ -273,8 +273,8 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 
 			/* Send CopyOutResponse message */
 			pq_beginmessage(&buf, 'H');
-			pq_sendbyte(&buf, 0);		/* overall format */
-			pq_sendint(&buf, 0, 2);		/* natts */
+			pq_sendbyte(&buf, 0);	/* overall format */
+			pq_sendint(&buf, 0, 2); /* natts */
 			pq_endmessage(&buf);
 
 			if (ti->path == NULL)
@@ -318,7 +318,7 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 				Assert(lnext(lc) == NULL);
 			}
 			else
-				pq_putemptymessage('c');		/* CopyDone */
+				pq_putemptymessage('c');	/* CopyDone */
 		}
 	}
 	PG_END_ENSURE_ERROR_CLEANUP(base_backup_cleanup, (Datum) 0);
@@ -365,7 +365,7 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 		dir = AllocateDir("pg_wal");
 		if (!dir)
 			ereport(ERROR,
-				  (errmsg("could not open directory \"%s\": %m", "pg_wal")));
+					(errmsg("could not open directory \"%s\": %m", "pg_wal")));
 		while ((de = ReadDir(dir, "pg_wal")) != NULL)
 		{
 			/* Does it look like a WAL segment, and is it in the range? */
@@ -436,7 +436,7 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 
 				XLogFileName(nextfname, ThisTimeLineID, nextsegno);
 				ereport(ERROR,
-					  (errmsg("could not find WAL file \"%s\"", nextfname)));
+						(errmsg("could not find WAL file \"%s\"", nextfname)));
 			}
 		}
 		if (segno != endsegno)
@@ -484,7 +484,7 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 				CheckXLogRemoved(segno, tli);
 				ereport(ERROR,
 						(errcode_for_file_access(),
-					errmsg("unexpected WAL file size \"%s\"", walFiles[i])));
+						 errmsg("unexpected WAL file size \"%s\"", walFiles[i])));
 			}
 
 			/* send the WAL file itself */
@@ -510,7 +510,7 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 				CheckXLogRemoved(segno, tli);
 				ereport(ERROR,
 						(errcode_for_file_access(),
-					errmsg("unexpected WAL file size \"%s\"", walFiles[i])));
+						 errmsg("unexpected WAL file size \"%s\"", walFiles[i])));
 			}
 
 			/* XLogSegSize is a multiple of 512, so no need for padding */
@@ -652,7 +652,7 @@ parse_basebackup_options(List *options, basebackup_options *opt)
 				ereport(ERROR,
 						(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
 						 errmsg("%d is outside the valid range for parameter \"%s\" (%d .. %d)",
-				(int) maxrate, "MAX_RATE", MAX_RATE_LOWER, MAX_RATE_UPPER)));
+								(int) maxrate, "MAX_RATE", MAX_RATE_LOWER, MAX_RATE_UPPER)));
 
 			opt->maxrate = (uint32) maxrate;
 			o_maxrate = true;
@@ -814,7 +814,7 @@ SendXlogRecPtrResult(XLogRecPtr ptr, TimeLineID tli)
 	pq_sendstring(&buf, "recptr");
 	pq_sendint(&buf, 0, 4);		/* table oid */
 	pq_sendint(&buf, 0, 2);		/* attnum */
-	pq_sendint(&buf, TEXTOID, 4);		/* type oid */
+	pq_sendint(&buf, TEXTOID, 4);	/* type oid */
 	pq_sendint(&buf, -1, 2);
 	pq_sendint(&buf, 0, 4);
 	pq_sendint(&buf, 0, 2);
@@ -827,7 +827,7 @@ SendXlogRecPtrResult(XLogRecPtr ptr, TimeLineID tli)
 	 * int8 may seem like a surprising data type for this, but in theory int4
 	 * would not be wide enough for this, as TimeLineID is unsigned.
 	 */
-	pq_sendint(&buf, INT8OID, 4);		/* type oid */
+	pq_sendint(&buf, INT8OID, 4);	/* type oid */
 	pq_sendint(&buf, -1, 2);
 	pq_sendint(&buf, 0, 4);
 	pq_sendint(&buf, 0, 2);
@@ -992,9 +992,9 @@ sendDir(char *path, int basepathlen, bool sizeonly, List *tablespaces,
 			ereport(ERROR,
 					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 					 errmsg("the standby was promoted during online backup"),
-				 errhint("This means that the backup being taken is corrupt "
-						 "and should not be used. "
-						 "Try taking another online backup.")));
+					 errhint("This means that the backup being taken is corrupt "
+							 "and should not be used. "
+							 "Try taking another online backup.")));
 
 		/* Scan for files that should be excluded */
 		excludeFound = false;
@@ -1113,9 +1113,9 @@ sendDir(char *path, int basepathlen, bool sizeonly, List *tablespaces,
 			 */
 			ereport(WARNING,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				  errmsg("tablespaces are not supported on this platform")));
+					 errmsg("tablespaces are not supported on this platform")));
 			continue;
-#endif   /* HAVE_READLINK */
+#endif							/* HAVE_READLINK */
 		}
 		else if (S_ISDIR(statbuf.st_mode))
 		{
@@ -1199,7 +1199,7 @@ sendDir(char *path, int basepathlen, bool sizeonly, List *tablespaces,
  * and the file did not exist.
  */
 static bool
-sendFile(char *readfilename, char *tarfilename, struct stat * statbuf,
+sendFile(char *readfilename, char *tarfilename, struct stat *statbuf,
 		 bool missing_ok)
 {
 	FILE	   *fp;
@@ -1225,7 +1225,7 @@ sendFile(char *readfilename, char *tarfilename, struct stat * statbuf,
 		/* Send the chunk as a CopyData message */
 		if (pq_putmessage('d', buf, cnt))
 			ereport(ERROR,
-			   (errmsg("base backup could not send data, aborting backup")));
+					(errmsg("base backup could not send data, aborting backup")));
 
 		len += cnt;
 		throttle(cnt);
@@ -1273,7 +1273,7 @@ sendFile(char *readfilename, char *tarfilename, struct stat * statbuf,
 
 static int64
 _tarWriteHeader(const char *filename, const char *linktarget,
-				struct stat * statbuf, bool sizeonly)
+				struct stat *statbuf, bool sizeonly)
 {
 	char		h[512];
 	enum tarError rc;
@@ -1281,7 +1281,7 @@ _tarWriteHeader(const char *filename, const char *linktarget,
 	if (!sizeonly)
 	{
 		rc = tarCreateHeader(h, filename, linktarget, statbuf->st_size,
-						  statbuf->st_mode, statbuf->st_uid, statbuf->st_gid,
+							 statbuf->st_mode, statbuf->st_uid, statbuf->st_gid,
 							 statbuf->st_mtime);
 
 		switch (rc)
@@ -1295,9 +1295,9 @@ _tarWriteHeader(const char *filename, const char *linktarget,
 				break;
 			case TAR_SYMLINK_TOO_LONG:
 				ereport(ERROR,
-					 (errmsg("symbolic link target too long for tar format: "
-							 "file name \"%s\", target \"%s\"",
-							 filename, linktarget)));
+						(errmsg("symbolic link target too long for tar format: "
+								"file name \"%s\", target \"%s\"",
+								filename, linktarget)));
 				break;
 			default:
 				elog(ERROR, "unrecognized tar error: %d", rc);
@@ -1314,7 +1314,7 @@ _tarWriteHeader(const char *filename, const char *linktarget,
  * write it as a directory anyway.
  */
 static int64
-_tarWriteDir(const char *pathbuf, int basepathlen, struct stat * statbuf,
+_tarWriteDir(const char *pathbuf, int basepathlen, struct stat *statbuf,
 			 bool sizeonly)
 {
 	/* If symlink, write it as a directory anyway */
@@ -1366,7 +1366,7 @@ throttle(size_t increment)
 		 * the maximum time to sleep. Thus the cast to long is safe.
 		 */
 		wait_result = WaitLatch(MyLatch,
-							 WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
+								WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
 								(long) (sleep / 1000),
 								WAIT_EVENT_BASE_BACKUP_THROTTLE);
 

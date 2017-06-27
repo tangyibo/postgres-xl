@@ -235,7 +235,7 @@ typedef struct
  */
 static const uint16 dsa_size_classes[] = {
 	sizeof(dsa_area_span), 0,	/* special size classes */
-	8, 16, 24, 32, 40, 48, 56, 64,		/* 8 classes separated by 8 bytes */
+	8, 16, 24, 32, 40, 48, 56, 64,	/* 8 classes separated by 8 bytes */
 	80, 96, 112, 128,			/* 4 classes separated by 16 bytes */
 	160, 192, 224, 256,			/* 4 classes separated by 32 bytes */
 	320, 384, 448, 512,			/* 4 classes separated by 64 bytes */
@@ -1080,7 +1080,7 @@ dsa_dump(dsa_area *area)
 			dsa_segment_index segment_index;
 
 			fprintf(stderr,
-				"    segment bin %zu (at least %d contiguous pages free):\n",
+					"    segment bin %zu (at least %d contiguous pages free):\n",
 					i, 1 << (i - 1));
 			segment_index = area->control->segment_bins[i];
 			while (segment_index != DSA_SEGMENT_INDEX_NONE)
@@ -1120,7 +1120,7 @@ dsa_dump(dsa_area *area)
 				fprintf(stderr, "    pool for large object spans:\n");
 			else
 				fprintf(stderr,
-					"    pool for size class %zu (object size %hu bytes):\n",
+						"    pool for size class %zu (object size %hu bytes):\n",
 						i, dsa_size_classes[i]);
 			for (j = 0; j < DSA_FULLNESS_CLASSES; ++j)
 			{
@@ -1304,7 +1304,7 @@ attach_internal(void *place, dsm_segment *segment, dsa_handle handle)
 
 	/* Set up the segment map for this process's mapping. */
 	segment_map = &area->segment_maps[0];
-	segment_map->segment = segment;		/* NULL for in-place */
+	segment_map->segment = segment; /* NULL for in-place */
 	segment_map->mapped_address = place;
 	segment_map->header = (dsa_segment_header *) segment_map->mapped_address;
 	segment_map->fpm = (FreePageManager *)
@@ -1734,7 +1734,7 @@ get_segment_by_index(dsa_area *area, dsa_segment_index index)
 		/* It's an error to try to access an unused slot. */
 		if (handle == DSM_HANDLE_INVALID)
 			elog(ERROR,
-			   "dsa_area could not attach to a segment that has been freed");
+				 "dsa_area could not attach to a segment that has been freed");
 
 		segment = dsm_attach(handle);
 		if (segment == NULL)

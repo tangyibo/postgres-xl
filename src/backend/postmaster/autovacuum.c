@@ -134,8 +134,8 @@ int			Log_autovacuum_min_duration = -1;
 #define STATS_READ_DELAY 1000
 
 /* the minimum allowed time between two awakenings of the launcher */
-#define MIN_AUTOVAC_SLEEPTIME 100.0		/* milliseconds */
-#define MAX_AUTOVAC_SLEEPTIME 300		/* seconds */
+#define MIN_AUTOVAC_SLEEPTIME 100.0 /* milliseconds */
+#define MAX_AUTOVAC_SLEEPTIME 300	/* seconds */
 
 /* Flags to tell if we are in an autovacuum process */
 static bool am_autovacuum_launcher = false;
@@ -247,7 +247,7 @@ typedef enum
 	AutoVacForkFailed,			/* failed trying to start a worker */
 	AutoVacRebalance,			/* rebalance the cost limits */
 	AutoVacNumSignals			/* must be last */
-}	AutoVacuumSignal;
+}			AutoVacuumSignal;
 
 /*-------------
  * The main autovacuum shmem struct.  On shared memory we store this main
@@ -326,7 +326,7 @@ NON_EXEC_STATIC void AutoVacLauncherMain(int argc, char *argv[]) pg_attribute_no
 
 static Oid	do_start_worker(void);
 static void launcher_determine_sleep(bool canlaunch, bool recursing,
-						 struct timeval * nap);
+						 struct timeval *nap);
 static void launch_worker(TimestampTz now);
 static List *get_database_list(void);
 static void rebuild_database_list(Oid newdb);
@@ -418,7 +418,7 @@ StartAutoVacLauncher(void)
 	{
 		case -1:
 			ereport(LOG,
-				 (errmsg("could not fork autovacuum launcher process: %m")));
+					(errmsg("could not fork autovacuum launcher process: %m")));
 			return 0;
 
 #ifndef EXEC_BACKEND
@@ -521,7 +521,7 @@ AutoVacLauncherMain(int argc, char *argv[])
 
 		/* Forget any pending QueryCancel or timeout request */
 		disable_all_timeouts(false);
-		QueryCancelPending = false;		/* second to avoid race condition */
+		QueryCancelPending = false; /* second to avoid race condition */
 
 		/* Report the error to the server log */
 		EmitErrorReport();
@@ -617,7 +617,8 @@ AutoVacLauncherMain(int argc, char *argv[])
 
 	/*
 	 * Set up our DSA so that backends can install work-item requests.  It may
-	 * already exist as created by a previous launcher.
+	 * already exist as created by a previous launcher; and we may even be
+	 * already attached to it, if we're here after longjmp'ing above.
 	 */
 	if (!AutoVacuumShmem->av_dsa_handle)
 	{
@@ -631,7 +632,7 @@ AutoVacLauncherMain(int argc, char *argv[])
 		AutoVacuumShmem->av_workitems = InvalidDsaPointer;
 		LWLockRelease(AutovacuumLock);
 	}
-	else
+	else if (AutoVacuumDSA == NULL)
 	{
 		AutoVacuumDSA = dsa_attach(AutoVacuumShmem->av_dsa_handle);
 		dsa_pin_mapping(AutoVacuumDSA);
@@ -854,7 +855,7 @@ shutdown:
  * cause a long sleep, which will be interrupted when a worker exits.
  */
 static void
-launcher_determine_sleep(bool canlaunch, bool recursing, struct timeval * nap)
+launcher_determine_sleep(bool canlaunch, bool recursing, struct timeval *nap)
 {
 	/*
 	 * We sleep until the next scheduled vacuum.  We trust that when the
@@ -1808,9 +1809,9 @@ autovac_balance_cost(void)
 	 * zero is not a valid value.
 	 */
 	int			vac_cost_limit = (autovacuum_vac_cost_limit > 0 ?
-								autovacuum_vac_cost_limit : VacuumCostLimit);
+								  autovacuum_vac_cost_limit : VacuumCostLimit);
 	int			vac_cost_delay = (autovacuum_vac_cost_delay >= 0 ?
-								autovacuum_vac_cost_delay : VacuumCostDelay);
+								  autovacuum_vac_cost_delay : VacuumCostDelay);
 	double		cost_total;
 	double		cost_avail;
 	dlist_iter	iter;
@@ -2689,7 +2690,7 @@ perform_work_item(AutoVacuumWorkItem *workitem)
 			case AVW_BRINSummarizeRange:
 				DirectFunctionCall2(brin_summarize_range,
 									ObjectIdGetDatum(workitem->avw_relation),
-						   Int64GetDatum((int64) workitem->avw_blockNumber));
+									Int64GetDatum((int64) workitem->avw_blockNumber));
 				break;
 			default:
 				elog(WARNING, "unrecognized work item found: type %d",

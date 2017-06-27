@@ -99,4 +99,4 @@ extern char *tuplestore_getmessage(Tuplestorestate *state, int *len);
 
 extern void tuplestore_collect_stat(Tuplestorestate *state, char *name);
 
-#endif   /* TUPLESTORE_H */
+#endif							/* TUPLESTORE_H */

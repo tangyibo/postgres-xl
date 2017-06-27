@@ -51,7 +51,7 @@ typedef struct IfStackElem
 typedef struct ConditionalStackData
 {
 	IfStackElem *head;
-}	ConditionalStackData;
+}			ConditionalStackData;
 
 typedef struct ConditionalStackData *ConditionalStack;
 
@@ -80,4 +80,4 @@ extern void conditional_stack_set_paren_depth(ConditionalStack cstack, int depth
 
 extern int	conditional_stack_get_paren_depth(ConditionalStack cstack);
 
-#endif   /* CONDITIONAL_H */
+#endif							/* CONDITIONAL_H */

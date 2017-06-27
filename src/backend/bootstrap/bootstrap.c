@@ -55,7 +55,7 @@
 #include "postmaster/clustermon.h"
 #endif
 
-uint32		bootstrap_data_checksum_version = 0;		/* No checksum */
+uint32		bootstrap_data_checksum_version = 0;	/* No checksum */
 
 
 #define ALLOC(t, c) \
@@ -172,7 +172,7 @@ static struct typmap *Ap = NULL;
 static Datum values[MAXATTR];	/* current row's attribute values */
 static bool Nulls[MAXATTR];
 
-static MemoryContext nogc = NULL;		/* special no-gc mem context */
+static MemoryContext nogc = NULL;	/* special no-gc mem context */
 
 /*
  *	At bootstrap time, we first declare all the indices to be built, and
@@ -715,7 +715,7 @@ DefineAttr(char *name, char *type, int attnum, int nullness)
 
 	namestrcpy(&attrtypes[attnum]->attname, name);
 	elog(DEBUG4, "column %s %s", NameStr(attrtypes[attnum]->attname), type);
-	attrtypes[attnum]->attnum = attnum + 1;		/* fillatt */
+	attrtypes[attnum]->attnum = attnum + 1; /* fillatt */
 
 	typeoid = gettype(type);
 
@@ -880,7 +880,7 @@ InsertOneNull(int i)
 	Assert(i >= 0 && i < MAXATTR);
 	if (boot_reldesc->rd_att->attrs[i]->attnotnull)
 		elog(ERROR,
-		"NULL value specified for not-null column \"%s\" of relation \"%s\"",
+			 "NULL value specified for not-null column \"%s\" of relation \"%s\"",
 			 NameStr(boot_reldesc->rd_att->attrs[i]->attname),
 			 RelationGetRelationName(boot_reldesc));
 	values[i] = PointerGetDatum(NULL);

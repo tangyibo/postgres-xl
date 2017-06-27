@@ -222,7 +222,7 @@ struct itimerval
 	struct timeval it_value;
 };
 
-int			setitimer(int which, const struct itimerval * value, struct itimerval * ovalue);
+int			setitimer(int which, const struct itimerval *value, struct itimerval *ovalue);
 
 /*
  * WIN32 does not provide 64-bit off_t, but does provide the functions operating
@@ -376,11 +376,11 @@ void		pg_queue_signal(int signum);
 #define send(s, buf, len, flags) pgwin32_send(s, buf, len, flags)
 
 SOCKET		pgwin32_socket(int af, int type, int protocol);
-int			pgwin32_bind(SOCKET s, struct sockaddr * addr, int addrlen);
+int			pgwin32_bind(SOCKET s, struct sockaddr *addr, int addrlen);
 int			pgwin32_listen(SOCKET s, int backlog);
-SOCKET		pgwin32_accept(SOCKET s, struct sockaddr * addr, int *addrlen);
-int			pgwin32_connect(SOCKET s, const struct sockaddr * name, int namelen);
-int			pgwin32_select(int nfds, fd_set *readfs, fd_set *writefds, fd_set *exceptfds, const struct timeval * timeout);
+SOCKET		pgwin32_accept(SOCKET s, struct sockaddr *addr, int *addrlen);
+int			pgwin32_connect(SOCKET s, const struct sockaddr *name, int namelen);
+int			pgwin32_select(int nfds, fd_set *readfs, fd_set *writefds, fd_set *exceptfds, const struct timeval *timeout);
 int			pgwin32_recv(SOCKET s, char *buf, int len, int flags);
 int			pgwin32_send(SOCKET s, const void *buf, int len, int flags);
 
@@ -442,7 +442,7 @@ typedef unsigned short mode_t;
 /* Pulled from Makefile.port in mingw */
 #define DLSUFFIX ".dll"
 
-#endif   /* _MSC_VER */
+#endif							/* _MSC_VER */
 
 /* These aren't provided by either MingW or MSVC */
 #define S_IRGRP 0

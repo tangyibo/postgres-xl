@@ -35,7 +35,7 @@ static char *basedir = NULL;
 static int	verbose = 0;
 static int	compresslevel = 0;
 static int	noloop = 0;
-static int	standby_message_timeout = 10 * 1000;		/* 10 sec = default */
+static int	standby_message_timeout = 10 * 1000;	/* 10 sec = default */
 static volatile bool time_to_abort = false;
 static bool do_create_slot = false;
 static bool slot_exists_ok = false;
@@ -405,7 +405,7 @@ StreamLog(void)
 	if (verbose)
 		fprintf(stderr,
 				_("%s: starting log streaming at %X/%X (timeline %u)\n"),
-		progname, (uint32) (stream.startpos >> 32), (uint32) stream.startpos,
+				progname, (uint32) (stream.startpos >> 32), (uint32) stream.startpos,
 				stream.timeline);
 
 	stream.stream_stop = stop_streaming;

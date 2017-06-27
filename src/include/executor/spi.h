@@ -163,4 +163,4 @@ extern void AtEOSubXact_SPI(bool isCommit, SubTransactionId mySubid);
 extern int SPI_execute_direct(const char *src, char *nodename);
 #endif
 
-#endif   /* SPI_H */
+#endif							/* SPI_H */

@@ -75,7 +75,8 @@ typedef struct ExtensionControlFile
 	char	   *name;			/* name of the extension */
 	char	   *directory;		/* directory for script files */
 	char	   *default_version;	/* default install target version, if any */
-	char	   *module_pathname;	/* string to substitute for MODULE_PATHNAME */
+	char	   *module_pathname;	/* string to substitute for
+									 * MODULE_PATHNAME */
 	char	   *comment;		/* comment, if any */
 	char	   *schema;			/* target schema (allowed if !relocatable) */
 	bool		relocatable;	/* is ALTER EXTENSION SET SCHEMA supported? */
@@ -95,7 +96,7 @@ typedef struct ExtensionVersionInfo
 	/* working state for Dijkstra's algorithm: */
 	bool		distance_known; /* is distance from start known yet? */
 	int			distance;		/* current worst-case distance estimate */
-	struct ExtensionVersionInfo *previous;		/* current best predecessor */
+	struct ExtensionVersionInfo *previous;	/* current best predecessor */
 } ExtensionVersionInfo;
 
 /* Local functions */
@@ -285,7 +286,7 @@ check_valid_extension_name(const char *extensionname)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("invalid extension name: \"%s\"", extensionname),
-			errdetail("Extension names must not begin or end with \"-\".")));
+				 errdetail("Extension names must not begin or end with \"-\".")));
 
 	/*
 	 * No directory separators either (this is sufficient to prevent ".."
@@ -310,7 +311,7 @@ check_valid_version_name(const char *versionname)
 	if (namelen == 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			   errmsg("invalid extension version name: \"%s\"", versionname),
+				 errmsg("invalid extension version name: \"%s\"", versionname),
 				 errdetail("Version names must not be empty.")));
 
 	/*
@@ -319,7 +320,7 @@ check_valid_version_name(const char *versionname)
 	if (strstr(versionname, "--"))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			   errmsg("invalid extension version name: \"%s\"", versionname),
+				 errmsg("invalid extension version name: \"%s\"", versionname),
 				 errdetail("Version names must not contain \"--\".")));
 
 	/*
@@ -328,8 +329,8 @@ check_valid_version_name(const char *versionname)
 	if (versionname[0] == '-' || versionname[namelen - 1] == '-')
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			   errmsg("invalid extension version name: \"%s\"", versionname),
-			  errdetail("Version names must not begin or end with \"-\".")));
+				 errmsg("invalid extension version name: \"%s\"", versionname),
+				 errdetail("Version names must not begin or end with \"-\".")));
 
 	/*
 	 * No directory separators either (this is sufficient to prevent ".."
@@ -338,7 +339,7 @@ check_valid_version_name(const char *versionname)
 	if (first_dir_separator(versionname) != NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			   errmsg("invalid extension version name: \"%s\"", versionname),
+				 errmsg("invalid extension version name: \"%s\"", versionname),
 				 errdetail("Version names must not contain directory separator characters.")));
 }
 
@@ -574,8 +575,8 @@ parse_extension_control_file(ExtensionControlFile *control,
 				/* syntax error in name list */
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("parameter \"%s\" must be a list of extension names",
-						item->name)));
+						 errmsg("parameter \"%s\" must be a list of extension names",
+								item->name)));
 			}
 		}
 		else
@@ -916,8 +917,8 @@ execute_extension_script(Oid extensionOid, ExtensionControlFile *control,
 		{
 			t_sql = DirectFunctionCall3(replace_text,
 										t_sql,
-									  CStringGetTextDatum("MODULE_PATHNAME"),
-							  CStringGetTextDatum(control->module_pathname));
+										CStringGetTextDatum("MODULE_PATHNAME"),
+										CStringGetTextDatum(control->module_pathname));
 		}
 
 		/* And now back to C string */
@@ -1425,9 +1426,9 @@ CreateExtensionInternal(char *extensionName,
 			!cascade)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("extension \"%s\" must be installed in schema \"%s\"",
-					   control->name,
-					   control->schema)));
+					 errmsg("extension \"%s\" must be installed in schema \"%s\"",
+							control->name,
+							control->schema)));
 
 		/* Always use the schema from control file for current extension. */
 		schemaName = control->schema;
@@ -1846,8 +1847,8 @@ RemoveExtensionById(Oid extId)
 	if (extId == CurrentExtensionObject)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-		  errmsg("cannot drop extension \"%s\" because it is being modified",
-				 get_extension_name(extId))));
+				 errmsg("cannot drop extension \"%s\" because it is being modified",
+						get_extension_name(extId))));
 
 	rel = heap_open(ExtensionRelationId, RowExclusiveLock);
 
@@ -2365,8 +2366,8 @@ pg_extension_config_dump(PG_FUNCTION_ARGS)
 		CurrentExtensionObject)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-		errmsg("table \"%s\" is not a member of the extension being created",
-			   tablename)));
+				 errmsg("table \"%s\" is not a member of the extension being created",
+						tablename)));
 
 	/*
 	 * Add the table OID and WHERE condition to the extension's extconfig and
@@ -2389,7 +2390,7 @@ pg_extension_config_dump(PG_FUNCTION_ARGS)
 
 	extTup = systable_getnext(extScan);
 
-	if (!HeapTupleIsValid(extTup))		/* should not happen */
+	if (!HeapTupleIsValid(extTup))	/* should not happen */
 		elog(ERROR, "could not find tuple for extension %u",
 			 CurrentExtensionObject);
 
@@ -2435,7 +2436,7 @@ pg_extension_config_dump(PG_FUNCTION_ARGS)
 		{
 			if (arrayData[i] == tableoid)
 			{
-				arrayIndex = i + 1;		/* replace this element instead */
+				arrayIndex = i + 1; /* replace this element instead */
 				break;
 			}
 		}
@@ -2537,7 +2538,7 @@ extension_config_remove(Oid extensionoid, Oid tableoid)
 
 	extTup = systable_getnext(extScan);
 
-	if (!HeapTupleIsValid(extTup))		/* should not happen */
+	if (!HeapTupleIsValid(extTup))	/* should not happen */
 		elog(ERROR, "could not find tuple for extension %u",
 			 extensionoid);
 
@@ -2738,7 +2739,7 @@ AlterExtensionNamespace(const char *extensionName, const char *newschema, Oid *o
 
 	extTup = systable_getnext(extScan);
 
-	if (!HeapTupleIsValid(extTup))		/* should not happen */
+	if (!HeapTupleIsValid(extTup))	/* should not happen */
 		elog(ERROR, "could not find tuple for extension %u",
 			 extensionOid);
 
@@ -2803,7 +2804,7 @@ AlterExtensionNamespace(const char *extensionName, const char *newschema, Oid *o
 		dep.objectId = pg_depend->objid;
 		dep.objectSubId = pg_depend->objsubid;
 
-		if (dep.objectSubId != 0)		/* should not happen */
+		if (dep.objectSubId != 0)	/* should not happen */
 			elog(ERROR, "extension should not have a sub-object dependency");
 
 		/* Relocate the object */
@@ -2978,8 +2979,8 @@ ExecAlterExtensionStmt(ParseState *pstate, AlterExtensionStmt *stmt)
 	if (strcmp(oldVersionName, versionName) == 0)
 	{
 		ereport(NOTICE,
-		   (errmsg("version \"%s\" of extension \"%s\" is already installed",
-				   versionName, stmt->extname)));
+				(errmsg("version \"%s\" of extension \"%s\" is already installed",
+						versionName, stmt->extname)));
 		return InvalidObjectAddress;
 	}
 

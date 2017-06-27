@@ -28,7 +28,7 @@ typedef struct
 {
 	/* dynahash.c requires key to be first field */
 	char		stmt_name[NAMEDATALEN];
-	CachedPlanSource *plansource;		/* the actual cached plan */
+	CachedPlanSource *plansource;	/* the actual cached plan */
 	bool		from_sql;		/* prepared via SQL, not FE/BE protocol? */
 #ifdef XCP	
 	bool		use_resowner;	/* does it use resowner for tracking? */
@@ -79,4 +79,4 @@ extern int SetRemoteStatementName(Plan *plan, const char *stmt_name, int num_par
 						Oid *param_types, int n);
 #endif
 
-#endif   /* PREPARE_H */
+#endif							/* PREPARE_H */

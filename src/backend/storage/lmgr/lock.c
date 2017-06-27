@@ -341,7 +341,7 @@ PROCLOCK_PRINT(const char *where, const PROCLOCK *proclockP)
 
 #define LOCK_PRINT(where, lock, type)  ((void) 0)
 #define PROCLOCK_PRINT(where, proclockP)  ((void) 0)
-#endif   /* not LOCK_DEBUG */
+#endif							/* not LOCK_DEBUG */
 
 
 static uint32 proclock_hash(const void *key, Size keysize);
@@ -406,7 +406,7 @@ InitLocks(void)
 									   init_table_size,
 									   max_table_size,
 									   &info,
-									HASH_ELEM | HASH_BLOBS | HASH_PARTITION);
+									   HASH_ELEM | HASH_BLOBS | HASH_PARTITION);
 
 	/* Assume an average of 2 holders per lock */
 	max_table_size *= 2;
@@ -425,7 +425,7 @@ InitLocks(void)
 										   init_table_size,
 										   max_table_size,
 										   &info,
-								 HASH_ELEM | HASH_FUNCTION | HASH_PARTITION);
+										   HASH_ELEM | HASH_FUNCTION | HASH_PARTITION);
 
 	/*
 	 * Allocate fast-path structures.
@@ -600,7 +600,7 @@ LockHasWaiters(const LOCKTAG *locktag, LOCKMODE lockmode, bool sessionLock)
 	/*
 	 * Find the LOCALLOCK entry for this lock and lockmode
 	 */
-	MemSet(&localtag, 0, sizeof(localtag));		/* must clear padding */
+	MemSet(&localtag, 0, sizeof(localtag)); /* must clear padding */
 	localtag.lock = *locktag;
 	localtag.mode = lockmode;
 
@@ -792,7 +792,7 @@ LockAcquireExtendedXC(const LOCKTAG *locktag,
 	/*
 	 * Find or create a LOCALLOCK entry for this lock and lockmode
 	 */
-	MemSet(&localtag, 0, sizeof(localtag));		/* must clear padding */
+	MemSet(&localtag, 0, sizeof(localtag)); /* must clear padding */
 	localtag.lock = *locktag;
 	localtag.mode = lockmode;
 
@@ -815,7 +815,7 @@ LockAcquireExtendedXC(const LOCKTAG *locktag,
 		locallock->lockOwners = NULL;	/* in case next line fails */
 		locallock->lockOwners = (LOCALLOCKOWNER *)
 			MemoryContextAlloc(TopMemoryContext,
-						  locallock->maxLockOwners * sizeof(LOCALLOCKOWNER));
+							   locallock->maxLockOwners * sizeof(LOCALLOCKOWNER));
 	}
 	else
 	{
@@ -1261,7 +1261,7 @@ SetupLockInTable(LockMethod lockMethodTable, PGPROC *proc,
 				}
 			}
 		}
-#endif   /* CHECK_DEADLOCK_RISK */
+#endif							/* CHECK_DEADLOCK_RISK */
 	}
 
 	/*
@@ -1966,7 +1966,7 @@ LockRelease(const LOCKTAG *locktag, LOCKMODE lockmode, bool sessionLock)
 	/*
 	 * Find the LOCALLOCK entry for this lock and lockmode
 	 */
-	MemSet(&localtag, 0, sizeof(localtag));		/* must clear padding */
+	MemSet(&localtag, 0, sizeof(localtag)); /* must clear padding */
 	localtag.lock = *locktag;
 	localtag.mode = lockmode;
 
@@ -2331,7 +2331,7 @@ LockReleaseAll(LOCKMETHODID lockmethodid, bool allLocks)
 		LWLockAcquire(partitionLock, LW_EXCLUSIVE);
 
 		for (proclock = (PROCLOCK *) SHMQueueNext(procLocks, procLocks,
-											   offsetof(PROCLOCK, procLink));
+												  offsetof(PROCLOCK, procLink));
 			 proclock;
 			 proclock = nextplock)
 		{
@@ -2729,7 +2729,7 @@ FastPathTransferRelationLocks(LockMethod lockMethodTable, const LOCKTAG *locktag
 			/* Find or create lock object. */
 			LWLockAcquire(partitionLock, LW_EXCLUSIVE);
 			for (lockmode = FAST_PATH_LOCKNUMBER_OFFSET;
-			lockmode < FAST_PATH_LOCKNUMBER_OFFSET + FAST_PATH_BITS_PER_SLOT;
+				 lockmode < FAST_PATH_LOCKNUMBER_OFFSET + FAST_PATH_BITS_PER_SLOT;
 				 ++lockmode)
 			{
 				PROCLOCK   *proclock;
@@ -2896,7 +2896,7 @@ GetLockConflicts(const LOCKTAG *locktag, LOCKMODE lockmode)
 		if (vxids == NULL)
 			vxids = (VirtualTransactionId *)
 				MemoryContextAlloc(TopMemoryContext,
-						   sizeof(VirtualTransactionId) * (MaxBackends + 1));
+								   sizeof(VirtualTransactionId) * (MaxBackends + 1));
 	}
 	else
 		vxids = (VirtualTransactionId *)
@@ -3394,7 +3394,7 @@ PostPrepare_Locks(TransactionId xid)
 		LWLockAcquire(partitionLock, LW_EXCLUSIVE);
 
 		for (proclock = (PROCLOCK *) SHMQueueNext(procLocks, procLocks,
-											   offsetof(PROCLOCK, procLink));
+												  offsetof(PROCLOCK, procLink));
 			 proclock;
 			 proclock = nextplock)
 		{
@@ -4047,7 +4047,7 @@ DumpAllLocks(void)
 			elog(LOG, "DumpAllLocks: proclock->tag.myLock = NULL");
 	}
 }
-#endif   /* LOCK_DEBUG */
+#endif							/* LOCK_DEBUG */
 
 /*
  * LOCK 2PC resource manager's routines
@@ -4126,7 +4126,7 @@ lock_twophase_recover(TransactionId xid, uint16 info,
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
 				 errmsg("out of shared memory"),
-		  errhint("You might need to increase max_locks_per_transaction.")));
+				 errhint("You might need to increase max_locks_per_transaction.")));
 	}
 
 	/*
@@ -4191,7 +4191,7 @@ lock_twophase_recover(TransactionId xid, uint16 info,
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
 				 errmsg("out of shared memory"),
-		  errhint("You might need to increase max_locks_per_transaction.")));
+				 errhint("You might need to increase max_locks_per_transaction.")));
 	}
 
 	/*
@@ -4280,8 +4280,8 @@ lock_twophase_standby_recover(TransactionId xid, uint16 info,
 		locktag->locktag_type == LOCKTAG_RELATION)
 	{
 		StandbyAcquireAccessExclusiveLock(xid,
-										locktag->locktag_field1 /* dboid */ ,
-									  locktag->locktag_field2 /* reloid */ );
+										  locktag->locktag_field1 /* dboid */ ,
+										  locktag->locktag_field2 /* reloid */ );
 	}
 }
 

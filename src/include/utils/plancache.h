@@ -81,7 +81,7 @@ struct RawStmt;
 typedef struct CachedPlanSource
 {
 	int			magic;			/* should equal CACHEDPLANSOURCE_MAGIC */
-	struct RawStmt *raw_parse_tree;		/* output of raw_parser(), or NULL */
+	struct RawStmt *raw_parse_tree; /* output of raw_parser(), or NULL */
 	const char *query_string;	/* source text of query */
 	const char *commandTag;		/* command tag (a constant!), or NULL */
 	Oid		   *param_types;	/* array of parameter type OIDs, or NULL */
@@ -96,11 +96,11 @@ typedef struct CachedPlanSource
 	List	   *query_list;		/* list of Query nodes, or NIL if not valid */
 	List	   *relationOids;	/* OIDs of relations the queries depend on */
 	List	   *invalItems;		/* other dependencies, as PlanInvalItems */
-	struct OverrideSearchPath *search_path;		/* search_path used for
-												 * parsing and planning */
+	struct OverrideSearchPath *search_path; /* search_path used for parsing
+											 * and planning */
 	MemoryContext query_context;	/* context holding the above, or NULL */
 	Oid			rewriteRoleId;	/* Role ID we did rewriting for */
-	bool		rewriteRowSecurity;		/* row_security used during rewrite */
+	bool		rewriteRowSecurity; /* row_security used during rewrite */
 	bool		dependsOnRLS;	/* is rewritten query specific to the above? */
 	/* If we have a generic plan, this is a reference-counted link to it: */
 	struct CachedPlan *gplan;	/* generic plan, or NULL if not valid */
@@ -111,11 +111,11 @@ typedef struct CachedPlanSource
 	bool		is_valid;		/* is the query_list currently valid? */
 	int			generation;		/* increments each time we create a plan */
 	/* If CachedPlanSource has been saved, it is a member of a global list */
-	struct CachedPlanSource *next_saved;		/* list link, if so */
+	struct CachedPlanSource *next_saved;	/* list link, if so */
 	/* State kept to help decide whether to use custom or generic plans: */
 	double		generic_cost;	/* cost of generic plan, or -1 if not known */
-	double		total_custom_cost;		/* total cost of custom plans so far */
-	int			num_custom_plans;		/* number of plans included in total */
+	double		total_custom_cost;	/* total cost of custom plans so far */
+	int			num_custom_plans;	/* number of plans included in total */
 #ifdef PGXC
 	char	   *stmt_name;		/* If set, this is a copy of prepared stmt name */
 #endif
@@ -193,4 +193,4 @@ extern void SetRemoteSubplan(CachedPlanSource *plansource,
 				 const char *plan_string);
 #endif
 
-#endif   /* PLANCACHE_H */
+#endif							/* PLANCACHE_H */

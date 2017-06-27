@@ -370,7 +370,7 @@ print_unaligned_text(const printTableContent *cont, FILE *fout)
 {
 	bool		opt_tuples_only = cont->opt->tuples_only;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 	bool		need_recordsep = false;
 
 	if (cancel_pressed)
@@ -461,7 +461,7 @@ print_unaligned_vertical(const printTableContent *cont, FILE *fout)
 {
 	bool		opt_tuples_only = cont->opt->tuples_only;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 	bool		need_recordsep = false;
 
 	if (cancel_pressed)
@@ -606,14 +606,14 @@ print_aligned_text(const printTableContent *cont, FILE *fout, bool is_pager)
 	unsigned int extra_row_output_lines = 0;
 	unsigned int extra_output_lines = 0;
 
-	const char *const * ptr;
+	const char *const *ptr;
 
-	struct lineptr **col_lineptrs;		/* pointers to line pointer per column */
+	struct lineptr **col_lineptrs;	/* pointers to line pointer per column */
 
 	bool	   *header_done;	/* Have all header lines been output? */
 	int		   *bytes_output;	/* Bytes output for column value */
 	printTextLineWrap *wrap;	/* Wrap status for each column */
-	int			output_columns = 0;		/* Width of interactive console */
+	int			output_columns = 0; /* Width of interactive console */
 	bool		is_local_pager = false;
 
 	if (cancel_pressed)
@@ -1006,7 +1006,7 @@ print_aligned_text(const printTableContent *cont, FILE *fout, bool is_pager)
 				int			bytes_to_output;
 				int			chars_to_output = width_wrap[j];
 				bool		finalspaces = (opt_border == 2 ||
-									   (col_count > 0 && j < col_count - 1));
+										   (col_count > 0 && j < col_count - 1));
 
 				/* Print left-hand wrap or newline mark */
 				if (opt_border != 0)
@@ -1046,14 +1046,14 @@ print_aligned_text(const printTableContent *cont, FILE *fout, bool is_pager)
 						/* spaces first */
 						fprintf(fout, "%*s", width_wrap[j] - chars_to_output, "");
 						fputnbytes(fout,
-								 (char *) (this_line->ptr + bytes_output[j]),
+								   (char *) (this_line->ptr + bytes_output[j]),
 								   bytes_to_output);
 					}
-					else	/* Left aligned cell */
+					else		/* Left aligned cell */
 					{
 						/* spaces second */
 						fputnbytes(fout,
-								 (char *) (this_line->ptr + bytes_output[j]),
+								   (char *) (this_line->ptr + bytes_output[j]),
 								   bytes_to_output);
 					}
 
@@ -1086,7 +1086,7 @@ print_aligned_text(const printTableContent *cont, FILE *fout, bool is_pager)
 				 * If left-aligned, pad out remaining space if needed (not
 				 * last column, and/or wrap marks required).
 				 */
-				if (cont->aligns[j] != 'r')		/* Left aligned cell */
+				if (cont->aligns[j] != 'r') /* Left aligned cell */
 				{
 					if (finalspaces ||
 						wrap[j] == PRINT_LINE_WRAP_WRAP ||
@@ -1236,7 +1236,7 @@ print_aligned_vertical(const printTableContent *cont,
 	const printTextLineFormat *dformat = &format->lrule[PRINT_RULE_DATA];
 	int			encoding = cont->opt->encoding;
 	unsigned long record = cont->opt->prior_records + 1;
-	const char *const * ptr;
+	const char *const *ptr;
 	unsigned int i,
 				hwidth = 0,
 				dwidth = 0,
@@ -1249,7 +1249,7 @@ print_aligned_vertical(const printTableContent *cont,
 	bool		is_local_pager = false,
 				hmultiline = false,
 				dmultiline = false;
-	int			output_columns = 0;		/* Width of interactive console */
+	int			output_columns = 0; /* Width of interactive console */
 
 	if (cancel_pressed)
 		return;
@@ -1789,7 +1789,7 @@ print_html_text(const printTableContent *cont, FILE *fout)
 	unsigned short opt_border = cont->opt->border;
 	const char *opt_table_attr = cont->opt->tableAttr;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -1879,7 +1879,7 @@ print_html_vertical(const printTableContent *cont, FILE *fout)
 	const char *opt_table_attr = cont->opt->tableAttr;
 	unsigned long record = cont->opt->prior_records + 1;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -1980,7 +1980,7 @@ print_asciidoc_text(const printTableContent *cont, FILE *fout)
 	bool		opt_tuples_only = cont->opt->tuples_only;
 	unsigned short opt_border = cont->opt->border;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -2091,7 +2091,7 @@ print_asciidoc_vertical(const printTableContent *cont, FILE *fout)
 	unsigned short opt_border = cont->opt->border;
 	unsigned long record = cont->opt->prior_records + 1;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -2223,7 +2223,7 @@ print_latex_text(const printTableContent *cont, FILE *fout)
 	bool		opt_tuples_only = cont->opt->tuples_only;
 	unsigned short opt_border = cont->opt->border;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -2328,7 +2328,7 @@ print_latex_longtable_text(const printTableContent *cont, FILE *fout)
 	const char *opt_table_attr = cont->opt->tableAttr;
 	const char *next_opt_table_attr_char = opt_table_attr;
 	const char *last_opt_table_attr_char = NULL;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -2360,7 +2360,7 @@ print_latex_longtable_text(const printTableContent *cont, FILE *fout)
 				{
 					fputs("p{", fout);
 					fwrite(next_opt_table_attr_char, strcspn(next_opt_table_attr_char,
-											 LONGTABLE_WHITESPACE), 1, fout);
+															 LONGTABLE_WHITESPACE), 1, fout);
 					last_opt_table_attr_char = next_opt_table_attr_char;
 					next_opt_table_attr_char += strcspn(next_opt_table_attr_char,
 														LONGTABLE_WHITESPACE);
@@ -2371,7 +2371,7 @@ print_latex_longtable_text(const printTableContent *cont, FILE *fout)
 				{
 					fputs("p{", fout);
 					fwrite(last_opt_table_attr_char, strcspn(last_opt_table_attr_char,
-											 LONGTABLE_WHITESPACE), 1, fout);
+															 LONGTABLE_WHITESPACE), 1, fout);
 					fputs("\\textwidth}", fout);
 				}
 				else
@@ -2482,7 +2482,7 @@ print_latex_vertical(const printTableContent *cont, FILE *fout)
 	unsigned short opt_border = cont->opt->border;
 	unsigned long record = cont->opt->prior_records + 1;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -2591,7 +2591,7 @@ print_troff_ms_text(const printTableContent *cont, FILE *fout)
 	bool		opt_tuples_only = cont->opt->tuples_only;
 	unsigned short opt_border = cont->opt->border;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 
 	if (cancel_pressed)
 		return;
@@ -2684,7 +2684,7 @@ print_troff_ms_vertical(const printTableContent *cont, FILE *fout)
 	unsigned short opt_border = cont->opt->border;
 	unsigned long record = cont->opt->prior_records + 1;
 	unsigned int i;
-	const char *const * ptr;
+	const char *const *ptr;
 	unsigned short current_format = 0;	/* 0=none, 1=header, 2=body */
 
 	if (cancel_pressed)

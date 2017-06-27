@@ -334,7 +334,7 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	 * won't change underneath us.
 	 */
 	if (!dbtemplate)
-		dbtemplate = "template1";		/* Default template database name */
+		dbtemplate = "template1";	/* Default template database name */
 
 	if (!get_db_info(dbtemplate, ShareLock,
 					 &src_dboid, &src_owner, &src_encoding,
@@ -441,7 +441,7 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 		if (dst_deftablespace == GLOBALTABLESPACE_OID)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				  errmsg("pg_global cannot be used as default tablespace")));
+					 errmsg("pg_global cannot be used as default tablespace")));
 
 		/*
 		 * If we are trying to change the default tablespace of the template,
@@ -503,8 +503,8 @@ createdb(ParseState *pstate, const CreatedbStmt *stmt)
 	if (CountOtherDBBackends(src_dboid, &notherbackends, &npreparedxacts))
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_IN_USE),
-			errmsg("source database \"%s\" is being accessed by other users",
-				   dbtemplate),
+				 errmsg("source database \"%s\" is being accessed by other users",
+						dbtemplate),
 				 errdetail_busy_db(notherbackends, npreparedxacts)));
 
 	/*
@@ -757,8 +757,8 @@ check_encoding_locale_matches(int encoding, const char *collate, const char *cty
 				 errmsg("encoding \"%s\" does not match locale \"%s\"",
 						pg_encoding_to_char(encoding),
 						ctype),
-		   errdetail("The chosen LC_CTYPE setting requires encoding \"%s\".",
-					 pg_encoding_to_char(ctype_encoding))));
+				 errdetail("The chosen LC_CTYPE setting requires encoding \"%s\".",
+						   pg_encoding_to_char(ctype_encoding))));
 
 	if (!(collate_encoding == encoding ||
 		  collate_encoding == PG_SQL_ASCII ||
@@ -772,8 +772,8 @@ check_encoding_locale_matches(int encoding, const char *collate, const char *cty
 				 errmsg("encoding \"%s\" does not match locale \"%s\"",
 						pg_encoding_to_char(encoding),
 						collate),
-		 errdetail("The chosen LC_COLLATE setting requires encoding \"%s\".",
-				   pg_encoding_to_char(collate_encoding))));
+				 errdetail("The chosen LC_COLLATE setting requires encoding \"%s\".",
+						   pg_encoding_to_char(collate_encoding))));
 }
 
 #ifdef PGXC
@@ -839,7 +839,7 @@ dropdb(const char *dbname, bool missing_ok)
 	pgdbrel = heap_open(DatabaseRelationId, RowExclusiveLock);
 
 	if (!get_db_info(dbname, AccessExclusiveLock, &db_id, NULL, NULL,
-				   &db_istemplate, NULL, NULL, NULL, NULL, NULL, NULL, NULL))
+					 &db_istemplate, NULL, NULL, NULL, NULL, NULL, NULL, NULL))
 	{
 		if (!missing_ok)
 		{
@@ -1163,7 +1163,7 @@ movedb(const char *dbname, const char *tblspcname)
 	pgdbrel = heap_open(DatabaseRelationId, RowExclusiveLock);
 
 	if (!get_db_info(dbname, AccessExclusiveLock, &db_id, NULL, NULL,
-				   NULL, NULL, NULL, NULL, NULL, &src_tblspcoid, NULL, NULL))
+					 NULL, NULL, NULL, NULL, NULL, &src_tblspcoid, NULL, NULL))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_DATABASE),
 				 errmsg("database \"%s\" does not exist", dbname)));
@@ -1362,7 +1362,7 @@ movedb(const char *dbname, const char *tblspcname)
 		sysscan = systable_beginscan(pgdbrel, DatabaseNameIndexId, true,
 									 NULL, 1, &scankey);
 		oldtuple = systable_getnext(sysscan);
-		if (!HeapTupleIsValid(oldtuple))		/* shouldn't happen... */
+		if (!HeapTupleIsValid(oldtuple))	/* shouldn't happen... */
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_DATABASE),
 					 errmsg("database \"%s\" does not exist", dbname)));
@@ -1605,8 +1605,8 @@ AlterDatabase(ParseState *pstate, AlterDatabaseStmt *stmt, bool isTopLevel)
 		if (list_length(stmt->options) != 1)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			   errmsg("option \"%s\" cannot be specified with other options",
-					  dtablespace->defname),
+					 errmsg("option \"%s\" cannot be specified with other options",
+							dtablespace->defname),
 					 parser_errposition(pstate, dtablespace->location)));
 		/* this case isn't allowed within a transaction block */
 #ifdef PGXC
@@ -1802,7 +1802,7 @@ AlterDatabaseOwner(const char *dbname, Oid newOwnerId)
 		if (!have_createdb_privilege())
 			ereport(ERROR,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				   errmsg("permission denied to change owner of database")));
+					 errmsg("permission denied to change owner of database")));
 
 		memset(repl_null, false, sizeof(repl_null));
 		memset(repl_repl, false, sizeof(repl_repl));
@@ -2131,7 +2131,7 @@ errdetail_busy_db(int notherbackends, int npreparedxacts)
 						 notherbackends);
 	else
 		errdetail_plural("There is %d prepared transaction using the database.",
-					"There are %d prepared transactions using the database.",
+						 "There are %d prepared transactions using the database.",
 						 npreparedxacts,
 						 npreparedxacts);
 	return 0;					/* just to keep ereport macro happy */

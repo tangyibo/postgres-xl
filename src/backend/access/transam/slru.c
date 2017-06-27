@@ -76,7 +76,7 @@ typedef struct SlruFlushData
 {
 	int			num_files;		/* # files actually open */
 	int			fd[MAX_FLUSH_BUFFERS];	/* their FD's */
-	int			segno[MAX_FLUSH_BUFFERS];		/* their log seg#s */
+	int			segno[MAX_FLUSH_BUFFERS];	/* their log seg#s */
 } SlruFlushData;
 
 typedef struct SlruFlushData *SlruFlush;
@@ -150,10 +150,10 @@ SimpleLruShmemSize(int nslots, int nlsns)
 	sz = MAXALIGN(sizeof(SlruSharedData));
 	sz += MAXALIGN(nslots * sizeof(char *));	/* page_buffer[] */
 	sz += MAXALIGN(nslots * sizeof(SlruPageStatus));	/* page_status[] */
-	sz += MAXALIGN(nslots * sizeof(bool));		/* page_dirty[] */
-	sz += MAXALIGN(nslots * sizeof(int));		/* page_number[] */
-	sz += MAXALIGN(nslots * sizeof(int));		/* page_lru_count[] */
-	sz += MAXALIGN(nslots * sizeof(LWLockPadded));		/* buffer_locks[] */
+	sz += MAXALIGN(nslots * sizeof(bool));	/* page_dirty[] */
+	sz += MAXALIGN(nslots * sizeof(int));	/* page_number[] */
+	sz += MAXALIGN(nslots * sizeof(int));	/* page_lru_count[] */
+	sz += MAXALIGN(nslots * sizeof(LWLockPadded));	/* buffer_locks[] */
 
 	if (nlsns > 0)
 		sz += MAXALIGN(nslots * nlsns * sizeof(XLogRecPtr));	/* group_lsn[] */
@@ -340,7 +340,7 @@ SimpleLruWaitIO(SlruCtl ctl, int slotno)
 			/* indeed, the I/O must have failed */
 			if (shared->page_status[slotno] == SLRU_PAGE_READ_IN_PROGRESS)
 				shared->page_status[slotno] = SLRU_PAGE_EMPTY;
-			else	/* write_in_progress */
+			else				/* write_in_progress */
 			{
 				shared->page_status[slotno] = SLRU_PAGE_VALID;
 				shared->page_dirty[slotno] = true;
@@ -921,22 +921,22 @@ SlruReportIOError(SlruCtl ctl, int pageno, TransactionId xid)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not access status of transaction %u", xid),
-				 errdetail("Could not seek in file \"%s\" to offset %u: %m.",
-						   path, offset)));
+					 errdetail("Could not seek in file \"%s\" to offset %u: %m.",
+							   path, offset)));
 			break;
 		case SLRU_READ_FAILED:
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not access status of transaction %u", xid),
-			   errdetail("Could not read from file \"%s\" at offset %u: %m.",
-						 path, offset)));
+					 errdetail("Could not read from file \"%s\" at offset %u: %m.",
+							   path, offset)));
 			break;
 		case SLRU_WRITE_FAILED:
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not access status of transaction %u", xid),
-				errdetail("Could not write to file \"%s\" at offset %u: %m.",
-						  path, offset)));
+					 errdetail("Could not write to file \"%s\" at offset %u: %m.",
+							   path, offset)));
 			break;
 		case SLRU_FSYNC_FAILED:
 			ereport(ERROR,
@@ -986,9 +986,9 @@ SlruSelectLRUPage(SlruCtl ctl, int pageno)
 		int			bestvalidslot = 0;	/* keep compiler quiet */
 		int			best_valid_delta = -1;
 		int			best_valid_page_number = 0; /* keep compiler quiet */
-		int			bestinvalidslot = 0;		/* keep compiler quiet */
+		int			bestinvalidslot = 0;	/* keep compiler quiet */
 		int			best_invalid_delta = -1;
-		int			best_invalid_page_number = 0;		/* keep compiler quiet */
+		int			best_invalid_page_number = 0;	/* keep compiler quiet */
 
 		/* See if page already has a buffer assigned */
 		for (slotno = 0; slotno < shared->num_slots; slotno++)
@@ -1206,8 +1206,8 @@ restart:;
 	{
 		LWLockRelease(shared->ControlLock);
 		ereport(LOG,
-		  (errmsg("could not truncate directory \"%s\": apparent wraparound",
-				  ctl->Dir)));
+				(errmsg("could not truncate directory \"%s\": apparent wraparound",
+						ctl->Dir)));
 		return;
 	}
 

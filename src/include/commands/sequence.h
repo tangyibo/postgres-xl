@@ -93,4 +93,4 @@ extern bool IsTempSequence(Oid relid);
 extern char *GetGlobalSeqName(Relation rel, const char *new_seqname, const char *new_schemaname);
 #endif
 
-#endif   /* SEQUENCE_H */
+#endif							/* SEQUENCE_H */

@@ -73,7 +73,7 @@ MultiExecBitmapIndexScan(BitmapIndexScanState *node)
 	if (node->biss_result)
 	{
 		tbm = node->biss_result;
-		node->biss_result = NULL;		/* reset for next time */
+		node->biss_result = NULL;	/* reset for next time */
 	}
 	else
 	{
@@ -254,7 +254,7 @@ ExecInitBitmapIndexScan(BitmapIndexScan *node, EState *estate, int eflags)
 	 */
 	relistarget = ExecRelationIsTargetRelation(estate, node->scan.scanrelid);
 	indexstate->biss_RelationDesc = index_open(node->indexid,
-									 relistarget ? NoLock : AccessShareLock);
+											   relistarget ? NoLock : AccessShareLock);
 
 	/*
 	 * Initialize index-specific scan state

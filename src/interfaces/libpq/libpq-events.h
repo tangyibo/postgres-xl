@@ -19,7 +19,7 @@
 #include "libpq-fe.h"
 
 #ifdef __cplusplus
-extern		"C"
+extern "C"
 {
 #endif
 
@@ -91,4 +91,4 @@ extern int	PQfireResultCreateEvents(PGconn *conn, PGresult *res);
 }
 #endif
 
-#endif   /* LIBPQ_EVENTS_H */
+#endif							/* LIBPQ_EVENTS_H */

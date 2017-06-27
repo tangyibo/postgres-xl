@@ -537,7 +537,7 @@ add_reloption_kind(void)
 	if (last_assigned_kind >= RELOPT_KIND_MAX)
 		ereport(ERROR,
 				(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-			errmsg("user-defined relation parameter types limit exceeded")));
+				 errmsg("user-defined relation parameter types limit exceeded")));
 	last_assigned_kind <<= 1;
 	return (relopt_kind) last_assigned_kind;
 }
@@ -567,7 +567,7 @@ add_reloption(relopt_gen *newoption)
 		{
 			max_custom_options *= 2;
 			custom_options = repalloc(custom_options,
-								  max_custom_options * sizeof(relopt_gen *));
+									  max_custom_options * sizeof(relopt_gen *));
 		}
 		MemoryContextSwitchTo(oldcxt);
 	}
@@ -818,7 +818,7 @@ transformRelOptions(Datum oldOptions, List *defList, char *namspace,
 			if (def->arg != NULL)
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-					errmsg("RESET must not include values for parameters")));
+						 errmsg("RESET must not include values for parameters")));
 		}
 		else
 		{
@@ -1137,8 +1137,8 @@ parse_one_reloption(relopt_value *option, char *text_str, int text_len,
 				if (validate && !parsed)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						errmsg("invalid value for boolean option \"%s\": %s",
-							   option->gen->name, value)));
+							 errmsg("invalid value for boolean option \"%s\": %s",
+									option->gen->name, value)));
 			}
 			break;
 		case RELOPT_TYPE_INT:
@@ -1149,16 +1149,16 @@ parse_one_reloption(relopt_value *option, char *text_str, int text_len,
 				if (validate && !parsed)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						errmsg("invalid value for integer option \"%s\": %s",
-							   option->gen->name, value)));
+							 errmsg("invalid value for integer option \"%s\": %s",
+									option->gen->name, value)));
 				if (validate && (option->values.int_val < optint->min ||
 								 option->values.int_val > optint->max))
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						   errmsg("value %s out of bounds for option \"%s\"",
-								  value, option->gen->name),
-					 errdetail("Valid values are between \"%d\" and \"%d\".",
-							   optint->min, optint->max)));
+							 errmsg("value %s out of bounds for option \"%s\"",
+									value, option->gen->name),
+							 errdetail("Valid values are between \"%d\" and \"%d\".",
+									   optint->min, optint->max)));
 			}
 			break;
 		case RELOPT_TYPE_REAL:
@@ -1175,10 +1175,10 @@ parse_one_reloption(relopt_value *option, char *text_str, int text_len,
 								 option->values.real_val > optreal->max))
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						   errmsg("value %s out of bounds for option \"%s\"",
-								  value, option->gen->name),
-					 errdetail("Valid values are between \"%f\" and \"%f\".",
-							   optreal->min, optreal->max)));
+							 errmsg("value %s out of bounds for option \"%s\"",
+									value, option->gen->name),
+							 errdetail("Valid values are between \"%f\" and \"%f\".",
+									   optreal->min, optreal->max)));
 			}
 			break;
 		case RELOPT_TYPE_STRING:
@@ -1321,33 +1321,33 @@ default_reloptions(Datum reloptions, bool validate, relopt_kind kind)
 	static const relopt_parse_elt tab[] = {
 		{"fillfactor", RELOPT_TYPE_INT, offsetof(StdRdOptions, fillfactor)},
 		{"autovacuum_enabled", RELOPT_TYPE_BOOL,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, enabled)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, enabled)},
 		{"autovacuum_vacuum_threshold", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, vacuum_threshold)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, vacuum_threshold)},
 		{"autovacuum_analyze_threshold", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, analyze_threshold)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, analyze_threshold)},
 		{"autovacuum_vacuum_cost_delay", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, vacuum_cost_delay)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, vacuum_cost_delay)},
 		{"autovacuum_vacuum_cost_limit", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, vacuum_cost_limit)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, vacuum_cost_limit)},
 		{"autovacuum_freeze_min_age", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, freeze_min_age)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, freeze_min_age)},
 		{"autovacuum_freeze_max_age", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, freeze_max_age)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, freeze_max_age)},
 		{"autovacuum_freeze_table_age", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, freeze_table_age)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, freeze_table_age)},
 		{"autovacuum_multixact_freeze_min_age", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, multixact_freeze_min_age)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, multixact_freeze_min_age)},
 		{"autovacuum_multixact_freeze_max_age", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, multixact_freeze_max_age)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, multixact_freeze_max_age)},
 		{"autovacuum_multixact_freeze_table_age", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, multixact_freeze_table_age)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, multixact_freeze_table_age)},
 		{"log_autovacuum_min_duration", RELOPT_TYPE_INT,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, log_min_duration)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, log_min_duration)},
 		{"autovacuum_vacuum_scale_factor", RELOPT_TYPE_REAL,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, vacuum_scale_factor)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, vacuum_scale_factor)},
 		{"autovacuum_analyze_scale_factor", RELOPT_TYPE_REAL,
-		offsetof(StdRdOptions, autovacuum) +offsetof(AutoVacOpts, analyze_scale_factor)},
+		offsetof(StdRdOptions, autovacuum) + offsetof(AutoVacOpts, analyze_scale_factor)},
 		{"user_catalog_table", RELOPT_TYPE_BOOL,
 		offsetof(StdRdOptions, user_catalog_table)},
 		{"parallel_workers", RELOPT_TYPE_INT,

@@ -392,7 +392,7 @@ typedef struct AggStatePerTransData
 	FunctionCallInfoData serialfn_fcinfo;
 
 	FunctionCallInfoData deserialfn_fcinfo;
-}	AggStatePerTransData;
+}			AggStatePerTransData;
 
 /*
  * AggStatePerAggData - per-aggregate information
@@ -440,7 +440,7 @@ typedef struct AggStatePerAggData
 	int16		resulttypeLen;
 	bool		resulttypeByVal;
 
-}	AggStatePerAggData;
+}			AggStatePerAggData;
 
 /*
  * AggStatePerGroupData - per-aggregate-per-group working state
@@ -472,7 +472,7 @@ typedef struct AggStatePerGroupData
 	 * NULL and not auto-replace it with a later input value. Only the first
 	 * non-NULL input will be auto-substituted.
 	 */
-}	AggStatePerGroupData;
+}			AggStatePerGroupData;
 
 /*
  * AggStatePerPhaseData - per-grouping-set-phase state
@@ -494,7 +494,7 @@ typedef struct AggStatePerPhaseData
 	FmgrInfo   *eqfunctions;	/* per-grouping-field equality fns */
 	Agg		   *aggnode;		/* Agg node for phase data */
 	Sort	   *sortnode;		/* Sort node for input ordering for phase */
-}	AggStatePerPhaseData;
+}			AggStatePerPhaseData;
 
 /*
  * AggStatePerHashData - per-hashtable state
@@ -512,11 +512,11 @@ typedef struct AggStatePerHashData
 	FmgrInfo   *eqfunctions;	/* per-grouping-field equality fns */
 	int			numCols;		/* number of hash key columns */
 	int			numhashGrpCols; /* number of columns in hash table */
-	int			largestGrpColIdx;		/* largest col required for hashing */
-	AttrNumber *hashGrpColIdxInput;		/* hash col indices in input slot */
-	AttrNumber *hashGrpColIdxHash;		/* indices in hashtbl tuples */
+	int			largestGrpColIdx;	/* largest col required for hashing */
+	AttrNumber *hashGrpColIdxInput; /* hash col indices in input slot */
+	AttrNumber *hashGrpColIdxHash;	/* indices in hashtbl tuples */
 	Agg		   *aggnode;		/* original Agg node, for numGroups etc. */
-}	AggStatePerHashData;
+}			AggStatePerHashData;
 
 
 static void select_current_set(AggState *aggstate, int setno, bool is_hash);
@@ -753,7 +753,7 @@ initialize_aggregate(AggState *aggstate, AggStatePerTrans pertrans,
 		MemoryContext oldContext;
 
 		oldContext = MemoryContextSwitchTo(
-							 aggstate->curaggcontext->ecxt_per_tuple_memory);
+										   aggstate->curaggcontext->ecxt_per_tuple_memory);
 		pergroupstate->transValue = datumCopy(pertrans->initValue,
 											  pertrans->transtypeByVal,
 											  pertrans->transtypeLen);
@@ -870,7 +870,7 @@ advance_transition_function(AggState *aggstate,
 			 * do not need to pfree the old transValue, since it's NULL.
 			 */
 			oldContext = MemoryContextSwitchTo(
-							 aggstate->curaggcontext->ecxt_per_tuple_memory);
+											   aggstate->curaggcontext->ecxt_per_tuple_memory);
 			pergroupstate->transValue = datumCopy(fcinfo->arg[1],
 												  pertrans->transtypeByVal,
 												  pertrans->transtypeLen);
@@ -1201,9 +1201,9 @@ advance_combine_function(AggState *aggstate,
 			if (!pertrans->transtypeByVal)
 			{
 				oldContext = MemoryContextSwitchTo(
-							 aggstate->curaggcontext->ecxt_per_tuple_memory);
+												   aggstate->curaggcontext->ecxt_per_tuple_memory);
 				pergroupstate->transValue = datumCopy(fcinfo->arg[1],
-													pertrans->transtypeByVal,
+													  pertrans->transtypeByVal,
 													  pertrans->transtypeLen);
 				MemoryContextSwitchTo(oldContext);
 			}
@@ -1531,7 +1531,7 @@ finalize_aggregate(AggState *aggstate,
 
 		/* Fill in the transition state value */
 		fcinfo.arg[0] = MakeExpandedObjectReadOnly(pergroupstate->transValue,
-											 pergroupstate->transValueIsNull,
+												   pergroupstate->transValueIsNull,
 												   pertrans->transtypeLen);
 		fcinfo.argnull[0] = pergroupstate->transValueIsNull;
 		anynull |= pergroupstate->transValueIsNull;
@@ -1611,8 +1611,8 @@ finalize_partialaggregate(AggState *aggstate,
 			FunctionCallInfo fcinfo = &pertrans->serialfn_fcinfo;
 
 			fcinfo->arg[0] = MakeExpandedObjectReadOnly(pergroupstate->transValue,
-											 pergroupstate->transValueIsNull,
-													 pertrans->transtypeLen);
+														pergroupstate->transValueIsNull,
+														pertrans->transtypeLen);
 			fcinfo->argnull[0] = pergroupstate->transValueIsNull;
 
 			*resultVal = FunctionCallInvoke(fcinfo);
@@ -1873,9 +1873,9 @@ build_hash_table(AggState *aggstate)
 												 perhash->hashfunctions,
 												 perhash->aggnode->numGroups,
 												 additionalsize,
-								aggstate->hashcontext->ecxt_per_tuple_memory,
+												 aggstate->hashcontext->ecxt_per_tuple_memory,
 												 tmpmem,
-								  DO_AGGSPLIT_SKIPFINAL(aggstate->aggsplit));
+												 DO_AGGSPLIT_SKIPFINAL(aggstate->aggsplit));
 	}
 }
 
@@ -2052,7 +2052,7 @@ lookup_hash_entry(AggState *aggstate)
 	{
 		entry->additional = (AggStatePerGroup)
 			MemoryContextAlloc(perhash->hashtable->tablecxt,
-						  sizeof(AggStatePerGroupData) * aggstate->numtrans);
+							   sizeof(AggStatePerGroupData) * aggstate->numtrans);
 		/* initialize aggregates for new tuple group */
 		initialize_aggregates(aggstate, (AggStatePerGroup) entry->additional,
 							  -1);
@@ -2374,8 +2374,7 @@ agg_retrieve_direct(AggState *aggstate)
 							   firstSlot,
 							   InvalidBuffer,
 							   true);
-				aggstate->grp_firstTuple = NULL;		/* don't keep two
-														 * pointers */
+				aggstate->grp_firstTuple = NULL;	/* don't keep two pointers */
 
 				/* set up for first advance_aggregates call */
 				tmpcontext->ecxt_outertuple = firstSlot;
@@ -2435,7 +2434,7 @@ agg_retrieve_direct(AggState *aggstate)
 											 node->numCols,
 											 node->grpColIdx,
 											 aggstate->phase->eqfunctions,
-										  tmpcontext->ecxt_per_tuple_memory))
+											 tmpcontext->ecxt_per_tuple_memory))
 						{
 							aggstate->grp_firstTuple = ExecCopySlotTuple(outerslot);
 							break;
@@ -2819,7 +2818,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	ExecAssignScanTypeFromOuterPlan(&aggstate->ss);
 	if (node->chain)
 		ExecSetSlotDescriptor(aggstate->sort_slot,
-						 aggstate->ss.ss_ScanTupleSlot->tts_tupleDescriptor);
+							  aggstate->ss.ss_ScanTupleSlot->tts_tupleDescriptor);
 
 	/*
 	 * Initialize result tuple type and projection info.
@@ -2935,7 +2934,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 				}
 
 				all_grouped_cols = bms_add_members(all_grouped_cols,
-												 phasedata->grouped_cols[0]);
+												   phasedata->grouped_cols[0]);
 			}
 			else
 			{
@@ -3306,8 +3305,8 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 		 */
 		existing_transno = find_compatible_pertrans(aggstate, aggref,
 													transfn_oid, aggtranstype,
-												serialfn_oid, deserialfn_oid,
-												  initValue, initValueIsNull,
+													serialfn_oid, deserialfn_oid,
+													initValue, initValueIsNull,
 													same_input_transnos);
 		if (existing_transno != -1)
 		{
@@ -3979,7 +3978,7 @@ ExecReScanAgg(AggState *node)
 		 * Reset the per-group state (in particular, mark transvalues null)
 		 */
 		MemSet(node->pergroup, 0,
-			 sizeof(AggStatePerGroupData) * node->numaggs * numGroupingSets);
+			   sizeof(AggStatePerGroupData) * node->numaggs * numGroupingSets);
 
 		/* reset to phase 1 */
 		initialize_phase(node, 1);

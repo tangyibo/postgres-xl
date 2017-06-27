@@ -196,7 +196,7 @@ make_pathkey_from_sortinfo(PlannerInfo *root,
 									  opcintype,
 									  opcintype,
 									  BTEqualStrategyNumber);
-	if (!OidIsValid(equality_op))		/* shouldn't happen */
+	if (!OidIsValid(equality_op))	/* shouldn't happen */
 		elog(ERROR, "could not find equality operator for opfamily %u",
 			 opfamily);
 	opfamilies = get_mergejoin_opfamilies(equality_op);
@@ -575,8 +575,8 @@ build_expression_pathkey(PlannerInfo *root,
 										  opfamily,
 										  opcintype,
 										  exprCollation((Node *) expr),
-									   (strategy == BTGreaterStrategyNumber),
-									   (strategy == BTGreaterStrategyNumber),
+										  (strategy == BTGreaterStrategyNumber),
+										  (strategy == BTGreaterStrategyNumber),
 										  0,
 										  rel,
 										  create_it);
@@ -746,7 +746,7 @@ convert_subquery_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 					outer_ec = get_eclass_for_sort_expr(root,
 														outer_expr,
 														NULL,
-												   sub_eclass->ec_opfamilies,
+														sub_eclass->ec_opfamilies,
 														sub_expr_type,
 														sub_expr_coll,
 														0,
@@ -762,9 +762,9 @@ convert_subquery_pathkeys(PlannerInfo *root, RelOptInfo *rel,
 
 					outer_pk = make_canonical_pathkey(root,
 													  outer_ec,
-													sub_pathkey->pk_opfamily,
-													sub_pathkey->pk_strategy,
-												sub_pathkey->pk_nulls_first);
+													  sub_pathkey->pk_opfamily,
+													  sub_pathkey->pk_strategy,
+													  sub_pathkey->pk_nulls_first);
 					/* score = # of equivalence peers */
 					score = list_length(outer_ec->ec_members) - 1;
 					/* +1 if it matches the proper query_pathkeys item */

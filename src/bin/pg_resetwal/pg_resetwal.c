@@ -57,7 +57,7 @@
 #include "pg_getopt.h"
 
 
-static ControlFileData ControlFile;		/* pg_control values */
+static ControlFileData ControlFile; /* pg_control values */
 static XLogSegNo newXlogSegNo;	/* new XLOG segment # */
 static bool guessed = false;	/* T if we had to guess at any values */
 static const char *progname;
@@ -438,7 +438,7 @@ main(int argc, char *argv[])
 	if (ControlFile.state != DB_SHUTDOWNED && !force)
 	{
 		printf(_("The database server was not shut down cleanly.\n"
-			   "Resetting the write-ahead log might cause data to be lost.\n"
+				 "Resetting the write-ahead log might cause data to be lost.\n"
 				 "If you want to proceed anyway, use -f to force reset.\n"));
 		exit(1);
 	}
@@ -564,7 +564,7 @@ ReadControlFile(void)
 	close(fd);
 
 	if (len >= sizeof(ControlFileData) &&
-	  ((ControlFileData *) buffer)->pg_control_version == PG_CONTROL_VERSION)
+		((ControlFileData *) buffer)->pg_control_version == PG_CONTROL_VERSION)
 	{
 		/* Check the CRC. */
 		INIT_CRC32C(crc);
@@ -834,7 +834,7 @@ static void
 RewriteControlFile(void)
 {
 	int			fd;
-	char		buffer[PG_CONTROL_SIZE];		/* need not be aligned */
+	char		buffer[PG_CONTROL_SIZE];	/* need not be aligned */
 
 	/*
 	 * Adjust fields as needed to force an empty XLOG starting at

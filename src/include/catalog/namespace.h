@@ -36,7 +36,7 @@ typedef struct _FuncCandidateList
 	int			ndargs;			/* number of defaulted args */
 	int		   *argnumbers;		/* args' positional indexes, if named call */
 	Oid			args[FLEXIBLE_ARRAY_MEMBER];	/* arg types */
-}	*FuncCandidateList;
+}		   *FuncCandidateList;
 
 /*
  *	Structure for xxxOverrideSearchPath functions
@@ -49,7 +49,7 @@ typedef struct OverrideSearchPath
 } OverrideSearchPath;
 
 typedef void (*RangeVarGetRelidCallback) (const RangeVar *relation, Oid relId,
-										   Oid oldRelId, void *callback_arg);
+										  Oid oldRelId, void *callback_arg);
 
 #define RangeVarGetRelid(relation, lockmode, missing_ok) \
 	RangeVarGetRelidExtended(relation, lockmode, missing_ok, false, NULL, NULL)
@@ -161,4 +161,4 @@ extern char *namespace_search_path;
 extern List *fetch_search_path(bool includeImplicit);
 extern int	fetch_search_path_array(Oid *sarray, int sarray_len);
 
-#endif   /* NAMESPACE_H */
+#endif							/* NAMESPACE_H */

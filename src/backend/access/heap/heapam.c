@@ -524,15 +524,15 @@ heapgettup(HeapScanDesc scan,
 				}
 			}
 			else
-				page = scan->rs_startblock;		/* first page */
+				page = scan->rs_startblock; /* first page */
 			heapgetpage(scan, page);
-			lineoff = FirstOffsetNumber;		/* first offnum */
+			lineoff = FirstOffsetNumber;	/* first offnum */
 			scan->rs_inited = true;
 		}
 		else
 		{
 			/* continue from previously returned page/tuple */
-			page = scan->rs_cblock;		/* current page */
+			page = scan->rs_cblock; /* current page */
 			lineoff =			/* next offnum */
 				OffsetNumberNext(ItemPointerGetOffsetNumber(&(tuple->t_self)));
 		}
@@ -580,7 +580,7 @@ heapgettup(HeapScanDesc scan,
 		else
 		{
 			/* continue from previously returned page/tuple */
-			page = scan->rs_cblock;		/* current page */
+			page = scan->rs_cblock; /* current page */
 		}
 
 		LockBuffer(scan->rs_cbuf, BUFFER_LOCK_SHARE);
@@ -826,7 +826,7 @@ heapgettup_pagemode(HeapScanDesc scan,
 				}
 			}
 			else
-				page = scan->rs_startblock;		/* first page */
+				page = scan->rs_startblock; /* first page */
 			heapgetpage(scan, page);
 			lineindex = 0;
 			scan->rs_inited = true;
@@ -834,7 +834,7 @@ heapgettup_pagemode(HeapScanDesc scan,
 		else
 		{
 			/* continue from previously returned page/tuple */
-			page = scan->rs_cblock;		/* current page */
+			page = scan->rs_cblock; /* current page */
 			lineindex = scan->rs_cindex + 1;
 		}
 
@@ -879,7 +879,7 @@ heapgettup_pagemode(HeapScanDesc scan,
 		else
 		{
 			/* continue from previously returned page/tuple */
-			page = scan->rs_cblock;		/* current page */
+			page = scan->rs_cblock; /* current page */
 		}
 
 		dp = BufferGetPage(scan->rs_cbuf);
@@ -1091,7 +1091,7 @@ fastgetattr(HeapTuple tup, int attnum, TupleDesc tupleDesc,
 			 )
 		);
 }
-#endif   /* defined(DISABLE_COMPLEX_MACRO) */
+#endif							/* defined(DISABLE_COMPLEX_MACRO) */
 
 
 /* ----------------------------------------------------------------
@@ -1429,7 +1429,7 @@ heap_beginscan_bm(Relation relation, Snapshot snapshot,
 HeapScanDesc
 heap_beginscan_sampling(Relation relation, Snapshot snapshot,
 						int nkeys, ScanKey key,
-					  bool allow_strat, bool allow_sync, bool allow_pagemode)
+						bool allow_strat, bool allow_sync, bool allow_pagemode)
 {
 	return heap_beginscan_internal(relation, snapshot, nkeys, key, NULL,
 								   allow_strat, allow_sync, allow_pagemode,
@@ -1794,7 +1794,7 @@ heap_update_snapshot(HeapScanDesc scan, Snapshot snapshot)
 #define HEAPDEBUG_1
 #define HEAPDEBUG_2
 #define HEAPDEBUG_3
-#endif   /* !defined(HEAPDEBUGALL) */
+#endif							/* !defined(HEAPDEBUGALL) */
 
 
 HeapTuple
@@ -2257,7 +2257,7 @@ heap_get_latest_tid(Relation relation,
 		 * tuple.  Check for XMIN match.
 		 */
 		if (TransactionIdIsValid(priorXmax) &&
-		  !TransactionIdEquals(priorXmax, HeapTupleHeaderGetXmin(tp.t_data)))
+			!TransactionIdEquals(priorXmax, HeapTupleHeaderGetXmin(tp.t_data)))
 		{
 			UnlockReleaseBuffer(buffer);
 			break;
@@ -2636,7 +2636,7 @@ heap_prepare_insert(Relation relation, HeapTuple tup, TransactionId xid,
 		HeapTupleHeaderSetXminFrozen(tup->t_data);
 
 	HeapTupleHeaderSetCmin(tup->t_data, cid);
-	HeapTupleHeaderSetXmax(tup->t_data, 0);		/* for cleanliness */
+	HeapTupleHeaderSetXmax(tup->t_data, 0); /* for cleanliness */
 	tup->t_tableOid = RelationGetRelid(relation);
 #ifdef PGXC
 	tup->t_xc_node_id = PGXCNodeIdentifier;
@@ -3751,8 +3751,8 @@ l2:
 				 */
 				if (xmax_infomask_changed(oldtup.t_data->t_infomask,
 										  infomask) ||
-				!TransactionIdEquals(HeapTupleHeaderGetRawXmax(oldtup.t_data),
-									 xwait))
+					!TransactionIdEquals(HeapTupleHeaderGetRawXmax(oldtup.t_data),
+										 xwait))
 					goto l2;
 			}
 
@@ -3831,7 +3831,7 @@ l2:
 			 */
 			if (xmax_infomask_changed(oldtup.t_data->t_infomask, infomask) ||
 				!TransactionIdEquals(xwait,
-								   HeapTupleHeaderGetRawXmax(oldtup.t_data)))
+									 HeapTupleHeaderGetRawXmax(oldtup.t_data)))
 				goto l2;
 
 			/* Otherwise check if it committed or aborted */
@@ -4021,7 +4021,7 @@ l2:
 								  oldtup.t_data->t_infomask,
 								  oldtup.t_data->t_infomask2,
 								  xid, *lockmode, false,
-							  &xmax_lock_old_tuple, &infomask_lock_old_tuple,
+								  &xmax_lock_old_tuple, &infomask_lock_old_tuple,
 								  &infomask2_lock_old_tuple);
 
 		Assert(HEAP_XMAX_IS_LOCKED_ONLY(infomask_lock_old_tuple));
@@ -4196,7 +4196,7 @@ l2:
 	 * logged.
 	 */
 	old_key_tuple = ExtractReplicaIdentity(relation, &oldtup,
-									   bms_overlap(modified_attrs, id_attrs),
+										   bms_overlap(modified_attrs, id_attrs),
 										   &old_key_copied);
 
 	/* NO EREPORT(ERROR) from here till changes are logged */
@@ -4233,7 +4233,7 @@ l2:
 		HeapTupleClearHeapOnly(newtup);
 	}
 
-	RelationPutHeapTuple(relation, newbuf, heaptup, false);		/* insert new tuple */
+	RelationPutHeapTuple(relation, newbuf, heaptup, false); /* insert new tuple */
 
 
 	/* Clear obsolete visibility flags, possibly set by ourselves above... */
@@ -4455,7 +4455,7 @@ HeapDetermineModifiedColumns(Relation relation, Bitmapset *interesting_cols,
 		if (!heap_tuple_attr_equals(RelationGetDescr(relation),
 									attnum, oldtup, newtup))
 			modified = bms_add_member(modified,
-								attnum - FirstLowInvalidHeapAttributeNumber);
+									  attnum - FirstLowInvalidHeapAttributeNumber);
 	}
 
 	return modified;
@@ -4854,7 +4854,7 @@ l3:
 				/* if the xmax changed in the meantime, start over */
 				if (xmax_infomask_changed(tuple->t_data->t_infomask, infomask) ||
 					!TransactionIdEquals(
-									HeapTupleHeaderGetRawXmax(tuple->t_data),
+										 HeapTupleHeaderGetRawXmax(tuple->t_data),
 										 xwait))
 					goto l3;
 				/* otherwise, we're good */
@@ -4940,11 +4940,11 @@ l3:
 				{
 					case LockWaitBlock:
 						MultiXactIdWait((MultiXactId) xwait, status, infomask,
-								  relation, &tuple->t_self, XLTW_Lock, NULL);
+										relation, &tuple->t_self, XLTW_Lock, NULL);
 						break;
 					case LockWaitSkip:
 						if (!ConditionalMultiXactIdWait((MultiXactId) xwait,
-												  status, infomask, relation,
+														status, infomask, relation,
 														NULL))
 						{
 							result = HeapTupleWouldBlock;
@@ -4955,12 +4955,12 @@ l3:
 						break;
 					case LockWaitError:
 						if (!ConditionalMultiXactIdWait((MultiXactId) xwait,
-												  status, infomask, relation,
+														status, infomask, relation,
 														NULL))
 							ereport(ERROR,
 									(errcode(ERRCODE_LOCK_NOT_AVAILABLE),
 									 errmsg("could not obtain lock on row in relation \"%s\"",
-										RelationGetRelationName(relation))));
+											RelationGetRelationName(relation))));
 
 						break;
 				}
@@ -4998,7 +4998,7 @@ l3:
 							ereport(ERROR,
 									(errcode(ERRCODE_LOCK_NOT_AVAILABLE),
 									 errmsg("could not obtain lock on row in relation \"%s\"",
-										RelationGetRelationName(relation))));
+											RelationGetRelationName(relation))));
 						break;
 				}
 			}
@@ -5249,8 +5249,8 @@ heap_acquire_tuplock(Relation relation, ItemPointer tid, LockTupleMode mode,
 			if (!ConditionalLockTupleTuplock(relation, tid, mode))
 				ereport(ERROR,
 						(errcode(ERRCODE_LOCK_NOT_AVAILABLE),
-					errmsg("could not obtain lock on row in relation \"%s\"",
-						   RelationGetRelationName(relation))));
+						 errmsg("could not obtain lock on row in relation \"%s\"",
+								RelationGetRelationName(relation))));
 			break;
 	}
 	*have_tuple_lock = true;
@@ -5376,7 +5376,7 @@ l5:
 		{
 			if (HEAP_XMAX_IS_LOCKED_ONLY(old_infomask) ||
 				!TransactionIdDidCommit(MultiXactIdGetUpdateXid(xmax,
-															  old_infomask)))
+																old_infomask)))
 			{
 				/*
 				 * Reset these bits and restart; otherwise fall through to
@@ -5766,7 +5766,7 @@ l4:
 				Assert(!HEAP_LOCKED_UPGRADED(mytup.t_data->t_infomask));
 
 				nmembers = GetMultiXactIdMembers(rawxmax, &members, false,
-									 HEAP_XMAX_IS_LOCKED_ONLY(old_infomask));
+												 HEAP_XMAX_IS_LOCKED_ONLY(old_infomask));
 				for (i = 0; i < nmembers; i++)
 				{
 					result = test_lockmode_for_conflict(members[i].status,
@@ -6386,7 +6386,7 @@ FreezeMultiXactId(MultiXactId multi, uint16 t_infomask,
 			{
 				Assert(!TransactionIdDidCommit(xid));
 				*flags |= FRM_INVALIDATE_XMAX;
-				xid = InvalidTransactionId;		/* not strictly necessary */
+				xid = InvalidTransactionId; /* not strictly necessary */
 			}
 			else
 			{
@@ -7261,7 +7261,7 @@ heap_tuple_needs_freeze(HeapTupleHeader tuple, TransactionId cutoff_xid,
 			/* need to check whether any member of the mxact is too old */
 
 			nmembers = GetMultiXactIdMembers(multi, &members, false,
-								HEAP_XMAX_IS_LOCKED_ONLY(tuple->t_infomask));
+											 HEAP_XMAX_IS_LOCKED_ONLY(tuple->t_infomask));
 
 			for (i = 0; i < nmembers; i++)
 			{
@@ -7664,7 +7664,7 @@ log_heap_update(Relation reln, Buffer oldbuf,
 	{
 		XLogRegisterBufData(0,
 							((char *) newtup->t_data) + SizeofHeapTupleHeader,
-						  newtup->t_len - SizeofHeapTupleHeader - suffixlen);
+							newtup->t_len - SizeofHeapTupleHeader - suffixlen);
 	}
 	else
 	{
@@ -7676,14 +7676,14 @@ log_heap_update(Relation reln, Buffer oldbuf,
 		if (newtup->t_data->t_hoff - SizeofHeapTupleHeader > 0)
 		{
 			XLogRegisterBufData(0,
-						   ((char *) newtup->t_data) + SizeofHeapTupleHeader,
-							 newtup->t_data->t_hoff - SizeofHeapTupleHeader);
+								((char *) newtup->t_data) + SizeofHeapTupleHeader,
+								newtup->t_data->t_hoff - SizeofHeapTupleHeader);
 		}
 
 		/* data after common prefix */
 		XLogRegisterBufData(0,
-			  ((char *) newtup->t_data) + newtup->t_data->t_hoff + prefixlen,
-			 newtup->t_len - newtup->t_data->t_hoff - prefixlen - suffixlen);
+							((char *) newtup->t_data) + newtup->t_data->t_hoff + prefixlen,
+							newtup->t_len - newtup->t_data->t_hoff - prefixlen - suffixlen);
 	}
 
 	/* We need to log a tuple identity */

@@ -44,7 +44,7 @@ static struct WSErrorEntry
 {
 	DWORD		error;
 	const char *description;
-}	WSErrors[] =
+}			WSErrors[] =
 
 {
 	{
@@ -236,7 +236,7 @@ struct MessageDLL
 	const char *dll_name;
 	void	   *handle;
 	int			loaded;			/* BOOL */
-}	dlls[] =
+}			dlls[] =
 
 {
 	{
@@ -307,7 +307,7 @@ winsock_strerror(int err, char *strerrbuf, size_t buflen)
 		success = 0 != FormatMessage(
 									 flags,
 									 dlls[i].handle, err,
-								   MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
+									 MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
 									 strerrbuf, buflen - 64,
 									 0
 			);

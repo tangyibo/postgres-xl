@@ -105,4 +105,4 @@ extern void HeapTupleHeaderAdjustCmax(HeapTupleHeader tup,
 /* Prototype for HeapTupleHeader accessors in heapam.c */
 extern TransactionId HeapTupleGetUpdateXid(HeapTupleHeader tuple);
 
-#endif   /* HTUP_H */
+#endif							/* HTUP_H */

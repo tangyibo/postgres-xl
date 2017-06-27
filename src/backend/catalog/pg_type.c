@@ -79,7 +79,7 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 	for (i = 0; i < Natts_pg_type; ++i)
 	{
 		nulls[i] = false;
-		values[i] = (Datum) NULL;		/* redundant, but safe */
+		values[i] = (Datum) NULL;	/* redundant, but safe */
 	}
 
 	/*
@@ -133,7 +133,7 @@ TypeShellMake(const char *typeName, Oid typeNamespace, Oid ownerId)
 		if (!OidIsValid(binary_upgrade_next_pg_type_oid))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			errmsg("pg_type OID value not set when in binary upgrade mode")));
+					 errmsg("pg_type OID value not set when in binary upgrade mode")));
 
 		HeapTupleSetOid(tup, binary_upgrade_next_pg_type_oid);
 		binary_upgrade_next_pg_type_oid = InvalidOid;
@@ -214,7 +214,7 @@ TypeCreate(Oid newTypeOid,
 		   bool isImplicitArray,
 		   Oid arrayType,
 		   Oid baseType,
-		   const char *defaultTypeValue,		/* human readable rep */
+		   const char *defaultTypeValue,	/* human readable rep */
 		   char *defaultTypeBin,	/* cooked rep */
 		   bool passedByValue,
 		   char alignment,
@@ -296,8 +296,8 @@ TypeCreate(Oid newTypeOid,
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-			   errmsg("internal size %d is invalid for passed-by-value type",
-					  internalSize)));
+					 errmsg("internal size %d is invalid for passed-by-value type",
+							internalSize)));
 	}
 	else
 	{
@@ -305,14 +305,14 @@ TypeCreate(Oid newTypeOid,
 		if (internalSize == -1 && !(alignment == 'i' || alignment == 'd'))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-			   errmsg("alignment \"%c\" is invalid for variable-length type",
-					  alignment)));
+					 errmsg("alignment \"%c\" is invalid for variable-length type",
+							alignment)));
 		/* cstring must have char alignment */
 		if (internalSize == -2 && !(alignment == 'c'))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-			   errmsg("alignment \"%c\" is invalid for variable-length type",
-					  alignment)));
+					 errmsg("alignment \"%c\" is invalid for variable-length type",
+							alignment)));
 	}
 
 	/* Only varlena types can be toasted */
@@ -511,8 +511,8 @@ TypeCreate(Oid newTypeOid,
 void
 GenerateTypeDependencies(Oid typeNamespace,
 						 Oid typeObjectId,
-						 Oid relationOid,		/* only for relation rowtypes */
-						 char relationKind,		/* ditto */
+						 Oid relationOid,	/* only for relation rowtypes */
+						 char relationKind, /* ditto */
 						 Oid owner,
 						 Oid inputProcedure,
 						 Oid outputProcedure,
@@ -652,7 +652,7 @@ GenerateTypeDependencies(Oid typeNamespace,
 		referenced.objectId = elementType;
 		referenced.objectSubId = 0;
 		recordDependencyOn(&myself, &referenced,
-				  isImplicitArray ? DEPENDENCY_INTERNAL : DEPENDENCY_NORMAL);
+						   isImplicitArray ? DEPENDENCY_INTERNAL : DEPENDENCY_NORMAL);
 	}
 
 	/* Normal dependency from a domain to its base type. */

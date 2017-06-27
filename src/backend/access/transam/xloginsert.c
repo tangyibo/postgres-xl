@@ -61,9 +61,9 @@ typedef struct
 } registered_buffer;
 
 static registered_buffer *registered_buffers;
-static int	max_registered_buffers;		/* allocated size */
-static int	max_registered_block_id = 0;		/* highest block_id + 1
-												 * currently registered */
+static int	max_registered_buffers; /* allocated size */
+static int	max_registered_block_id = 0;	/* highest block_id + 1 currently
+											 * registered */
 
 /*
  * A chain of XLogRecDatas to hold the "main data" of a WAL record, registered
@@ -175,7 +175,7 @@ XLogEnsureRecordSpace(int max_block_id, int ndatas)
 		 * they are included in WAL data, but initialize it all for tidiness.
 		 */
 		MemSet(&registered_buffers[max_registered_buffers], 0,
-			(nbuffers - max_registered_buffers) * sizeof(registered_buffer));
+			   (nbuffers - max_registered_buffers) * sizeof(registered_buffer));
 		max_registered_buffers = nbuffers;
 	}
 
@@ -438,7 +438,7 @@ XLogInsert(RmgrId rmid, uint8 info)
 	if (IsBootstrapProcessingMode() && rmid != RM_XLOG_ID)
 	{
 		XLogResetInsertion();
-		EndPos = SizeOfXLogLongPHD;		/* start of 1st chkpt record */
+		EndPos = SizeOfXLogLongPHD; /* start of 1st chkpt record */
 		return EndPos;
 	}
 
@@ -1039,7 +1039,7 @@ InitXLogInsert(void)
 	{
 		registered_buffers = (registered_buffer *)
 			MemoryContextAllocZero(xloginsert_cxt,
-				  sizeof(registered_buffer) * (XLR_NORMAL_MAX_BLOCK_ID + 1));
+								   sizeof(registered_buffer) * (XLR_NORMAL_MAX_BLOCK_ID + 1));
 		max_registered_buffers = XLR_NORMAL_MAX_BLOCK_ID + 1;
 	}
 	if (rdatas == NULL)

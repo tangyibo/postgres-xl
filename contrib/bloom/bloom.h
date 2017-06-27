@@ -75,7 +75,7 @@ typedef BloomPageOpaqueData *BloomPageOpaque;
 
 /* Preserved page numbers */
 #define BLOOM_METAPAGE_BLKNO	(0)
-#define BLOOM_HEAD_BLKNO		(1)		/* first data page */
+#define BLOOM_HEAD_BLKNO		(1) /* first data page */
 
 /*
  * We store Bloom signatures as arrays of uint16 words.
@@ -101,8 +101,8 @@ typedef struct BloomOptions
 {
 	int32		vl_len_;		/* varlena header (do not touch directly!) */
 	int			bloomLength;	/* length of signature in words (not bits!) */
-	int			bitSize[INDEX_MAX_KEYS];		/* # of bits generated for
-												 * each index key */
+	int			bitSize[INDEX_MAX_KEYS];	/* # of bits generated for each
+											 * index key */
 } BloomOptions;
 
 /*
@@ -111,8 +111,8 @@ typedef struct BloomOptions
  */
 typedef BlockNumber FreeBlockNumberArray[
 										 MAXALIGN_DOWN(
-		BLCKSZ - SizeOfPageHeaderData - MAXALIGN(sizeof(BloomPageOpaqueData))
-	   - MAXALIGN(sizeof(uint16) * 2 + sizeof(uint32) + sizeof(BloomOptions))
+													   BLCKSZ - SizeOfPageHeaderData - MAXALIGN(sizeof(BloomPageOpaqueData))
+													   - MAXALIGN(sizeof(uint16) * 2 + sizeof(uint32) + sizeof(BloomOptions))
 													   ) / sizeof(BlockNumber)
 ];
 

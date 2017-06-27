@@ -339,7 +339,7 @@ CatCachePrintStats(int code, Datum arg)
 		 cc_lsearches,
 		 cc_lhits);
 }
-#endif   /* CATCACHE_STATS */
+#endif							/* CATCACHE_STATS */
 
 
 /*
@@ -1571,7 +1571,7 @@ SearchCatCacheList(CatCache *cache,
 		oldcxt = MemoryContextSwitchTo(CacheMemoryContext);
 		nmembers = list_length(ctlist);
 		cl = (CatCList *)
-			palloc(offsetof(CatCList, members) +nmembers * sizeof(CatCTup *));
+			palloc(offsetof(CatCList, members) + nmembers * sizeof(CatCTup *));
 		heap_copytuple_with_tuple(ntp, &cl->tuple);
 		MemoryContextSwitchTo(oldcxt);
 		heap_freetuple(ntp);

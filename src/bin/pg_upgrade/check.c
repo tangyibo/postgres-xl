@@ -174,23 +174,25 @@ report_clusters_compatible(void)
 
 
 void
-issue_warnings(void)
+issue_warnings_and_set_wal_level(void)
 {
+	/*
+	 * We unconditionally start/stop the new server because pg_resetwal -o set
+	 * wal_level to 'minimum'.  If the user is upgrading standby servers using
+	 * the rsync instructions, they will need pg_upgrade to write its final
+	 * WAL record showing wal_level as 'replica'.
+	 */
+	start_postmaster(&new_cluster, true);
+
 	/* Create dummy large object permissions for old < PG 9.0? */
 	if (GET_MAJOR_VERSION(old_cluster.major_version) <= 804)
-	{
-		start_postmaster(&new_cluster, true);
 		new_9_0_populate_pg_largeobject_metadata(&new_cluster, false);
-		stop_postmaster(false);
-	}
 
 	/* Reindex hash indexes for old < 10.0 */
 	if (GET_MAJOR_VERSION(old_cluster.major_version) <= 906)
-	{
-		start_postmaster(&new_cluster, true);
 		old_9_6_invalidate_hash_indexes(&new_cluster, false);
-		stop_postmaster(false);
-	}
+
+	stop_postmaster(false);
 }
 
 
@@ -207,18 +209,18 @@ output_completion_banner(char *analyze_script_file_name,
 	else
 		pg_log(PG_REPORT,
 			   "Optimizer statistics and free space information are not transferred\n"
-		"by pg_upgrade so, once you start the new server, consider running:\n"
+			   "by pg_upgrade so, once you start the new server, consider running:\n"
 			   "    %s\n\n", analyze_script_file_name);
 
 
 	if (deletion_script_file_name)
 		pg_log(PG_REPORT,
-			"Running this script will delete the old cluster's data files:\n"
+			   "Running this script will delete the old cluster's data files:\n"
 			   "    %s\n",
 			   deletion_script_file_name);
 	else
 		pg_log(PG_REPORT,
-		 "Could not create a script to delete the old cluster's data files\n"
+			   "Could not create a script to delete the old cluster's data files\n"
 			   "because user-defined tablespaces or the new cluster's data directory\n"
 			   "exist in the old cluster directory.  The old cluster's contents must\n"
 			   "be deleted manually.\n");
@@ -737,7 +739,7 @@ check_proper_datallowconn(ClusterInfo *cluster)
 			 */
 			if (strcmp(datallowconn, "f") == 0)
 				pg_fatal("All non-template0 databases must allow connections, "
-					   "i.e. their pg_database.datallowconn must be true\n");
+						 "i.e. their pg_database.datallowconn must be true\n");
 		}
 	}
 
@@ -857,8 +859,8 @@ check_for_isn_and_int8_passing_mismatch(ClusterInfo *cluster)
 	{
 		pg_log(PG_REPORT, "fatal\n");
 		pg_fatal("Your installation contains \"contrib/isn\" functions which rely on the\n"
-		  "bigint data type.  Your old and new clusters pass bigint values\n"
-		"differently so this cluster cannot currently be upgraded.  You can\n"
+				 "bigint data type.  Your old and new clusters pass bigint values\n"
+				 "differently so this cluster cannot currently be upgraded.  You can\n"
 				 "manually upgrade databases that use \"contrib/isn\" facilities and remove\n"
 				 "\"contrib/isn\" from the old cluster and restart the upgrade.  A list of\n"
 				 "the problem functions is in the file:\n"
@@ -917,13 +919,13 @@ check_for_reg_data_type_usage(ClusterInfo *cluster)
 								"WHERE	c.oid = a.attrelid AND "
 								"		NOT a.attisdropped AND "
 								"		a.atttypid IN ( "
-		  "			'pg_catalog.regproc'::pg_catalog.regtype, "
+								"			'pg_catalog.regproc'::pg_catalog.regtype, "
 								"			'pg_catalog.regprocedure'::pg_catalog.regtype, "
-		  "			'pg_catalog.regoper'::pg_catalog.regtype, "
+								"			'pg_catalog.regoper'::pg_catalog.regtype, "
 								"			'pg_catalog.regoperator'::pg_catalog.regtype, "
 		/* regclass.oid is preserved, so 'regclass' is OK */
 		/* regtype.oid is preserved, so 'regtype' is OK */
-		"			'pg_catalog.regconfig'::pg_catalog.regtype, "
+								"			'pg_catalog.regconfig'::pg_catalog.regtype, "
 								"			'pg_catalog.regdictionary'::pg_catalog.regtype) AND "
 								"		c.relnamespace = n.oid AND "
 								"		n.nspname NOT IN ('pg_catalog', 'information_schema')");
@@ -961,8 +963,8 @@ check_for_reg_data_type_usage(ClusterInfo *cluster)
 	{
 		pg_log(PG_REPORT, "fatal\n");
 		pg_fatal("Your installation contains one of the reg* data types in user tables.\n"
-		 "These data types reference system OIDs that are not preserved by\n"
-		"pg_upgrade, so this cluster cannot currently be upgraded.  You can\n"
+				 "These data types reference system OIDs that are not preserved by\n"
+				 "pg_upgrade, so this cluster cannot currently be upgraded.  You can\n"
 				 "remove the problem tables and restart the upgrade.  A list of the problem\n"
 				 "columns is in the file:\n"
 				 "    %s\n\n", output_path);

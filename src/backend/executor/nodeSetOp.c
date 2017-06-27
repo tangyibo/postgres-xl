@@ -64,7 +64,7 @@ typedef struct SetOpStatePerGroupData
 {
 	long		numLeft;		/* number of left-input dups in group */
 	long		numRight;		/* number of right-input dups in group */
-}	SetOpStatePerGroupData;
+}			SetOpStatePerGroupData;
 
 
 static TupleTableSlot *setop_retrieve_direct(SetOpState *setopstate);
@@ -263,7 +263,7 @@ setop_retrieve_direct(SetOpState *setopstate)
 					   resultTupleSlot,
 					   InvalidBuffer,
 					   true);
-		setopstate->grp_firstTuple = NULL;		/* don't keep two pointers */
+		setopstate->grp_firstTuple = NULL;	/* don't keep two pointers */
 
 		/* Initialize working state for a new input tuple group */
 		initialize_counts(pergroup);
@@ -333,7 +333,7 @@ setop_fill_hash_table(SetOpState *setopstate)
 	SetOp	   *node = (SetOp *) setopstate->ps.plan;
 	PlanState  *outerPlan;
 	int			firstFlag;
-	bool in_first_rel PG_USED_FOR_ASSERTS_ONLY;
+	bool		in_first_rel PG_USED_FOR_ASSERTS_ONLY;
 
 	/*
 	 * get state info from node

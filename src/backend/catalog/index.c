@@ -159,7 +159,7 @@ relationHasPrimaryKey(Relation rel)
 		HeapTuple	indexTuple;
 
 		indexTuple = SearchSysCache1(INDEXRELID, ObjectIdGetDatum(indexoid));
-		if (!HeapTupleIsValid(indexTuple))		/* should not happen */
+		if (!HeapTupleIsValid(indexTuple))	/* should not happen */
 			elog(ERROR, "cache lookup failed for index %u", indexoid);
 		result = ((Form_pg_index) GETSTRUCT(indexTuple))->indisprimary;
 		ReleaseSysCache(indexTuple);
@@ -208,8 +208,8 @@ index_check_primary_key(Relation heapRel,
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-			 errmsg("multiple primary keys for table \"%s\" are not allowed",
-					RelationGetRelationName(heapRel))));
+				 errmsg("multiple primary keys for table \"%s\" are not allowed",
+						RelationGetRelationName(heapRel))));
 	}
 
 	/*
@@ -233,7 +233,7 @@ index_check_primary_key(Relation heapRel,
 			continue;
 
 		atttuple = SearchSysCache2(ATTNUM,
-								 ObjectIdGetDatum(RelationGetRelid(heapRel)),
+								   ObjectIdGetDatum(RelationGetRelid(heapRel)),
 								   Int16GetDatum(attnum));
 		if (!HeapTupleIsValid(atttuple))
 			elog(ERROR, "cache lookup failed for attribute %d of relation %u",
@@ -326,14 +326,14 @@ ConstructTupleDescriptor(Relation heapRelation,
 				 * here we are indexing on a system attribute (-1...-n)
 				 */
 				from = SystemAttributeDefinition(atnum,
-										   heapRelation->rd_rel->relhasoids);
+												 heapRelation->rd_rel->relhasoids);
 			}
 			else
 			{
 				/*
 				 * here we are indexing on a normal attribute (1...n)
 				 */
-				if (atnum > natts)		/* safety check */
+				if (atnum > natts)	/* safety check */
 					elog(ERROR, "invalid column number %d", atnum);
 				from = heapTupDesc->attrs[AttrNumberGetAttrOffset(atnum)];
 			}
@@ -421,7 +421,7 @@ ConstructTupleDescriptor(Relation heapRelation,
 		/*
 		 * Set the attribute name as specified by caller.
 		 */
-		if (colnames_item == NULL)		/* shouldn't happen */
+		if (colnames_item == NULL)	/* shouldn't happen */
 			elog(ERROR, "too few entries in colnames list");
 		namestrcpy(&to->attname, (const char *) lfirst(colnames_item));
 		colnames_item = lnext(colnames_item);
@@ -955,7 +955,7 @@ index_create(Relation heapRelation,
 			else
 			{
 				elog(ERROR, "constraint must be PRIMARY, UNIQUE or EXCLUDE");
-				constraintType = 0;		/* keep compiler quiet */
+				constraintType = 0; /* keep compiler quiet */
 			}
 
 			index_constraint_create(heapRelation,
@@ -965,9 +965,9 @@ index_create(Relation heapRelation,
 									constraintType,
 									deferrable,
 									initdeferred,
-									false,		/* already marked primary */
-									false,		/* pg_index entry is OK */
-									false,		/* no old dependencies */
+									false,	/* already marked primary */
+									false,	/* pg_index entry is OK */
+									false,	/* no old dependencies */
 									allow_system_table_mods,
 									is_internal);
 		}
@@ -1039,7 +1039,7 @@ index_create(Relation heapRelation,
 		if (indexInfo->ii_Expressions)
 		{
 			recordDependencyOnSingleRelExpr(&myself,
-										  (Node *) indexInfo->ii_Expressions,
+											(Node *) indexInfo->ii_Expressions,
 											heapRelationId,
 											DEPENDENCY_NORMAL,
 											DEPENDENCY_AUTO, false);
@@ -1206,7 +1206,7 @@ index_constraint_create(Relation heapRelation,
 								   indexInfo->ii_KeyAttrNumbers,
 								   indexInfo->ii_NumIndexAttrs,
 								   InvalidOid,	/* no domain */
-								   indexRelationId,		/* index OID */
+								   indexRelationId, /* index OID */
 								   InvalidOid,	/* no foreign key */
 								   NULL,
 								   NULL,
@@ -1217,12 +1217,12 @@ index_constraint_create(Relation heapRelation,
 								   ' ',
 								   ' ',
 								   indexInfo->ii_ExclusionOps,
-								   NULL,		/* no check constraint */
+								   NULL,	/* no check constraint */
 								   NULL,
 								   NULL,
-								   true,		/* islocal */
+								   true,	/* islocal */
 								   0,	/* inhcount */
-								   true,		/* noinherit */
+								   true,	/* noinherit */
 								   is_internal);
 
 	/*
@@ -1938,7 +1938,7 @@ index_update_stats(Relation rel,
 
 		if (rd_rel->relkind != RELKIND_INDEX)
 			visibilitymap_count(rel, &relallvisible, NULL);
-		else	/* don't bother for indexes */
+		else					/* don't bother for indexes */
 			relallvisible = 0;
 
 #ifdef XCP
@@ -2274,7 +2274,7 @@ IndexBuildHeapRangeScan(Relation heapRelation,
 	if (IsBootstrapProcessingMode() || indexInfo->ii_Concurrent)
 	{
 		snapshot = RegisterSnapshot(GetTransactionSnapshot());
-		OldestXmin = InvalidTransactionId;		/* not used */
+		OldestXmin = InvalidTransactionId;	/* not used */
 
 		/* "any visible" mode is not compatible with this */
 		Assert(!anyvisible);
@@ -2287,8 +2287,8 @@ IndexBuildHeapRangeScan(Relation heapRelation,
 	}
 
 	scan = heap_beginscan_strat(heapRelation,	/* relation */
-								snapshot,		/* snapshot */
-								0,		/* number of keys */
+								snapshot,	/* snapshot */
+								0,	/* number of keys */
 								NULL,	/* scan key */
 								true,	/* buffer access strategy OK */
 								allow_sync);	/* syncscan OK? */
@@ -2539,7 +2539,7 @@ IndexBuildHeapRangeScan(Relation heapRelation,
 					break;
 				default:
 					elog(ERROR, "unexpected HeapTupleSatisfiesVacuum result");
-					indexIt = tupleIsAlive = false;		/* keep compiler quiet */
+					indexIt = tupleIsAlive = false; /* keep compiler quiet */
 					break;
 			}
 
@@ -2692,8 +2692,8 @@ IndexCheckExclusion(Relation heapRelation,
 	 */
 	snapshot = RegisterSnapshot(GetLatestSnapshot());
 	scan = heap_beginscan_strat(heapRelation,	/* relation */
-								snapshot,		/* snapshot */
-								0,		/* number of keys */
+								snapshot,	/* snapshot */
+								0,	/* number of keys */
 								NULL,	/* scan key */
 								true,	/* buffer access strategy OK */
 								true);	/* syncscan OK */
@@ -3012,8 +3012,8 @@ validate_index_heapscan(Relation heapRelation,
 	 * match the sorted TIDs.
 	 */
 	scan = heap_beginscan_strat(heapRelation,	/* relation */
-								snapshot,		/* snapshot */
-								0,		/* number of keys */
+								snapshot,	/* snapshot */
+								0,	/* number of keys */
 								NULL,	/* scan key */
 								true,	/* buffer access strategy OK */
 								false); /* syncscan not OK */
@@ -3344,7 +3344,7 @@ reindex_index(Oid indexId, bool skip_constraint_checks, char persistence,
 	if (RELATION_IS_OTHER_TEMP(iRel))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			   errmsg("cannot reindex temporary tables of other sessions")));
+				 errmsg("cannot reindex temporary tables of other sessions")));
 
 	/*
 	 * Also check for active uses of the index in the current transaction; we

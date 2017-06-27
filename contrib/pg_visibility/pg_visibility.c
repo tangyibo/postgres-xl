@@ -481,7 +481,7 @@ collect_visibility_data(Oid relid, bool include_pd)
 	check_relation_relkind(rel);
 
 	nblocks = RelationGetNumberOfBlocks(rel);
-	info = palloc0(offsetof(vbits, bits) +nblocks);
+	info = palloc0(offsetof(vbits, bits) + nblocks);
 	info->next = 0;
 	info->count = nblocks;
 
@@ -774,6 +774,6 @@ check_relation_relkind(Relation rel)
 		rel->rd_rel->relkind != RELKIND_TOASTVALUE)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-		   errmsg("\"%s\" is not a table, materialized view, or TOAST table",
-				  RelationGetRelationName(rel))));
+				 errmsg("\"%s\" is not a table, materialized view, or TOAST table",
+						RelationGetRelationName(rel))));
 }

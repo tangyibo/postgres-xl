@@ -15,7 +15,7 @@
 #define TWOPHASE_RMGR_H
 
 typedef void (*TwoPhaseCallback) (TransactionId xid, uint16 info,
-											  void *recdata, uint32 len);
+								  void *recdata, uint32 len);
 typedef uint8 TwoPhaseRmgrId;
 
 /*
@@ -37,4 +37,4 @@ extern const TwoPhaseCallback twophase_standby_recover_callbacks[];
 extern void RegisterTwoPhaseRecord(TwoPhaseRmgrId rmid, uint16 info,
 					   const void *data, uint32 len);
 
-#endif   /* TWOPHASE_RMGR_H */
+#endif							/* TWOPHASE_RMGR_H */

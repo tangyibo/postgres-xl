@@ -3135,7 +3135,7 @@ get_typmodout(Oid typid)
 	else
 		return InvalidOid;
 }
-#endif   /* NOT_USED */
+#endif							/* NOT_USED */
 
 /*
  * get_typcollation

@@ -110,7 +110,7 @@ do { \
 	uu.clock_seq_hi_and_reserved |= 0x80; \
 } while(0)
 
-#endif   /* !HAVE_UUID_OSSP */
+#endif							/* !HAVE_UUID_OSSP */
 
 PG_MODULE_MAGIC;
 
@@ -262,11 +262,11 @@ uuid_generate_internal(int v, unsigned char *ns, char *ptr, int len)
 
 	switch (v)
 	{
-		case 0:			/* constant-value uuids */
+		case 0:					/* constant-value uuids */
 			strlcpy(strbuf, ptr, 37);
 			break;
 
-		case 1:			/* time/node-based uuids */
+		case 1:					/* time/node-based uuids */
 			{
 #ifdef HAVE_UUID_E2FS
 				uuid_t		uu;
@@ -316,8 +316,8 @@ uuid_generate_internal(int v, unsigned char *ns, char *ptr, int len)
 				break;
 			}
 
-		case 3:			/* namespace-based MD5 uuids */
-		case 5:			/* namespace-based SHA1 uuids */
+		case 3:					/* namespace-based MD5 uuids */
+		case 5:					/* namespace-based SHA1 uuids */
 			{
 				dce_uuid_t	uu;
 #ifdef HAVE_UUID_BSD
@@ -373,7 +373,7 @@ uuid_generate_internal(int v, unsigned char *ns, char *ptr, int len)
 				break;
 			}
 
-		case 4:			/* random uuid */
+		case 4:					/* random uuid */
 		default:
 			{
 #ifdef HAVE_UUID_E2FS
@@ -398,7 +398,7 @@ uuid_generate_internal(int v, unsigned char *ns, char *ptr, int len)
 	return DirectFunctionCall1(uuid_in, CStringGetDatum(strbuf));
 }
 
-#endif   /* HAVE_UUID_OSSP */
+#endif							/* HAVE_UUID_OSSP */
 
 
 Datum

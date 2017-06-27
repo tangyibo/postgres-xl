@@ -387,7 +387,7 @@ ExecInsertIndexTuples(TupleTableSlot *slot,
 			index_insert(indexRelation, /* index relation */
 						 values,	/* array of index Datums */
 						 isnull,	/* null flags */
-						 tupleid,		/* tid of heap tuple */
+						 tupleid,	/* tid of heap tuple */
 						 heapRelation,	/* heap relation */
 						 checkUnique,	/* type of uniqueness check to do */
 						 indexInfo);	/* index AM may need this */
@@ -432,7 +432,7 @@ ExecInsertIndexTuples(TupleTableSlot *slot,
 													 indexRelation, indexInfo,
 													 tupleid, values, isnull,
 													 estate, false,
-												waitMode, violationOK, NULL);
+													 waitMode, violationOK, NULL);
 		}
 
 		if ((checkUnique == UNIQUE_CHECK_PARTIAL ||
@@ -542,7 +542,7 @@ ExecCheckIndexConstraints(TupleTableSlot *slot,
 					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 					 errmsg("ON CONFLICT does not support deferrable unique constraints/exclusion constraints as arbiters"),
 					 errtableconstraint(heapRelation,
-								   RelationGetRelationName(indexRelation))));
+										RelationGetRelationName(indexRelation))));
 
 		checkedIndex = true;
 
@@ -580,7 +580,7 @@ ExecCheckIndexConstraints(TupleTableSlot *slot,
 		satisfiesConstraint =
 			check_exclusion_or_unique_constraint(heapRelation, indexRelation,
 												 indexInfo, &invalidItemPtr,
-											   values, isnull, estate, false,
+												 values, isnull, estate, false,
 												 CEOUC_WAIT, true,
 												 conflictTid);
 		if (!satisfiesConstraint)

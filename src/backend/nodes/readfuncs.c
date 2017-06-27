@@ -688,8 +688,7 @@ _readRangeVar(void)
 {
 	READ_LOCALS(RangeVar);
 
-	local_node->catalogname = NULL;		/* not currently saved in output
-										 * format */
+	local_node->catalogname = NULL; /* not currently saved in output format */
 
 	READ_STRING_FIELD(schemaname);
 	READ_STRING_FIELD(relname);
@@ -709,8 +708,8 @@ _readTableFunc(void)
 {
 	READ_LOCALS(TableFunc);
 
-	READ_NODE_FIELD(ns_names);
 	READ_NODE_FIELD(ns_uris);
+	READ_NODE_FIELD(ns_names);
 	READ_NODE_FIELD(docexpr);
 	READ_NODE_FIELD(rowexpr);
 	READ_NODE_FIELD(colnames);
@@ -801,7 +800,7 @@ _readConst(void)
 
 	token = pg_strtok(&length); /* skip :constvalue */
 	if (local_node->constisnull)
-		token = pg_strtok(&length);		/* skip "<>" */
+		token = pg_strtok(&length); /* skip "<>" */
 	else
 #ifdef XCP
 		if (portable_input)

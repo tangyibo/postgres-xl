@@ -72,9 +72,9 @@
  */
 #define RELMAPPER_FILENAME		"pg_filenode.map"
 
-#define RELMAPPER_FILEMAGIC		0x592717		/* version ID value */
+#define RELMAPPER_FILEMAGIC		0x592717	/* version ID value */
 
-#define MAX_MAPPINGS			62		/* 62 * 8 + 16 = 512 */
+#define MAX_MAPPINGS			62	/* 62 * 8 + 16 = 512 */
 
 typedef struct RelMapping
 {
@@ -684,8 +684,8 @@ load_relmap_file(bool shared)
 
 	if (!EQ_CRC32C(crc, map->crc))
 		ereport(FATAL,
-		  (errmsg("relation mapping file \"%s\" contains incorrect checksum",
-				  mapfilename)));
+				(errmsg("relation mapping file \"%s\" contains incorrect checksum",
+						mapfilename)));
 }
 
 /*

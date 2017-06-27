@@ -22,10 +22,10 @@
 
 
 extern ObjectAddress ExecCreateTableAs(CreateTableAsStmt *stmt, const char *queryString,
-	  ParamListInfo params, QueryEnvironment *queryEnv, char *completionTag);
+				  ParamListInfo params, QueryEnvironment *queryEnv, char *completionTag);
 
 extern int	GetIntoRelEFlags(IntoClause *intoClause);
 
 extern DestReceiver *CreateIntoRelDestReceiver(IntoClause *intoClause);
 
-#endif   /* CREATEAS_H */
+#endif							/* CREATEAS_H */

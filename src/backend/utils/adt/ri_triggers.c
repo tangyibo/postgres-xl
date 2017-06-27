@@ -123,14 +123,11 @@ typedef struct RI_ConstraintInfo
 	char		confdeltype;	/* foreign key's ON DELETE action */
 	char		confmatchtype;	/* foreign key's match type */
 	int			nkeys;			/* number of key columns */
-	int16		pk_attnums[RI_MAX_NUMKEYS];		/* attnums of referenced cols */
-	int16		fk_attnums[RI_MAX_NUMKEYS];		/* attnums of referencing cols */
-	Oid			pf_eq_oprs[RI_MAX_NUMKEYS];		/* equality operators (PK =
-												 * FK) */
-	Oid			pp_eq_oprs[RI_MAX_NUMKEYS];		/* equality operators (PK =
-												 * PK) */
-	Oid			ff_eq_oprs[RI_MAX_NUMKEYS];		/* equality operators (FK =
-												 * FK) */
+	int16		pk_attnums[RI_MAX_NUMKEYS]; /* attnums of referenced cols */
+	int16		fk_attnums[RI_MAX_NUMKEYS]; /* attnums of referencing cols */
+	Oid			pf_eq_oprs[RI_MAX_NUMKEYS]; /* equality operators (PK = FK) */
+	Oid			pp_eq_oprs[RI_MAX_NUMKEYS]; /* equality operators (PK = PK) */
+	Oid			ff_eq_oprs[RI_MAX_NUMKEYS]; /* equality operators (FK = FK) */
 	dlist_node	valid_link;		/* Link in list of valid entries */
 } RI_ConstraintInfo;
 
@@ -592,7 +589,7 @@ ri_Check_Pk_Match(Relation pk_rel, Relation fk_rel,
 	result = ri_PerformCheck(riinfo, &qkey, qplan,
 							 fk_rel, pk_rel,
 							 old_row, NULL,
-							 true,		/* treat like update */
+							 true,	/* treat like update */
 							 SPI_OK_SELECT);
 
 	if (SPI_finish() != SPI_OK_FINISH)
@@ -784,7 +781,7 @@ ri_restrict_del(TriggerData *trigdata, bool is_no_action)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, NULL,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_SELECT);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -1007,7 +1004,7 @@ ri_restrict_upd(TriggerData *trigdata, bool is_no_action)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, NULL,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_SELECT);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -1163,7 +1160,7 @@ RI_FKey_cascade_del(PG_FUNCTION_ARGS)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, NULL,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_DELETE);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -1344,7 +1341,7 @@ RI_FKey_cascade_upd(PG_FUNCTION_ARGS)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, new_row,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_UPDATE);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -1509,7 +1506,7 @@ RI_FKey_setnull_del(PG_FUNCTION_ARGS)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, NULL,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_UPDATE);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -1685,7 +1682,7 @@ RI_FKey_setnull_upd(PG_FUNCTION_ARGS)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, NULL,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_UPDATE);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -1851,7 +1848,7 @@ RI_FKey_setdefault_del(PG_FUNCTION_ARGS)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, NULL,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_UPDATE);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -2042,7 +2039,7 @@ RI_FKey_setdefault_upd(PG_FUNCTION_ARGS)
 			ri_PerformCheck(riinfo, &qkey, qplan,
 							fk_rel, pk_rel,
 							old_row, NULL,
-							true,		/* must detect new rows */
+							true,	/* must detect new rows */
 							SPI_OK_UPDATE);
 
 			if (SPI_finish() != SPI_OK_FINISH)
@@ -2728,7 +2725,7 @@ ri_CheckTrigger(FunctionCallInfo fcinfo, const char *funcname, int tgkind)
 		!TRIGGER_FIRED_FOR_ROW(trigdata->tg_event))
 		ereport(ERROR,
 				(errcode(ERRCODE_E_R_I_E_TRIGGER_PROTOCOL_VIOLATED),
-			   errmsg("function \"%s\" must be fired AFTER ROW", funcname)));
+				 errmsg("function \"%s\" must be fired AFTER ROW", funcname)));
 
 	switch (tgkind)
 	{
@@ -2771,8 +2768,8 @@ ri_FetchConstraintInfo(Trigger *trigger, Relation trig_rel, bool rel_is_pk)
 	if (!OidIsValid(constraintOid))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-		  errmsg("no pg_constraint entry for trigger \"%s\" on table \"%s\"",
-				 trigger->tgname, RelationGetRelationName(trig_rel)),
+				 errmsg("no pg_constraint entry for trigger \"%s\" on table \"%s\"",
+						trigger->tgname, RelationGetRelationName(trig_rel)),
 				 errhint("Remove this referential integrity trigger and its mates, then do ALTER TABLE ADD CONSTRAINT.")));
 
 	/* Find or create a hashtable entry for the constraint */
@@ -2844,7 +2841,7 @@ ri_LoadConstraintInfo(Oid constraintOid)
 	/* And extract data */
 	Assert(riinfo->constraint_id == constraintOid);
 	riinfo->oidHashValue = GetSysCacheHashValue1(CONSTROID,
-											ObjectIdGetDatum(constraintOid));
+												 ObjectIdGetDatum(constraintOid));
 	memcpy(&riinfo->conname, &conForm->conname, sizeof(NameData));
 	riinfo->pk_relid = conForm->confrelid;
 	riinfo->fk_relid = conForm->conrelid;
@@ -3118,7 +3115,7 @@ ri_PerformCheck(const RI_ConstraintInfo *riinfo,
 	 */
 	if (IsolationUsesXactSnapshot() && detectNewRows)
 	{
-		CommandCounterIncrement();		/* be sure all my own work is visible */
+		CommandCounterIncrement();	/* be sure all my own work is visible */
 		test_snapshot = GetLatestSnapshot();
 		crosscheck_snapshot = GetTransactionSnapshot();
 	}
@@ -3166,7 +3163,7 @@ ri_PerformCheck(const RI_ConstraintInfo *riinfo,
 	/* XXX wouldn't it be clearer to do this part at the caller? */
 	if (qkey->constr_queryno != RI_PLAN_CHECK_LOOKUPPK_FROM_PK &&
 		expect_OK == SPI_OK_SELECT &&
-	(SPI_processed == 0) == (qkey->constr_queryno == RI_PLAN_CHECK_LOOKUPPK))
+		(SPI_processed == 0) == (qkey->constr_queryno == RI_PLAN_CHECK_LOOKUPPK))
 		ri_ReportViolation(riinfo,
 						   pk_rel, fk_rel,
 						   new_tuple ? new_tuple : old_tuple,
@@ -3337,9 +3334,9 @@ ri_ReportViolation(const RI_ConstraintInfo *riinfo,
 						NameStr(riinfo->conname),
 						RelationGetRelationName(fk_rel)),
 				 has_perm ?
-			errdetail("Key (%s)=(%s) is still referenced from table \"%s\".",
-					  key_names.data, key_values.data,
-					  RelationGetRelationName(fk_rel)) :
+				 errdetail("Key (%s)=(%s) is still referenced from table \"%s\".",
+						   key_names.data, key_values.data,
+						   RelationGetRelationName(fk_rel)) :
 				 errdetail("Key is still referenced from table \"%s\".",
 						   RelationGetRelationName(fk_rel)),
 				 errtableconstraint(fk_rel, NameStr(riinfo->conname))));
@@ -3591,11 +3588,11 @@ ri_AttributesEqual(Oid eq_opr, Oid typeid,
 	{
 		oldvalue = FunctionCall3(&entry->cast_func_finfo,
 								 oldvalue,
-								 Int32GetDatum(-1),		/* typmod */
+								 Int32GetDatum(-1), /* typmod */
 								 BoolGetDatum(false));	/* implicit coercion */
 		newvalue = FunctionCall3(&entry->cast_func_finfo,
 								 newvalue,
-								 Int32GetDatum(-1),		/* typmod */
+								 Int32GetDatum(-1), /* typmod */
 								 BoolGetDatum(false));	/* implicit coercion */
 	}
 
@@ -3670,7 +3667,7 @@ ri_HashCompareOp(Oid eq_opr, Oid typeid)
 		op_input_types(eq_opr, &lefttype, &righttype);
 		Assert(lefttype == righttype);
 		if (typeid == lefttype)
-			castfunc = InvalidOid;		/* simplest case */
+			castfunc = InvalidOid;	/* simplest case */
 		else
 		{
 			pathtype = find_coercion_pathway(lefttype, typeid,

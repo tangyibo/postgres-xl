@@ -86,7 +86,7 @@ LocalPrefetchBuffer(SMgrRelation smgr, ForkNumber forkNum,
 
 	/* Not in buffers, so initiate prefetch */
 	smgrprefetch(smgr, forkNum, blockNum);
-#endif   /* USE_PREFETCH */
+#endif							/* USE_PREFETCH */
 }
 
 
@@ -189,7 +189,7 @@ LocalBufferAlloc(SMgrRelation smgr, ForkNumber forkNum, BlockNumber blockNum,
 				/* Found a usable buffer */
 				LocalRefCount[b]++;
 				ResourceOwnerRememberBuffer(CurrentResourceOwner,
-										  BufferDescriptorGetBuffer(bufHdr));
+											BufferDescriptorGetBuffer(bufHdr));
 				break;
 			}
 		}

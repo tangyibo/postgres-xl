@@ -445,8 +445,8 @@ inv_seek(LargeObjectDesc *obj_desc, int64 offset, int whence)
 	if (newoffset < 0 || newoffset > MAX_LARGE_OBJECT_SIZE)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-		   errmsg_internal("invalid large object seek target: " INT64_FORMAT,
-						   newoffset)));
+				 errmsg_internal("invalid large object seek target: " INT64_FORMAT,
+								 newoffset)));
 
 	obj_desc->offset = newoffset;
 	return newoffset;
@@ -624,7 +624,7 @@ inv_write(LargeObjectDesc *obj_desc, const char *buf, int nbytes)
 		{
 			if ((oldtuple = systable_getnext_ordered(sd, ForwardScanDirection)) != NULL)
 			{
-				if (HeapTupleHasNulls(oldtuple))		/* paranoia */
+				if (HeapTupleHasNulls(oldtuple))	/* paranoia */
 					elog(ERROR, "null field found in pg_largeobject");
 				olddata = (Form_pg_largeobject) GETSTRUCT(oldtuple);
 				Assert(olddata->pageno >= pageno);
@@ -806,7 +806,7 @@ inv_truncate(LargeObjectDesc *obj_desc, int64 len)
 	olddata = NULL;
 	if ((oldtuple = systable_getnext_ordered(sd, ForwardScanDirection)) != NULL)
 	{
-		if (HeapTupleHasNulls(oldtuple))		/* paranoia */
+		if (HeapTupleHasNulls(oldtuple))	/* paranoia */
 			elog(ERROR, "null field found in pg_largeobject");
 		olddata = (Form_pg_largeobject) GETSTRUCT(oldtuple);
 		Assert(olddata->pageno >= pageno);

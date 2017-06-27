@@ -25,12 +25,12 @@ typedef enum
 
 /* Hook for plugins to get control in ProcessUtility() */
 typedef void (*ProcessUtility_hook_type) (PlannedStmt *pstmt,
-					  const char *queryString, ProcessUtilityContext context,
-													  ParamListInfo params,
-												  QueryEnvironment *queryEnv,
-									DestReceiver *dest,
-									bool sentToRemote,
-									char *completionTag);
+										  const char *queryString, ProcessUtilityContext context,
+										  ParamListInfo params,
+										  QueryEnvironment *queryEnv,
+										  DestReceiver *dest,
+										  bool sentToRemote,
+										  char *completionTag);
 extern PGDLLIMPORT ProcessUtility_hook_type ProcessUtility_hook;
 
 extern void ProcessUtility(PlannedStmt *pstmt, const char *queryString,
@@ -62,4 +62,4 @@ extern bool CommandIsReadOnly(PlannedStmt *pstmt);
 extern bool pgxc_lock_for_utility_stmt(Node *parsetree);
 #endif
 
-#endif   /* UTILITY_H */
+#endif							/* UTILITY_H */

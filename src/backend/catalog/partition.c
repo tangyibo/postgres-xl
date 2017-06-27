@@ -80,9 +80,9 @@ typedef struct PartitionBoundInfoData
 	int			ndatums;		/* Length of the datums following array */
 	Datum	  **datums;			/* Array of datum-tuples with key->partnatts
 								 * datums each */
-	RangeDatumContent **content;/* what's contained in each range bound datum?
-								 * (see the above enum); NULL for list
-								 * partitioned tables */
+	RangeDatumContent **content;	/* what's contained in each range bound
+									 * datum? (see the above enum); NULL for
+									 * list partitioned tables */
 	int		   *indexes;		/* Partition indexes; one entry per member of
 								 * the datums array (plus one if range
 								 * partitioned table) */
@@ -293,7 +293,7 @@ RelationBuildPartitionDesc(Relation rel)
 			 * also save the index of partition the value comes from.
 			 */
 			all_values = (PartitionListValue **) palloc(ndatums *
-											   sizeof(PartitionListValue *));
+														sizeof(PartitionListValue *));
 			i = 0;
 			foreach(cell, non_null_values)
 			{
@@ -318,7 +318,7 @@ RelationBuildPartitionDesc(Relation rel)
 			bool	   *distinct_indexes;
 
 			all_bounds = (PartitionRangeBound **) palloc0(2 * nparts *
-											  sizeof(PartitionRangeBound *));
+														  sizeof(PartitionRangeBound *));
 			distinct_indexes = (bool *) palloc(2 * nparts * sizeof(bool));
 
 			/*
@@ -420,7 +420,7 @@ RelationBuildPartitionDesc(Relation rel)
 			 * into the relcache.
 			 */
 			rbounds = (PartitionRangeBound **) palloc(ndatums *
-											  sizeof(PartitionRangeBound *));
+													  sizeof(PartitionRangeBound *));
 			k = 0;
 			for (i = 0; i < 2 * nparts; i++)
 			{
@@ -481,8 +481,8 @@ RelationBuildPartitionDesc(Relation rel)
 					{
 						boundinfo->datums[i] = (Datum *) palloc(sizeof(Datum));
 						boundinfo->datums[i][0] = datumCopy(all_values[i]->value,
-														key->parttypbyval[0],
-														 key->parttyplen[0]);
+															key->parttypbyval[0],
+															key->parttyplen[0]);
 
 						/* If the old index has no mapping, assign one */
 						if (mapping[all_values[i]->index] == -1)
@@ -513,7 +513,7 @@ RelationBuildPartitionDesc(Relation rel)
 			case PARTITION_STRATEGY_RANGE:
 				{
 					boundinfo->content = (RangeDatumContent **) palloc(ndatums *
-												sizeof(RangeDatumContent *));
+																	   sizeof(RangeDatumContent *));
 					boundinfo->indexes = (int *) palloc((ndatums + 1) *
 														sizeof(int));
 
@@ -522,7 +522,7 @@ RelationBuildPartitionDesc(Relation rel)
 						int			j;
 
 						boundinfo->datums[i] = (Datum *) palloc(key->partnatts *
-															  sizeof(Datum));
+																sizeof(Datum));
 						boundinfo->content[i] = (RangeDatumContent *)
 							palloc(key->partnatts *
 								   sizeof(RangeDatumContent));
@@ -573,7 +573,7 @@ RelationBuildPartitionDesc(Relation rel)
 		/*
 		 * Now assign OIDs from the original array into mapped indexes of the
 		 * result array.  Order of OIDs in the former is defined by the
-		 * catalog scan that retrived them, whereas that in the latter is
+		 * catalog scan that retrieved them, whereas that in the latter is
 		 * defined by canonicalized representation of the list values or the
 		 * range bounds.
 		 */
@@ -739,7 +739,7 @@ check_new_partition_bound(char *relname, Relation parent,
 										 upper) >= 0)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					errmsg("cannot create range partition with empty range"),
+							 errmsg("cannot create range partition with empty range"),
 							 parser_errposition(pstate, spec->location)));
 
 				if (partdesc->nparts > 0)
@@ -942,7 +942,7 @@ map_partition_varattnos(List *expr, int target_varno,
 
 	part_attnos = convert_tuples_by_name_map(RelationGetDescr(partrel),
 											 RelationGetDescr(parent),
-								 gettext_noop("could not convert row type"));
+											 gettext_noop("could not convert row type"));
 	expr = (List *) map_variable_attnos((Node *) expr,
 										target_varno, 0,
 										part_attnos,
@@ -1120,7 +1120,7 @@ RelationGetPartitionDispatchInfo(Relation rel, int lockmode,
 			pd[i]->tupslot = MakeSingleTupleTableSlot(tupdesc);
 			pd[i]->tupmap = convert_tuples_by_name(RelationGetDescr(parent),
 												   tupdesc,
-								 gettext_noop("could not convert row type"));
+												   gettext_noop("could not convert row type"));
 		}
 		else
 		{
@@ -1200,7 +1200,7 @@ get_partition_operator(PartitionKey key, int col, StrategyNumber strategy,
 
 	/*
 	 * If one doesn't exist, we must resort to using an operator in the same
-	 * opreator family but with the operator class declared input type.  It is
+	 * operator family but with the operator class declared input type.  It is
 	 * OK to do so, because the column's type is known to be binary-coercible
 	 * with the operator class input type (otherwise, the operator class in
 	 * question would not have been accepted as the partitioning operator
@@ -1311,6 +1311,12 @@ get_qual_for_list(PartitionKey key, PartitionBoundSpec *spec)
 	List	   *arrelems = NIL;
 	bool		list_has_null = false;
 
+	/*
+	 * Only single-column list partitioning is supported, so we are worried
+	 * only about the partition key with index 0.
+	 */
+	Assert(key->partnatts == 1);
+
 	/* Construct Var or expression representing the partition column */
 	if (key->partattrs[0] != 0)
 		keyCol = (Expr *) makeVar(1,
@@ -1333,20 +1339,28 @@ get_qual_for_list(PartitionKey key, PartitionBoundSpec *spec)
 			arrelems = lappend(arrelems, copyObject(val));
 	}
 
-	/* Construct an ArrayExpr for the non-null partition values */
-	arr = makeNode(ArrayExpr);
-	arr->array_typeid = !type_is_array(key->parttypid[0])
-		? get_array_type(key->parttypid[0])
-		: key->parttypid[0];
-	arr->array_collid = key->parttypcoll[0];
-	arr->element_typeid = key->parttypid[0];
-	arr->elements = arrelems;
-	arr->multidims = false;
-	arr->location = -1;
+	if (arrelems)
+	{
+		/* Construct an ArrayExpr for the non-null partition values */
+		arr = makeNode(ArrayExpr);
+		arr->array_typeid = !type_is_array(key->parttypid[0])
+			? get_array_type(key->parttypid[0])
+			: key->parttypid[0];
+		arr->array_collid = key->parttypcoll[0];
+		arr->element_typeid = key->parttypid[0];
+		arr->elements = arrelems;
+		arr->multidims = false;
+		arr->location = -1;
 
-	/* Generate the main expression, i.e., keyCol = ANY (arr) */
-	opexpr = make_partition_op_expr(key, 0, BTEqualStrategyNumber,
-									keyCol, (Expr *) arr);
+		/* Generate the main expression, i.e., keyCol = ANY (arr) */
+		opexpr = make_partition_op_expr(key, 0, BTEqualStrategyNumber,
+										keyCol, (Expr *) arr);
+	}
+	else
+	{
+		/* If there are no partition values, we don't need an = ANY expr */
+		opexpr = NULL;
+	}
 
 	if (!list_has_null)
 	{
@@ -1361,7 +1375,7 @@ get_qual_for_list(PartitionKey key, PartitionBoundSpec *spec)
 		nulltest->argisrow = false;
 		nulltest->location = -1;
 
-		result = list_make2(nulltest, opexpr);
+		result = opexpr ? list_make2(nulltest, opexpr) : list_make1(nulltest);
 	}
 	else
 	{
@@ -1369,16 +1383,21 @@ get_qual_for_list(PartitionKey key, PartitionBoundSpec *spec)
 		 * Gin up a "col IS NULL" test that will be OR'd with the main
 		 * expression.
 		 */
-		Expr	   *or;
-
 		nulltest = makeNode(NullTest);
 		nulltest->arg = keyCol;
 		nulltest->nulltesttype = IS_NULL;
 		nulltest->argisrow = false;
 		nulltest->location = -1;
 
-		or = makeBoolExpr(OR_EXPR, list_make2(nulltest, opexpr), -1);
-		result = list_make1(or);
+		if (opexpr)
+		{
+			Expr	   *or;
+
+			or = makeBoolExpr(OR_EXPR, list_make2(nulltest, opexpr), -1);
+			result = list_make1(or);
+		}
+		else
+			result = list_make1(nulltest);
 	}
 
 	return result;
@@ -1553,7 +1572,7 @@ get_qual_for_range(PartitionKey key, PartitionBoundSpec *spec)
 	 */
 	i = 0;
 	partexprs_item = list_head(key->partexprs);
-	partexprs_item_saved = partexprs_item;		/* placate compiler */
+	partexprs_item_saved = partexprs_item;	/* placate compiler */
 	forboth(cell1, spec->lowerdatums, cell2, spec->upperdatums)
 	{
 		EState	   *estate;
@@ -1595,7 +1614,7 @@ get_qual_for_range(PartitionKey key, PartitionBoundSpec *spec)
 		fix_opfuncids((Node *) test_expr);
 		test_exprstate = ExecInitExpr(test_expr, NULL);
 		test_result = ExecEvalExprSwitchContext(test_exprstate,
-											  GetPerTupleExprContext(estate),
+												GetPerTupleExprContext(estate),
 												&isNull);
 		MemoryContextSwitchTo(oldcxt);
 		FreeExecutorState(estate);
@@ -1676,7 +1695,7 @@ get_qual_for_range(PartitionKey key, PartitionBoundSpec *spec)
 											make_partition_op_expr(key, j,
 																   strategy,
 																   keyCol,
-														(Expr *) lower_val));
+																   (Expr *) lower_val));
 			}
 
 			if (need_next_upper_arm && upper_val)
@@ -1698,7 +1717,7 @@ get_qual_for_range(PartitionKey key, PartitionBoundSpec *spec)
 											make_partition_op_expr(key, j,
 																   strategy,
 																   keyCol,
-														(Expr *) upper_val));
+																   (Expr *) upper_val));
 			}
 
 			/*
@@ -1722,13 +1741,13 @@ get_qual_for_range(PartitionKey key, PartitionBoundSpec *spec)
 		if (lower_or_arm_args != NIL)
 			lower_or_arms = lappend(lower_or_arms,
 									list_length(lower_or_arm_args) > 1
-							  ? makeBoolExpr(AND_EXPR, lower_or_arm_args, -1)
+									? makeBoolExpr(AND_EXPR, lower_or_arm_args, -1)
 									: linitial(lower_or_arm_args));
 
 		if (upper_or_arm_args != NIL)
 			upper_or_arms = lappend(upper_or_arms,
 									list_length(upper_or_arm_args) > 1
-							  ? makeBoolExpr(AND_EXPR, upper_or_arm_args, -1)
+									? makeBoolExpr(AND_EXPR, upper_or_arm_args, -1)
 									: linitial(upper_or_arm_args));
 
 		/* If no work to do in the next iteration, break away. */
@@ -2250,8 +2269,8 @@ partition_bound_cmp(PartitionKey key, PartitionBoundInfo boundinfo,
 					bool		lower = boundinfo->indexes[offset] < 0;
 
 					cmpval = partition_rbound_cmp(key,
-												bound_datums, content, lower,
-											  (PartitionRangeBound *) probe);
+												  bound_datums, content, lower,
+												  (PartitionRangeBound *) probe);
 				}
 				else
 					cmpval = partition_rbound_datum_cmp(key,

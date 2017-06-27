@@ -45,10 +45,10 @@
 #endif
 
 
-static int	time2tm(TimeADT time, struct pg_tm * tm, fsec_t *fsec);
-static int	timetz2tm(TimeTzADT *time, struct pg_tm * tm, fsec_t *fsec, int *tzp);
-static int	tm2time(struct pg_tm * tm, fsec_t fsec, TimeADT *result);
-static int	tm2timetz(struct pg_tm * tm, fsec_t fsec, int tz, TimeTzADT *result);
+static int	time2tm(TimeADT time, struct pg_tm *tm, fsec_t *fsec);
+static int	timetz2tm(TimeTzADT *time, struct pg_tm *tm, fsec_t *fsec, int *tzp);
+static int	tm2time(struct pg_tm *tm, fsec_t fsec, TimeADT *result);
+static int	tm2timetz(struct pg_tm *tm, fsec_t fsec, int tz, TimeTzADT *result);
 static void AdjustTimeForTypmod(TimeADT *time, int32 typmod);
 
 
@@ -147,7 +147,7 @@ date_in(PG_FUNCTION_ARGS)
 		case DTK_CURRENT:
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			  errmsg("date/time value \"current\" is no longer supported")));
+					 errmsg("date/time value \"current\" is no longer supported")));
 
 			GetCurrentDateTime(tm);
 			break;
@@ -314,7 +314,7 @@ EncodeSpecialDate(DateADT dt, char *str)
 		strcpy(str, EARLY);
 	else if (DATE_IS_NOEND(dt))
 		strcpy(str, LATE);
-	else	/* shouldn't happen */
+	else						/* shouldn't happen */
 		elog(ERROR, "invalid argument for EncodeSpecialDate");
 }
 
@@ -539,7 +539,7 @@ date_pli(PG_FUNCTION_ARGS)
 	DateADT		result;
 
 	if (DATE_NOT_FINITE(dateVal))
-		PG_RETURN_DATEADT(dateVal);		/* can't change infinity */
+		PG_RETURN_DATEADT(dateVal); /* can't change infinity */
 
 	result = dateVal + days;
 
@@ -563,7 +563,7 @@ date_mii(PG_FUNCTION_ARGS)
 	DateADT		result;
 
 	if (DATE_NOT_FINITE(dateVal))
-		PG_RETURN_DATEADT(dateVal);		/* can't change infinity */
+		PG_RETURN_DATEADT(dateVal); /* can't change infinity */
 
 	result = dateVal - days;
 
@@ -1173,7 +1173,7 @@ abstime_date(PG_FUNCTION_ARGS)
 		case INVALID_ABSTIME:
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				   errmsg("cannot convert reserved abstime value to date")));
+					 errmsg("cannot convert reserved abstime value to date")));
 			result = 0;			/* keep compiler quiet */
 			break;
 
@@ -1247,7 +1247,7 @@ time_in(PG_FUNCTION_ARGS)
  * Convert a tm structure to a time data type.
  */
 static int
-tm2time(struct pg_tm * tm, fsec_t fsec, TimeADT *result)
+tm2time(struct pg_tm *tm, fsec_t fsec, TimeADT *result)
 {
 	*result = ((((tm->tm_hour * MINS_PER_HOUR + tm->tm_min) * SECS_PER_MINUTE) + tm->tm_sec)
 			   * USECS_PER_SEC) + fsec;
@@ -1262,7 +1262,7 @@ tm2time(struct pg_tm * tm, fsec_t fsec, TimeADT *result)
  * if pg_time_t is just 32 bits) - thomas 97/05/27
  */
 static int
-time2tm(TimeADT time, struct pg_tm * tm, fsec_t *fsec)
+time2tm(TimeADT time, struct pg_tm *tm, fsec_t *fsec)
 {
 	tm->tm_hour = time / USECS_PER_HOUR;
 	time -= tm->tm_hour * USECS_PER_HOUR;
@@ -1946,7 +1946,7 @@ time_part(PG_FUNCTION_ARGS)
  * Convert a tm structure to a time data type.
  */
 static int
-tm2timetz(struct pg_tm * tm, fsec_t fsec, int tz, TimeTzADT *result)
+tm2timetz(struct pg_tm *tm, fsec_t fsec, int tz, TimeTzADT *result)
 {
 	result->time = ((((tm->tm_hour * MINS_PER_HOUR + tm->tm_min) * SECS_PER_MINUTE) + tm->tm_sec) *
 					USECS_PER_SEC) + fsec;
@@ -2080,7 +2080,7 @@ timetztypmodout(PG_FUNCTION_ARGS)
  * Convert TIME WITH TIME ZONE data type to POSIX time structure.
  */
 static int
-timetz2tm(TimeTzADT *time, struct pg_tm * tm, fsec_t *fsec, int *tzp)
+timetz2tm(TimeTzADT *time, struct pg_tm *tm, fsec_t *fsec, int *tzp)
 {
 	TimeOffset	trem = time->time;
 
@@ -2610,8 +2610,8 @@ timetz_part(PG_FUNCTION_ARGS)
 			default:
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				errmsg("\"time with time zone\" units \"%s\" not recognized",
-					   lowunits)));
+						 errmsg("\"time with time zone\" units \"%s\" not recognized",
+								lowunits)));
 				result = 0;
 		}
 	}
@@ -2728,9 +2728,9 @@ timetz_izone(PG_FUNCTION_ARGS)
 	if (zone->month != 0 || zone->day != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-		  errmsg("interval time zone \"%s\" must not include months or days",
-				 DatumGetCString(DirectFunctionCall1(interval_out,
-												  PointerGetDatum(zone))))));
+				 errmsg("interval time zone \"%s\" must not include months or days",
+						DatumGetCString(DirectFunctionCall1(interval_out,
+															PointerGetDatum(zone))))));
 
 	tz = -(zone->time / USECS_PER_SEC);
 

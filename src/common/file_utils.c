@@ -65,7 +65,7 @@ fsync_pgdata(const char *pg_data,
 
 	/* handle renaming of pg_xlog to pg_wal in post-10 clusters */
 	snprintf(pg_wal, MAXPGPATH, "%s/%s", pg_data,
-		  serverVersion < MINIMUM_VERSION_FOR_PG_WAL ? "pg_xlog" : "pg_wal");
+			 serverVersion < MINIMUM_VERSION_FOR_PG_WAL ? "pg_xlog" : "pg_wal");
 	snprintf(pg_tblspc, MAXPGPATH, "%s/pg_tblspc", pg_data);
 
 	/*
@@ -250,7 +250,7 @@ pre_sync_fname(const char *fname, bool isdir, const char *progname)
 	return 0;
 }
 
-#endif   /* PG_FLUSH_DATA_WORKS */
+#endif							/* PG_FLUSH_DATA_WORKS */
 
 /*
  * fsync_fname -- Try to fsync a file or directory

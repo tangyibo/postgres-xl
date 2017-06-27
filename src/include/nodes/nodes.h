@@ -596,7 +596,7 @@ extern PGDLLIMPORT Node *newNodeMacroHolder;
 	newNodeMacroHolder->type = (tag), \
 	newNodeMacroHolder \
 )
-#endif   /* __GNUC__ */
+#endif							/* __GNUC__ */
 
 
 #define makeNode(_type_)		((_type_ *) newNode(sizeof(_type_),T_##_type_))
@@ -621,7 +621,7 @@ castNodeImpl(NodeTag type, void *ptr)
 #define castNode(_type_, nodeptr) ((_type_ *) castNodeImpl(T_##_type_, nodeptr))
 #else
 #define castNode(_type_, nodeptr) ((_type_ *) (nodeptr))
-#endif   /* USE_ASSERT_CHECKING */
+#endif							/* USE_ASSERT_CHECKING */
 
 
 /* ----------------------------------------------------------------
@@ -665,6 +665,7 @@ extern int16 *readAttrNumberCols(int numCols);
  * nodes/copyfuncs.c
  */
 extern void *copyObjectImpl(const void *obj);
+
 /* cast result back to argument type, if supported by compiler */
 #ifdef HAVE_TYPEOF
 #define copyObject(obj) ((typeof(obj)) copyObjectImpl(obj))
@@ -857,4 +858,4 @@ typedef enum OnConflictAction
 	ONCONFLICT_UPDATE			/* ON CONFLICT ... DO UPDATE */
 } OnConflictAction;
 
-#endif   /* NODES_H */
+#endif							/* NODES_H */

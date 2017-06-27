@@ -105,4 +105,4 @@ extern uint32 bms_hash_value(const Bitmapset *a);
 extern int	bms_any_member(Bitmapset *a);
 #endif
 
-#endif   /* BITMAPSET_H */
+#endif							/* BITMAPSET_H */

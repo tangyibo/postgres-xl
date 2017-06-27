@@ -153,4 +153,4 @@ extern Datum pg_msgmodule_enable(PG_FUNCTION_ARGS);
 extern Datum pg_msgmodule_disable(PG_FUNCTION_ARGS);
 extern Datum pg_msgmodule_enable_all(PG_FUNCTION_ARGS);
 extern Datum pg_msgmodule_disable_all(PG_FUNCTION_ARGS);
-#endif   /* BUILTINS_H */
+#endif							/* BUILTINS_H */

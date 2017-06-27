@@ -320,7 +320,7 @@ create_index_paths(PlannerInfo *root, RelOptInfo *rel)
 	 * the joinclause list.  Add these to bitjoinpaths.
 	 */
 	indexpaths = generate_bitmap_or_paths(root, rel,
-									   joinorclauses, rel->baserestrictinfo);
+										  joinorclauses, rel->baserestrictinfo);
 	bitjoinpaths = list_concat(bitjoinpaths, indexpaths);
 
 	/*
@@ -1170,7 +1170,7 @@ build_paths_for_OR(PlannerInfo *root, RelOptInfo *rel,
 				   List *clauses, List *other_clauses)
 {
 	List	   *result = NIL;
-	List	   *all_clauses = NIL;		/* not computed till needed */
+	List	   *all_clauses = NIL;	/* not computed till needed */
 	ListCell   *lc;
 
 	foreach(lc, rel->indexlist)
@@ -1383,7 +1383,7 @@ choose_bitmap_and(PlannerInfo *root, RelOptInfo *rel, List *paths)
 
 	Assert(npaths > 0);			/* else caller error */
 	if (npaths == 1)
-		return (Path *) linitial(paths);		/* easy case */
+		return (Path *) linitial(paths);	/* easy case */
 
 	/*
 	 * In theory we should consider every nonempty subset of the given paths.
@@ -1650,7 +1650,7 @@ bitmap_and_cost_est(PlannerInfo *root, RelOptInfo *rel, List *paths)
 	apath.path.pathtype = T_BitmapAnd;
 	apath.path.parent = rel;
 	apath.path.pathtarget = rel->reltarget;
-	apath.path.param_info = NULL;		/* not used in bitmap trees */
+	apath.path.param_info = NULL;	/* not used in bitmap trees */
 	apath.path.pathkeys = NIL;
 	apath.bitmapquals = paths;
 	cost_bitmap_and_node(&apath, root);
@@ -1760,7 +1760,7 @@ get_bitmap_tree_required_outer(Path *bitmapqual)
 		foreach(lc, ((BitmapAndPath *) bitmapqual)->bitmapquals)
 		{
 			result = bms_join(result,
-						get_bitmap_tree_required_outer((Path *) lfirst(lc)));
+							  get_bitmap_tree_required_outer((Path *) lfirst(lc)));
 		}
 	}
 	else if (IsA(bitmapqual, BitmapOrPath))
@@ -1768,7 +1768,7 @@ get_bitmap_tree_required_outer(Path *bitmapqual)
 		foreach(lc, ((BitmapOrPath *) bitmapqual)->bitmapquals)
 		{
 			result = bms_join(result,
-						get_bitmap_tree_required_outer((Path *) lfirst(lc)));
+							  get_bitmap_tree_required_outer((Path *) lfirst(lc)));
 		}
 	}
 	else
@@ -1982,7 +1982,7 @@ get_loop_count(PlannerInfo *root, Index cur_relid, Relids outer_relids)
 		outer_rel = root->simple_rel_array[outer_relid];
 		if (outer_rel == NULL)
 			continue;
-		Assert(outer_rel->relid == outer_relid);		/* sanity check on array */
+		Assert(outer_rel->relid == outer_relid);	/* sanity check on array */
 
 		/* Other relation could be proven empty, if so ignore */
 		if (IS_DUMMY_REL(outer_rel))
@@ -2161,9 +2161,9 @@ match_eclass_clauses_to_index(PlannerInfo *root, IndexOptInfo *index,
 		arg.indexcol = indexcol;
 		clauses = generate_implied_equalities_for_column(root,
 														 index->rel,
-												  ec_member_matches_indexcol,
+														 ec_member_matches_indexcol,
 														 (void *) &arg,
-											index->rel->lateral_referencers);
+														 index->rel->lateral_referencers);
 
 		/*
 		 * We have to check whether the results actually do match the index,
@@ -2632,7 +2632,7 @@ match_pathkeys_to_index(IndexOptInfo *index, List *pathkeys,
 			return;
 	}
 
-	*orderby_clauses_p = orderby_clauses;		/* success! */
+	*orderby_clauses_p = orderby_clauses;	/* success! */
 	*clause_columns_p = clause_columns;
 }
 
@@ -2836,8 +2836,8 @@ check_index_predicates(PlannerInfo *root, RelOptInfo *rel)
 		clauselist =
 			list_concat(clauselist,
 						generate_join_implied_equalities(root,
-													   bms_union(rel->relids,
-																 otherrels),
+														 bms_union(rel->relids,
+																   otherrels),
 														 otherrels,
 														 rel));
 
@@ -3062,7 +3062,7 @@ relation_has_unique_index_for(PlannerInfo *root, RelOptInfo *rel,
 
 				if (match_index_to_operand(rexpr, c, ind))
 				{
-					matched = true;		/* column is unique */
+					matched = true; /* column is unique */
 					break;
 				}
 			}
@@ -3983,7 +3983,7 @@ adjust_rowcompare_for_index(RowCompareExpr *clause,
 			if (!var_on_left)
 			{
 				expr_op = get_commutator(expr_op);
-				if (!OidIsValid(expr_op))		/* should not happen */
+				if (!OidIsValid(expr_op))	/* should not happen */
 					elog(ERROR, "could not find commutator of member %d(%u,%u) of opfamily %u",
 						 op_strategy, lefttype, righttype, opfam);
 			}
@@ -4085,7 +4085,7 @@ prefix_quals(Node *leftop, Oid opfamily, Oid collation,
 				break;
 			case BYTEAOID:
 				prefix = DatumGetCString(DirectFunctionCall1(byteaout,
-												  prefix_const->constvalue));
+															 prefix_const->constvalue));
 				break;
 			default:
 				elog(ERROR, "unexpected const type: %u",

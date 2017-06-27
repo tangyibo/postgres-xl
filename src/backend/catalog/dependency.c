@@ -110,12 +110,12 @@ typedef struct
 } ObjectAddressExtra;
 
 /* ObjectAddressExtra flag bits */
-#define DEPFLAG_ORIGINAL	0x0001		/* an original deletion target */
-#define DEPFLAG_NORMAL		0x0002		/* reached via normal dependency */
-#define DEPFLAG_AUTO		0x0004		/* reached via auto dependency */
-#define DEPFLAG_INTERNAL	0x0008		/* reached via internal dependency */
-#define DEPFLAG_EXTENSION	0x0010		/* reached via extension dependency */
-#define DEPFLAG_REVERSE		0x0020		/* reverse internal/extension link */
+#define DEPFLAG_ORIGINAL	0x0001	/* an original deletion target */
+#define DEPFLAG_NORMAL		0x0002	/* reached via normal dependency */
+#define DEPFLAG_AUTO		0x0004	/* reached via auto dependency */
+#define DEPFLAG_INTERNAL	0x0008	/* reached via internal dependency */
+#define DEPFLAG_EXTENSION	0x0010	/* reached via extension dependency */
+#define DEPFLAG_REVERSE		0x0020	/* reverse internal/extension link */
 
 
 /* expansible list of ObjectAddresses */
@@ -163,7 +163,7 @@ static const Oid object_classes[] = {
 	OperatorClassRelationId,	/* OCLASS_OPCLASS */
 	OperatorFamilyRelationId,	/* OCLASS_OPFAMILY */
 	AccessMethodRelationId,		/* OCLASS_AM */
-	AccessMethodOperatorRelationId,		/* OCLASS_AMOP */
+	AccessMethodOperatorRelationId, /* OCLASS_AMOP */
 	AccessMethodProcedureRelationId,	/* OCLASS_AMPROC */
 	RewriteRelationId,			/* OCLASS_REWRITE */
 	TriggerRelationId,			/* OCLASS_TRIGGER */
@@ -176,7 +176,7 @@ static const Oid object_classes[] = {
 	AuthIdRelationId,			/* OCLASS_ROLE */
 	DatabaseRelationId,			/* OCLASS_DATABASE */
 	TableSpaceRelationId,		/* OCLASS_TBLSPACE */
-	ForeignDataWrapperRelationId,		/* OCLASS_FDW */
+	ForeignDataWrapperRelationId,	/* OCLASS_FDW */
 	ForeignServerRelationId,	/* OCLASS_FOREIGN_SERVER */
 	UserMappingRelationId,		/* OCLASS_USER_MAPPING */
 	DefaultAclRelationId,		/* OCLASS_DEFACL */
@@ -416,7 +416,7 @@ performMultipleDeletions(const ObjectAddresses *objects,
 		findDependentObjects(thisobj,
 							 DEPFLAG_ORIGINAL,
 							 flags,
-							 NULL,		/* empty stack */
+							 NULL,	/* empty stack */
 							 targetObjects,
 							 objects,
 							 &depRel);
@@ -1061,8 +1061,8 @@ reportDependentObjects(const ObjectAddresses *targetObjects,
 		if (origObject)
 			ereport(ERROR,
 					(errcode(ERRCODE_DEPENDENT_OBJECTS_STILL_EXIST),
-				  errmsg("cannot drop %s because other objects depend on it",
-						 getObjectDescription(origObject)),
+					 errmsg("cannot drop %s because other objects depend on it",
+							getObjectDescription(origObject)),
 					 errdetail("%s", clientdetail.data),
 					 errdetail_log("%s", logdetail.data),
 					 errhint("Use DROP ... CASCADE to drop the dependent objects too.")));
@@ -1566,7 +1566,7 @@ recordDependencyOnSingleRelExpr(const ObjectAddress *depender,
 	rte.type = T_RangeTblEntry;
 	rte.rtekind = RTE_RELATION;
 	rte.relid = relId;
-	rte.relkind = RELKIND_RELATION;		/* no need for exactness here */
+	rte.relkind = RELKIND_RELATION; /* no need for exactness here */
 
 	context.rtables = list_make1(list_make1(&rte));
 
@@ -1793,8 +1793,8 @@ find_expr_references_walker(Node *node,
 				case REGROLEOID:
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						errmsg("constant of the type %s cannot be used here",
-							   "regrole")));
+							 errmsg("constant of the type %s cannot be used here",
+									"regrole")));
 					break;
 			}
 		}
@@ -2032,7 +2032,7 @@ find_expr_references_walker(Node *node,
 					TargetEntry *tle = (TargetEntry *) lfirst(lc);
 
 					if (tle->resjunk)
-						continue;		/* ignore junk tlist items */
+						continue;	/* ignore junk tlist items */
 					add_object_address(OCLASS_CLASS, rte->relid, tle->resno,
 									   context->addrs);
 				}

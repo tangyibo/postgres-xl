@@ -220,4 +220,4 @@ extern Oid	get_tablesample_method_id(const char *methodname);
 
 #define TypeIsToastable(typid)	(get_typstorage(typid) != 'p')
 
-#endif   /* LSYSCACHE_H */
+#endif							/* LSYSCACHE_H */

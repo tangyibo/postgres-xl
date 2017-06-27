@@ -69,13 +69,13 @@ typedef struct toast_compress_header
 
 static void toast_delete_datum(Relation rel, Datum value, bool is_speculative);
 static Datum toast_save_datum(Relation rel, Datum value,
-				 struct varlena * oldexternal, int options);
+				 struct varlena *oldexternal, int options);
 static bool toastrel_valueid_exists(Relation toastrel, Oid valueid);
 static bool toastid_valueid_exists(Oid toastrelid, Oid valueid);
-static struct varlena *toast_fetch_datum(struct varlena * attr);
-static struct varlena *toast_fetch_datum_slice(struct varlena * attr,
+static struct varlena *toast_fetch_datum(struct varlena *attr);
+static struct varlena *toast_fetch_datum_slice(struct varlena *attr,
 						int32 sliceoffset, int32 length);
-static struct varlena *toast_decompress_datum(struct varlena * attr);
+static struct varlena *toast_decompress_datum(struct varlena *attr);
 static int toast_open_indexes(Relation toastrel,
 				   LOCKMODE lock,
 				   Relation **toastidxs,
@@ -98,7 +98,7 @@ static void init_toast_snapshot(Snapshot toast_snapshot);
  * ----------
  */
 struct varlena *
-heap_tuple_fetch_attr(struct varlena * attr)
+heap_tuple_fetch_attr(struct varlena *attr)
 {
 	struct varlena *result;
 
@@ -169,7 +169,7 @@ heap_tuple_fetch_attr(struct varlena * attr)
  * ----------
  */
 struct varlena *
-heap_tuple_untoast_attr(struct varlena * attr)
+heap_tuple_untoast_attr(struct varlena *attr)
 {
 	if (VARATT_IS_EXTERNAL_ONDISK(attr))
 	{
@@ -255,7 +255,7 @@ heap_tuple_untoast_attr(struct varlena * attr)
  * ----------
  */
 struct varlena *
-heap_tuple_untoast_attr_slice(struct varlena * attr,
+heap_tuple_untoast_attr_slice(struct varlena *attr,
 							  int32 sliceoffset, int32 slicelength)
 {
 	struct varlena *preslice;
@@ -1475,7 +1475,7 @@ toast_get_valid_index(Oid toastoid, LOCKMODE lock)
  */
 static Datum
 toast_save_datum(Relation rel, Datum value,
-				 struct varlena * oldexternal, int options)
+				 struct varlena *oldexternal, int options)
 {
 	Relation	toastrel;
 	Relation   *toastidxs;
@@ -1530,7 +1530,7 @@ toast_save_datum(Relation rel, Datum value,
 	{
 		data_p = VARDATA_SHORT(dval);
 		data_todo = VARSIZE_SHORT(dval) - VARHDRSZ_SHORT;
-		toast_pointer.va_rawsize = data_todo + VARHDRSZ;		/* as if not short */
+		toast_pointer.va_rawsize = data_todo + VARHDRSZ;	/* as if not short */
 		toast_pointer.va_extsize = data_todo;
 	}
 	else if (VARATT_IS_COMPRESSED(dval))
@@ -1635,7 +1635,7 @@ toast_save_datum(Relation rel, Datum value,
 			{
 				toast_pointer.va_valueid =
 					GetNewOidWithIndex(toastrel,
-									 RelationGetRelid(toastidxs[validIndex]),
+									   RelationGetRelid(toastidxs[validIndex]),
 									   (AttrNumber) 1);
 			} while (toastid_valueid_exists(rel->rd_toastoid,
 											toast_pointer.va_valueid));
@@ -1880,7 +1880,7 @@ toastid_valueid_exists(Oid toastrelid, Oid valueid)
  * ----------
  */
 static struct varlena *
-toast_fetch_datum(struct varlena * attr)
+toast_fetch_datum(struct varlena *attr)
 {
 	Relation	toastrel;
 	Relation   *toastidxs;
@@ -2051,7 +2051,7 @@ toast_fetch_datum(struct varlena * attr)
  * ----------
  */
 static struct varlena *
-toast_fetch_datum_slice(struct varlena * attr, int32 sliceoffset, int32 length)
+toast_fetch_datum_slice(struct varlena *attr, int32 sliceoffset, int32 length)
 {
 	Relation	toastrel;
 	Relation   *toastidxs;
@@ -2175,7 +2175,7 @@ toast_fetch_datum_slice(struct varlena * attr, int32 sliceoffset, int32 length)
 	init_toast_snapshot(&SnapshotToast);
 	nextidx = startchunk;
 	toastscan = systable_beginscan_ordered(toastrel, toastidxs[validIndex],
-										&SnapshotToast, nscankeys, toastkey);
+										   &SnapshotToast, nscankeys, toastkey);
 	while ((ttup = systable_getnext_ordered(toastscan, ForwardScanDirection)) != NULL)
 	{
 		/*
@@ -2283,7 +2283,7 @@ toast_fetch_datum_slice(struct varlena * attr, int32 sliceoffset, int32 length)
  * Decompress a compressed version of a varlena datum
  */
 static struct varlena *
-toast_decompress_datum(struct varlena * attr)
+toast_decompress_datum(struct varlena *attr)
 {
 	struct varlena *result;
 

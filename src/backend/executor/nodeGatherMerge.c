@@ -515,7 +515,7 @@ form_tuple_array(GatherMergeState *gm_state, int reader)
 		tuple_buffer->tuple[i] = heap_copytuple(gm_readnext_tuple(gm_state,
 																  reader,
 																  false,
-													   &tuple_buffer->done));
+																  &tuple_buffer->done));
 		if (!HeapTupleIsValid(tuple_buffer->tuple[i]))
 			break;
 		tuple_buffer->nTuples++;
@@ -597,7 +597,7 @@ gather_merge_readnext(GatherMergeState *gm_state, int reader, bool nowait)
 	ExecStoreTuple(tup,			/* tuple to store */
 				   gm_state->gm_slots[reader],	/* slot in which to store the
 												 * tuple */
-				   InvalidBuffer,		/* buffer associated with this tuple */
+				   InvalidBuffer,	/* buffer associated with this tuple */
 				   true);		/* pfree this pointer if not from heap */
 
 	return true;

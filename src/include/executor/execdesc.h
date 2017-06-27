@@ -44,7 +44,7 @@ typedef struct QueryDesc
 	DestReceiver *dest;			/* the destination for tuple output */
 	ParamListInfo params;		/* param values being passed in */
 	QueryEnvironment *queryEnv; /* query environment passed in */
-	int			instrument_options;		/* OR of InstrumentOption flags */
+	int			instrument_options; /* OR of InstrumentOption flags */
 
 	/* These fields are set by ExecutorStart */
 	TupleDesc	tupDesc;		/* descriptor for result tuples */
@@ -59,7 +59,7 @@ typedef struct QueryDesc
 								 * get local data from squeue */
 #endif
 	/* This field is set by ExecutorRun */
-	bool		already_executed;		/* true if previously executed */
+	bool		already_executed;	/* true if previously executed */
 
 	/* This is always set NULL by the core system, but plugins can change it */
 	struct Instrumentation *totaltime;	/* total time spent in ExecutorRun */
@@ -77,4 +77,4 @@ extern QueryDesc *CreateQueryDesc(PlannedStmt *plannedstmt,
 
 extern void FreeQueryDesc(QueryDesc *qdesc);
 
-#endif   /* EXECDESC_H  */
+#endif							/* EXECDESC_H  */

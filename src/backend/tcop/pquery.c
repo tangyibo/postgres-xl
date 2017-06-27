@@ -89,7 +89,7 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 	QueryDesc  *qd = (QueryDesc *) palloc(sizeof(QueryDesc));
 
 	qd->operation = plannedstmt->commandType;	/* operation */
-	qd->plannedstmt = plannedstmt;		/* plan */
+	qd->plannedstmt = plannedstmt;	/* plan */
 	qd->sourceText = sourceText;	/* query text */
 	qd->snapshot = RegisterSnapshot(snapshot);	/* snapshot */
 	/* RI check snapshot */
@@ -97,8 +97,7 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 	qd->dest = dest;			/* output dest */
 	qd->params = params;		/* parameter values passed into query */
 	qd->queryEnv = queryEnv;
-	qd->instrument_options = instrument_options;		/* instrumentation
-														 * wanted? */
+	qd->instrument_options = instrument_options;	/* instrumentation wanted? */
 
 	/* null these fields until set by ExecutorStart */
 	qd->tupDesc = NULL;
@@ -1454,7 +1453,7 @@ PortalRunSelect(Portal portal,
 		if (!ScanDirectionIsNoMovement(direction))
 		{
 			if (nprocessed > 0)
-				portal->atStart = false;		/* OK to go backward now */
+				portal->atStart = false;	/* OK to go backward now */
 			if (count == 0 || nprocessed < (uint64) count)
 				portal->atEnd = true;	/* we retrieved 'em all */
 			portal->portalPos += nprocessed;
@@ -1701,7 +1700,7 @@ PortalRunUtility(Portal portal, PlannedStmt *pstmt,
 
 	ProcessUtility(pstmt,
 				   portal->sourceText,
-			   isTopLevel ? PROCESS_UTILITY_TOPLEVEL : PROCESS_UTILITY_QUERY,
+				   isTopLevel ? PROCESS_UTILITY_TOPLEVEL : PROCESS_UTILITY_QUERY,
 				   portal->portalParams,
 				   portal->queryEnv,
 				   dest,

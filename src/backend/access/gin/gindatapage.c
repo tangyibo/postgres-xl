@@ -391,7 +391,7 @@ GinDataPageAddPostingItem(Page page, PostingItem *data, OffsetNumber offset)
 		if (offset != maxoff + 1)
 			memmove(ptr + sizeof(PostingItem),
 					ptr,
-					(maxoff - offset + 1) *sizeof(PostingItem));
+					(maxoff - offset + 1) * sizeof(PostingItem));
 	}
 	memcpy(ptr, data, sizeof(PostingItem));
 
@@ -685,7 +685,7 @@ dataBeginPlaceToPageLeaf(GinBtree btree, Buffer buf, GinBtreeStack *stack,
 
 		Assert(GinPageRightMost(page) ||
 			   ginCompareItemPointers(GinDataPageGetRightBound(*newlpage),
-								   GinDataPageGetRightBound(*newrpage)) < 0);
+									  GinDataPageGetRightBound(*newrpage)) < 0);
 
 		if (append)
 			elog(DEBUG2, "appended %d items to block %u; split %d/%d (%d to go)",
@@ -1468,7 +1468,7 @@ addItemsToLeaf(disassembledLeaf *leaf, ItemPointer newItems, int nNewItems)
 			ItemPointerData next_first;
 
 			next = (leafSegmentInfo *) dlist_container(leafSegmentInfo, node,
-								 dlist_next_node(&leaf->segments, iter.cur));
+													   dlist_next_node(&leaf->segments, iter.cur));
 			if (next->items)
 				next_first = next->items[0];
 			else
@@ -1595,7 +1595,7 @@ leafRepackItems(disassembledLeaf *leaf, ItemPointer remaining)
 				{
 					seginfo->seg = ginCompressPostingList(seginfo->items,
 														  seginfo->nitems,
-												GinPostingListSegmentMaxSize,
+														  GinPostingListSegmentMaxSize,
 														  &npacked);
 				}
 				if (npacked != seginfo->nitems)
@@ -1610,7 +1610,7 @@ leafRepackItems(disassembledLeaf *leaf, ItemPointer remaining)
 						pfree(seginfo->seg);
 					seginfo->seg = ginCompressPostingList(seginfo->items,
 														  seginfo->nitems,
-											 GinPostingListSegmentTargetSize,
+														  GinPostingListSegmentTargetSize,
 														  &npacked);
 					if (seginfo->action != GIN_SEGMENT_INSERT)
 						seginfo->action = GIN_SEGMENT_REPLACE;

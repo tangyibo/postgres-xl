@@ -536,7 +536,7 @@ appendShellStringNoError(PQExpBuffer buf, const char *str)
 		backslash_run_length--;
 	}
 	appendPQExpBufferStr(buf, "^\"");
-#endif   /* WIN32 */
+#endif							/* WIN32 */
 
 	return ok;
 }
@@ -596,7 +596,7 @@ void
 appendPsqlMetaConnect(PQExpBuffer buf, const char *dbname)
 {
 	const char *s;
-	bool		complex;
+	bool complex;
 
 	/*
 	 * If the name is plain ASCII characters, emit a trivial "\connect "foo"".
@@ -604,6 +604,7 @@ appendPsqlMetaConnect(PQExpBuffer buf, const char *dbname)
 	 * general case.  No database has a zero-length name.
 	 */
 	complex = false;
+
 	for (s = dbname; *s; s++)
 	{
 		if (*s == '\n' || *s == '\r')
@@ -712,9 +713,9 @@ parsePGArray(const char *atext, char ***itemarray, int *nitems)
 					{
 						atext++;
 						if (*atext == '\0')
-							return false;		/* premature end of string */
+							return false;	/* premature end of string */
 					}
-					*strings++ = *atext++;		/* copy quoted data */
+					*strings++ = *atext++;	/* copy quoted data */
 				}
 				atext++;
 			}

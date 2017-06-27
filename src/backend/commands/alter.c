@@ -408,7 +408,7 @@ ExecRenameStmt(RenameStmt *stmt)
 		default:
 			elog(ERROR, "unrecognized rename stmt type: %d",
 				 (int) stmt->renameType);
-			return InvalidObjectAddress;		/* keep compiler happy */
+			return InvalidObjectAddress;	/* keep compiler happy */
 	}
 }
 
@@ -468,7 +468,7 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 	{
 		case OBJECT_EXTENSION:
 			address = AlterExtensionNamespace(strVal((Value *) stmt->object), stmt->newschema,
-										  oldSchemaAddr ? &oldNspOid : NULL);
+											  oldSchemaAddr ? &oldNspOid : NULL);
 			break;
 
 		case OBJECT_FOREIGN_TABLE:
@@ -525,7 +525,7 @@ ExecAlterObjectSchemaStmt(AlterObjectSchemaStmt *stmt,
 		default:
 			elog(ERROR, "unrecognized AlterObjectSchemaStmt type: %d",
 				 (int) stmt->objectType);
-			return InvalidObjectAddress;		/* keep compiler happy */
+			return InvalidObjectAddress;	/* keep compiler happy */
 	}
 
 	if (oldSchemaAddr)
@@ -880,7 +880,7 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 		default:
 			elog(ERROR, "unrecognized AlterOwnerStmt type: %d",
 				 (int) stmt->objectType);
-			return InvalidObjectAddress;		/* keep compiler happy */
+			return InvalidObjectAddress;	/* keep compiler happy */
 	}
 }
 

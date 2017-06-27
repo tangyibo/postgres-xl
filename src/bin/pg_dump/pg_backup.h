@@ -63,10 +63,10 @@ typedef struct _restoreOptions
 	int			createDB;		/* Issue commands to create the database */
 	int			noOwner;		/* Don't try to match original object owner */
 	int			noTablespace;	/* Don't issue tablespace-related commands */
-	int			disable_triggers;		/* disable triggers during data-only
-										 * restore */
-	int			use_setsessauth;/* Use SET SESSION AUTHORIZATION commands
-								 * instead of OWNER TO */
+	int			disable_triggers;	/* disable triggers during data-only
+									 * restore */
+	int			use_setsessauth;	/* Use SET SESSION AUTHORIZATION commands
+									 * instead of OWNER TO */
 	char	   *superuser;		/* Username to use as superuser */
 	char	   *use_role;		/* Issue SET ROLE to this */
 	int			dropSchema;
@@ -75,8 +75,8 @@ typedef struct _restoreOptions
 	int			column_inserts;
 	int			if_exists;
 	int			no_publications;	/* Skip publication entries */
-	int			no_security_labels;		/* Skip security label entries */
-	int			no_subscriptions;		/* Skip subscription entries */
+	int			no_security_labels; /* Skip security label entries */
+	int			no_subscriptions;	/* Skip subscription entries */
 	int			strict_names;
 
 	const char *filename;
@@ -181,17 +181,16 @@ typedef struct Archive
 	RestoreOptions *ropt;		/* options, if restoring */
 
 	int			verbose;
-	char	   *remoteVersionStr;		/* server's version string */
+	char	   *remoteVersionStr;	/* server's version string */
 	int			remoteVersion;	/* same in numeric form */
 	bool		isStandby;		/* is server a standby node */
 	bool		isPostgresXL;	/* is server a Postgres-XL node */
 
-	int			minRemoteVersion;		/* allowable range */
+	int			minRemoteVersion;	/* allowable range */
 	int			maxRemoteVersion;
 
 	int			numWorkers;		/* number of parallel processes */
-	char	   *sync_snapshot_id;		/* sync snapshot id for parallel
-										 * operation */
+	char	   *sync_snapshot_id;	/* sync snapshot id for parallel operation */
 
 	/* info needed for string escaping */
 	int			encoding;		/* libpq code for client_encoding */
@@ -300,4 +299,4 @@ extern int	archprintf(Archive *AH, const char *fmt,...) pg_attribute_printf(2, 3
 #define appendStringLiteralAH(buf,str,AH) \
 	appendStringLiteral(buf, str, (AH)->encoding, (AH)->std_strings)
 
-#endif   /* PG_BACKUP_H */
+#endif							/* PG_BACKUP_H */

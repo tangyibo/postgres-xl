@@ -598,12 +598,12 @@ exit_nicely(void)
 	{
 		if (made_new_pgdata || found_existing_pgdata)
 			fprintf(stderr,
-			  _("%s: data directory \"%s\" not removed at user's request\n"),
+					_("%s: data directory \"%s\" not removed at user's request\n"),
 					progname, pg_data);
 
 		if (made_new_xlogdir || found_existing_xlogdir)
 			fprintf(stderr,
-			   _("%s: WAL directory \"%s\" not removed at user's request\n"),
+					_("%s: WAL directory \"%s\" not removed at user's request\n"),
 					progname, xlog_dir);
 	}
 
@@ -783,16 +783,16 @@ check_input(char *path)
 					_("%s: file \"%s\" does not exist\n"), progname, path);
 			fprintf(stderr,
 					_("This might mean you have a corrupted installation or identified\n"
-					"the wrong directory with the invocation option -L.\n"));
+					  "the wrong directory with the invocation option -L.\n"));
 		}
 		else
 		{
 			fprintf(stderr,
-				 _("%s: could not access file \"%s\": %s\n"), progname, path,
+					_("%s: could not access file \"%s\": %s\n"), progname, path,
 					strerror(errno));
 			fprintf(stderr,
 					_("This might mean you have a corrupted installation or identified\n"
-					"the wrong directory with the invocation option -L.\n"));
+					  "the wrong directory with the invocation option -L.\n"));
 		}
 		exit(1);
 	}
@@ -801,8 +801,8 @@ check_input(char *path)
 		fprintf(stderr,
 				_("%s: file \"%s\" is not a regular file\n"), progname, path);
 		fprintf(stderr,
-		_("This might mean you have a corrupted installation or identified\n"
-		  "the wrong directory with the invocation option -L.\n"));
+				_("This might mean you have a corrupted installation or identified\n"
+				  "the wrong directory with the invocation option -L.\n"));
 		exit(1);
 	}
 }
@@ -1092,7 +1092,7 @@ setup_config(void)
 			 "default_text_search_config = 'pg_catalog.%s'",
 			 escape_quotes(default_text_search_config));
 	conflines = replace_token(conflines,
-						 "#default_text_search_config = 'pg_catalog.simple'",
+							  "#default_text_search_config = 'pg_catalog.simple'",
 							  repltok);
 #ifdef PGXC
 	/* Add Postgres-XC node name to configuration file */
@@ -1237,11 +1237,11 @@ setup_config(void)
 			getaddrinfo("::1", NULL, &hints, &gai_result) != 0)
 		{
 			conflines = replace_token(conflines,
-							   "host    all             all             ::1",
-							 "#host    all             all             ::1");
+									  "host    all             all             ::1",
+									  "#host    all             all             ::1");
 			conflines = replace_token(conflines,
-							   "host    replication     all             ::1",
-							 "#host    replication     all             ::1");
+									  "host    replication     all             ::1",
+									  "#host    replication     all             ::1");
 		}
 	}
 #else							/* !HAVE_IPV6 */
@@ -1252,7 +1252,7 @@ setup_config(void)
 	conflines = replace_token(conflines,
 							  "host    replication     all             ::1",
 							  "#host    replication     all             ::1");
-#endif   /* HAVE_IPV6 */
+#endif							/* HAVE_IPV6 */
 
 	/* Replace default authentication methods */
 	conflines = replace_token(conflines,
@@ -1403,7 +1403,7 @@ bootstrap_template1(void)
 static void
 setup_auth(FILE *cmdfd)
 {
-	const char *const * line;
+	const char *const *line;
 	static const char *const pg_authid_setup[] = {
 		/*
 		 * The authid table shouldn't be readable except through views, to
@@ -1490,7 +1490,7 @@ get_su_pwd(void)
 static void
 setup_depend(FILE *cmdfd)
 {
-	const char *const * line;
+	const char *const *line;
 	static const char *const pg_depend_setup[] = {
 		/*
 		 * Make PIN entries in pg_depend for all objects made so far in the
@@ -1499,9 +1499,16 @@ setup_depend(FILE *cmdfd)
 		 * for instance) but generating only the minimum required set of
 		 * dependencies seems hard.
 		 *
-		 * Note that we deliberately do not pin the system views, which
-		 * haven't been created yet.  Also, no conversions, databases, or
-		 * tablespaces are pinned.
+		 * Catalogs that are intentionally not scanned here are:
+		 *
+		 * pg_database: it's a feature, not a bug, that template1 is not
+		 * pinned.
+		 *
+		 * pg_extension: a pinned extension isn't really an extension, hmm?
+		 *
+		 * pg_tablespace: tablespaces don't participate in the dependency
+		 * code, and DropTableSpace() explicitly protects the built-in
+		 * tablespaces.
 		 *
 		 * First delete any already-made entries; PINs override all else, and
 		 * must be the only entries for their objects.
@@ -1521,6 +1528,8 @@ setup_depend(FILE *cmdfd)
 		" FROM pg_cast;\n\n",
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_constraint;\n\n",
+		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
+		" FROM pg_conversion;\n\n",
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
 		" FROM pg_attrdef;\n\n",
 		"INSERT INTO pg_depend SELECT 0,0,0, tableoid,oid,0, 'p' "
@@ -1644,7 +1653,7 @@ setup_description(FILE *cmdfd)
 	/* Create default descriptions for operator implementation functions */
 	PG_CMD_PUTS("WITH funcdescs AS ( "
 				"SELECT p.oid as p_oid, oprname, "
-			  "coalesce(obj_description(o.oid, 'pg_operator'),'') as opdesc "
+				"coalesce(obj_description(o.oid, 'pg_operator'),'') as opdesc "
 				"FROM pg_proc p JOIN pg_operator o ON oprcode = p.oid ) "
 				"INSERT INTO pg_description "
 				"  SELECT p_oid, 'pg_proc'::regclass, 0, "
@@ -1652,7 +1661,7 @@ setup_description(FILE *cmdfd)
 				"  FROM funcdescs "
 				"  WHERE opdesc NOT LIKE 'deprecated%' AND "
 				"  NOT EXISTS (SELECT 1 FROM pg_description "
-		"    WHERE objoid = p_oid AND classoid = 'pg_proc'::regclass);\n\n");
+				"    WHERE objoid = p_oid AND classoid = 'pg_proc'::regclass);\n\n");
 
 	/*
 	 * Even though the tables are temp, drop them explicitly so they don't get
@@ -1668,10 +1677,16 @@ setup_description(FILE *cmdfd)
 static void
 setup_collation(FILE *cmdfd)
 {
-	PG_CMD_PUTS("SELECT pg_import_system_collations(if_not_exists => false, schema => 'pg_catalog');\n\n");
+	/*
+	 * Add an SQL-standard name.  We don't want to pin this, so it doesn't go
+	 * in pg_collation.h.  But add it before reading system collations, so
+	 * that it wins if libc defines a locale named ucs_basic.
+	 */
+	PG_CMD_PRINTF3("INSERT INTO pg_collation (collname, collnamespace, collowner, collprovider, collencoding, collcollate, collctype) VALUES ('ucs_basic', 'pg_catalog'::regnamespace, %u, '%c', %d, 'C', 'C');\n\n",
+				   BOOTSTRAP_SUPERUSERID, COLLPROVIDER_LIBC, PG_UTF8);
 
-	/* Add an SQL-standard name */
-	PG_CMD_PRINTF3("INSERT INTO pg_collation (collname, collnamespace, collowner, collprovider, collencoding, collcollate, collctype) VALUES ('ucs_basic', 'pg_catalog'::regnamespace, %u, '%c', %d, 'C', 'C');\n\n", BOOTSTRAP_SUPERUSERID, COLLPROVIDER_LIBC, PG_UTF8);
+	/* Now import all collations we can find in the operating system */
+	PG_CMD_PUTS("SELECT pg_import_system_collations('pg_catalog');\n\n");
 }
 
 /*
@@ -1996,7 +2011,7 @@ vacuum_db(FILE *cmdfd)
 static void
 make_template0(FILE *cmdfd)
 {
-	const char *const * line;
+	const char *const *line;
 	static const char *const template0_setup[] = {
 		"CREATE DATABASE template0 IS_TEMPLATE = true ALLOW_CONNECTIONS = false;\n\n",
 
@@ -2040,7 +2055,7 @@ make_template0(FILE *cmdfd)
 static void
 make_postgres(FILE *cmdfd)
 {
-	const char *const * line;
+	const char *const *line;
 	static const char *const postgres_setup[] = {
 		"CREATE DATABASE postgres;\n\n",
 		"COMMENT ON DATABASE postgres IS 'default administrative connection database';\n\n",
@@ -2110,7 +2125,7 @@ check_ok(void)
 
 /* Hack to suppress a warning about %x from some versions of gcc */
 static inline size_t
-my_strftime(char *s, size_t max, const char *fmt, const struct tm * tm)
+my_strftime(char *s, size_t max, const char *fmt, const struct tm *tm)
 {
 	return strftime(s, max, fmt, tm);
 }
@@ -2264,9 +2279,9 @@ check_locale_encoding(const char *locale, int user_enc)
 		fprintf(stderr, _("%s: encoding mismatch\n"), progname);
 		fprintf(stderr,
 				_("The encoding you selected (%s) and the encoding that the\n"
-			  "selected locale uses (%s) do not match.  This would lead to\n"
-			"misbehavior in various character string processing functions.\n"
-			   "Rerun %s and either do not specify an encoding explicitly,\n"
+				  "selected locale uses (%s) do not match.  This would lead to\n"
+				  "misbehavior in various character string processing functions.\n"
+				  "Rerun %s and either do not specify an encoding explicitly,\n"
 				  "or choose a matching combination.\n"),
 				pg_encoding_to_char(user_enc),
 				pg_encoding_to_char(locale_enc),
@@ -2355,7 +2370,7 @@ usage(const char *progname)
 	printf(_("      --no-locale           equivalent to --locale=C\n"));
 	printf(_("      --pwfile=FILE         read password for the new superuser from file\n"));
 	printf(_("  -T, --text-search-config=CFG\n"
-		 "                            default text search configuration\n"));
+			 "                            default text search configuration\n"));
 	printf(_("  -U, --username=NAME       database superuser name\n"));
 	printf(_("  -W, --pwprompt            prompt for a password for the new superuser\n"));
 	printf(_("  -X, --waldir=WALDIR       location for the write-ahead log directory\n"));
@@ -2382,15 +2397,15 @@ check_authmethod_unspecified(const char **authmethod)
 	{
 		authwarning = _("\nWARNING: enabling \"trust\" authentication for local connections\n"
 						"You can change this by editing pg_hba.conf or using the option -A, or\n"
-			"--auth-local and --auth-host, the next time you run initdb.\n");
+						"--auth-local and --auth-host, the next time you run initdb.\n");
 		*authmethod = "trust";
 	}
 }
 
 static void
-check_authmethod_valid(const char *authmethod, const char *const * valid_methods, const char *conntype)
+check_authmethod_valid(const char *authmethod, const char *const *valid_methods, const char *conntype)
 {
-	const char *const * p;
+	const char *const *p;
 
 	for (p = valid_methods; *p; p++)
 	{
@@ -2572,18 +2587,18 @@ setup_locale_encoding(void)
 			 */
 #ifdef WIN32
 			printf(_("Encoding \"%s\" implied by locale is not allowed as a server-side encoding.\n"
-			"The default database encoding will be set to \"%s\" instead.\n"),
+					 "The default database encoding will be set to \"%s\" instead.\n"),
 				   pg_encoding_to_char(ctype_enc),
 				   pg_encoding_to_char(PG_UTF8));
 			ctype_enc = PG_UTF8;
 			encodingid = encodingid_to_string(ctype_enc);
 #else
 			fprintf(stderr,
-			   _("%s: locale \"%s\" requires unsupported encoding \"%s\"\n"),
+					_("%s: locale \"%s\" requires unsupported encoding \"%s\"\n"),
 					progname, lc_ctype, pg_encoding_to_char(ctype_enc));
 			fprintf(stderr,
-			  _("Encoding \"%s\" is not allowed as a server-side encoding.\n"
-				"Rerun %s with a different locale selection.\n"),
+					_("Encoding \"%s\" is not allowed as a server-side encoding.\n"
+					  "Rerun %s with a different locale selection.\n"),
 					pg_encoding_to_char(ctype_enc), progname);
 			exit(1);
 #endif
@@ -2995,6 +3010,11 @@ initialize_data_directory(void)
 
 	setup_depend(cmdfd);
 
+	/*
+	 * Note that no objects created after setup_depend() will be "pinned".
+	 * They are all droppable at the whim of the DBA.
+	 */
+
 	setup_sysviews(cmdfd);
 
 #ifdef PGXC
@@ -3060,7 +3080,7 @@ main(int argc, char *argv[])
 		{"show", no_argument, NULL, 's'},
 		{"noclean", no_argument, NULL, 'n'},	/* for backwards compatibility */
 		{"no-clean", no_argument, NULL, 'n'},
-		{"nosync", no_argument, NULL, 'N'},		/* for backwards compatibility */
+		{"nosync", no_argument, NULL, 'N'}, /* for backwards compatibility */
 		{"no-sync", no_argument, NULL, 'N'},
 		{"sync-only", no_argument, NULL, 'S'},
 		{"waldir", required_argument, NULL, 'X'},

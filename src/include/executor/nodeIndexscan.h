@@ -37,9 +37,9 @@ extern void ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 					   IndexRuntimeKeyInfo **runtimeKeys, int *numRuntimeKeys,
 					   IndexArrayKeyInfo **arrayKeys, int *numArrayKeys);
 extern void ExecIndexEvalRuntimeKeys(ExprContext *econtext,
-					   IndexRuntimeKeyInfo *runtimeKeys, int numRuntimeKeys);
+						 IndexRuntimeKeyInfo *runtimeKeys, int numRuntimeKeys);
 extern bool ExecIndexEvalArrayKeys(ExprContext *econtext,
 					   IndexArrayKeyInfo *arrayKeys, int numArrayKeys);
 extern bool ExecIndexAdvanceArrayKeys(IndexArrayKeyInfo *arrayKeys, int numArrayKeys);
 
-#endif   /* NODEINDEXSCAN_H */
+#endif							/* NODEINDEXSCAN_H */

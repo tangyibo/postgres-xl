@@ -1342,8 +1342,8 @@ vacuum_rel(Oid relid, RangeVar *relation, int options, VacuumParams *params)
 		if (IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
 			ereport(LOG,
 					(errcode(ERRCODE_LOCK_NOT_AVAILABLE),
-				   errmsg("skipping vacuum of \"%s\" --- lock not available",
-						  relation->relname)));
+					 errmsg("skipping vacuum of \"%s\" --- lock not available",
+							relation->relname)));
 	}
 
 	if (!onerel)
@@ -1368,8 +1368,8 @@ vacuum_rel(Oid relid, RangeVar *relation, int options, VacuumParams *params)
 	{
 		if (onerel->rd_rel->relisshared)
 			ereport(WARNING,
-				  (errmsg("skipping \"%s\" --- only superuser can vacuum it",
-						  RelationGetRelationName(onerel))));
+					(errmsg("skipping \"%s\" --- only superuser can vacuum it",
+							RelationGetRelationName(onerel))));
 		else if (onerel->rd_rel->relnamespace == PG_CATALOG_NAMESPACE)
 			ereport(WARNING,
 					(errmsg("skipping \"%s\" --- only superuser or database owner can vacuum it",

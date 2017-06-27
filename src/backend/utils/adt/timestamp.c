@@ -114,9 +114,9 @@ anytimestamp_typmod_check(bool istz, int32 typmod)
 	{
 		ereport(WARNING,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-		   errmsg("TIMESTAMP(%d)%s precision reduced to maximum allowed, %d",
-				  typmod, (istz ? " WITH TIME ZONE" : ""),
-				  MAX_TIMESTAMP_PRECISION)));
+				 errmsg("TIMESTAMP(%d)%s precision reduced to maximum allowed, %d",
+						typmod, (istz ? " WITH TIME ZONE" : ""),
+						MAX_TIMESTAMP_PRECISION)));
 		typmod = MAX_TIMESTAMP_PRECISION;
 	}
 
@@ -195,7 +195,7 @@ timestamp_in(PG_FUNCTION_ARGS)
 		case DTK_INVALID:
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			  errmsg("date/time value \"%s\" is no longer supported", str)));
+					 errmsg("date/time value \"%s\" is no longer supported", str)));
 
 			TIMESTAMP_NOEND(result);
 			break;
@@ -363,8 +363,8 @@ AdjustTimestampForTypmod(Timestamp *time, int32 typmod)
 		if (typmod < 0 || typmod > MAX_TIMESTAMP_PRECISION)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				  errmsg("timestamp(%d) precision must be between %d and %d",
-						 typmod, 0, MAX_TIMESTAMP_PRECISION)));
+					 errmsg("timestamp(%d) precision must be between %d and %d",
+							typmod, 0, MAX_TIMESTAMP_PRECISION)));
 
 		if (*time >= INT64CONST(0))
 		{
@@ -435,7 +435,7 @@ timestamptz_in(PG_FUNCTION_ARGS)
 		case DTK_INVALID:
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			  errmsg("date/time value \"%s\" is no longer supported", str)));
+					 errmsg("date/time value \"%s\" is no longer supported", str)));
 
 			TIMESTAMP_NOEND(result);
 			break;
@@ -459,7 +459,7 @@ timestamptz_in(PG_FUNCTION_ARGS)
  * don't care, so we don't bother being consistent.
  */
 static int
-parse_sane_timezone(struct pg_tm * tm, text *zone)
+parse_sane_timezone(struct pg_tm *tm, text *zone)
 {
 	char		tzname[TZ_STRLEN_MAX + 1];
 	int			rt;
@@ -500,7 +500,7 @@ parse_sane_timezone(struct pg_tm * tm, text *zone)
 		if (rt == DTERR_TZDISP_OVERFLOW)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				   errmsg("numeric time zone \"%s\" out of range", tzname)));
+					 errmsg("numeric time zone \"%s\" out of range", tzname)));
 		else if (rt != DTERR_BAD_FORMAT)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -942,7 +942,7 @@ interval_in(PG_FUNCTION_ARGS)
 		case DTK_INVALID:
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			  errmsg("date/time value \"%s\" is no longer supported", str)));
+					 errmsg("date/time value \"%s\" is no longer supported", str)));
 			break;
 
 		default:
@@ -1091,8 +1091,8 @@ intervaltypmodin(PG_FUNCTION_ARGS)
 		{
 			ereport(WARNING,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			  errmsg("INTERVAL(%d) precision reduced to maximum allowed, %d",
-					 tl[1], MAX_INTERVAL_PRECISION)));
+					 errmsg("INTERVAL(%d) precision reduced to maximum allowed, %d",
+							tl[1], MAX_INTERVAL_PRECISION)));
 			typmod = INTERVAL_TYPMOD(MAX_INTERVAL_PRECISION, tl[0]);
 		}
 		else
@@ -1463,8 +1463,8 @@ AdjustIntervalForTypmod(Interval *interval, int32 typmod)
 			if (precision < 0 || precision > MAX_INTERVAL_PRECISION)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				   errmsg("interval(%d) precision must be between %d and %d",
-						  precision, 0, MAX_INTERVAL_PRECISION)));
+						 errmsg("interval(%d) precision must be between %d and %d",
+								precision, 0, MAX_INTERVAL_PRECISION)));
 
 			if (interval->time >= INT64CONST(0))
 			{
@@ -1530,7 +1530,7 @@ EncodeSpecialTimestamp(Timestamp dt, char *str)
 		strcpy(str, EARLY);
 	else if (TIMESTAMP_IS_NOEND(dt))
 		strcpy(str, LATE);
-	else	/* shouldn't happen */
+	else						/* shouldn't happen */
 		elog(ERROR, "invalid argument for EncodeSpecialTimestamp");
 }
 
@@ -1698,7 +1698,7 @@ timestamptz_to_time_t(TimestampTz t)
 	pg_time_t	result;
 
 	result = (pg_time_t) (t / USECS_PER_SEC +
-				 ((POSTGRES_EPOCH_JDATE - UNIX_EPOCH_JDATE) * SECS_PER_DAY));
+						  ((POSTGRES_EPOCH_JDATE - UNIX_EPOCH_JDATE) * SECS_PER_DAY));
 
 	return result;
 }
@@ -1744,7 +1744,7 @@ dt2time(Timestamp jd, int *hour, int *min, int *sec, fsec_t *fsec)
 	time -= (*min) * USECS_PER_MINUTE;
 	*sec = time / USECS_PER_SEC;
 	*fsec = time - (*sec * USECS_PER_SEC);
-}	/* dt2time() */
+}								/* dt2time() */
 
 
 /*
@@ -1759,7 +1759,7 @@ dt2time(Timestamp jd, int *hour, int *min, int *sec, fsec_t *fsec)
  * If attimezone is NULL, the global timezone setting will be used.
  */
 int
-timestamp2tm(Timestamp dt, int *tzp, struct pg_tm * tm, fsec_t *fsec, const char **tzn, pg_tz *attimezone)
+timestamp2tm(Timestamp dt, int *tzp, struct pg_tm *tm, fsec_t *fsec, const char **tzn, pg_tz *attimezone)
 {
 	Timestamp	date;
 	Timestamp	time;
@@ -1855,7 +1855,7 @@ timestamp2tm(Timestamp dt, int *tzp, struct pg_tm * tm, fsec_t *fsec, const char
  * Returns -1 on failure (value out of range).
  */
 int
-tm2timestamp(struct pg_tm * tm, fsec_t fsec, int *tzp, Timestamp *result)
+tm2timestamp(struct pg_tm *tm, fsec_t fsec, int *tzp, Timestamp *result)
 {
 	TimeOffset	date;
 	TimeOffset	time;
@@ -1903,7 +1903,7 @@ tm2timestamp(struct pg_tm * tm, fsec_t fsec, int *tzp, Timestamp *result)
  * Convert an interval data type to a tm structure.
  */
 int
-interval2tm(Interval span, struct pg_tm * tm, fsec_t *fsec)
+interval2tm(Interval span, struct pg_tm *tm, fsec_t *fsec)
 {
 	TimeOffset	time;
 	TimeOffset	tfrac;
@@ -1931,7 +1931,7 @@ interval2tm(Interval span, struct pg_tm * tm, fsec_t *fsec)
 }
 
 int
-tm2interval(struct pg_tm * tm, fsec_t fsec, Interval *span)
+tm2interval(struct pg_tm *tm, fsec_t fsec, Interval *span)
 {
 	double		total_months = (double) tm->tm_year * MONTHS_PER_YEAR + tm->tm_mon;
 
@@ -1985,7 +1985,7 @@ interval_finite(PG_FUNCTION_ARGS)
  *---------------------------------------------------------*/
 
 void
-GetEpochTime(struct pg_tm * tm)
+GetEpochTime(struct pg_tm *tm)
 {
 	struct pg_tm *t0;
 	pg_time_t	epoch = 0;
@@ -2015,7 +2015,7 @@ SetEpochTimestamp(void)
 	tm2timestamp(tm, 0, NULL, &dt);
 
 	return dt;
-}	/* SetEpochTimestamp() */
+}								/* SetEpochTimestamp() */
 
 /*
  * We are currently sharing some code between timestamp and timestamptz.
@@ -2629,7 +2629,7 @@ timestamp_mi(PG_FUNCTION_ARGS)
 	 *----------
 	 */
 	result = DatumGetIntervalP(DirectFunctionCall1(interval_justify_hours,
-												 IntervalPGetDatum(result)));
+												   IntervalPGetDatum(result)));
 
 	PG_RETURN_INTERVAL_P(result);
 }
@@ -3165,7 +3165,7 @@ interval_mul(PG_FUNCTION_ARGS)
 	month_remainder_days = (orig_month * factor - result->month) * DAYS_PER_MONTH;
 	month_remainder_days = TSROUND(month_remainder_days);
 	sec_remainder = (orig_day * factor - result->day +
-		   month_remainder_days - (int) month_remainder_days) * SECS_PER_DAY;
+					 month_remainder_days - (int) month_remainder_days) * SECS_PER_DAY;
 	sec_remainder = TSROUND(sec_remainder);
 
 	/*
@@ -3228,7 +3228,7 @@ interval_div(PG_FUNCTION_ARGS)
 	month_remainder_days = (orig_month / factor - result->month) * DAYS_PER_MONTH;
 	month_remainder_days = TSROUND(month_remainder_days);
 	sec_remainder = (orig_day / factor - result->day +
-		   month_remainder_days - (int) month_remainder_days) * SECS_PER_DAY;
+					 month_remainder_days - (int) month_remainder_days) * SECS_PER_DAY;
 	sec_remainder = TSROUND(sec_remainder);
 	if (Abs(sec_remainder) >= SECS_PER_DAY)
 	{
@@ -3279,7 +3279,7 @@ interval_accum(PG_FUNCTION_ARGS)
 
 	newsum = DatumGetIntervalP(DirectFunctionCall2(interval_pl,
 												   IntervalPGetDatum(&sumX),
-												 IntervalPGetDatum(newval)));
+												   IntervalPGetDatum(newval)));
 	N.time += 1;
 
 	transdatums[0] = IntervalPGetDatum(newsum);
@@ -3363,7 +3363,7 @@ interval_accum_inv(PG_FUNCTION_ARGS)
 
 	newsum = DatumGetIntervalP(DirectFunctionCall2(interval_mi,
 												   IntervalPGetDatum(&sumX),
-												 IntervalPGetDatum(newval)));
+												   IntervalPGetDatum(newval)));
 	N.time -= 1;
 
 	transdatums[0] = IntervalPGetDatum(newsum);
@@ -3918,8 +3918,8 @@ timestamptz_trunc(PG_FUNCTION_ARGS)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			   errmsg("timestamp with time zone units \"%s\" not recognized",
-					  lowunits)));
+				 errmsg("timestamp with time zone units \"%s\" not recognized",
+						lowunits)));
 		result = 0;
 	}
 
@@ -3992,7 +3992,7 @@ interval_trunc(PG_FUNCTION_ARGS)
 						ereport(ERROR,
 								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								 errmsg("interval units \"%s\" not supported "
-							  "because months usually have fractional weeks",
+										"because months usually have fractional weeks",
 										lowunits)));
 					else
 						ereport(ERROR,
@@ -4213,8 +4213,8 @@ NonFiniteTimestampTzPart(int type, int unit, char *lowunits,
 		if (isTz)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			   errmsg("timestamp with time zone units \"%s\" not recognized",
-					  lowunits)));
+					 errmsg("timestamp with time zone units \"%s\" not recognized",
+							lowunits)));
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -4259,8 +4259,8 @@ NonFiniteTimestampTzPart(int type, int unit, char *lowunits,
 			if (isTz)
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("timestamp with time zone units \"%s\" not supported",
-					   lowunits)));
+						 errmsg("timestamp with time zone units \"%s\" not supported",
+								lowunits)));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -4398,7 +4398,7 @@ timestamp_part(PG_FUNCTION_ARGS)
 			case DTK_JULIAN:
 				result = date2j(tm->tm_year, tm->tm_mon, tm->tm_mday);
 				result += ((((tm->tm_hour * MINS_PER_HOUR) + tm->tm_min) * SECS_PER_MINUTE) +
-					tm->tm_sec + (fsec / 1000000.0)) / (double) SECS_PER_DAY;
+						   tm->tm_sec + (fsec / 1000000.0)) / (double) SECS_PER_DAY;
 				break;
 
 			case DTK_ISOYEAR:
@@ -4602,7 +4602,7 @@ timestamptz_part(PG_FUNCTION_ARGS)
 			case DTK_JULIAN:
 				result = date2j(tm->tm_year, tm->tm_mon, tm->tm_mday);
 				result += ((((tm->tm_hour * MINS_PER_HOUR) + tm->tm_min) * SECS_PER_MINUTE) +
-					tm->tm_sec + (fsec / 1000000.0)) / (double) SECS_PER_DAY;
+						   tm->tm_sec + (fsec / 1000000.0)) / (double) SECS_PER_DAY;
 				break;
 
 			case DTK_ISOYEAR:
@@ -4632,8 +4632,8 @@ timestamptz_part(PG_FUNCTION_ARGS)
 			default:
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("timestamp with time zone units \"%s\" not supported",
-					   lowunits)));
+						 errmsg("timestamp with time zone units \"%s\" not supported",
+								lowunits)));
 				result = 0;
 		}
 
@@ -4654,8 +4654,8 @@ timestamptz_part(PG_FUNCTION_ARGS)
 			default:
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("timestamp with time zone units \"%s\" not supported",
-					   lowunits)));
+						 errmsg("timestamp with time zone units \"%s\" not supported",
+								lowunits)));
 				result = 0;
 		}
 	}
@@ -4663,8 +4663,8 @@ timestamptz_part(PG_FUNCTION_ARGS)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-			   errmsg("timestamp with time zone units \"%s\" not recognized",
-					  lowunits)));
+				 errmsg("timestamp with time zone units \"%s\" not recognized",
+						lowunits)));
 
 		result = 0;
 	}
@@ -4923,9 +4923,9 @@ timestamp_izone(PG_FUNCTION_ARGS)
 	if (zone->month != 0 || zone->day != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-		  errmsg("interval time zone \"%s\" must not include months or days",
-				 DatumGetCString(DirectFunctionCall1(interval_out,
-												  PointerGetDatum(zone))))));
+				 errmsg("interval time zone \"%s\" must not include months or days",
+						DatumGetCString(DirectFunctionCall1(interval_out,
+															PointerGetDatum(zone))))));
 
 	tz = zone->time / USECS_PER_SEC;
 
@@ -4937,7 +4937,7 @@ timestamp_izone(PG_FUNCTION_ARGS)
 				 errmsg("timestamp out of range")));
 
 	PG_RETURN_TIMESTAMPTZ(result);
-}	/* timestamp_izone() */
+}								/* timestamp_izone() */
 
 /* timestamp_timestamptz()
  * Convert local timestamp to timestamp at GMT
@@ -5120,9 +5120,9 @@ timestamptz_izone(PG_FUNCTION_ARGS)
 	if (zone->month != 0 || zone->day != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-		  errmsg("interval time zone \"%s\" must not include months or days",
-				 DatumGetCString(DirectFunctionCall1(interval_out,
-												  PointerGetDatum(zone))))));
+				 errmsg("interval time zone \"%s\" must not include months or days",
+						DatumGetCString(DirectFunctionCall1(interval_out,
+															PointerGetDatum(zone))))));
 
 	tz = -(zone->time / USECS_PER_SEC);
 
@@ -5203,9 +5203,9 @@ generate_series_timestamp(PG_FUNCTION_ARGS)
 	{
 		/* increment current in preparation for next iteration */
 		fctx->current = DatumGetTimestamp(
-								   DirectFunctionCall2(timestamp_pl_interval,
-											TimestampGetDatum(fctx->current),
-											  PointerGetDatum(&fctx->step)));
+										  DirectFunctionCall2(timestamp_pl_interval,
+															  TimestampGetDatum(fctx->current),
+															  PointerGetDatum(&fctx->step)));
 
 		/* do when there is more left to send */
 		SRF_RETURN_NEXT(funcctx, TimestampGetDatum(result));
@@ -5284,9 +5284,9 @@ generate_series_timestamptz(PG_FUNCTION_ARGS)
 	{
 		/* increment current in preparation for next iteration */
 		fctx->current = DatumGetTimestampTz(
-								 DirectFunctionCall2(timestamptz_pl_interval,
-										  TimestampTzGetDatum(fctx->current),
-											  PointerGetDatum(&fctx->step)));
+											DirectFunctionCall2(timestamptz_pl_interval,
+																TimestampTzGetDatum(fctx->current),
+																PointerGetDatum(&fctx->step)));
 
 		/* do when there is more left to send */
 		SRF_RETURN_NEXT(funcctx, TimestampTzGetDatum(result));

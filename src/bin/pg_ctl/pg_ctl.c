@@ -68,6 +68,10 @@ typedef enum
 
 #define DEFAULT_WAIT	60
 
+#define USEC_PER_SEC	1000000
+
+#define WAITS_PER_SEC	10		/* should divide USEC_PER_SEC evenly */
+
 static bool do_wait = true;
 static int	wait_seconds = DEFAULT_WAIT;
 static bool wait_seconds_arg = false;
@@ -83,7 +87,7 @@ static const char *progname;
 static char *log_file = NULL;
 static char *exec_path = NULL;
 static char *event_source = NULL;
-static char *register_servicename = "PostgreSQL";		/* FIXME: + version ID? */
+static char *register_servicename = "PostgreSQL";	/* FIXME: + version ID? */
 static char *register_username = NULL;
 static char *register_password = NULL;
 static char *argv0 = NULL;
@@ -173,7 +177,7 @@ write_eventlog(int level, const char *line)
 	if (evtHandle == INVALID_HANDLE_VALUE)
 	{
 		evtHandle = RegisterEventSource(NULL,
-						 event_source ? event_source : DEFAULT_EVENT_SOURCE);
+										event_source ? event_source : DEFAULT_EVENT_SOURCE);
 		if (evtHandle == NULL)
 		{
 			evtHandle = INVALID_HANDLE_VALUE;
@@ -214,7 +218,7 @@ write_stderr(const char *fmt,...)
 	 */
 	if (pgwin32_is_service())	/* Running as a service */
 	{
-		char		errbuf[2048];		/* Arbitrary size? */
+		char		errbuf[2048];	/* Arbitrary size? */
 
 		vsnprintf(errbuf, sizeof(errbuf), fmt, ap);
 
@@ -260,8 +264,7 @@ get_pgpid(bool is_status_request)
 		/*
 		 * The Linux Standard Base Core Specification 3.1 says this should
 		 * return '4, program or service status is unknown'
-		 * https://refspecs.linuxbase.org/LSB_3.1.0/LSB-Core-generic/LSB-Core-g
-		 * eneric/iniscrptact.html
+		 * https://refspecs.linuxbase.org/LSB_3.1.0/LSB-Core-generic/LSB-Core-generic/iniscrptact.html
 		 */
 		exit(is_status_request ? 4 : 1);
 	}
@@ -514,7 +517,7 @@ start_postmaster(void)
 	postmasterProcess = pi.hProcess;
 	CloseHandle(pi.hThread);
 	return pi.dwProcessId;		/* Shell's PID, not postmaster's! */
-#endif   /* WIN32 */
+#endif							/* WIN32 */
 }
 
 
@@ -546,7 +549,7 @@ test_postmaster_connection(pgpid_t pm_pid, bool do_checkpoint)
 
 	connstr[0] = '\0';
 
-	for (i = 0; i < wait_seconds; i++)
+	for (i = 0; i < wait_seconds * WAITS_PER_SEC; i++)
 	{
 		/* Do we need a connection string? */
 		if (connstr[0] == '\0')
@@ -674,7 +677,7 @@ test_postmaster_connection(pgpid_t pm_pid, bool do_checkpoint)
 						 * timeout first.
 						 */
 						snprintf(connstr, sizeof(connstr),
-						"dbname=postgres port=%d host='%s' connect_timeout=5",
+								 "dbname=postgres port=%d host='%s' connect_timeout=5",
 								 portnum, host_str);
 					}
 				}
@@ -716,24 +719,28 @@ test_postmaster_connection(pgpid_t pm_pid, bool do_checkpoint)
 #endif
 
 		/* No response, or startup still in process; wait */
-#ifdef WIN32
-		if (do_checkpoint)
+		if (i % WAITS_PER_SEC == 0)
 		{
-			/*
-			 * Increment the wait hint by 6 secs (connection timeout + sleep)
-			 * We must do this to indicate to the SCM that our startup time is
-			 * changing, otherwise it'll usually send a stop signal after 20
-			 * seconds, despite incrementing the checkpoint counter.
-			 */
-			status.dwWaitHint += 6000;
-			status.dwCheckPoint++;
-			SetServiceStatus(hStatus, (LPSERVICE_STATUS) &status);
-		}
-		else
+#ifdef WIN32
+			if (do_checkpoint)
+			{
+				/*
+				 * Increment the wait hint by 6 secs (connection timeout +
+				 * sleep).  We must do this to indicate to the SCM that our
+				 * startup time is changing, otherwise it'll usually send a
+				 * stop signal after 20 seconds, despite incrementing the
+				 * checkpoint counter.
+				 */
+				status.dwWaitHint += 6000;
+				status.dwCheckPoint++;
+				SetServiceStatus(hStatus, (LPSERVICE_STATUS) &status);
+			}
+			else
 #endif
-			print_msg(".");
+				print_msg(".");
+		}
 
-		pg_usleep(1000000);		/* 1 sec */
+		pg_usleep(USEC_PER_SEC / WAITS_PER_SEC);
 	}
 
 	/* return result of last call to PQping */
@@ -801,8 +808,7 @@ read_post_opts(void)
 				 */
 				if ((arg1 = strstr(optline, " \"")) != NULL)
 				{
-					*arg1 = '\0';		/* terminate so we get only program
-										 * name */
+					*arg1 = '\0';	/* terminate so we get only program name */
 					post_opts = pg_strdup(arg1 + 1);	/* point past whitespace */
 				}
 				if (exec_path == NULL)
@@ -1014,12 +1020,13 @@ do_stop(void)
 
 		print_msg(_("waiting for server to shut down..."));
 
-		for (cnt = 0; cnt < wait_seconds; cnt++)
+		for (cnt = 0; cnt < wait_seconds * WAITS_PER_SEC; cnt++)
 		{
 			if ((pid = get_pgpid(false)) != 0)
 			{
-				print_msg(".");
-				pg_usleep(1000000);		/* 1 sec */
+				if (cnt % WAITS_PER_SEC == 0)
+					print_msg(".");
+				pg_usleep(USEC_PER_SEC / WAITS_PER_SEC);
 			}
 			else
 				break;
@@ -1032,7 +1039,7 @@ do_stop(void)
 			write_stderr(_("%s: server does not shut down\n"), progname);
 			if (shutdown_mode == SMART_MODE)
 				write_stderr(_("HINT: The \"-m fast\" option immediately disconnects sessions rather than\n"
-						  "waiting for session-initiated disconnection.\n"));
+							   "waiting for session-initiated disconnection.\n"));
 			exit(1);
 		}
 		print_msg(_(" done\n"));
@@ -1104,12 +1111,13 @@ do_restart(void)
 
 		/* always wait for restart */
 
-		for (cnt = 0; cnt < wait_seconds; cnt++)
+		for (cnt = 0; cnt < wait_seconds * WAITS_PER_SEC; cnt++)
 		{
 			if ((pid = get_pgpid(false)) != 0)
 			{
-				print_msg(".");
-				pg_usleep(1000000);		/* 1 sec */
+				if (cnt % WAITS_PER_SEC == 0)
+					print_msg(".");
+				pg_usleep(USEC_PER_SEC / WAITS_PER_SEC);
 			}
 			else
 				break;
@@ -1122,7 +1130,7 @@ do_restart(void)
 			write_stderr(_("%s: server does not shut down\n"), progname);
 			if (shutdown_mode == SMART_MODE)
 				write_stderr(_("HINT: The \"-m fast\" option immediately disconnects sessions rather than\n"
-						  "waiting for session-initiated disconnection.\n"));
+							   "waiting for session-initiated disconnection.\n"));
 			exit(1);
 		}
 
@@ -1241,17 +1249,18 @@ do_promote(void)
 	if (do_wait)
 	{
 		DBState		state = DB_STARTUP;
+		int			cnt;
 
 		print_msg(_("waiting for server to promote..."));
-		while (wait_seconds > 0)
+		for (cnt = 0; cnt < wait_seconds * WAITS_PER_SEC; cnt++)
 		{
 			state = get_control_dbstate();
 			if (state == DB_IN_PRODUCTION)
 				break;
 
-			print_msg(".");
-			pg_usleep(1000000); /* 1 sec */
-			wait_seconds--;
+			if (cnt % WAITS_PER_SEC == 0)
+				print_msg(".");
+			pg_usleep(USEC_PER_SEC / WAITS_PER_SEC);
 		}
 		if (state == DB_IN_PRODUCTION)
 		{
@@ -1346,8 +1355,7 @@ do_status(void)
 	/*
 	 * The Linux Standard Base Core Specification 3.1 says this should return
 	 * '3, program is not running'
-	 * https://refspecs.linuxbase.org/LSB_3.1.0/LSB-Core-generic/LSB-Core-gener
-	 * ic/iniscrptact.html
+	 * https://refspecs.linuxbase.org/LSB_3.1.0/LSB-Core-generic/LSB-Core-generic/iniscrptact.html
 	 */
 	exit(3);
 }
@@ -1376,7 +1384,7 @@ IsWindowsXPOrGreater(void)
 	osv.dwOSVersionInfoSize = sizeof(osv);
 
 	/* Windows XP = Version 5.1 */
-	return (!GetVersionEx(&osv) ||		/* could not get version */
+	return (!GetVersionEx(&osv) ||	/* could not get version */
 			osv.dwMajorVersion > 5 || (osv.dwMajorVersion == 5 && osv.dwMinorVersion >= 1));
 }
 
@@ -1388,7 +1396,7 @@ IsWindows7OrGreater(void)
 	osv.dwOSVersionInfoSize = sizeof(osv);
 
 	/* Windows 7 = Version 6.0 */
-	return (!GetVersionEx(&osv) ||		/* could not get version */
+	return (!GetVersionEx(&osv) ||	/* could not get version */
 			osv.dwMajorVersion > 6 || (osv.dwMajorVersion == 6 && osv.dwMinorVersion >= 0));
 }
 #endif
@@ -1507,10 +1515,10 @@ pgwin32_doRegister(void)
 	}
 
 	if ((hService = CreateService(hSCM, register_servicename, register_servicename,
-							   SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
+								  SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
 								  pgctl_start_type, SERVICE_ERROR_NORMAL,
 								  pgwin32_CommandLine(true),
-	   NULL, NULL, "RPCSS\0", register_username, register_password)) == NULL)
+								  NULL, NULL, "RPCSS\0", register_username, register_password)) == NULL)
 	{
 		CloseServiceHandle(hSCM);
 		write_stderr(_("%s: could not register service \"%s\": error code %lu\n"),
@@ -1679,7 +1687,7 @@ pgwin32_ServiceMain(DWORD argc, LPTSTR *argv)
 				break;
 			}
 
-		case (WAIT_OBJECT_0 + 1):		/* postmaster went down */
+		case (WAIT_OBJECT_0 + 1):	/* postmaster went down */
 			break;
 
 		default:
@@ -1796,10 +1804,10 @@ CreateRestrictedProcess(char *cmd, PROCESS_INFORMATION *processInfo, bool as_ser
 	/* Allocate list of SIDs to remove */
 	ZeroMemory(&dropSids, sizeof(dropSids));
 	if (!AllocateAndInitializeSid(&NtAuthority, 2,
-		 SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0,
+								  SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0,
 								  0, &dropSids[0].Sid) ||
 		!AllocateAndInitializeSid(&NtAuthority, 2,
-	SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_POWER_USERS, 0, 0, 0, 0, 0,
+								  SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_POWER_USERS, 0, 0, 0, 0, 0,
 								  0, &dropSids[1].Sid))
 	{
 		write_stderr(_("%s: could not allocate SIDs: error code %lu\n"),
@@ -1931,7 +1939,7 @@ CreateRestrictedProcess(char *cmd, PROCESS_INFORMATION *processInfo, bool as_ser
 	 */
 	return r;
 }
-#endif   /* WIN32 */
+#endif							/* WIN32 */
 
 static void
 do_advice(void)
@@ -1984,7 +1992,7 @@ do_help(void)
 #endif
 	printf(_("  -l, --log=FILENAME     write (or append) server log to FILENAME\n"));
 	printf(_("  -o, --options=OPTIONS  command line options to pass to postgres\n"
-	 "                         (PostgreSQL server executable) or initdb\n"));
+			 "                         (PostgreSQL server executable) or initdb\n"));
 	printf(_("  -p PATH-TO-POSTGRES    normally not necessary\n"));
 	printf(_("\nOptions for stop or restart:\n"));
 	printf(_("  -m, --mode=MODE        MODE can be \"smart\", \"fast\", or \"immediate\"\n"));

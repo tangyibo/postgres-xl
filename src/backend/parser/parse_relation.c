@@ -453,8 +453,8 @@ check_lateral_ref_ok(ParseState *pstate, ParseNamespaceItem *nsitem,
 
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-			errmsg("invalid reference to FROM-clause entry for table \"%s\"",
-				   refname),
+				 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
+						refname),
 				 (rte == pstate->p_target_rangetblentry) ?
 				 errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
 						 refname) :
@@ -878,7 +878,7 @@ searchRangeTableForCol(ParseState *pstate, const char *alias, char *colname,
 				fuzzy_rte_penalty =
 					varstr_levenshtein_less_equal(alias, strlen(alias),
 												  rte->eref->aliasname,
-												strlen(rte->eref->aliasname),
+												  strlen(rte->eref->aliasname),
 												  1, 1, 1,
 												  MAX_FUZZY_DISTANCE + 1,
 												  true);
@@ -947,7 +947,7 @@ markRTEForSelectPriv(ParseState *pstate, RangeTblEntry *rte,
 		rte->requiredPerms |= ACL_SELECT;
 		/* Must offset the attnum to fit in a bitmapset */
 		rte->selectedCols = bms_add_member(rte->selectedCols,
-								   col - FirstLowInvalidHeapAttributeNumber);
+										   col - FirstLowInvalidHeapAttributeNumber);
 	}
 	else if (rte->rtekind == RTE_JOIN)
 	{
@@ -1340,7 +1340,7 @@ addRangeTableEntry(ParseState *pstate,
 	else
 #endif
 	rte->requiredPerms = ACL_SELECT;
-	rte->checkAsUser = InvalidOid;		/* not set-uid by default, either */
+	rte->checkAsUser = InvalidOid;	/* not set-uid by default, either */
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -1395,7 +1395,7 @@ addRangeTableEntryForRelation(ParseState *pstate,
 	rte->inFromCl = inFromCl;
 
 	rte->requiredPerms = ACL_SELECT;
-	rte->checkAsUser = InvalidOid;		/* not set-uid by default, either */
+	rte->checkAsUser = InvalidOid;	/* not set-uid by default, either */
 	rte->selectedCols = NULL;
 	rte->insertedCols = NULL;
 	rte->updatedCols = NULL;
@@ -1562,7 +1562,7 @@ addRangeTableEntryForFunction(ParseState *pstate,
 		rtfunc->funccoltypes = NIL;
 		rtfunc->funccoltypmods = NIL;
 		rtfunc->funccolcollations = NIL;
-		rtfunc->funcparams = NULL;		/* not set until planning */
+		rtfunc->funcparams = NULL;	/* not set until planning */
 
 		/*
 		 * Now determine if the function returns a simple or composite type.
@@ -1582,7 +1582,7 @@ addRangeTableEntryForFunction(ParseState *pstate,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("a column definition list is only allowed for functions returning \"record\""),
 						 parser_errposition(pstate,
-										exprLocation((Node *) coldeflist))));
+											exprLocation((Node *) coldeflist))));
 		}
 		else
 		{
@@ -1668,8 +1668,8 @@ addRangeTableEntryForFunction(ParseState *pstate,
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
-			 errmsg("function \"%s\" in FROM has unsupported return type %s",
-					funcname, format_type_be(funcrettype)),
+					 errmsg("function \"%s\" in FROM has unsupported return type %s",
+							funcname, format_type_be(funcrettype)),
 					 parser_errposition(pstate, exprLocation(funcexpr))));
 
 		/* Finish off the RangeTblFunction and add it to the RTE's list */
@@ -1779,7 +1779,7 @@ addRangeTableEntryForTableFunc(ParseState *pstate,
 	/* fill in any unspecified alias columns */
 	if (numaliases < list_length(tf->colnames))
 		eref->colnames = list_concat(eref->colnames,
-								   list_copy_tail(tf->colnames, numaliases));
+									 list_copy_tail(tf->colnames, numaliases));
 
 	rte->eref = eref;
 
@@ -2002,8 +2002,8 @@ addRangeTableEntryForCTE(ParseState *pstate,
 			ctequery->returningList == NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("WITH query \"%s\" does not have a RETURNING clause",
-						cte->ctename),
+					 errmsg("WITH query \"%s\" does not have a RETURNING clause",
+							cte->ctename),
 					 parser_errposition(pstate, rv->location)));
 	}
 
@@ -2620,7 +2620,7 @@ expandTupleDesc(TupleDesc tupdesc, Alias *eref, int count, int offset,
 					 * what type the Const claims to be.
 					 */
 					*colvars = lappend(*colvars,
-									 makeNullConst(INT4OID, -1, InvalidOid));
+									   makeNullConst(INT4OID, -1, InvalidOid));
 				}
 			}
 			if (aliascell)
@@ -2706,7 +2706,7 @@ expandRelAttrs(ParseState *pstate, RangeTblEntry *rte,
 		markVarForSelectPriv(pstate, varnode, rte);
 	}
 
-	Assert(name == NULL && var == NULL);		/* lists not the same length? */
+	Assert(name == NULL && var == NULL);	/* lists not the same length? */
 
 	return te_list;
 }
@@ -2775,7 +2775,7 @@ get_rte_attribute_type(RangeTblEntry *rte, AttrNumber attnum,
 				tp = SearchSysCache2(ATTNUM,
 									 ObjectIdGetDatum(rte->relid),
 									 Int16GetDatum(attnum));
-				if (!HeapTupleIsValid(tp))		/* shouldn't happen */
+				if (!HeapTupleIsValid(tp))	/* shouldn't happen */
 					elog(ERROR, "cache lookup failed for attribute %d of relation %u",
 						 attnum, rte->relid);
 				att_tup = (Form_pg_attribute) GETSTRUCT(tp);
@@ -2787,9 +2787,9 @@ get_rte_attribute_type(RangeTblEntry *rte, AttrNumber attnum,
 				if (att_tup->attisdropped)
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
-					errmsg("column \"%s\" of relation \"%s\" does not exist",
-						   NameStr(att_tup->attname),
-						   get_rel_name(rte->relid))));
+							 errmsg("column \"%s\" of relation \"%s\" does not exist",
+									NameStr(att_tup->attname),
+									get_rel_name(rte->relid))));
 				*vartype = att_tup->atttypid;
 				*vartypmod = att_tup->atttypmod;
 				*varcollid = att_tup->attcollation;
@@ -2959,7 +2959,7 @@ get_rte_attribute_is_dropped(RangeTblEntry *rte, AttrNumber attnum)
 				tp = SearchSysCache2(ATTNUM,
 									 ObjectIdGetDatum(rte->relid),
 									 Int16GetDatum(attnum));
-				if (!HeapTupleIsValid(tp))		/* shouldn't happen */
+				if (!HeapTupleIsValid(tp))	/* shouldn't happen */
 					elog(ERROR, "cache lookup failed for attribute %d of relation %u",
 						 attnum, rte->relid);
 				att_tup = (Form_pg_attribute) GETSTRUCT(tp);
@@ -3281,11 +3281,11 @@ errorMissingRTE(ParseState *pstate, RangeVar *relation)
 	if (rte)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_TABLE),
-			errmsg("invalid reference to FROM-clause entry for table \"%s\"",
-				   relation->relname),
+				 errmsg("invalid reference to FROM-clause entry for table \"%s\"",
+						relation->relname),
 				 (badAlias ?
-			errhint("Perhaps you meant to reference the table alias \"%s\".",
-					badAlias) :
+				  errhint("Perhaps you meant to reference the table alias \"%s\".",
+						  badAlias) :
 				  errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
 						  rte->eref->aliasname)),
 				 parser_errposition(pstate, relation->location)));
@@ -3344,8 +3344,8 @@ errorMissingColumn(ParseState *pstate,
 				 errmsg("column %s.%s does not exist", relname, colname) :
 				 errmsg("column \"%s\" does not exist", colname),
 				 state->rfirst ? closestfirst ?
-			  errhint("Perhaps you meant to reference the column \"%s.%s\".",
-					  state->rfirst->eref->aliasname, closestfirst) :
+				 errhint("Perhaps you meant to reference the column \"%s.%s\".",
+						 state->rfirst->eref->aliasname, closestfirst) :
 				 errhint("There is a column named \"%s\" in table \"%s\", but it cannot be referenced from this part of the query.",
 						 colname, state->rfirst->eref->aliasname) : 0,
 				 parser_errposition(pstate, location)));

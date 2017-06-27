@@ -69,9 +69,9 @@ typedef struct
 {
 	bool		initialized;
 	unsigned short seed[3];
-}	BackendRandomShmemStruct;
+}			BackendRandomShmemStruct;
 
-static BackendRandomShmemStruct *BackendRandomShmem;
+static BackendRandomShmemStruct * BackendRandomShmem;
 
 Size
 BackendRandomShmemSize(void)
@@ -155,4 +155,4 @@ pg_backend_random(char *dst, int len)
 }
 
 
-#endif   /* HAVE_STRONG_RANDOM */
+#endif							/* HAVE_STRONG_RANDOM */

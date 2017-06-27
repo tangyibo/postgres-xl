@@ -32,7 +32,7 @@ typedef struct SnapshotData *Snapshot;
  * function.
  */
 typedef bool (*SnapshotSatisfiesFunc) (HeapTuple htup,
-										   Snapshot snapshot, Buffer buffer);
+									   Snapshot snapshot, Buffer buffer);
 
 /*
  * Struct representing all kind of possible snapshots.
@@ -130,4 +130,4 @@ typedef enum
 	HeapTupleWouldBlock			/* can be returned by heap_tuple_lock */
 } HTSU_Result;
 
-#endif   /* SNAPSHOT_H */
+#endif							/* SNAPSHOT_H */

@@ -137,7 +137,7 @@ typedef struct MergeJoinClauseData
 	 * stored here.
 	 */
 	SortSupportData ssup;
-}	MergeJoinClauseData;
+}			MergeJoinClauseData;
 
 /* Result type for MJEvalOuterValues and MJEvalInnerValues */
 typedef enum
@@ -216,7 +216,7 @@ MJExamineQuals(List *mergeclauses,
 			clause->ssup.ssup_reverse = false;
 		else if (opstrategy == BTGreaterStrategyNumber)
 			clause->ssup.ssup_reverse = true;
-		else	/* planner screwed up */
+		else					/* planner screwed up */
 			elog(ERROR, "unsupported mergejoin strategy %d", opstrategy);
 		clause->ssup.ssup_nulls_first = nulls_first;
 
@@ -225,7 +225,7 @@ MJExamineQuals(List *mergeclauses,
 								   &op_strategy,
 								   &op_lefttype,
 								   &op_righttype);
-		if (op_strategy != BTEqualStrategyNumber)		/* should not happen */
+		if (op_strategy != BTEqualStrategyNumber)	/* should not happen */
 			elog(ERROR, "cannot merge using non-equality operator %u",
 				 qual->opno);
 
@@ -849,7 +849,7 @@ ExecMergeJoin(MergeJoinState *node)
 					 */
 					TupleTableSlot *result;
 
-					node->mj_MatchedInner = true;		/* do it only once */
+					node->mj_MatchedInner = true;	/* do it only once */
 
 					result = MJFillInner(node);
 					if (result)
@@ -951,7 +951,7 @@ ExecMergeJoin(MergeJoinState *node)
 					 */
 					TupleTableSlot *result;
 
-					node->mj_MatchedOuter = true;		/* do it only once */
+					node->mj_MatchedOuter = true;	/* do it only once */
 
 					result = MJFillOuter(node);
 					if (result)
@@ -1212,7 +1212,7 @@ ExecMergeJoin(MergeJoinState *node)
 					 */
 					TupleTableSlot *result;
 
-					node->mj_MatchedOuter = true;		/* do it only once */
+					node->mj_MatchedOuter = true;	/* do it only once */
 
 					result = MJFillOuter(node);
 					if (result)
@@ -1274,7 +1274,7 @@ ExecMergeJoin(MergeJoinState *node)
 					 */
 					TupleTableSlot *result;
 
-					node->mj_MatchedInner = true;		/* do it only once */
+					node->mj_MatchedInner = true;	/* do it only once */
 
 					result = MJFillInner(node);
 					if (result)
@@ -1344,7 +1344,7 @@ ExecMergeJoin(MergeJoinState *node)
 					 */
 					TupleTableSlot *result;
 
-					node->mj_MatchedInner = true;		/* do it only once */
+					node->mj_MatchedInner = true;	/* do it only once */
 
 					result = MJFillInner(node);
 					if (result)
@@ -1390,7 +1390,7 @@ ExecMergeJoin(MergeJoinState *node)
 					 */
 					TupleTableSlot *result;
 
-					node->mj_MatchedOuter = true;		/* do it only once */
+					node->mj_MatchedOuter = true;	/* do it only once */
 
 					result = MJFillOuter(node);
 					if (result)
@@ -1534,14 +1534,14 @@ ExecInitMergeJoin(MergeJoin *node, EState *estate, int eflags)
 			mergestate->mj_FillInner = false;
 			mergestate->mj_NullInnerTupleSlot =
 				ExecInitNullTupleSlot(estate,
-							  ExecGetResultType(innerPlanState(mergestate)));
+									  ExecGetResultType(innerPlanState(mergestate)));
 			break;
 		case JOIN_RIGHT:
 			mergestate->mj_FillOuter = false;
 			mergestate->mj_FillInner = true;
 			mergestate->mj_NullOuterTupleSlot =
 				ExecInitNullTupleSlot(estate,
-							  ExecGetResultType(outerPlanState(mergestate)));
+									  ExecGetResultType(outerPlanState(mergestate)));
 
 			/*
 			 * Can't handle right or full join with non-constant extra
@@ -1558,10 +1558,10 @@ ExecInitMergeJoin(MergeJoin *node, EState *estate, int eflags)
 			mergestate->mj_FillInner = true;
 			mergestate->mj_NullOuterTupleSlot =
 				ExecInitNullTupleSlot(estate,
-							  ExecGetResultType(outerPlanState(mergestate)));
+									  ExecGetResultType(outerPlanState(mergestate)));
 			mergestate->mj_NullInnerTupleSlot =
 				ExecInitNullTupleSlot(estate,
-							  ExecGetResultType(innerPlanState(mergestate)));
+									  ExecGetResultType(innerPlanState(mergestate)));
 
 			/*
 			 * Can't handle right or full join with non-constant extra

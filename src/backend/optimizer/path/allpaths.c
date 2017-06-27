@@ -165,7 +165,7 @@ make_one_rel(PlannerInfo *root, List *joinlist)
 		if (brel == NULL)
 			continue;
 
-		Assert(brel->relid == rti);		/* sanity check on array */
+		Assert(brel->relid == rti); /* sanity check on array */
 
 		/* ignore RTEs that are "other rels" */
 		if (brel->reloptkind != RELOPT_BASEREL)
@@ -264,7 +264,7 @@ set_base_rel_sizes(PlannerInfo *root)
 		if (rel == NULL)
 			continue;
 
-		Assert(rel->relid == rti);		/* sanity check on array */
+		Assert(rel->relid == rti);	/* sanity check on array */
 
 		/* ignore RTEs that are "other rels" */
 		if (rel->reloptkind != RELOPT_BASEREL)
@@ -306,7 +306,7 @@ set_base_rel_pathlists(PlannerInfo *root)
 		if (rel == NULL)
 			continue;
 
-		Assert(rel->relid == rti);		/* sanity check on array */
+		Assert(rel->relid == rti);	/* sanity check on array */
 
 		/* ignore RTEs that are "other rels" */
 		if (rel->reloptkind != RELOPT_BASEREL)
@@ -816,7 +816,7 @@ set_tablesample_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *
 	 */
 	if ((root->query_level > 1 ||
 		 bms_membership(root->all_baserels) != BMS_SINGLETON) &&
-	 !(GetTsmRoutine(rte->tablesample->tsmhandler)->repeatable_across_scans))
+		!(GetTsmRoutine(rte->tablesample->tsmhandler)->repeatable_across_scans))
 	{
 		path = (Path *) create_material_path(rel, path);
 	}
@@ -859,10 +859,10 @@ set_foreign_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
  *	  Set size estimates for a simple "append relation"
  *
  * The passed-in rel and RTE represent the entire append relation.  The
- * relation's contents are computed by appending together the output of
- * the individual member relations.  Note that in the inheritance case,
- * the first member relation is actually the same table as is mentioned in
- * the parent RTE ... but it has a different RTE and RelOptInfo.  This is
+ * relation's contents are computed by appending together the output of the
+ * individual member relations.  Note that in the non-partitioned inheritance
+ * case, the first member relation is actually the same table as is mentioned
+ * in the parent RTE ... but it has a different RTE and RelOptInfo.  This is
  * a good thing because their outputs are not the same size.
  */
 static void
@@ -986,7 +986,7 @@ set_append_rel_size(PlannerInfo *root, RelOptInfo *rel,
 				childquals = lappend(childquals,
 									 make_restrictinfo((Expr *) onecq,
 													   rinfo->is_pushed_down,
-													rinfo->outerjoin_delayed,
+													   rinfo->outerjoin_delayed,
 													   pseudoconstant,
 													   rinfo->security_level,
 													   NULL, NULL, NULL));
@@ -1323,14 +1323,14 @@ add_paths_to_append_rel(PlannerInfo *root, RelOptInfo *rel,
 		 */
 		if (childrel->cheapest_total_path->param_info == NULL)
 			subpaths = accumulate_append_subpath(subpaths,
-											  childrel->cheapest_total_path);
+												 childrel->cheapest_total_path);
 		else
 			subpaths_valid = false;
 
 		/* Same idea, but for a partial plan. */
 		if (childrel->partial_pathlist != NIL)
 			partial_subpaths = accumulate_append_subpath(partial_subpaths,
-									   linitial(childrel->partial_pathlist));
+														 linitial(childrel->partial_pathlist));
 		else
 			partial_subpaths_valid = false;
 
@@ -1596,7 +1596,7 @@ generate_mergeappend_paths(PlannerInfo *root, RelOptInfo *rel,
 															total_subpaths,
 															pathkeys,
 															NULL,
-														  partitioned_rels));
+															partitioned_rels));
 	}
 }
 
@@ -1962,7 +1962,7 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		pathkeys = convert_subquery_pathkeys(root,
 											 rel,
 											 subpath->pathkeys,
-							make_tlist_from_pathtarget(subpath->pathtarget));
+											 make_tlist_from_pathtarget(subpath->pathtarget));
 
 		if (subroot->distribution && subroot->distribution->distributionExpr)
 		{
@@ -3119,7 +3119,7 @@ create_partial_bitmap_paths(PlannerInfo *root, RelOptInfo *rel,
 		return;
 
 	add_partial_path(rel, (Path *) create_bitmap_heap_path(root, rel,
-					bitmapqual, rel->lateral_relids, 1.0, parallel_workers));
+														   bitmapqual, rel->lateral_relids, 1.0, parallel_workers));
 }
 
 /*
@@ -3157,7 +3157,7 @@ compute_parallel_worker(RelOptInfo *rel, double heap_pages, double index_pages)
 		 */
 		if (rel->reloptkind == RELOPT_BASEREL &&
 			((heap_pages >= 0 && heap_pages < min_parallel_table_scan_size) ||
-		   (index_pages >= 0 && index_pages < min_parallel_index_scan_size)))
+			 (index_pages >= 0 && index_pages < min_parallel_index_scan_size)))
 			return 0;
 
 		if (heap_pages >= 0)
@@ -3513,4 +3513,4 @@ debug_print_rel(PlannerInfo *root, RelOptInfo *rel)
 	fflush(stdout);
 }
 
-#endif   /* OPTIMIZER_DEBUG */
+#endif							/* OPTIMIZER_DEBUG */

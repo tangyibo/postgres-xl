@@ -302,7 +302,7 @@ transformStmt(ParseState *pstate, Node *parseTree)
 		default:
 			break;
 	}
-#endif   /* RAW_EXPRESSION_COVERAGE_TEST */
+#endif							/* RAW_EXPRESSION_COVERAGE_TEST */
 
 	switch (nodeTag(parseTree))
 	{
@@ -339,7 +339,7 @@ transformStmt(ParseState *pstate, Node *parseTree)
 			 */
 		case T_DeclareCursorStmt:
 			result = transformDeclareCursorStmt(pstate,
-											(DeclareCursorStmt *) parseTree);
+												(DeclareCursorStmt *) parseTree);
 			break;
 
 		case T_ExplainStmt:
@@ -356,7 +356,7 @@ transformStmt(ParseState *pstate, Node *parseTree)
 
 		case T_CreateTableAsStmt:
 			result = transformCreateTableAsStmt(pstate,
-											(CreateTableAsStmt *) parseTree);
+												(CreateTableAsStmt *) parseTree);
 			break;
 
 		default:
@@ -542,7 +542,7 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 	qry->override = stmt->override;
 
 	isOnConflictUpdate = (stmt->onConflictClause &&
-						stmt->onConflictClause->action == ONCONFLICT_UPDATE);
+						  stmt->onConflictClause->action == ONCONFLICT_UPDATE);
 
 	/*
 	 * We have three cases to deal with: DEFAULT VALUES (selectStmt == NULL),
@@ -891,7 +891,7 @@ transformInsertStmt(ParseState *pstate, InsertStmt *stmt)
 		qry->targetList = lappend(qry->targetList, tle);
 
 		rte->insertedCols = bms_add_member(rte->insertedCols,
-							  attr_num - FirstLowInvalidHeapAttributeNumber);
+										   attr_num - FirstLowInvalidHeapAttributeNumber);
 
 		icols = lnext(icols);
 		attnos = lnext(attnos);
@@ -970,7 +970,7 @@ transformInsertRow(ParseState *pstate, List *exprlist,
 				 errmsg("INSERT has more expressions than target columns"),
 				 parser_errposition(pstate,
 									exprLocation(list_nth(exprlist,
-												  list_length(icolumns))))));
+														  list_length(icolumns))))));
 	if (stmtcols != NIL &&
 		list_length(exprlist) < list_length(icolumns))
 	{
@@ -992,7 +992,7 @@ transformInsertRow(ParseState *pstate, List *exprlist,
 				  errhint("The insertion source is a row expression containing the same number of columns expected by the INSERT. Did you accidentally use extra parentheses?") : 0),
 				 parser_errposition(pstate,
 									exprLocation(list_nth(icolumns,
-												  list_length(exprlist))))));
+														  list_length(exprlist))))));
 	}
 
 	/*
@@ -1251,7 +1251,7 @@ transformSelectStmt(ParseState *pstate, SelectStmt *stmt)
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT ... INTO is not allowed here"),
 				 parser_errposition(pstate,
-								  exprLocation((Node *) stmt->intoClause))));
+									exprLocation((Node *) stmt->intoClause))));
 
 	/* make FOR UPDATE/FOR SHARE info available to addRangeTableEntry */
 	pstate->p_locking_clause = stmt->lockingClause;
@@ -1580,7 +1580,7 @@ transformValuesClause(ParseState *pstate, SelectStmt *stmt)
 		  translator: %s is a SQL row locking clause such as FOR UPDATE */
 				 errmsg("%s cannot be applied to VALUES",
 						LCS_asString(((LockingClause *)
-								linitial(stmt->lockingClause))->strength))));
+									  linitial(stmt->lockingClause))->strength))));
 
 	qry->rtable = pstate->p_rtable;
 	qry->jointree = makeFromExpr(pstate->p_joinlist, NULL);
@@ -1648,7 +1648,7 @@ transformSetOperationStmt(ParseState *pstate, SelectStmt *stmt)
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("SELECT ... INTO is not allowed here"),
 				 parser_errposition(pstate,
-						exprLocation((Node *) leftmostSelect->intoClause))));
+									exprLocation((Node *) leftmostSelect->intoClause))));
 
 	/*
 	 * We need to extract ORDER BY and other top-level clauses here and not
@@ -1801,7 +1801,7 @@ transformSetOperationStmt(ParseState *pstate, SelectStmt *stmt)
 				 errdetail("Only result column names can be used, not expressions or functions."),
 				 errhint("Add the expression/function to every SELECT, or move the UNION into a FROM clause."),
 				 parser_errposition(pstate,
-						   exprLocation(list_nth(qry->targetList, tllen)))));
+									exprLocation(list_nth(qry->targetList, tllen)))));
 
 	qry->limitOffset = transformLimitClause(pstate, limitOffset,
 											EXPR_KIND_OFFSET, "OFFSET");
@@ -1862,7 +1862,7 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("INTO is only allowed on first SELECT of UNION/INTERSECT/EXCEPT"),
 				 parser_errposition(pstate,
-								  exprLocation((Node *) stmt->intoClause))));
+									exprLocation((Node *) stmt->intoClause))));
 
 	/* We don't support FOR UPDATE/SHARE with set ops at the moment. */
 	if (stmt->lockingClause)
@@ -1872,7 +1872,7 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 		  translator: %s is a SQL row locking clause such as FOR UPDATE */
 				 errmsg("%s is not allowed with UNION/INTERSECT/EXCEPT",
 						LCS_asString(((LockingClause *)
-								linitial(stmt->lockingClause))->strength))));
+									  linitial(stmt->lockingClause))->strength))));
 
 	/*
 	 * If an internal node of a set-op tree has ORDER BY, LIMIT, FOR UPDATE,
@@ -1934,7 +1934,7 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 						(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 						 errmsg("UNION/INTERSECT/EXCEPT member statement cannot refer to other relations of same query level"),
 						 parser_errposition(pstate,
-							 locate_var_of_level((Node *) selectQuery, 1))));
+											locate_var_of_level((Node *) selectQuery, 1))));
 		}
 
 		/*
@@ -2021,8 +2021,8 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 		if (list_length(ltargetlist) != list_length(rtargetlist))
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("each %s query must have the same number of columns",
-						context),
+					 errmsg("each %s query must have the same number of columns",
+							context),
 					 parser_errposition(pstate,
 										exprLocation((Node *) rtargetlist))));
 
@@ -2119,8 +2119,8 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 			 * collation.)
 			 */
 			rescolcoll = select_common_collation(pstate,
-											  list_make2(lcolnode, rcolnode),
-										 (op->op == SETOP_UNION && op->all));
+												 list_make2(lcolnode, rcolnode),
+												 (op->op == SETOP_UNION && op->all));
 
 			/* emit results */
 			op->colTypes = lappend_oid(op->colTypes, rescoltype);
@@ -2155,7 +2155,7 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 				grpcl->tleSortGroupRef = 0;
 				grpcl->eqop = eqop;
 				grpcl->sortop = sortop;
-				grpcl->nulls_first = false;		/* OK with or without sortop */
+				grpcl->nulls_first = false; /* OK with or without sortop */
 				grpcl->hashable = hashable;
 
 				op->groupClauses = lappend(op->groupClauses, grpcl);
@@ -2176,7 +2176,7 @@ transformSetOperationTree(ParseState *pstate, SelectStmt *stmt,
 				rescolnode->collation = rescolcoll;
 				rescolnode->location = bestlocation;
 				restle = makeTargetEntry((Expr *) rescolnode,
-										 0,		/* no need to set resno */
+										 0, /* no need to set resno */
 										 NULL,
 										 false);
 				*targetlist = lappend(*targetlist, restle);
@@ -2361,7 +2361,7 @@ transformUpdateTargetList(ParseState *pstate, List *origTlist)
 					(errcode(ERRCODE_UNDEFINED_COLUMN),
 					 errmsg("column \"%s\" of relation \"%s\" does not exist",
 							origTarget->name,
-						 RelationGetRelationName(pstate->p_target_relation)),
+							RelationGetRelationName(pstate->p_target_relation)),
 					 parser_errposition(pstate, origTarget->location)));
 
 		updateTargetListEntry(pstate, tle, origTarget->name,
@@ -2371,7 +2371,7 @@ transformUpdateTargetList(ParseState *pstate, List *origTlist)
 
 		/* Mark the target column as requiring update permissions */
 		target_rte->updatedCols = bms_add_member(target_rte->updatedCols,
-								attrno - FirstLowInvalidHeapAttributeNumber);
+												 attrno - FirstLowInvalidHeapAttributeNumber);
 
 		orig_tl = lnext(orig_tl);
 	}
@@ -2825,7 +2825,7 @@ LCS_asString(LockClauseStrength strength)
 void
 CheckSelectLocking(Query *qry, LockClauseStrength strength)
 {
-	Assert(strength != LCS_NONE);		/* else caller error */
+	Assert(strength != LCS_NONE);	/* else caller error */
 
 	if (qry->setOperations)
 		ereport(ERROR,
@@ -2986,25 +2986,25 @@ transformLockingClause(ParseState *pstate, Query *qry, LockingClause *lc,
 							  translator: %s is a SQL row locking clause such as FOR UPDATE */
 									 errmsg("%s cannot be applied to a join",
 											LCS_asString(lc->strength)),
-							 parser_errposition(pstate, thisrel->location)));
+									 parser_errposition(pstate, thisrel->location)));
 							break;
 						case RTE_FUNCTION:
 							ereport(ERROR,
 									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							/*------
 							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-								 errmsg("%s cannot be applied to a function",
-										LCS_asString(lc->strength)),
-							 parser_errposition(pstate, thisrel->location)));
+									 errmsg("%s cannot be applied to a function",
+											LCS_asString(lc->strength)),
+									 parser_errposition(pstate, thisrel->location)));
 							break;
 						case RTE_TABLEFUNC:
 							ereport(ERROR,
 									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							/*------
 							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-							errmsg("%s cannot be applied to a table function",
-								   LCS_asString(lc->strength)),
-							 parser_errposition(pstate, thisrel->location)));
+									 errmsg("%s cannot be applied to a table function",
+											LCS_asString(lc->strength)),
+									 parser_errposition(pstate, thisrel->location)));
 							break;
 						case RTE_VALUES:
 							ereport(ERROR,
@@ -3013,16 +3013,16 @@ transformLockingClause(ParseState *pstate, Query *qry, LockingClause *lc,
 							  translator: %s is a SQL row locking clause such as FOR UPDATE */
 									 errmsg("%s cannot be applied to VALUES",
 											LCS_asString(lc->strength)),
-							 parser_errposition(pstate, thisrel->location)));
+									 parser_errposition(pstate, thisrel->location)));
 							break;
 						case RTE_CTE:
 							ereport(ERROR,
 									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							/*------
 							  translator: %s is a SQL row locking clause such as FOR UPDATE */
-							   errmsg("%s cannot be applied to a WITH query",
-									  LCS_asString(lc->strength)),
-							 parser_errposition(pstate, thisrel->location)));
+									 errmsg("%s cannot be applied to a WITH query",
+											LCS_asString(lc->strength)),
+									 parser_errposition(pstate, thisrel->location)));
 							break;
 						case RTE_NAMEDTUPLESTORE:
 							ereport(ERROR,
@@ -3031,7 +3031,7 @@ transformLockingClause(ParseState *pstate, Query *qry, LockingClause *lc,
 							  translator: %s is a SQL row locking clause such as FOR UPDATE */
 									 errmsg("%s cannot be applied to a named tuplestore",
 											LCS_asString(lc->strength)),
-							 parser_errposition(pstate, thisrel->location)));
+									 parser_errposition(pstate, thisrel->location)));
 							break;
 						default:
 							elog(ERROR, "unrecognized RTE type: %d",
@@ -3064,7 +3064,7 @@ applyLockingClause(Query *qry, Index rtindex,
 {
 	RowMarkClause *rc;
 
-	Assert(strength != LCS_NONE);		/* else caller error */
+	Assert(strength != LCS_NONE);	/* else caller error */
 
 	/* If it's an explicit clause, make sure hasForUpdate gets set */
 	if (!pushedDown)
@@ -3218,4 +3218,4 @@ test_raw_expression_coverage(Node *node, void *context)
 									  context);
 }
 
-#endif   /* RAW_EXPRESSION_COVERAGE_TEST */
+#endif							/* RAW_EXPRESSION_COVERAGE_TEST */

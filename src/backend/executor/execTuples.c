@@ -254,8 +254,8 @@ ExecDropSingleTupleTableSlot(TupleTableSlot *slot)
  * --------------------------------
  */
 void
-ExecSetSlotDescriptor(TupleTableSlot *slot,		/* slot to change */
-					  TupleDesc tupdesc)		/* new tuple descriptor */
+ExecSetSlotDescriptor(TupleTableSlot *slot, /* slot to change */
+					  TupleDesc tupdesc)	/* new tuple descriptor */
 {
 	/* For safety, make sure slot is empty before changing it */
 	ExecClearTuple(slot);
@@ -1377,7 +1377,7 @@ HeapTupleHeaderGetDatum(HeapTupleHeader tuple)
 
 	/* And do the flattening */
 	result = toast_flatten_tuple_to_datum(tuple,
-										HeapTupleHeaderGetDatumLength(tuple),
+										  HeapTupleHeaderGetDatumLength(tuple),
 										  tupDesc);
 
 	ReleaseTupleDesc(tupDesc);

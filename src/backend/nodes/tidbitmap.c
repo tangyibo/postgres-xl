@@ -216,7 +216,7 @@ typedef struct PTIterationArray
  */
 struct TBMSharedIterator
 {
-	TBMSharedIteratorState *state;		/* shared state */
+	TBMSharedIteratorState *state;	/* shared state */
 	PTEntryArray *ptbase;		/* pagetable element array */
 	PTIterationArray *ptpages;	/* sorted exact page index list */
 	PTIterationArray *ptchunks; /* sorted lossy page index list */
@@ -297,8 +297,8 @@ tbm_create(long maxbytes, dsa_area *dsa)
 	 */
 	nbuckets = maxbytes /
 		(sizeof(PagetableEntry) + sizeof(Pointer) + sizeof(Pointer));
-	nbuckets = Min(nbuckets, INT_MAX - 1);		/* safety limit */
-	nbuckets = Max(nbuckets, 16);		/* sanity limit */
+	nbuckets = Min(nbuckets, INT_MAX - 1);	/* safety limit */
+	nbuckets = Max(nbuckets, 16);	/* sanity limit */
 	tbm->maxentries = (int) nbuckets;
 	tbm->lossify_start = 0;
 	tbm->dsa = dsa;
@@ -723,7 +723,7 @@ tbm_begin_iterate(TIDBitmap *tbm)
 	 * needs of the TBMIterateResult sub-struct.
 	 */
 	iterator = (TBMIterator *) palloc(sizeof(TBMIterator) +
-								 MAX_TUPLES_PER_PAGE * sizeof(OffsetNumber));
+									  MAX_TUPLES_PER_PAGE * sizeof(OffsetNumber));
 	iterator->tbm = tbm;
 
 	/*
@@ -1498,7 +1498,7 @@ tbm_attach_shared_iterate(dsa_area *dsa, dsa_pointer dp)
 	 * serve the needs of the TBMIterateResult sub-struct.
 	 */
 	iterator = (TBMSharedIterator *) palloc0(sizeof(TBMSharedIterator) +
-								 MAX_TUPLES_PER_PAGE * sizeof(OffsetNumber));
+											 MAX_TUPLES_PER_PAGE * sizeof(OffsetNumber));
 
 	istate = (TBMSharedIteratorState *) dsa_get_address(dsa, dp);
 
@@ -1537,7 +1537,7 @@ pagetable_allocate(pagetable_hash *pagetable, Size size)
 	tbm->dsapagetableold = tbm->dsapagetable;
 	tbm->dsapagetable = dsa_allocate_extended(tbm->dsa,
 											  sizeof(PTEntryArray) + size,
-											DSA_ALLOC_HUGE | DSA_ALLOC_ZERO);
+											  DSA_ALLOC_HUGE | DSA_ALLOC_ZERO);
 	ptbase = dsa_get_address(tbm->dsa, tbm->dsapagetable);
 
 	return ptbase->ptentry;

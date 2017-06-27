@@ -572,7 +572,7 @@ RestoreArchive(Archive *AHX)
 								char	   *mark;
 
 								if (strcmp(te->desc, "CONSTRAINT") == 0 ||
-								 strcmp(te->desc, "CHECK CONSTRAINT") == 0 ||
+									strcmp(te->desc, "CHECK CONSTRAINT") == 0 ||
 									strcmp(te->desc, "FK CONSTRAINT") == 0)
 									strcpy(buffer, "DROP CONSTRAINT");
 								else
@@ -744,7 +744,7 @@ restore_toc_entry(ArchiveHandle *AH, TocEntry *te, bool is_parallel)
 
 	defnDumped = false;
 
-	if ((reqs & REQ_SCHEMA) != 0)		/* We want the schema */
+	if ((reqs & REQ_SCHEMA) != 0)	/* We want the schema */
 	{
 		/* Show namespace if available */
 		if (te->namespace)
@@ -1650,13 +1650,13 @@ dump_lo_buf(ArchiveHandle *AH)
 
 		res = lo_write(AH->connection, AH->loFd, AH->lo_buf, AH->lo_buf_used);
 		ahlog(AH, 5, ngettext("wrote %lu byte of large object data (result = %lu)\n",
-					 "wrote %lu bytes of large object data (result = %lu)\n",
+							  "wrote %lu bytes of large object data (result = %lu)\n",
 							  AH->lo_buf_used),
 			  (unsigned long) AH->lo_buf_used, (unsigned long) res);
 		if (res != AH->lo_buf_used)
 			exit_horribly(modulename,
-			"could not write to large object (result: %lu, expected: %lu)\n",
-					   (unsigned long) res, (unsigned long) AH->lo_buf_used);
+						  "could not write to large object (result: %lu, expected: %lu)\n",
+						  (unsigned long) res, (unsigned long) AH->lo_buf_used);
 	}
 	else
 	{
@@ -1765,8 +1765,8 @@ warn_or_exit_horribly(ArchiveHandle *AH,
 	{
 		write_msg(modulename, "Error from TOC entry %d; %u %u %s %s %s\n",
 				  AH->currentTE->dumpId,
-			 AH->currentTE->catalogId.tableoid, AH->currentTE->catalogId.oid,
-			  AH->currentTE->desc, AH->currentTE->tag, AH->currentTE->owner);
+				  AH->currentTE->catalogId.tableoid, AH->currentTE->catalogId.oid,
+				  AH->currentTE->desc, AH->currentTE->tag, AH->currentTE->owner);
 	}
 	AH->lastErrorStage = AH->stage;
 	AH->lastErrorTE = AH->currentTE;
@@ -2179,7 +2179,7 @@ _discoverArchiveFormat(ArchiveHandle *AH)
 		AH->lookahead[AH->lookaheadLen++] = vmin;
 
 		/* Check header version; varies from V1.0 */
-		if (vmaj > 1 || (vmaj == 1 && vmin > 0))		/* Version > 1.0 */
+		if (vmaj > 1 || (vmaj == 1 && vmin > 0))	/* Version > 1.0 */
 		{
 			if ((byteread = fgetc(fh)) == EOF)
 				READ_ERROR_EXIT(fh);
@@ -2337,12 +2337,12 @@ _allocAH(const char *FileSpec, const ArchiveFormat fmt,
 	AH->OF = stdout;
 
 	/*
-	 * On Windows, we need to use binary mode to read/write non-text archive
-	 * formats.  Force stdin/stdout into binary mode if that is what we are
-	 * using.
+	 * On Windows, we need to use binary mode to read/write non-text files,
+	 * which include all archive formats as well as compressed plain text.
+	 * Force stdin/stdout into binary mode if that is what we are using.
 	 */
 #ifdef WIN32
-	if (fmt != archNull &&
+	if ((fmt != archNull || compression != 0) &&
 		(AH->fSpec == NULL || strcmp(AH->fSpec, "") == 0))
 	{
 		if (mode == archModeWrite)
@@ -2559,7 +2559,7 @@ ReadToc(ArchiveHandle *AH)
 		/* Sanity check */
 		if (te->dumpId <= 0)
 			exit_horribly(modulename,
-					   "entry ID %d out of range -- perhaps a corrupt TOC\n",
+						  "entry ID %d out of range -- perhaps a corrupt TOC\n",
 						  te->dumpId);
 
 		te->hadDumper = ReadInt(AH);
@@ -2924,7 +2924,7 @@ _tocEntryRequired(TocEntry *te, teSection curSection, RestoreOptions *ropt)
 		 */
 		if (!(ropt->sequence_data && strcmp(te->desc, "SEQUENCE SET") == 0) &&
 			!(ropt->binary_upgrade && strcmp(te->desc, "BLOB") == 0) &&
-		!(ropt->binary_upgrade && strncmp(te->tag, "LARGE OBJECT ", 13) == 0))
+			!(ropt->binary_upgrade && strncmp(te->tag, "LARGE OBJECT ", 13) == 0))
 			res = res & REQ_SCHEMA;
 	}
 
@@ -3270,8 +3270,8 @@ _selectTablespace(ArchiveHandle *AH, const char *tablespace)
 
 		if (!res || PQresultStatus(res) != PGRES_COMMAND_OK)
 			warn_or_exit_horribly(AH, modulename,
-								"could not set default_tablespace to %s: %s",
-								fmtId(want), PQerrorMessage(AH->connection));
+								  "could not set default_tablespace to %s: %s",
+								  fmtId(want), PQerrorMessage(AH->connection));
 
 		PQclear(res);
 	}
@@ -3600,7 +3600,7 @@ WriteHead(ArchiveHandle *AH)
 {
 	struct tm	crtm;
 
-	(*AH->WriteBufPtr) (AH, "PGDMP", 5);		/* Magic code */
+	(*AH->WriteBufPtr) (AH, "PGDMP", 5);	/* Magic code */
 	(*AH->WriteBytePtr) (AH, ARCHIVE_MAJOR(AH->version));
 	(*AH->WriteBytePtr) (AH, ARCHIVE_MINOR(AH->version));
 	(*AH->WriteBytePtr) (AH, ARCHIVE_REV(AH->version));
@@ -3648,7 +3648,7 @@ ReadHead(ArchiveHandle *AH)
 		vmaj = (*AH->ReadBytePtr) (AH);
 		vmin = (*AH->ReadBytePtr) (AH);
 
-		if (vmaj > 1 || (vmaj == 1 && vmin > 0))		/* Version > 1.0 */
+		if (vmaj > 1 || (vmaj == 1 && vmin > 0))	/* Version > 1.0 */
 			vrev = (*AH->ReadBytePtr) (AH);
 		else
 			vrev = 0;

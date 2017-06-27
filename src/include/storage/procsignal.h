@@ -46,8 +46,7 @@ typedef enum
 	PROCSIG_PGXCPOOL_REFRESH,	/* refresh local view of connection handles */
 #endif
 	PROCSIG_PARALLEL_MESSAGE,	/* message from cooperating parallel backend */
-	PROCSIG_WALSND_INIT_STOPPING,		/* ask walsenders to prepare for
-										 * shutdown  */
+	PROCSIG_WALSND_INIT_STOPPING,	/* ask walsenders to prepare for shutdown  */
 
 	/* Recovery conflict reasons */
 	PROCSIG_RECOVERY_CONFLICT_DATABASE,
@@ -72,4 +71,4 @@ extern int SendProcSignal(pid_t pid, ProcSignalReason reason,
 
 extern void procsignal_sigusr1_handler(SIGNAL_ARGS);
 
-#endif   /* PROCSIGNAL_H */
+#endif							/* PROCSIGNAL_H */

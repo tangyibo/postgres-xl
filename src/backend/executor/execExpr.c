@@ -344,7 +344,7 @@ ExecBuildProjectionInfo(List *targetList,
 			attnum = variable->varattno;
 
 			if (inputDesc == NULL)
-				isSafeVar = true;		/* can't check, just assume OK */
+				isSafeVar = true;	/* can't check, just assume OK */
 			else if (attnum <= inputDesc->natts)
 			{
 				Form_pg_attribute attr = inputDesc->attrs[attnum - 1];
@@ -777,7 +777,7 @@ ExecInitExprRec(Expr *node, PlanState *parent, ExprState *state,
 					if (nfuncs != winstate->numfuncs)
 						ereport(ERROR,
 								(errcode(ERRCODE_WINDOWING_ERROR),
-						  errmsg("window function calls cannot be nested")));
+								 errmsg("window function calls cannot be nested")));
 				}
 				else
 				{
@@ -1362,7 +1362,7 @@ ExecInitExprRec(Expr *node, PlanState *parent, ExprState *state,
 
 					/* If WHEN result isn't true, jump to next CASE arm */
 					scratch.opcode = EEOP_JUMP_IF_NOT_TRUE;
-					scratch.d.jump.jumpdone = -1;		/* computed later */
+					scratch.d.jump.jumpdone = -1;	/* computed later */
 					ExprEvalPushStep(state, &scratch);
 					whenstep = state->steps_len - 1;
 
@@ -1374,7 +1374,7 @@ ExecInitExprRec(Expr *node, PlanState *parent, ExprState *state,
 
 					/* Emit JUMP step to jump to end of CASE's code */
 					scratch.opcode = EEOP_JUMP;
-					scratch.d.jump.jumpdone = -1;		/* computed later */
+					scratch.d.jump.jumpdone = -1;	/* computed later */
 					ExprEvalPushStep(state, &scratch);
 
 					/*
@@ -1545,8 +1545,8 @@ ExecInitExprRec(Expr *node, PlanState *parent, ExprState *state,
 							ereport(ERROR,
 									(errcode(ERRCODE_DATATYPE_MISMATCH),
 									 errmsg("ROW() column has type %s instead of type %s",
-										format_type_be(exprType((Node *) e)),
-									   format_type_be(attrs[i]->atttypid))));
+											format_type_be(exprType((Node *) e)),
+											format_type_be(attrs[i]->atttypid))));
 					}
 					else
 					{
@@ -1720,7 +1720,7 @@ ExecInitExprRec(Expr *node, PlanState *parent, ExprState *state,
 
 					/* if it's not null, skip to end of COALESCE expr */
 					scratch.opcode = EEOP_JUMP_IF_NOT_NULL;
-					scratch.d.jump.jumpdone = -1;		/* adjust later */
+					scratch.d.jump.jumpdone = -1;	/* adjust later */
 					ExprEvalPushStep(state, &scratch);
 
 					adjust_jumps = lappend_int(adjust_jumps,
@@ -2076,10 +2076,10 @@ ExecInitFunc(ExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
 	if (nargs > FUNC_MAX_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_TOO_MANY_ARGUMENTS),
-			 errmsg_plural("cannot pass more than %d argument to a function",
-						   "cannot pass more than %d arguments to a function",
-						   FUNC_MAX_ARGS,
-						   FUNC_MAX_ARGS)));
+				 errmsg_plural("cannot pass more than %d argument to a function",
+							   "cannot pass more than %d arguments to a function",
+							   FUNC_MAX_ARGS,
+							   FUNC_MAX_ARGS)));
 
 	/* Allocate function lookup data and parameter workspace for this call */
 	scratch->d.func.finfo = palloc0(sizeof(FmgrInfo));
@@ -2105,7 +2105,7 @@ ExecInitFunc(ExprEvalStep *scratch, Expr *node, List *args, Oid funcid,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("set-valued function called in context that cannot accept a set"),
 				 parent ? executor_errposition(parent->state,
-										  exprLocation((Node *) node)) : 0));
+											   exprLocation((Node *) node)) : 0));
 
 	/* Build code to evaluate arguments directly into the fcinfo struct */
 	argno = 0;
@@ -2380,7 +2380,7 @@ ExecInitArrayRef(ExprEvalStep *scratch, ArrayRef *aref, PlanState *parent,
 
 		/* Each subscript is evaluated into subscriptvalue/subscriptnull */
 		ExecInitExprRec(e, parent, state,
-					  &arefstate->subscriptvalue, &arefstate->subscriptnull);
+						&arefstate->subscriptvalue, &arefstate->subscriptnull);
 
 		/* ... and then ARRAYREF_SUBSCRIPT saves it into step's workspace */
 		scratch->opcode = EEOP_ARRAYREF_SUBSCRIPT;
@@ -2413,7 +2413,7 @@ ExecInitArrayRef(ExprEvalStep *scratch, ArrayRef *aref, PlanState *parent,
 
 		/* Each subscript is evaluated into subscriptvalue/subscriptnull */
 		ExecInitExprRec(e, parent, state,
-					  &arefstate->subscriptvalue, &arefstate->subscriptnull);
+						&arefstate->subscriptvalue, &arefstate->subscriptnull);
 
 		/* ... and then ARRAYREF_SUBSCRIPT saves it into step's workspace */
 		scratch->opcode = EEOP_ARRAYREF_SUBSCRIPT;

@@ -85,7 +85,7 @@ timetravel(PG_FUNCTION_ARGS)
 	Trigger    *trigger;		/* to get trigger name */
 	int			argc;
 	char	  **args;			/* arguments */
-	int			attnum[MaxAttrNum];		/* fnumbers of start/stop columns */
+	int			attnum[MaxAttrNum]; /* fnumbers of start/stop columns */
 	Datum		oldtimeon,
 				oldtimeoff;
 	Datum		newtimeon,
@@ -461,7 +461,7 @@ set_timetravel(PG_FUNCTION_ARGS)
 			s = rname = DatumGetCString(DirectFunctionCall1(nameout, NameGetDatum(relname)));
 			if (s)
 			{
-				pp = malloc(offsetof(TTOffList, name) +strlen(rname) + 1);
+				pp = malloc(offsetof(TTOffList, name) + strlen(rname) + 1);
 				if (pp)
 				{
 					pp->next = NULL;

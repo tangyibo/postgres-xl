@@ -73,7 +73,7 @@ check_publication_add_relation(Relation targetrel)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("\"%s\" is a system table",
 						RelationGetRelationName(targetrel)),
-			   errdetail("System tables cannot be added to publications.")));
+				 errdetail("System tables cannot be added to publications.")));
 
 	/* UNLOGGED and TEMP relations cannot be part of publication. */
 	if (!RelationNeedsWAL(targetrel))
@@ -81,7 +81,7 @@ check_publication_add_relation(Relation targetrel)
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				 errmsg("table \"%s\" cannot be replicated",
 						RelationGetRelationName(targetrel)),
-		errdetail("Temporary and unlogged relations cannot be replicated.")));
+				 errdetail("Temporary and unlogged relations cannot be replicated.")));
 }
 
 /*
@@ -104,6 +104,30 @@ is_publishable_class(Oid relid, Form_pg_class reltuple)
 		reltuple->relpersistence == RELPERSISTENCE_PERMANENT &&
 		relid >= FirstNormalObjectId;
 }
+
+
+/*
+ * SQL-callable variant of the above
+ *
+ * This returns null when the relation does not exist.  This is intended to be
+ * used for example in psql to avoid gratuitous errors when there are
+ * concurrent catalog changes.
+ */
+Datum
+pg_relation_is_publishable(PG_FUNCTION_ARGS)
+{
+	Oid			relid = PG_GETARG_OID(0);
+	HeapTuple	tuple;
+	bool		result;
+
+	tuple = SearchSysCache1(RELOID, ObjectIdGetDatum(relid));
+	if (!tuple)
+		PG_RETURN_NULL();
+	result = is_publishable_class(relid, (Form_pg_class) GETSTRUCT(tuple));
+	ReleaseSysCache(tuple);
+	PG_RETURN_BOOL(result);
+}
+
 
 /*
  * Insert new publication / relation mapping.
@@ -139,8 +163,8 @@ publication_add_relation(Oid pubid, Relation targetrel,
 
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
-			errmsg("relation \"%s\" is already member of publication \"%s\"",
-				   RelationGetRelationName(targetrel), pub->name)));
+				 errmsg("relation \"%s\" is already member of publication \"%s\"",
+						RelationGetRelationName(targetrel), pub->name)));
 	}
 
 	check_publication_add_relation(targetrel);

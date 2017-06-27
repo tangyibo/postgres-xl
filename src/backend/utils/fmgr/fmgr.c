@@ -46,7 +46,7 @@ typedef struct
 	TransactionId fn_xmin;		/* for checking up-to-dateness */
 	ItemPointerData fn_tid;
 	PGFunction	user_fn;		/* the function's address */
-	const Pg_finfo_record *inforec;		/* address of its info record */
+	const Pg_finfo_record *inforec; /* address of its info record */
 } CFuncHashTabEntry;
 
 static HTAB *CFuncHash = NULL;
@@ -172,7 +172,7 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 		finfo->fn_nargs = fbp->nargs;
 		finfo->fn_strict = fbp->strict;
 		finfo->fn_retset = fbp->retset;
-		finfo->fn_stats = TRACK_FUNC_ALL;		/* ie, never track */
+		finfo->fn_stats = TRACK_FUNC_ALL;	/* ie, never track */
 		finfo->fn_addr = fbp->func;
 		finfo->fn_oid = functionId;
 		return;
@@ -208,7 +208,7 @@ fmgr_info_cxt_security(Oid functionId, FmgrInfo *finfo, MemoryContext mcxt,
 		 FmgrHookIsNeeded(functionId)))
 	{
 		finfo->fn_addr = fmgr_security_definer;
-		finfo->fn_stats = TRACK_FUNC_ALL;		/* ie, never track */
+		finfo->fn_stats = TRACK_FUNC_ALL;	/* ie, never track */
 		finfo->fn_oid = functionId;
 		ReleaseSysCache(procedureTuple);
 		return;
@@ -396,8 +396,8 @@ fetch_finfo_record(void *filehandle, const char *funcname)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-			errmsg("could not find function information for function \"%s\"",
-				   funcname),
+				 errmsg("could not find function information for function \"%s\"",
+						funcname),
 				 errhint("SQL-callable functions need an accompanying PG_FUNCTION_INFO_V1(funcname).")));
 		return NULL;			/* silence compiler */
 	}
@@ -631,7 +631,7 @@ fmgr_security_definer(PG_FUNCTION_ARGS)
 
 	if (OidIsValid(fcache->userid))
 		SetUserIdAndSecContext(fcache->userid,
-							save_sec_context | SECURITY_LOCAL_USERID_CHANGE);
+							   save_sec_context | SECURITY_LOCAL_USERID_CHANGE);
 
 	if (fcache->proconfig)
 	{
@@ -1795,7 +1795,7 @@ Int64GetDatum(int64 X)
 	*retval = X;
 	return PointerGetDatum(retval);
 }
-#endif   /* USE_FLOAT8_BYVAL */
+#endif							/* USE_FLOAT8_BYVAL */
 
 #ifndef USE_FLOAT4_BYVAL
 
@@ -1828,7 +1828,7 @@ Float8GetDatum(float8 X)
  */
 
 struct varlena *
-pg_detoast_datum(struct varlena * datum)
+pg_detoast_datum(struct varlena *datum)
 {
 	if (VARATT_IS_EXTENDED(datum))
 		return heap_tuple_untoast_attr(datum);
@@ -1837,7 +1837,7 @@ pg_detoast_datum(struct varlena * datum)
 }
 
 struct varlena *
-pg_detoast_datum_copy(struct varlena * datum)
+pg_detoast_datum_copy(struct varlena *datum)
 {
 	if (VARATT_IS_EXTENDED(datum))
 		return heap_tuple_untoast_attr(datum);
@@ -1853,14 +1853,14 @@ pg_detoast_datum_copy(struct varlena * datum)
 }
 
 struct varlena *
-pg_detoast_datum_slice(struct varlena * datum, int32 first, int32 count)
+pg_detoast_datum_slice(struct varlena *datum, int32 first, int32 count)
 {
 	/* Only get the specified portion from the toast rel */
 	return heap_tuple_untoast_attr_slice(datum, first, count);
 }
 
 struct varlena *
-pg_detoast_datum_packed(struct varlena * datum)
+pg_detoast_datum_packed(struct varlena *datum)
 {
 	if (VARATT_IS_COMPRESSED(datum) || VARATT_IS_EXTERNAL(datum))
 		return heap_tuple_untoast_attr(datum);

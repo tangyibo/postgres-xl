@@ -67,7 +67,7 @@ extern char *ChooseConstraintName(const char *name1, const char *name2,
 					 List *others);
 
 extern void AlterConstraintNamespaces(Oid ownerId, Oid oldNspId,
-					  Oid newNspId, bool isType, ObjectAddresses *objsMoved);
+						  Oid newNspId, bool isType, ObjectAddresses *objsMoved);
 extern Oid	get_relation_constraint_oid(Oid relid, const char *conname, bool missing_ok);
 extern Oid	get_domain_constraint_oid(Oid typid, const char *conname, bool missing_ok);
 
@@ -79,4 +79,4 @@ extern bool check_functional_grouping(Oid relid,
 						  List *grouping_columns,
 						  List **constraintDeps);
 
-#endif   /* PG_CONSTRAINT_FN_H */
+#endif							/* PG_CONSTRAINT_FN_H */

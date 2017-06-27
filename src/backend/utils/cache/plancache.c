@@ -169,7 +169,7 @@ CreateCachedPlan(RawStmt *raw_parse_tree,
 	MemoryContext source_context;
 	MemoryContext oldcxt;
 
-	Assert(query_string != NULL);		/* required as of 8.4 */
+	Assert(query_string != NULL);	/* required as of 8.4 */
 
 	/*
 	 * Make a dedicated memory context for the CachedPlanSource and its
@@ -254,7 +254,7 @@ CreateOneShotCachedPlan(RawStmt *raw_parse_tree,
 {
 	CachedPlanSource *plansource;
 
-	Assert(query_string != NULL);		/* required as of 8.4 */
+	Assert(query_string != NULL);	/* required as of 8.4 */
 
 	/*
 	 * Create and fill the CachedPlanSource struct within the caller's memory
@@ -1260,7 +1260,7 @@ GetCachedPlan(CachedPlanSource *plansource, ParamListInfo boundParams,
 			{
 				/* otherwise, it should be a sibling of the plansource */
 				MemoryContextSetParent(plan->context,
-								MemoryContextGetParent(plansource->context));
+									   MemoryContextGetParent(plansource->context));
 			}
 			/* Update generic_cost whenever we make a new generic plan */
 			plansource->generic_cost = cached_plan_cost(plan, false);
@@ -1600,7 +1600,7 @@ AcquireExecutorLocks(List *stmt_list, bool acquire)
 			 * acquire a non-conflicting lock.
 			 */
 			if (list_member_int(plannedstmt->resultRelations, rt_index) ||
-			  list_member_int(plannedstmt->nonleafResultRelations, rt_index))
+				list_member_int(plannedstmt->nonleafResultRelations, rt_index))
 				lockmode = RowExclusiveLock;
 			else if ((rc = get_plan_rowmark(plannedstmt->rowMarks, rt_index)) != NULL &&
 					 RowMarkRequiresRowShareLock(rc->markType))

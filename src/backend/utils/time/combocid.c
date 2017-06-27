@@ -130,7 +130,7 @@ HeapTupleHeaderGetCmax(HeapTupleHeader tup)
 	 * things too much.
 	 */
 	Assert(CritSectionCount > 0 ||
-	  TransactionIdIsCurrentTransactionId(HeapTupleHeaderGetUpdateXid(tup)));
+		   TransactionIdIsCurrentTransactionId(HeapTupleHeaderGetUpdateXid(tup)));
 
 	if (tup->t_infomask & HEAP_COMBOCID)
 		return GetRealCmax(cid);

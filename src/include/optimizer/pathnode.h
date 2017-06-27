@@ -290,4 +290,4 @@ extern ParamPathInfo *get_joinrel_parampathinfo(PlannerInfo *root,
 extern ParamPathInfo *get_appendrel_parampathinfo(RelOptInfo *appendrel,
 							Relids required_outer);
 
-#endif   /* PATHNODE_H */
+#endif							/* PATHNODE_H */

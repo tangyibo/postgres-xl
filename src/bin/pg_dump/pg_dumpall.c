@@ -53,7 +53,7 @@ static void buildShSecLabels(PGconn *conn, const char *catalog_name,
 				 uint32 objectId, PQExpBuffer buffer,
 				 const char *target, const char *objname);
 static PGconn *connectDatabase(const char *dbname, const char *connstr, const char *pghost, const char *pgport,
-		   const char *pguser, trivalue prompt_password, bool fail_on_error);
+				const char *pguser, trivalue prompt_password, bool fail_on_error);
 static char *constructConnStr(const char **keywords, const char **values);
 static PGresult *executeQuery(PGconn *conn, const char *query);
 static void executeCommand(PGconn *conn, const char *query);
@@ -742,7 +742,7 @@ dumpRoles(PGconn *conn)
 						  "rolcreaterole, rolcreatedb, "
 						  "rolcanlogin, rolconnlimit, rolpassword, "
 						  "rolvaliduntil, rolreplication, rolbypassrls, "
-					"pg_catalog.shobj_description(oid, '%s') as rolcomment, "
+						  "pg_catalog.shobj_description(oid, '%s') as rolcomment, "
 						  "rolname = current_user AS is_current_user "
 						  "FROM %s "
 						  "WHERE rolname !~ '^pg_' "
@@ -753,7 +753,7 @@ dumpRoles(PGconn *conn)
 						  "rolcreaterole, rolcreatedb, "
 						  "rolcanlogin, rolconnlimit, rolpassword, "
 						  "rolvaliduntil, rolreplication, rolbypassrls, "
-					"pg_catalog.shobj_description(oid, '%s') as rolcomment, "
+						  "pg_catalog.shobj_description(oid, '%s') as rolcomment, "
 						  "rolname = current_user AS is_current_user "
 						  "FROM %s "
 						  "ORDER BY 2", role_catalog, role_catalog);
@@ -764,7 +764,7 @@ dumpRoles(PGconn *conn)
 						  "rolcanlogin, rolconnlimit, rolpassword, "
 						  "rolvaliduntil, rolreplication, "
 						  "false as rolbypassrls, "
-					"pg_catalog.shobj_description(oid, '%s') as rolcomment, "
+						  "pg_catalog.shobj_description(oid, '%s') as rolcomment, "
 						  "rolname = current_user AS is_current_user "
 						  "FROM %s "
 						  "ORDER BY 2", role_catalog, role_catalog);
@@ -775,7 +775,7 @@ dumpRoles(PGconn *conn)
 						  "rolcanlogin, rolconnlimit, rolpassword, "
 						  "rolvaliduntil, false as rolreplication, "
 						  "false as rolbypassrls, "
-					"pg_catalog.shobj_description(oid, '%s') as rolcomment, "
+						  "pg_catalog.shobj_description(oid, '%s') as rolcomment, "
 						  "rolname = current_user AS is_current_user "
 						  "FROM %s "
 						  "ORDER BY 2", role_catalog, role_catalog);
@@ -986,8 +986,8 @@ dumpRoleMembership(PGconn *conn)
 					  "LEFT JOIN %s ur on ur.oid = a.roleid "
 					  "LEFT JOIN %s um on um.oid = a.member "
 					  "LEFT JOIN %s ug on ug.oid = a.grantor "
-					"WHERE NOT (ur.rolname ~ '^pg_' AND um.rolname ~ '^pg_')"
-				 "ORDER BY 1,2,3", role_catalog, role_catalog, role_catalog);
+					  "WHERE NOT (ur.rolname ~ '^pg_' AND um.rolname ~ '^pg_')"
+					  "ORDER BY 1,2,3", role_catalog, role_catalog, role_catalog);
 	res = executeQuery(conn, buf->data);
 
 	if (PQntuples(res) > 0)
@@ -1152,7 +1152,7 @@ dumpTablespaces(PGconn *conn)
 	 */
 	if (server_version >= 90600)
 		res = executeQuery(conn, "SELECT oid, spcname, "
-						 "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
+						   "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
 						   "pg_catalog.pg_tablespace_location(oid), "
 						   "(SELECT pg_catalog.array_agg(acl) FROM (SELECT pg_catalog.unnest(coalesce(spcacl,pg_catalog.acldefault('t',spcowner))) AS acl "
 						   "EXCEPT SELECT pg_catalog.unnest(pg_catalog.acldefault('t',spcowner))) as foo)"
@@ -1161,40 +1161,40 @@ dumpTablespaces(PGconn *conn)
 						   "EXCEPT SELECT pg_catalog.unnest(coalesce(spcacl,pg_catalog.acldefault('t',spcowner)))) as foo)"
 						   "AS rspcacl,"
 						   "array_to_string(spcoptions, ', '),"
-						"pg_catalog.shobj_description(oid, 'pg_tablespace') "
+						   "pg_catalog.shobj_description(oid, 'pg_tablespace') "
 						   "FROM pg_catalog.pg_tablespace "
 						   "WHERE spcname !~ '^pg_' "
 						   "ORDER BY 1");
 	else if (server_version >= 90200)
 		res = executeQuery(conn, "SELECT oid, spcname, "
-						 "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
+						   "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
 						   "pg_catalog.pg_tablespace_location(oid), "
 						   "spcacl, '' as rspcacl, "
 						   "array_to_string(spcoptions, ', '),"
-						"pg_catalog.shobj_description(oid, 'pg_tablespace') "
+						   "pg_catalog.shobj_description(oid, 'pg_tablespace') "
 						   "FROM pg_catalog.pg_tablespace "
 						   "WHERE spcname !~ '^pg_' "
 						   "ORDER BY 1");
 	else if (server_version >= 90000)
 		res = executeQuery(conn, "SELECT oid, spcname, "
-						 "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
+						   "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
 						   "spclocation, spcacl, '' as rspcacl, "
 						   "array_to_string(spcoptions, ', '),"
-						"pg_catalog.shobj_description(oid, 'pg_tablespace') "
+						   "pg_catalog.shobj_description(oid, 'pg_tablespace') "
 						   "FROM pg_catalog.pg_tablespace "
 						   "WHERE spcname !~ '^pg_' "
 						   "ORDER BY 1");
 	else if (server_version >= 80200)
 		res = executeQuery(conn, "SELECT oid, spcname, "
-						 "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
+						   "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
 						   "spclocation, spcacl, '' as rspcacl, null, "
-						"pg_catalog.shobj_description(oid, 'pg_tablespace') "
+						   "pg_catalog.shobj_description(oid, 'pg_tablespace') "
 						   "FROM pg_catalog.pg_tablespace "
 						   "WHERE spcname !~ '^pg_' "
 						   "ORDER BY 1");
 	else
 		res = executeQuery(conn, "SELECT oid, spcname, "
-						 "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
+						   "pg_catalog.pg_get_userbyid(spcowner) AS spcowner, "
 						   "spclocation, spcacl, '' as rspcacl, "
 						   "null, null "
 						   "FROM pg_catalog.pg_tablespace "
@@ -1394,8 +1394,8 @@ dumpCreateDB(PGconn *conn)
 						  "AS rdatacl, "
 						  "datconnlimit, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = d.dattablespace) AS dattablespace "
-					 "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
-				"WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
+						  "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
+						  "WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
 	else if (server_version >= 90300)
 		printfPQExpBuffer(buf,
 						  "SELECT datname, "
@@ -1405,19 +1405,19 @@ dumpCreateDB(PGconn *conn)
 						  "datistemplate, datacl, '' as rdatacl, "
 						  "datconnlimit, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = d.dattablespace) AS dattablespace "
-					 "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
-				"WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
+						  "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
+						  "WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
 	else if (server_version >= 80400)
 		printfPQExpBuffer(buf,
 						  "SELECT datname, "
 						  "coalesce(rolname, (select rolname from %s where oid=(select datdba from pg_database where datname='template0'))), "
 						  "pg_encoding_to_char(d.encoding), "
-					  "datcollate, datctype, datfrozenxid, 0 AS datminmxid, "
+						  "datcollate, datctype, datfrozenxid, 0 AS datminmxid, "
 						  "datistemplate, datacl, '' as rdatacl, "
 						  "datconnlimit, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = d.dattablespace) AS dattablespace "
-					 "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
-				"WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
+						  "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
+						  "WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
 	else if (server_version >= 80100)
 		printfPQExpBuffer(buf,
 						  "SELECT datname, "
@@ -1427,8 +1427,8 @@ dumpCreateDB(PGconn *conn)
 						  "datistemplate, datacl, '' as rdatacl, "
 						  "datconnlimit, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = d.dattablespace) AS dattablespace "
-					 "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
-				"WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
+						  "FROM pg_database d LEFT JOIN %s u ON (datdba = u.oid) "
+						  "WHERE datallowconn ORDER BY 1", role_catalog, role_catalog);
 	else
 		printfPQExpBuffer(buf,
 						  "SELECT datname, "
@@ -1438,7 +1438,7 @@ dumpCreateDB(PGconn *conn)
 						  "datistemplate, datacl, '' as rdatacl, "
 						  "-1 as datconnlimit, "
 						  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = d.dattablespace) AS dattablespace "
-		   "FROM pg_database d LEFT JOIN pg_shadow u ON (datdba = usesysid) "
+						  "FROM pg_database d LEFT JOIN pg_shadow u ON (datdba = usesysid) "
 						  "WHERE datallowconn ORDER BY 1");
 
 	res = executeQuery(conn, buf->data);
@@ -1639,7 +1639,7 @@ dumpUserConfig(PGconn *conn, const char *username)
 		if (server_version >= 90000)
 			printfPQExpBuffer(buf, "SELECT setconfig[%d] FROM pg_db_role_setting WHERE "
 							  "setdatabase = 0 AND setrole = "
-				"(SELECT oid FROM %s WHERE rolname = ", count, role_catalog);
+							  "(SELECT oid FROM %s WHERE rolname = ", count, role_catalog);
 		else if (server_version >= 80100)
 			printfPQExpBuffer(buf, "SELECT rolconfig[%d] FROM %s WHERE rolname = ", count, role_catalog);
 		else
@@ -1680,7 +1680,7 @@ dumpDbRoleConfig(PGconn *conn)
 
 	printfPQExpBuffer(buf, "SELECT rolname, datname, unnest(setconfig) "
 					  "FROM pg_db_role_setting, %s u, pg_database "
-	"WHERE setrole = u.oid AND setdatabase = pg_database.oid", role_catalog);
+					  "WHERE setrole = u.oid AND setdatabase = pg_database.oid", role_catalog);
 	res = executeQuery(conn, buf->data);
 
 	if (PQntuples(res) > 0)

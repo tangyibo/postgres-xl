@@ -48,7 +48,7 @@ typedef struct df_files
 	ino_t		inode;			/* Inode number of file */
 #endif
 	void	   *handle;			/* a handle for pg_dl* functions */
-	char		filename[FLEXIBLE_ARRAY_MEMBER];		/* Full pathname of file */
+	char		filename[FLEXIBLE_ARRAY_MEMBER];	/* Full pathname of file */
 } DynamicFileList;
 
 static DynamicFileList *file_list = NULL;
@@ -65,7 +65,7 @@ char	   *Dynamic_library_path;
 
 static void *internal_load_library(const char *libname);
 static void incompatible_module_error(const char *libname,
-		   const Pg_magic_struct *module_magic_data) pg_attribute_noreturn();
+						  const Pg_magic_struct *module_magic_data) pg_attribute_noreturn();
 static void internal_unload_library(const char *libname);
 static bool file_exists(const char *name);
 static char *expand_dynamic_library_name(const char *name);
@@ -214,7 +214,7 @@ internal_load_library(const char *libname)
 		 * File not loaded yet.
 		 */
 		file_scanner = (DynamicFileList *)
-			malloc(offsetof(DynamicFileList, filename) +strlen(libname) + 1);
+			malloc(offsetof(DynamicFileList, filename) + strlen(libname) + 1);
 		if (file_scanner == NULL)
 			ereport(ERROR,
 					(errcode(ERRCODE_OUT_OF_MEMORY),
@@ -268,9 +268,9 @@ internal_load_library(const char *libname)
 			free((char *) file_scanner);
 			/* complain */
 			ereport(ERROR,
-				  (errmsg("incompatible library \"%s\": missing magic block",
-						  libname),
-				   errhint("Extension libraries are required to use the PG_MODULE_MAGIC macro.")));
+					(errmsg("incompatible library \"%s\": missing magic block",
+							libname),
+					 errhint("Extension libraries are required to use the PG_MODULE_MAGIC macro.")));
 		}
 
 		/*
@@ -362,7 +362,7 @@ incompatible_module_error(const char *libname,
 		if (details.len)
 			appendStringInfoChar(&details, '\n');
 		appendStringInfo(&details,
-					   _("Server has FLOAT4PASSBYVAL = %s, library has %s."),
+						 _("Server has FLOAT4PASSBYVAL = %s, library has %s."),
 						 magic_data.float4byval ? "true" : "false",
 						 module_magic_data->float4byval ? "true" : "false");
 	}
@@ -371,14 +371,14 @@ incompatible_module_error(const char *libname,
 		if (details.len)
 			appendStringInfoChar(&details, '\n');
 		appendStringInfo(&details,
-					   _("Server has FLOAT8PASSBYVAL = %s, library has %s."),
+						 _("Server has FLOAT8PASSBYVAL = %s, library has %s."),
 						 magic_data.float8byval ? "true" : "false",
 						 module_magic_data->float8byval ? "true" : "false");
 	}
 
 	if (details.len == 0)
 		appendStringInfoString(&details,
-			  _("Magic block has unexpected length or padding difference."));
+							   _("Magic block has unexpected length or padding difference."));
 
 	ereport(ERROR,
 			(errmsg("incompatible library \"%s\": magic block mismatch",
@@ -448,7 +448,7 @@ internal_unload_library(const char *libname)
 		else
 			prv = file_scanner;
 	}
-#endif   /* NOT_USED */
+#endif							/* NOT_USED */
 }
 
 static bool

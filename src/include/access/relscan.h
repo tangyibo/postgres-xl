@@ -39,7 +39,7 @@ typedef struct ParallelHeapScanDescData
 	BlockNumber phs_startblock; /* starting block number */
 	BlockNumber phs_cblock;		/* current block number */
 	char		phs_snapshot_data[FLEXIBLE_ARRAY_MEMBER];
-}	ParallelHeapScanDescData;
+}			ParallelHeapScanDescData;
 
 typedef struct HeapScanDescData
 {
@@ -75,7 +75,7 @@ typedef struct HeapScanDescData
 	int			rs_cindex;		/* current tuple's index in vistuples */
 	int			rs_ntuples;		/* number of visible tuples on page */
 	OffsetNumber rs_vistuples[MaxHeapTuplesPerPage];	/* their offsets */
-}	HeapScanDescData;
+}			HeapScanDescData;
 
 /*
  * We use the same IndexScanDescData structure for both amgettuple-based
@@ -89,14 +89,14 @@ typedef struct IndexScanDescData
 	Relation	indexRelation;	/* index relation descriptor */
 	Snapshot	xs_snapshot;	/* snapshot to see */
 	int			numberOfKeys;	/* number of index qualifier conditions */
-	int			numberOfOrderBys;		/* number of ordering operators */
+	int			numberOfOrderBys;	/* number of ordering operators */
 	ScanKey		keyData;		/* array of index qualifier descriptors */
 	ScanKey		orderByData;	/* array of ordering op descriptors */
 	bool		xs_want_itup;	/* caller requests index tuples */
 	bool		xs_temp_snap;	/* unregister snapshot at scan end? */
 
 	/* signaling to index AM about killing index tuples */
-	bool		kill_prior_tuple;		/* last-returned tuple is dead */
+	bool		kill_prior_tuple;	/* last-returned tuple is dead */
 	bool		ignore_killed_tuples;	/* do not return killed entries */
 	bool		xactStartedInRecovery;	/* prevents killing/seeing killed
 										 * tuples */
@@ -137,7 +137,7 @@ typedef struct IndexScanDescData
 
 	/* parallel index scan information, in shared memory */
 	ParallelIndexScanDesc parallel_scan;
-}	IndexScanDescData;
+}			IndexScanDescData;
 
 /* Generic structure for parallel scans */
 typedef struct ParallelIndexScanDescData
@@ -146,7 +146,7 @@ typedef struct ParallelIndexScanDescData
 	Oid			ps_indexid;
 	Size		ps_offset;		/* Offset in bytes of am specific structure */
 	char		ps_snapshot_data[FLEXIBLE_ARRAY_MEMBER];
-}	ParallelIndexScanDescData;
+}			ParallelIndexScanDescData;
 
 /* Struct for heap-or-index scans of system tables */
 typedef struct SysScanDescData
@@ -156,6 +156,6 @@ typedef struct SysScanDescData
 	HeapScanDesc scan;			/* only valid in heap-scan case */
 	IndexScanDesc iscan;		/* only valid in index-scan case */
 	Snapshot	snapshot;		/* snapshot to unregister at end of scan */
-}	SysScanDescData;
+}			SysScanDescData;
 
-#endif   /* RELSCAN_H */
+#endif							/* RELSCAN_H */

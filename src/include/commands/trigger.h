@@ -219,4 +219,4 @@ extern bool RI_Initial_Check(Trigger *trigger,
 
 extern int	RI_FKey_trigger_type(Oid tgfoid);
 
-#endif   /* TRIGGER_H */
+#endif							/* TRIGGER_H */

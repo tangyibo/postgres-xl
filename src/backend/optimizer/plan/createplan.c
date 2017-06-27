@@ -85,9 +85,9 @@
  * ressortgroupref labels.  This is passed down by parent nodes such as Sort
  * and Group, which need these values to be available in their inputs.
  */
-#define CP_EXACT_TLIST		0x0001		/* Plan must return specified tlist */
-#define CP_SMALL_TLIST		0x0002		/* Prefer narrower tlists */
-#define CP_LABEL_TLIST		0x0004		/* tlist must contain sortgrouprefs */
+#define CP_EXACT_TLIST		0x0001	/* Plan must return specified tlist */
+#define CP_SMALL_TLIST		0x0002	/* Prefer narrower tlists */
+#define CP_LABEL_TLIST		0x0004	/* tlist must contain sortgrouprefs */
 
 
 static Plan *create_plan_recurse(PlannerInfo *root, Path *best_path,
@@ -169,7 +169,7 @@ static TableFuncScan *create_tablefuncscan_plan(PlannerInfo *root, Path *best_pa
 static CteScan *create_ctescan_plan(PlannerInfo *root, Path *best_path,
 					List *tlist, List *scan_clauses);
 static NamedTuplestoreScan *create_namedtuplestorescan_plan(PlannerInfo *root,
-						   Path *best_path, List *tlist, List *scan_clauses);
+								Path *best_path, List *tlist, List *scan_clauses);
 static WorkTableScan *create_worktablescan_plan(PlannerInfo *root, Path *best_path,
 						  List *tlist, List *scan_clauses);
 static ForeignScan *create_foreignscan_plan(PlannerInfo *root, ForeignPath *best_path,
@@ -445,7 +445,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			else if (IsA(best_path, MinMaxAggPath))
 			{
 				plan = (Plan *) create_minmaxagg_plan(root,
-												(MinMaxAggPath *) best_path);
+													  (MinMaxAggPath *) best_path);
 			}
 			else
 			{
@@ -456,7 +456,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			break;
 		case T_ProjectSet:
 			plan = (Plan *) create_project_set_plan(root,
-											   (ProjectSetPath *) best_path);
+													(ProjectSetPath *) best_path);
 			break;
 		case T_Material:
 			plan = (Plan *) create_material_plan(root,
@@ -467,7 +467,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			if (IsA(best_path, UpperUniquePath))
 			{
 				plan = (Plan *) create_upper_unique_plan(root,
-											   (UpperUniquePath *) best_path,
+														 (UpperUniquePath *) best_path,
 														 flags);
 			}
 			else
@@ -494,7 +494,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 		case T_Agg:
 			if (IsA(best_path, GroupingSetsPath))
 				plan = create_groupingsets_plan(root,
-											 (GroupingSetsPath *) best_path);
+												(GroupingSetsPath *) best_path);
 			else
 			{
 				Assert(IsA(best_path, AggPath));
@@ -504,7 +504,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			break;
 		case T_WindowAgg:
 			plan = (Plan *) create_windowagg_plan(root,
-												(WindowAggPath *) best_path);
+												  (WindowAggPath *) best_path);
 			break;
 		case T_SetOp:
 			plan = (Plan *) create_setop_plan(root,
@@ -513,7 +513,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			break;
 		case T_RecursiveUnion:
 			plan = (Plan *) create_recursiveunion_plan(root,
-										   (RecursiveUnionPath *) best_path);
+													   (RecursiveUnionPath *) best_path);
 			break;
 		case T_LockRows:
 			plan = (Plan *) create_lockrows_plan(root,
@@ -522,7 +522,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			break;
 		case T_ModifyTable:
 			plan = (Plan *) create_modifytable_plan(root,
-											  (ModifyTablePath *) best_path);
+													(ModifyTablePath *) best_path);
 			break;
 		case T_Limit:
 			plan = (Plan *) create_limit_plan(root,
@@ -531,7 +531,7 @@ create_plan_recurse(PlannerInfo *root, Path *best_path, int flags)
 			break;
 		case T_GatherMerge:
 			plan = (Plan *) create_gather_merge_plan(root,
-											  (GatherMergePath *) best_path);
+													 (GatherMergePath *) best_path);
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d",
@@ -673,7 +673,7 @@ create_scan_plan(PlannerInfo *root, Path *best_path, int flags)
 
 		case T_BitmapHeapScan:
 			plan = (Plan *) create_bitmap_scan_plan(root,
-												(BitmapHeapPath *) best_path,
+													(BitmapHeapPath *) best_path,
 													tlist,
 													scan_clauses);
 			break;
@@ -687,7 +687,7 @@ create_scan_plan(PlannerInfo *root, Path *best_path, int flags)
 
 		case T_SubqueryScan:
 			plan = (Plan *) create_subqueryscan_plan(root,
-											  (SubqueryScanPath *) best_path,
+													 (SubqueryScanPath *) best_path,
 													 tlist,
 													 scan_clauses);
 			break;
@@ -1033,7 +1033,7 @@ create_join_plan(PlannerInfo *root, JoinPath *best_path)
 	if (get_loc_restrictinfo(best_path) != NIL)
 		set_qpqual((Plan) plan,
 				   list_concat(get_qpqual((Plan) plan),
-					   get_actual_clauses(get_loc_restrictinfo(best_path))));
+							   get_actual_clauses(get_loc_restrictinfo(best_path))));
 #endif
 
 	return plan;
@@ -1474,7 +1474,7 @@ create_unique_plan(PlannerInfo *root, UniquePath *best_path, int flags)
 			 * for the IN clause operators' RHS datatype.
 			 */
 			eqop = get_equality_op_for_ordering_op(sortop, NULL);
-			if (!OidIsValid(eqop))		/* shouldn't happen */
+			if (!OidIsValid(eqop))	/* shouldn't happen */
 				elog(ERROR, "could not find equality operator for ordering operator %u",
 					 sortop);
 
@@ -1965,9 +1965,9 @@ create_groupingsets_plan(PlannerInfo *root, GroupingSetsPath *best_path)
 										 NIL,
 										 strat,
 										 AGGSPLIT_SIMPLE,
-							   list_length((List *) linitial(rollup->gsets)),
+										 list_length((List *) linitial(rollup->gsets)),
 										 new_grpColIdx,
-								   extract_grouping_ops(rollup->groupClause),
+										 extract_grouping_ops(rollup->groupClause),
 										 rollup->gsets,
 										 NIL,
 										 rollup->numGroups,
@@ -2931,7 +2931,7 @@ create_indexscan_plan(PlannerInfo *root,
 												indexoid,
 												fixed_indexquals,
 												fixed_indexorderbys,
-											best_path->indexinfo->indextlist,
+												best_path->indexinfo->indextlist,
 												best_path->indexscandir);
 	else
 		scan_plan = (Scan *) make_indexscan(tlist,
@@ -3192,7 +3192,7 @@ create_bitmap_subplan(PlannerInfo *root, Path *bitmapqual,
 			plan->total_cost = opath->path.total_cost;
 			plan->plan_rows =
 				clamp_row_est(opath->bitmapselectivity * opath->path.parent->tuples);
-			plan->plan_width = 0;		/* meaningless */
+			plan->plan_width = 0;	/* meaningless */
 			plan->parallel_aware = false;
 			plan->parallel_safe = opath->path.parallel_safe;
 		}
@@ -3678,7 +3678,7 @@ create_worktablescan_plan(PlannerInfo *root, Path *best_path,
 		if (!cteroot)			/* shouldn't happen */
 			elog(ERROR, "bad levelsup for CTE \"%s\"", rte->ctename);
 	}
-	if (cteroot->wt_param_id < 0)		/* shouldn't happen */
+	if (cteroot->wt_param_id < 0)	/* shouldn't happen */
 		elog(ERROR, "could not find param ID for CTE \"%s\"", rte->ctename);
 
 	/* Sort clauses into best execution order */
@@ -4002,7 +4002,7 @@ create_nestloop_plan(PlannerInfo *root,
 				 bms_overlap(((PlaceHolderVar *) nlp->paramval)->phrels,
 							 outerrelids) &&
 				 bms_is_subset(find_placeholder_info(root,
-											(PlaceHolderVar *) nlp->paramval,
+													 (PlaceHolderVar *) nlp->paramval,
 													 false)->ph_eval_at,
 							   outerrelids))
 		{
@@ -4079,10 +4079,10 @@ create_mergejoin_plan(PlannerInfo *root,
 	 * necessary.
 	 */
 	outer_plan = create_plan_recurse(root, best_path->jpath.outerjoinpath,
-					 (best_path->outersortkeys != NIL) ? CP_SMALL_TLIST : 0);
+									 (best_path->outersortkeys != NIL) ? CP_SMALL_TLIST : 0);
 
 	inner_plan = create_plan_recurse(root, best_path->jpath.innerjoinpath,
-					 (best_path->innersortkeys != NIL) ? CP_SMALL_TLIST : 0);
+									 (best_path->innersortkeys != NIL) ? CP_SMALL_TLIST : 0);
 
 	/* Sort join qual clauses into best execution order */
 	/* NB: do NOT reorder the mergeclauses */
@@ -4127,7 +4127,7 @@ create_mergejoin_plan(PlannerInfo *root,
 	 * outer_is_left status.
 	 */
 	mergeclauses = get_switched_clauses(best_path->path_mergeclauses,
-							 best_path->jpath.outerjoinpath->parent->relids);
+										best_path->jpath.outerjoinpath->parent->relids);
 
 	/*
 	 * Create explicit sort nodes for the outer and inner paths if necessary.
@@ -4378,7 +4378,7 @@ create_hashjoin_plan(PlannerInfo *root,
 	 * that we don't put extra data in the outer batch files.
 	 */
 	outer_plan = create_plan_recurse(root, best_path->jpath.outerjoinpath,
-						  (best_path->num_batches > 1) ? CP_SMALL_TLIST : 0);
+									 (best_path->num_batches > 1) ? CP_SMALL_TLIST : 0);
 
 	inner_plan = create_plan_recurse(root, best_path->jpath.innerjoinpath,
 									 CP_SMALL_TLIST);
@@ -4425,7 +4425,7 @@ create_hashjoin_plan(PlannerInfo *root,
 	 * on the left.
 	 */
 	hashclauses = get_switched_clauses(best_path->path_hashclauses,
-							 best_path->jpath.outerjoinpath->parent->relids);
+									   best_path->jpath.outerjoinpath->parent->relids);
 
 	/*
 	 * If there is a single join clause and we can identify the outer variable
@@ -4565,8 +4565,8 @@ replace_nestloop_params_mutator(Node *node, PlannerInfo *root)
 		 * rels, and then grab its PlaceHolderInfo to tell for sure.
 		 */
 		if (!bms_overlap(phv->phrels, root->curOuterRels) ||
-		  !bms_is_subset(find_placeholder_info(root, phv, false)->ph_eval_at,
-						 root->curOuterRels))
+			!bms_is_subset(find_placeholder_info(root, phv, false)->ph_eval_at,
+						   root->curOuterRels))
 		{
 			/*
 			 * We can't replace the whole PHV, but we might still need to
@@ -5224,7 +5224,7 @@ bitmap_subplan_mark_shared(Plan *plan)
 {
 	if (IsA(plan, BitmapAnd))
 		bitmap_subplan_mark_shared(
-								linitial(((BitmapAnd *) plan)->bitmapplans));
+								   linitial(((BitmapAnd *) plan)->bitmapplans));
 	else if (IsA(plan, BitmapOr))
 		((BitmapOr *) plan)->isshared = true;
 	else if (IsA(plan, BitmapIndexScan))
@@ -6438,7 +6438,7 @@ prepare_sort_from_pathkeys(Plan *lefttree, List *pathkeys,
 								  NULL,
 								  true);
 			tlist = lappend(tlist, tle);
-			lefttree->targetlist = tlist;		/* just in case NIL before */
+			lefttree->targetlist = tlist;	/* just in case NIL before */
 #ifdef XCP
 			/*
 			 * RemoteSubplan is conditionally projection capable - it is
@@ -7241,7 +7241,7 @@ make_modifytable(PlannerInfo *root,
 	node->partitioned_rels = partitioned_rels;
 	node->resultRelations = resultRelations;
 	node->resultRelIndex = -1;	/* will be set correctly in setrefs.c */
-	node->rootResultRelIndex = -1;		/* will be set correctly in setrefs.c */
+	node->rootResultRelIndex = -1;	/* will be set correctly in setrefs.c */
 	node->plans = subplans;
 	if (!onconflict)
 	{

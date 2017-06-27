@@ -92,4 +92,4 @@ extern char *GetRelationPath_client(Oid dbNode, Oid spcNode, Oid relNode,
 #define relpath(rnode, forknum) \
 	relpathbackend((rnode).node, (rnode).backend, forknum)
 #endif
-#endif   /* RELPATH_H */
+#endif							/* RELPATH_H */

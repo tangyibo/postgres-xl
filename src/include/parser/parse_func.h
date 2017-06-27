@@ -71,4 +71,4 @@ extern void check_srf_call_placement(ParseState *pstate, Node *last_srf,
 						 int location);
 
 extern void check_pg_get_expr_args(ParseState *pstate, Oid fnoid, List *args);
-#endif   /* PARSE_FUNC_H */
+#endif							/* PARSE_FUNC_H */

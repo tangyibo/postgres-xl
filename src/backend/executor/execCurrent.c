@@ -157,7 +157,7 @@ execCurrentOf(CurrentOfExpr *cexpr,
 	{
 		ScanState  *scanstate;
 		bool		lisnull;
-		Oid tuple_tableoid PG_USED_FOR_ASSERTS_ONLY;
+		Oid			tuple_tableoid PG_USED_FOR_ASSERTS_ONLY;
 		ItemPointer tuple_tid;
 
 		/*

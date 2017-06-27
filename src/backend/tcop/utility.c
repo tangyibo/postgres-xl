@@ -339,8 +339,8 @@ CheckRestrictedOperation(const char *cmdname)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 		/* translator: %s is name of a SQL command, eg PREPARE */
-			 errmsg("cannot execute %s within security-restricted operation",
-					cmdname)));
+				 errmsg("cannot execute %s within security-restricted operation",
+						cmdname)));
 }
 
 
@@ -1656,7 +1656,7 @@ ProcessUtilitySlow(ParseState *pstate,
 							 * table
 							 */
 							toast_options = transformRelOptions((Datum) 0,
-											  ((CreateStmt *) stmt)->options,
+																((CreateStmt *) stmt)->options,
 																"toast",
 																validnsps,
 																true,
@@ -1826,8 +1826,8 @@ ProcessUtilitySlow(ParseState *pstate,
 					}
 					else
 						ereport(NOTICE,
-						  (errmsg("relation \"%s\" does not exist, skipping",
-								  atstmt->relation->relname)));
+								(errmsg("relation \"%s\" does not exist, skipping",
+										atstmt->relation->relname)));
 				}
 
 				/* ALTER TABLE stashes commands internally */
@@ -1844,7 +1844,7 @@ ProcessUtilitySlow(ParseState *pstate,
 					 */
 					switch (stmt->subtype)
 					{
-						case 'T':		/* ALTER DOMAIN DEFAULT */
+						case 'T':	/* ALTER DOMAIN DEFAULT */
 
 							/*
 							 * Recursively alter column default for table and,
@@ -1854,35 +1854,35 @@ ProcessUtilitySlow(ParseState *pstate,
 								AlterDomainDefault(stmt->typeName,
 												   stmt->def);
 							break;
-						case 'N':		/* ALTER DOMAIN DROP NOT NULL */
+						case 'N':	/* ALTER DOMAIN DROP NOT NULL */
 							address =
 								AlterDomainNotNull(stmt->typeName,
 												   false);
 							break;
-						case 'O':		/* ALTER DOMAIN SET NOT NULL */
+						case 'O':	/* ALTER DOMAIN SET NOT NULL */
 							address =
 								AlterDomainNotNull(stmt->typeName,
 												   true);
 							break;
-						case 'C':		/* ADD CONSTRAINT */
+						case 'C':	/* ADD CONSTRAINT */
 							address =
 								AlterDomainAddConstraint(stmt->typeName,
 														 stmt->def,
 														 &secondaryObject);
 							break;
-						case 'X':		/* DROP CONSTRAINT */
+						case 'X':	/* DROP CONSTRAINT */
 							address =
 								AlterDomainDropConstraint(stmt->typeName,
 														  stmt->name,
 														  stmt->behavior,
 														  stmt->missing_ok);
 							break;
-						case 'V':		/* VALIDATE CONSTRAINT */
+						case 'V':	/* VALIDATE CONSTRAINT */
 							address =
 								AlterDomainValidateConstraint(stmt->typeName,
 															  stmt->name);
 							break;
-						default:		/* oops */
+						default:	/* oops */
 							elog(ERROR, "unrecognized alter domain type: %d",
 								 (int) stmt->subtype);
 							break;
@@ -2014,14 +2014,14 @@ ProcessUtilitySlow(ParseState *pstate,
 					/* ... and do it */
 					EventTriggerAlterTableStart(parsetree);
 					address =
-						DefineIndex(relid,		/* OID of heap relation */
+						DefineIndex(relid,	/* OID of heap relation */
 									stmt,
 									InvalidOid, /* no predefined OID */
-									false,		/* is_alter_table */
-									true,		/* check_rights */
-									true,		/* check_not_in_use */
-									false,		/* skip_build */
-									false);		/* quiet */
+									false,	/* is_alter_table */
+									true,	/* check_rights */
+									true,	/* check_not_in_use */
+									false,	/* skip_build */
+									false); /* quiet */
 
 #ifdef PGXC
 					if (IS_PGXC_COORDINATOR && !stmt->isconstraint && !IsConnFromCoord())
@@ -2133,7 +2133,7 @@ ProcessUtilitySlow(ParseState *pstate,
 #endif
 				break;
 
-			case T_CreateEnumStmt:		/* CREATE TYPE AS ENUM */
+			case T_CreateEnumStmt:	/* CREATE TYPE AS ENUM */
 				address = DefineEnum((CreateEnumStmt *) parsetree);
 #ifdef PGXC
 				if (IS_PGXC_LOCAL_COORDINATOR)
@@ -2141,7 +2141,7 @@ ProcessUtilitySlow(ParseState *pstate,
 #endif
 				break;
 
-			case T_CreateRangeStmt:		/* CREATE TYPE AS RANGE */
+			case T_CreateRangeStmt: /* CREATE TYPE AS RANGE */
 				address = DefineRange((CreateRangeStmt *) parsetree);
 #ifdef PGXC
 				if (IS_PGXC_LOCAL_COORDINATOR)
@@ -2149,7 +2149,7 @@ ProcessUtilitySlow(ParseState *pstate,
 #endif
 				break;
 
-			case T_AlterEnumStmt:		/* ALTER TYPE (enum) */
+			case T_AlterEnumStmt:	/* ALTER TYPE (enum) */
 				address = AlterEnum((AlterEnumStmt *) parsetree);
 #ifdef PGXC
 				/*
@@ -2289,7 +2289,7 @@ ProcessUtilitySlow(ParseState *pstate,
 				PG_TRY();
 				{
 					address = ExecRefreshMatView((RefreshMatViewStmt *) parsetree,
-										 queryString, params, completionTag);
+												 queryString, params, completionTag);
 #ifdef PGXC
 					if ((IS_PGXC_COORDINATOR) && !IsConnFromCoord())
 					{
@@ -2514,7 +2514,7 @@ ProcessUtilitySlow(ParseState *pstate,
 #endif
 				break;
 
-			case T_AlterPolicyStmt:		/* ALTER POLICY */
+			case T_AlterPolicyStmt: /* ALTER POLICY */
 				address = AlterPolicy((AlterPolicyStmt *) parsetree);
 #ifdef PGXC
 				if (IS_PGXC_LOCAL_COORDINATOR)
@@ -2695,7 +2695,7 @@ UtilityReturnsTuples(Node *parsetree)
 					return false;
 				portal = GetPortalByName(stmt->portalname);
 				if (!PortalIsValid(portal))
-					return false;		/* not our business to raise error */
+					return false;	/* not our business to raise error */
 				return portal->tupDesc ? true : false;
 			}
 
@@ -2706,7 +2706,7 @@ UtilityReturnsTuples(Node *parsetree)
 
 				entry = FetchPreparedStatement(stmt->name, false);
 				if (!entry)
-					return false;		/* not our business to raise error */
+					return false;	/* not our business to raise error */
 				if (entry->plansource->resultDesc)
 					return true;
 				return false;
@@ -3896,7 +3896,7 @@ GetCommandLogLevel(Node *parsetree)
 
 		case T_SelectStmt:
 			if (((SelectStmt *) parsetree)->intoClause)
-				lev = LOGSTMT_DDL;		/* SELECT INTO */
+				lev = LOGSTMT_DDL;	/* SELECT INTO */
 			else
 				lev = LOGSTMT_ALL;
 			break;

@@ -649,7 +649,7 @@ select_perl_context(bool trusted)
 		ereport(ERROR,
 				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
 				 errmsg("%s", strip_trailing_ws(sv2cstr(ERRSV))),
-		errcontext("while executing PostgreSQL::InServer::SPI::bootstrap")));
+				 errcontext("while executing PostgreSQL::InServer::SPI::bootstrap")));
 
 	/* Fully initialized, so mark the hashtable entry valid */
 	interp_desc->interp = interp;
@@ -739,7 +739,7 @@ plperl_init_interp(void)
 	STMT_START { \
 		if (saved != NULL) { setlocale_perl(name, saved); pfree(saved); } \
 	} STMT_END
-#endif   /* WIN32 */
+#endif							/* WIN32 */
 
 	if (plperl_on_init && *plperl_on_init)
 	{
@@ -1320,19 +1320,19 @@ plperl_sv_to_datum(SV *sv, Oid typid, int32 typmod,
 			if (!type_is_rowtype(typid))
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
-				  errmsg("cannot convert Perl hash to non-composite type %s",
-						 format_type_be(typid))));
+						 errmsg("cannot convert Perl hash to non-composite type %s",
+								format_type_be(typid))));
 
 			td = lookup_rowtype_tupdesc_noerror(typid, typmod, true);
 			if (td == NULL)
 			{
 				/* Try to look it up based on our result type */
 				if (fcinfo == NULL ||
-				get_call_result_type(fcinfo, NULL, &td) != TYPEFUNC_COMPOSITE)
+					get_call_result_type(fcinfo, NULL, &td) != TYPEFUNC_COMPOSITE)
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						errmsg("function returning record called in context "
-							   "that cannot accept type record")));
+							 errmsg("function returning record called in context "
+									"that cannot accept type record")));
 			}
 
 			ret = plperl_hash_to_datum(sv, td);
@@ -1346,7 +1346,7 @@ plperl_sv_to_datum(SV *sv, Oid typid, int32 typmod,
 		/* Reference, but not reference to hash or array ... */
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
-		 errmsg("PL/Perl function must return reference to hash or array")));
+				 errmsg("PL/Perl function must return reference to hash or array")));
 		return (Datum) 0;		/* shut up compiler */
 	}
 	else
@@ -1436,8 +1436,8 @@ plperl_ref_from_pg_array(Datum arg, Oid typid)
 
 	/* Check for a transform function */
 	transform_funcid = get_transform_fromsql(elementtype,
-										current_call_data->prodesc->lang_oid,
-									   current_call_data->prodesc->trftypes);
+											 current_call_data->prodesc->lang_oid,
+											 current_call_data->prodesc->trftypes);
 
 	/* Look up transform or output function as appropriate */
 	if (OidIsValid(transform_funcid))
@@ -1572,7 +1572,7 @@ plperl_trigger_build_args(FunctionCallInfo fcinfo)
 
 	relid = DatumGetCString(
 							DirectFunctionCall1(oidout,
-								  ObjectIdGetDatum(tdata->tg_relation->rd_id)
+												ObjectIdGetDatum(tdata->tg_relation->rd_id)
 												)
 		);
 
@@ -1725,8 +1725,8 @@ plperl_modify_tuple(HV *hvTD, TriggerData *tdata, HeapTuple otup)
 							key)));
 
 		modvalues[attn - 1] = plperl_sv_to_datum(val,
-										  tupdesc->attrs[attn - 1]->atttypid,
-										 tupdesc->attrs[attn - 1]->atttypmod,
+												 tupdesc->attrs[attn - 1]->atttypid,
+												 tupdesc->attrs[attn - 1]->atttypmod,
 												 NULL,
 												 NULL,
 												 InvalidOid,
@@ -2076,8 +2076,8 @@ plperl_create_sub(plperl_proc_desc *prodesc, char *s, Oid fn_oid)
 	if (!subref)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-		 errmsg("didn't get a CODE reference from compiling function \"%s\"",
-				prodesc->proname)));
+				 errmsg("didn't get a CODE reference from compiling function \"%s\"",
+						prodesc->proname)));
 
 	prodesc->reference = subref;
 
@@ -2443,7 +2443,7 @@ plperl_trigger_handler(PG_FUNCTION_ARGS)
 	HV		   *hvTD;
 	ErrorContextCallback pl_error_context;
 	TriggerData *tdata;
-	int rc		PG_USED_FOR_ASSERTS_ONLY;
+	int			rc PG_USED_FOR_ASSERTS_ONLY;
 
 	/* Connect to SPI manager */
 	if (SPI_connect() != SPI_OK_CONNECT)
@@ -2527,8 +2527,8 @@ plperl_trigger_handler(PG_FUNCTION_ARGS)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_E_R_I_E_TRIGGER_PROTOCOL_VIOLATED),
-				  errmsg("result of PL/Perl trigger function must be undef, "
-						 "\"SKIP\", or \"MODIFY\"")));
+					 errmsg("result of PL/Perl trigger function must be undef, "
+							"\"SKIP\", or \"MODIFY\"")));
 			trv = NULL;
 		}
 		retval = PointerGetDatum(trv);
@@ -2735,7 +2735,7 @@ compile_plperl_function(Oid fn_oid, bool is_trigger, bool is_event_trigger)
 
 		/* Fetch protrftypes */
 		protrftypes_datum = SysCacheGetAttr(PROCOID, procTup,
-										  Anum_pg_proc_protrftypes, &isnull);
+											Anum_pg_proc_protrftypes, &isnull);
 		MemoryContextSwitchTo(proc_cxt);
 		prodesc->trftypes = isnull ? NIL : oid_array_to_list(protrftypes_datum);
 		MemoryContextSwitchTo(oldcontext);
@@ -2789,7 +2789,7 @@ compile_plperl_function(Oid fn_oid, bool is_trigger, bool is_event_trigger)
 			prodesc->result_oid = procStruct->prorettype;
 			prodesc->fn_retisset = procStruct->proretset;
 			prodesc->fn_retistuple = (procStruct->prorettype == RECORDOID ||
-								   typeStruct->typtype == TYPTYPE_COMPOSITE);
+									  typeStruct->typtype == TYPTYPE_COMPOSITE);
 
 			prodesc->fn_retisarray =
 				(typeStruct->typlen == -1 && typeStruct->typelem);
@@ -2813,7 +2813,7 @@ compile_plperl_function(Oid fn_oid, bool is_trigger, bool is_event_trigger)
 			for (i = 0; i < prodesc->nargs; i++)
 			{
 				typeTup = SearchSysCache1(TYPEOID,
-						ObjectIdGetDatum(procStruct->proargtypes.values[i]));
+										  ObjectIdGetDatum(procStruct->proargtypes.values[i]));
 				if (!HeapTupleIsValid(typeTup))
 					elog(ERROR, "cache lookup failed for type %u",
 						 procStruct->proargtypes.values[i]);
@@ -2825,7 +2825,7 @@ compile_plperl_function(Oid fn_oid, bool is_trigger, bool is_event_trigger)
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("PL/Perl functions cannot accept type %s",
-						format_type_be(procStruct->proargtypes.values[i]))));
+									format_type_be(procStruct->proargtypes.values[i]))));
 
 				if (typeStruct->typtype == TYPTYPE_COMPOSITE ||
 					procStruct->proargtypes.values[i] == RECORDOID)
@@ -2956,7 +2956,7 @@ plperl_hash_from_tuple(HeapTuple tuple, TupleDesc tupdesc)
 	check_stack_depth();
 
 	hv = newHV();
-	hv_ksplit(hv, tupdesc->natts);		/* pre-grow the hash */
+	hv_ksplit(hv, tupdesc->natts);	/* pre-grow the hash */
 
 	for (i = 0; i < tupdesc->natts; i++)
 	{
@@ -3117,7 +3117,7 @@ plperl_spi_execute_fetch_result(SPITupleTable *tuptable, uint64 processed,
 		if (processed > (uint64) AV_SIZE_MAX)
 			ereport(ERROR,
 					(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
-			errmsg("query result has too many rows to fit in a Perl array")));
+					 errmsg("query result has too many rows to fit in a Perl array")));
 
 		rows = newAV();
 		av_extend(rows, processed);
@@ -3635,7 +3635,7 @@ plperl_spi_exec_prepared(char *query, HV *attr, int argc, SV **argv)
 		 * go
 		 ************************************************************/
 		spi_rv = SPI_execute_plan(qdesc->plan, argvalues, nulls,
-							 current_call_data->prodesc->fn_readonly, limit);
+								  current_call_data->prodesc->fn_readonly, limit);
 		ret_hv = plperl_spi_execute_fetch_result(SPI_tuptable, SPI_processed,
 												 spi_rv);
 		if (argc > 0)
@@ -3933,7 +3933,7 @@ setlocale_perl(int category, char *locale)
 				newctype = RETVAL;
 			new_ctype(newctype);
 		}
-#endif   /* USE_LOCALE_CTYPE */
+#endif							/* USE_LOCALE_CTYPE */
 #ifdef USE_LOCALE_COLLATE
 		if (category == LC_COLLATE
 #ifdef LC_ALL
@@ -3951,7 +3951,7 @@ setlocale_perl(int category, char *locale)
 				newcoll = RETVAL;
 			new_collate(newcoll);
 		}
-#endif   /* USE_LOCALE_COLLATE */
+#endif							/* USE_LOCALE_COLLATE */
 
 #ifdef USE_LOCALE_NUMERIC
 		if (category == LC_NUMERIC
@@ -3970,7 +3970,7 @@ setlocale_perl(int category, char *locale)
 				newnum = RETVAL;
 			new_numeric(newnum);
 		}
-#endif   /* USE_LOCALE_NUMERIC */
+#endif							/* USE_LOCALE_NUMERIC */
 	}
 
 	return RETVAL;

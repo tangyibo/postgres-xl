@@ -1026,8 +1026,8 @@ numerictypmodin(PG_FUNCTION_ARGS)
 		if (tl[1] < 0 || tl[1] > tl[0])
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				errmsg("NUMERIC scale %d must be between 0 and precision %d",
-					   tl[1], tl[0])));
+					 errmsg("NUMERIC scale %d must be between 0 and precision %d",
+							tl[1], tl[0])));
 		typmod = ((tl[0] << 16) | tl[1]) + VARHDRSZ;
 	}
 	else if (n == 1)
@@ -1497,7 +1497,7 @@ width_bucket_numeric(PG_FUNCTION_ARGS)
 		NUMERIC_IS_NAN(bound2))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_ARGUMENT_FOR_WIDTH_BUCKET_FUNCTION),
-			 errmsg("operand, lower bound, and upper bound cannot be NaN")));
+				 errmsg("operand, lower bound, and upper bound cannot be NaN")));
 
 	init_var(&result_var);
 	init_var(&count_var);
@@ -1509,8 +1509,8 @@ width_bucket_numeric(PG_FUNCTION_ARGS)
 	{
 		case 0:
 			ereport(ERROR,
-				(errcode(ERRCODE_INVALID_ARGUMENT_FOR_WIDTH_BUCKET_FUNCTION),
-				 errmsg("lower bound cannot equal upper bound")));
+					(errcode(ERRCODE_INVALID_ARGUMENT_FOR_WIDTH_BUCKET_FUNCTION),
+					 errmsg("lower bound cannot equal upper bound")));
 
 			/* bound1 < bound2 */
 		case -1:
@@ -1770,7 +1770,7 @@ numeric_abbrev_abort(int memtupcount, SortSupport ssup)
 		if (trace_sort)
 			elog(LOG,
 				 "numeric_abbrev: aborting abbreviation at cardinality %f"
-			   " below threshold %f after " INT64_FORMAT " values (%d rows)",
+				 " below threshold %f after " INT64_FORMAT " values (%d rows)",
 				 abbr_card, nss->input_count / 10000.0 + 0.5,
 				 nss->input_count, memtupcount);
 #endif
@@ -1933,7 +1933,7 @@ numeric_abbrev_convert_var(NumericVar *var, NumericSortSupport *nss)
 	return NumericAbbrevGetDatum(result);
 }
 
-#endif   /* NUMERIC_ABBREV_BITS == 64 */
+#endif							/* NUMERIC_ABBREV_BITS == 64 */
 
 #if NUMERIC_ABBREV_BITS == 32
 
@@ -2010,7 +2010,7 @@ numeric_abbrev_convert_var(NumericVar *var, NumericSortSupport *nss)
 	return NumericAbbrevGetDatum(result);
 }
 
-#endif   /* NUMERIC_ABBREV_BITS == 32 */
+#endif							/* NUMERIC_ABBREV_BITS == 32 */
 
 /*
  * Ordinary (non-sortsupport) comparisons follow.
@@ -4704,7 +4704,7 @@ numeric_stddev_internal(NumericAggState *state,
 	rscale = vsumX.dscale * 2;
 
 	mul_var(&vsumX, &vsumX, &vsumX, rscale);	/* vsumX = sumX * sumX */
-	mul_var(&vN, &vsumX2, &vsumX2, rscale);		/* vsumX2 = N * sumX2 */
+	mul_var(&vN, &vsumX2, &vsumX2, rscale); /* vsumX2 = N * sumX2 */
 	sub_var(&vsumX2, &vsumX, &vsumX2);	/* N * sumX2 - sumX * sumX */
 
 	if (cmp_var(&vsumX2, &const_zero) <= 0)
@@ -4715,11 +4715,11 @@ numeric_stddev_internal(NumericAggState *state,
 	else
 	{
 		if (sample)
-			mul_var(&vN, &vNminus1, &vNminus1, 0);		/* N * (N - 1) */
+			mul_var(&vN, &vNminus1, &vNminus1, 0);	/* N * (N - 1) */
 		else
 			mul_var(&vN, &vN, &vNminus1, 0);	/* N * N */
 		rscale = select_div_scale(&vsumX2, &vNminus1);
-		div_var(&vsumX2, &vNminus1, &vsumX, rscale, true);		/* variance */
+		div_var(&vsumX2, &vNminus1, &vsumX, rscale, true);	/* variance */
 		if (!variance)
 			sqrt_var(&vsumX, &vsumX, rscale);	/* stddev */
 
@@ -5369,7 +5369,7 @@ dump_var(const char *str, NumericVar *var)
 
 	printf("\n");
 }
-#endif   /* NUMERIC_DEBUG */
+#endif							/* NUMERIC_DEBUG */
 
 
 /* ----------------------------------------------------------------------
@@ -8081,7 +8081,7 @@ power_var(NumericVar *base, NumericVar *exp, NumericVar *result)
 	if (cmp_var(base, &const_zero) == 0)
 	{
 		set_var_from_var(&const_zero, result);
-		result->dscale = NUMERIC_MIN_SIG_DIGITS;		/* no need to round */
+		result->dscale = NUMERIC_MIN_SIG_DIGITS;	/* no need to round */
 		return;
 	}
 
@@ -8175,8 +8175,7 @@ power_var_int(NumericVar *base, int exp, NumericVar *result, int rscale)
 			 * While 0 ^ 0 can be either 1 or indeterminate (error), we treat
 			 * it as 1 because most programming languages do this. SQL:2003
 			 * also requires a return value of 1.
-			 * http://en.wikipedia.org/wiki/Exponentiation#Zero_to_the_zero_pow
-			 * er
+			 * http://en.wikipedia.org/wiki/Exponentiation#Zero_to_the_zero_power
 			 */
 			set_var_from_var(&const_one, result);
 			result->dscale = rscale;	/* no need to round */
@@ -8361,7 +8360,7 @@ cmp_abs(NumericVar *var1, NumericVar *var2)
  */
 static int
 cmp_abs_common(const NumericDigit *var1digits, int var1ndigits, int var1weight,
-			 const NumericDigit *var2digits, int var2ndigits, int var2weight)
+			   const NumericDigit *var2digits, int var2ndigits, int var2weight)
 {
 	int			i1 = 0;
 	int			i2 = 0;

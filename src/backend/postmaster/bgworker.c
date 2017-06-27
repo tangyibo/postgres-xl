@@ -118,7 +118,7 @@ static const struct
 {
 	const char *fn_name;
 	bgworker_main_type fn_addr;
-}	InternalBGWorkers[] =
+}			InternalBGWorkers[] =
 
 {
 	{
@@ -636,7 +636,7 @@ SanityCheckBackgroundWorker(BackgroundWorker *worker, int elevel)
 static void
 bgworker_quickdie(SIGNAL_ARGS)
 {
-	sigaddset(&BlockSig, SIGQUIT);		/* prevent nested calls */
+	sigaddset(&BlockSig, SIGQUIT);	/* prevent nested calls */
 	PG_SETMASK(&BlockSig);
 
 	/*
@@ -853,7 +853,7 @@ RegisterBackgroundWorker(BackgroundWorker *worker)
 
 	if (!IsUnderPostmaster)
 		ereport(DEBUG1,
-		 (errmsg("registering background worker \"%s\"", worker->bgw_name)));
+				(errmsg("registering background worker \"%s\"", worker->bgw_name)));
 
 	if (!process_shared_preload_libraries_in_progress &&
 		strcmp(worker->bgw_library_name, "postgres") != 0)
@@ -986,7 +986,7 @@ RegisterDynamicBackgroundWorker(BackgroundWorker *worker,
 		if (!slot->in_use)
 		{
 			memcpy(&slot->worker, worker, sizeof(BackgroundWorker));
-			slot->pid = InvalidPid;		/* indicates not started yet */
+			slot->pid = InvalidPid; /* indicates not started yet */
 			slot->generation++;
 			slot->terminate = false;
 			generation = slot->generation;

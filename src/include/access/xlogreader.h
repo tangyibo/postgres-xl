@@ -31,11 +31,11 @@ typedef struct XLogReaderState XLogReaderState;
 
 /* Function type definition for the read_page callback */
 typedef int (*XLogPageReadCB) (XLogReaderState *xlogreader,
-										   XLogRecPtr targetPagePtr,
-										   int reqLen,
-										   XLogRecPtr targetRecPtr,
-										   char *readBuf,
-										   TimeLineID *pageTLI);
+							   XLogRecPtr targetPagePtr,
+							   int reqLen,
+							   XLogRecPtr targetRecPtr,
+							   char *readBuf,
+							   TimeLineID *pageTLI);
 
 typedef struct
 {
@@ -204,7 +204,7 @@ extern void XLogReaderInvalReadState(XLogReaderState *state);
 
 #ifdef FRONTEND
 extern XLogRecPtr XLogFindNextRecord(XLogReaderState *state, XLogRecPtr RecPtr);
-#endif   /* FRONTEND */
+#endif							/* FRONTEND */
 
 /* Functions for decoding an XLogRecord */
 
@@ -233,4 +233,4 @@ extern bool XLogRecGetBlockTag(XLogReaderState *record, uint8 block_id,
 				   RelFileNode *rnode, ForkNumber *forknum,
 				   BlockNumber *blknum);
 
-#endif   /* XLOGREADER_H */
+#endif							/* XLOGREADER_H */

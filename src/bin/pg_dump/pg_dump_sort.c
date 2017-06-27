@@ -360,7 +360,7 @@ sortDumpableObjects(DumpableObject **objs, int numObjs,
 static bool
 TopoSort(DumpableObject **objs,
 		 int numObjs,
-		 DumpableObject **ordering,		/* output argument */
+		 DumpableObject **ordering, /* output argument */
 		 int *nOrdering)		/* output argument */
 {
 	DumpId		maxDumpId = getMaxDumpId();
@@ -1181,7 +1181,7 @@ repairDependencyLoop(DumpableObject **loop,
 		write_msg(NULL, "Consider using a full dump instead of a --data-only dump to avoid this problem.\n");
 		if (nLoop > 1)
 			removeObjectDependency(loop[0], loop[1]->dumpId);
-		else	/* must be a self-dependency */
+		else					/* must be a self-dependency */
 			removeObjectDependency(loop[0], loop[0]->dumpId);
 		return;
 	}
@@ -1201,7 +1201,7 @@ repairDependencyLoop(DumpableObject **loop,
 
 	if (nLoop > 1)
 		removeObjectDependency(loop[0], loop[1]->dumpId);
-	else	/* must be a self-dependency */
+	else						/* must be a self-dependency */
 		removeObjectDependency(loop[0], loop[0]->dumpId);
 }
 

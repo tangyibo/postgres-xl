@@ -29,7 +29,7 @@ static bool expression_returns_set_walker(Node *node, void *context);
 static int	leftmostLoc(int loc1, int loc2);
 static bool fix_opfuncids_walker(Node *node, void *context);
 static bool planstate_walk_subplans(List *plans, bool (*walker) (),
-												void *context);
+									void *context);
 static bool planstate_walk_members(List *plans, PlanState **planstates,
 					   bool (*walker) (), void *context);
 
@@ -121,7 +121,7 @@ exprType(const Node *expr)
 							ereport(ERROR,
 									(errcode(ERRCODE_UNDEFINED_OBJECT),
 									 errmsg("could not find array type for data type %s",
-							format_type_be(exprType((Node *) tent->expr)))));
+											format_type_be(exprType((Node *) tent->expr)))));
 					}
 				}
 				else if (sublink->subLinkType == MULTIEXPR_SUBLINK)
@@ -152,7 +152,7 @@ exprType(const Node *expr)
 							ereport(ERROR,
 									(errcode(ERRCODE_UNDEFINED_OBJECT),
 									 errmsg("could not find array type for data type %s",
-									format_type_be(subplan->firstColType))));
+											format_type_be(subplan->firstColType))));
 					}
 				}
 				else if (subplan->subLinkType == MULTIEXPR_SUBLINK)
@@ -1007,10 +1007,10 @@ exprSetCollation(Node *expr, Oid collation)
 			((NullIfExpr *) expr)->opcollid = collation;
 			break;
 		case T_ScalarArrayOpExpr:
-			Assert(!OidIsValid(collation));		/* result is always boolean */
+			Assert(!OidIsValid(collation)); /* result is always boolean */
 			break;
 		case T_BoolExpr:
-			Assert(!OidIsValid(collation));		/* result is always boolean */
+			Assert(!OidIsValid(collation)); /* result is always boolean */
 			break;
 		case T_SubLink:
 #ifdef USE_ASSERT_CHECKING
@@ -1036,13 +1036,13 @@ exprSetCollation(Node *expr, Oid collation)
 					Assert(!OidIsValid(collation));
 				}
 			}
-#endif   /* USE_ASSERT_CHECKING */
+#endif							/* USE_ASSERT_CHECKING */
 			break;
 		case T_FieldSelect:
 			((FieldSelect *) expr)->resultcollid = collation;
 			break;
 		case T_FieldStore:
-			Assert(!OidIsValid(collation));		/* result is always composite */
+			Assert(!OidIsValid(collation)); /* result is always composite */
 			break;
 		case T_RelabelType:
 			((RelabelType *) expr)->resultcollid = collation;
@@ -1054,7 +1054,7 @@ exprSetCollation(Node *expr, Oid collation)
 			((ArrayCoerceExpr *) expr)->resultcollid = collation;
 			break;
 		case T_ConvertRowtypeExpr:
-			Assert(!OidIsValid(collation));		/* result is always composite */
+			Assert(!OidIsValid(collation)); /* result is always composite */
 			break;
 		case T_CaseExpr:
 			((CaseExpr *) expr)->casecollid = collation;
@@ -1063,10 +1063,10 @@ exprSetCollation(Node *expr, Oid collation)
 			((ArrayExpr *) expr)->array_collid = collation;
 			break;
 		case T_RowExpr:
-			Assert(!OidIsValid(collation));		/* result is always composite */
+			Assert(!OidIsValid(collation)); /* result is always composite */
 			break;
 		case T_RowCompareExpr:
-			Assert(!OidIsValid(collation));		/* result is always boolean */
+			Assert(!OidIsValid(collation)); /* result is always boolean */
 			break;
 		case T_CoalesceExpr:
 			((CoalesceExpr *) expr)->coalescecollid = collation;
@@ -1075,7 +1075,7 @@ exprSetCollation(Node *expr, Oid collation)
 			((MinMaxExpr *) expr)->minmaxcollid = collation;
 			break;
 		case T_SQLValueFunction:
-			Assert(!OidIsValid(collation));		/* no collatable results */
+			Assert(!OidIsValid(collation)); /* no collatable results */
 			break;
 		case T_XmlExpr:
 			Assert((((XmlExpr *) expr)->op == IS_XMLSERIALIZE) ?
@@ -1083,10 +1083,10 @@ exprSetCollation(Node *expr, Oid collation)
 				   (collation == InvalidOid));
 			break;
 		case T_NullTest:
-			Assert(!OidIsValid(collation));		/* result is always boolean */
+			Assert(!OidIsValid(collation)); /* result is always boolean */
 			break;
 		case T_BooleanTest:
-			Assert(!OidIsValid(collation));		/* result is always boolean */
+			Assert(!OidIsValid(collation)); /* result is always boolean */
 			break;
 		case T_CoerceToDomain:
 			((CoerceToDomain *) expr)->resultcollid = collation;
@@ -1098,11 +1098,11 @@ exprSetCollation(Node *expr, Oid collation)
 			((SetToDefault *) expr)->collation = collation;
 			break;
 		case T_CurrentOfExpr:
-			Assert(!OidIsValid(collation));		/* result is always boolean */
+			Assert(!OidIsValid(collation)); /* result is always boolean */
 			break;
 		case T_NextValueExpr:
-			Assert(!OidIsValid(collation));		/* result is always an integer
-												 * type */
+			Assert(!OidIsValid(collation)); /* result is always an integer
+											 * type */
 			break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(expr));
@@ -3096,7 +3096,7 @@ query_tree_mutator(Query *query,
 	MUTATE(query->limitCount, query->limitCount, Node *);
 	if (!(flags & QTW_IGNORE_CTE_SUBQUERIES))
 		MUTATE(query->cteList, query->cteList, List *);
-	else	/* else copy CTE list as-is */
+	else						/* else copy CTE list as-is */
 		query->cteList = copyObject(query->cteList);
 	query->rtable = range_table_mutator(query->rtable,
 										mutator, context, flags);
@@ -3732,31 +3732,31 @@ planstate_tree_walker(PlanState *planstate,
 	{
 		case T_ModifyTable:
 			if (planstate_walk_members(((ModifyTable *) plan)->plans,
-								  ((ModifyTableState *) planstate)->mt_plans,
+									   ((ModifyTableState *) planstate)->mt_plans,
 									   walker, context))
 				return true;
 			break;
 		case T_Append:
 			if (planstate_walk_members(((Append *) plan)->appendplans,
-									((AppendState *) planstate)->appendplans,
+									   ((AppendState *) planstate)->appendplans,
 									   walker, context))
 				return true;
 			break;
 		case T_MergeAppend:
 			if (planstate_walk_members(((MergeAppend *) plan)->mergeplans,
-								((MergeAppendState *) planstate)->mergeplans,
+									   ((MergeAppendState *) planstate)->mergeplans,
 									   walker, context))
 				return true;
 			break;
 		case T_BitmapAnd:
 			if (planstate_walk_members(((BitmapAnd *) plan)->bitmapplans,
-								 ((BitmapAndState *) planstate)->bitmapplans,
+									   ((BitmapAndState *) planstate)->bitmapplans,
 									   walker, context))
 				return true;
 			break;
 		case T_BitmapOr:
 			if (planstate_walk_members(((BitmapOr *) plan)->bitmapplans,
-								  ((BitmapOrState *) planstate)->bitmapplans,
+									   ((BitmapOrState *) planstate)->bitmapplans,
 									   walker, context))
 				return true;
 			break;

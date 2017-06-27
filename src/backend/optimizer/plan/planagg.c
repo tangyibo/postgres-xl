@@ -90,8 +90,8 @@ preprocess_minmax_aggregates(PlannerInfo *root, List *tlist)
 	if (!parse->hasAggs)
 		return;
 
-	Assert(!parse->setOperations);		/* shouldn't get here if a setop */
-	Assert(parse->rowMarks == NIL);		/* nor if FOR UPDATE */
+	Assert(!parse->setOperations);	/* shouldn't get here if a setop */
+	Assert(parse->rowMarks == NIL); /* nor if FOR UPDATE */
 
 	/*
 	 * Reject unoptimizable cases.
@@ -204,7 +204,7 @@ preprocess_minmax_aggregates(PlannerInfo *root, List *tlist)
 			SS_make_initplan_output_param(root,
 										  exprType((Node *) mminfo->target),
 										  -1,
-									 exprCollation((Node *) mminfo->target));
+										  exprCollation((Node *) mminfo->target));
 	}
 
 	/*

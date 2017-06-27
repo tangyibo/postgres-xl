@@ -320,8 +320,8 @@ aclparse(const char *s, AclItem *aip)
 			default:
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-					  errmsg("invalid mode character: must be one of \"%s\"",
-							 ACL_ALL_RIGHTS_STR)));
+						 errmsg("invalid mode character: must be one of \"%s\"",
+								ACL_ALL_RIGHTS_STR)));
 		}
 
 		privs |= read;
@@ -573,7 +573,7 @@ aclitemin(PG_FUNCTION_ARGS)
 	if (*s)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
-			   errmsg("extra garbage at the end of the ACL specification")));
+				 errmsg("extra garbage at the end of the ACL specification")));
 
 	PG_RETURN_ACLITEM_P(aip);
 }
@@ -793,7 +793,7 @@ acldefault(GrantObjectType objtype, Oid ownerId)
 			break;
 		default:
 			elog(ERROR, "unrecognized objtype: %d", (int) objtype);
-			world_default = ACL_NO_RIGHTS;		/* keep compiler quiet */
+			world_default = ACL_NO_RIGHTS;	/* keep compiler quiet */
 			owner_default = ACL_NO_RIGHTS;
 			break;
 	}
@@ -1193,7 +1193,7 @@ cc_restart:
 	if ((ACLITEM_GET_GOPTIONS(*mod_aip) & ~own_privs) != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_GRANT_OPERATION),
-		errmsg("grant options cannot be granted back to your own grantor")));
+				 errmsg("grant options cannot be granted back to your own grantor")));
 
 	pfree(acl);
 }
@@ -4713,7 +4713,7 @@ roles_has_privs_of(Oid roleid)
 	/*
 	 * Now safe to assign to state variable
 	 */
-	cached_privs_role = InvalidOid;		/* just paranoia */
+	cached_privs_role = InvalidOid; /* just paranoia */
 	list_free(cached_privs_roles);
 	cached_privs_roles = new_cached_privs_roles;
 	cached_privs_role = roleid;
@@ -5176,7 +5176,7 @@ get_rolespec_tuple(const RoleSpec *role)
 			if (!HeapTupleIsValid(tuple))
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
-					  errmsg("role \"%s\" does not exist", role->rolename)));
+						 errmsg("role \"%s\" does not exist", role->rolename)));
 			break;
 
 		case ROLESPEC_CURRENT_USER:

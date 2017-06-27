@@ -1177,7 +1177,7 @@ make_temp_sockdir(void)
 
 	return temp_sockdir;
 }
-#endif   /* HAVE_UNIX_SOCKETS */
+#endif							/* HAVE_UNIX_SOCKETS */
 
 /*
  * Check whether string matches pattern
@@ -2342,7 +2342,7 @@ wait_for_tests(PID_TYPE * pids, int *statuses, char **names, int num_tests)
 		p = active_pids[r - WAIT_OBJECT_0];
 		/* compact the active_pids array */
 		active_pids[r - WAIT_OBJECT_0] = active_pids[tests_left - 1];
-#endif   /* WIN32 */
+#endif							/* WIN32 */
 
 		for (i = 0; i < num_tests; i++)
 		{
@@ -2569,8 +2569,8 @@ run_schedule(const char *schedule, test_function tfunc)
 				bool		newdiff;
 
 				if (tl)
-					tl = tl->next;		/* tl has the same length as rl and el
-										 * if it exists */
+					tl = tl->next;	/* tl has the same length as rl and el if
+									 * it exists */
 
 				newdiff = results_differ(tests[i], rl->str, el->str);
 				if (newdiff && tl)
@@ -2756,7 +2756,7 @@ create_database(const char *dbname)
 				 "ALTER DATABASE \"%s\" SET lc_numeric TO 'C';"
 				 "ALTER DATABASE \"%s\" SET lc_time TO 'C';"
 				 "ALTER DATABASE \"%s\" SET bytea_output TO 'hex';"
-			"ALTER DATABASE \"%s\" SET timezone_abbreviations TO 'Default';",
+				 "ALTER DATABASE \"%s\" SET timezone_abbreviations TO 'Default';",
 				 dbname, dbname, dbname, dbname, dbname, dbname);
 
 	/*

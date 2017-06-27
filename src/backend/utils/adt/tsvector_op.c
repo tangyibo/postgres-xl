@@ -411,7 +411,7 @@ tsvector_bsearch(const TSVector tsv, char *lexeme, int lexeme_len)
 			StopHigh = StopMiddle;
 		else if (cmp > 0)
 			StopLow = StopMiddle + 1;
-		else	/* found it */
+		else					/* found it */
 			return StopMiddle;
 	}
 
@@ -674,7 +674,7 @@ tsvector_unnest(PG_FUNCTION_ARGS)
 		Datum		values[3];
 
 		values[0] = PointerGetDatum(
-				  cstring_to_text_with_len(data + arrin[i].pos, arrin[i].len)
+									cstring_to_text_with_len(data + arrin[i].pos, arrin[i].len)
 			);
 
 		if (arrin[i].haspos)
@@ -697,14 +697,14 @@ tsvector_unnest(PG_FUNCTION_ARGS)
 				positions[j] = Int16GetDatum(WEP_GETPOS(posv->pos[j]));
 				weight = 'D' - WEP_GETWEIGHT(posv->pos[j]);
 				weights[j] = PointerGetDatum(
-										 cstring_to_text_with_len(&weight, 1)
+											 cstring_to_text_with_len(&weight, 1)
 					);
 			}
 
 			values[1] = PointerGetDatum(
-			  construct_array(positions, posv->npos, INT2OID, 2, true, 's'));
+										construct_array(positions, posv->npos, INT2OID, 2, true, 's'));
 			values[2] = PointerGetDatum(
-			  construct_array(weights, posv->npos, TEXTOID, -1, false, 'i'));
+										construct_array(weights, posv->npos, TEXTOID, -1, false, 'i'));
 		}
 		else
 		{
@@ -738,7 +738,7 @@ tsvector_to_array(PG_FUNCTION_ARGS)
 	for (i = 0; i < tsin->size; i++)
 	{
 		elements[i] = PointerGetDatum(
-		  cstring_to_text_with_len(STRPTR(tsin) + arrin[i].pos, arrin[i].len)
+									  cstring_to_text_with_len(STRPTR(tsin) + arrin[i].pos, arrin[i].len)
 			);
 	}
 
@@ -1058,7 +1058,7 @@ tsvector_concat(PG_FUNCTION_ARGS)
 					if (ptr2->haspos)
 						dataoff += add_pos(in2, ptr2, out, ptr, maxpos) * sizeof(WordEntryPos);
 				}
-				else	/* must have ptr2->haspos */
+				else			/* must have ptr2->haspos */
 				{
 					int			addlen = add_pos(in2, ptr2, out, ptr, maxpos);
 
@@ -1255,7 +1255,7 @@ checkclass_str(CHKVAL *chkval, WordEntry *entry, QueryOperand *val,
 				posvec_iter++;
 			}
 		}
-		else	/* data != NULL */
+		else					/* data != NULL */
 		{
 			data->npos = posvec->npos;
 			data->pos = posvec->pos;
@@ -1489,7 +1489,7 @@ TS_phrase_output(ExecPhraseData *data,
 			Lindex++;
 			Rindex++;
 		}
-		else	/* Lpos > Rpos */
+		else					/* Lpos > Rpos */
 		{
 			/* Rpos is not matched in Ldata, should we output it? */
 			if (emit & TSPO_R_ONLY)
@@ -2466,7 +2466,7 @@ tsvector_update_trigger(PG_FUNCTION_ARGS, bool config_column)
 	Oid			cfgId;
 
 	/* Check call context */
-	if (!CALLED_AS_TRIGGER(fcinfo))		/* internal error */
+	if (!CALLED_AS_TRIGGER(fcinfo)) /* internal error */
 		elog(ERROR, "tsvector_update_trigger: not fired by trigger manager");
 
 	trigdata = (TriggerData *) fcinfo->context;

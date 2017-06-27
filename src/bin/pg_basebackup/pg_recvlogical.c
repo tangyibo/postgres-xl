@@ -37,7 +37,7 @@
 static char *outfile = NULL;
 static int	verbose = 0;
 static int	noloop = 0;
-static int	standby_message_timeout = 10 * 1000;		/* 10 sec = default */
+static int	standby_message_timeout = 10 * 1000;	/* 10 sec = default */
 static int	fsync_interval = 10 * 1000; /* 10 sec = default */
 static XLogRecPtr startpos = InvalidXLogRecPtr;
 static XLogRecPtr endpos = InvalidXLogRecPtr;
@@ -132,9 +132,9 @@ sendFeedback(PGconn *conn, TimestampTz now, bool force, bool replyRequested)
 
 	if (verbose)
 		fprintf(stderr,
-		   _("%s: confirming write up to %X/%X, flush to %X/%X (slot %s)\n"),
+				_("%s: confirming write up to %X/%X, flush to %X/%X (slot %s)\n"),
 				progname,
-			(uint32) (output_written_lsn >> 32), (uint32) output_written_lsn,
+				(uint32) (output_written_lsn >> 32), (uint32) output_written_lsn,
 				(uint32) (output_fsync_lsn >> 32), (uint32) output_fsync_lsn,
 				replication_slot);
 
@@ -142,13 +142,13 @@ sendFeedback(PGconn *conn, TimestampTz now, bool force, bool replyRequested)
 	len += 1;
 	fe_sendint64(output_written_lsn, &replybuf[len]);	/* write */
 	len += 8;
-	fe_sendint64(output_fsync_lsn, &replybuf[len]);		/* flush */
+	fe_sendint64(output_fsync_lsn, &replybuf[len]); /* flush */
 	len += 8;
 	fe_sendint64(InvalidXLogRecPtr, &replybuf[len]);	/* apply */
 	len += 8;
 	fe_sendint64(now, &replybuf[len]);	/* sendTime */
 	len += 8;
-	replybuf[len] = replyRequested ? 1 : 0;		/* replyRequested */
+	replybuf[len] = replyRequested ? 1 : 0; /* replyRequested */
 	len += 1;
 
 	startpos = output_written_lsn;
@@ -241,7 +241,7 @@ StreamLogicalLog(void)
 
 	/* Initiate the replication stream at specified location */
 	appendPQExpBuffer(query, "START_REPLICATION SLOT \"%s\" LOGICAL %X/%X",
-			 replication_slot, (uint32) (startpos >> 32), (uint32) startpos);
+					  replication_slot, (uint32) (startpos >> 32), (uint32) startpos);
 
 	/* print options if there are any */
 	if (noptions)
@@ -570,7 +570,7 @@ StreamLogicalLog(void)
 			if (ret < 0)
 			{
 				fprintf(stderr,
-				  _("%s: could not write %u bytes to log file \"%s\": %s\n"),
+						_("%s: could not write %u bytes to log file \"%s\": %s\n"),
 						progname, bytes_left, outfile,
 						strerror(errno));
 				goto error;
@@ -584,7 +584,7 @@ StreamLogicalLog(void)
 		if (write(outfd, "\n", 1) != 1)
 		{
 			fprintf(stderr,
-				  _("%s: could not write %u bytes to log file \"%s\": %s\n"),
+					_("%s: could not write %u bytes to log file \"%s\": %s\n"),
 					progname, 1, outfile,
 					strerror(errno));
 			goto error;

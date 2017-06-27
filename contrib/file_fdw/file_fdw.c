@@ -250,7 +250,7 @@ file_fdw_validator(PG_FUNCTION_ARGS)
 					 buf.len > 0
 					 ? errhint("Valid options in this context are: %s",
 							   buf.data)
-				  : errhint("There are no valid options in this context.")));
+					 : errhint("There are no valid options in this context.")));
 		}
 
 		/*
@@ -544,13 +544,13 @@ fileGetForeignPaths(PlannerInfo *root,
 	 */
 	add_path(baserel, (Path *)
 			 create_foreignscan_path(root, baserel,
-									 NULL,		/* default pathtarget */
+									 NULL,	/* default pathtarget */
 									 baserel->rows,
 									 startup_cost,
 									 total_cost,
-									 NIL,		/* no pathkeys */
-									 NULL,		/* no outer rel either */
-									 NULL,		/* no extra plan */
+									 NIL,	/* no pathkeys */
+									 NULL,	/* no outer rel either */
+									 NULL,	/* no extra plan */
 									 coptions));
 
 	/*

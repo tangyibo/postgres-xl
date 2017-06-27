@@ -175,7 +175,7 @@ check_primary_key(PG_FUNCTION_ARGS)
 		for (i = 0; i < nkeys; i++)
 		{
 			snprintf(sql + strlen(sql), sizeof(sql) - strlen(sql), "%s = $%d %s",
-				  args[i + nkeys + 1], i + 1, (i < nkeys - 1) ? "and " : "");
+					 args[i + nkeys + 1], i + 1, (i < nkeys - 1) ? "and " : "");
 		}
 
 		/* Prepare plan for query */
@@ -248,7 +248,7 @@ check_foreign_key(PG_FUNCTION_ARGS)
 	Datum	   *kvals;			/* key values */
 	char	   *relname;		/* referencing relation name */
 	Relation	rel;			/* triggered relation */
-	HeapTuple	trigtuple = NULL;		/* tuple to being changed */
+	HeapTuple	trigtuple = NULL;	/* tuple to being changed */
 	HeapTuple	newtuple = NULL;	/* tuple to return */
 	TupleDesc	tupdesc;		/* tuple description */
 	EPlan	   *plan;			/* prepared plan(s) */

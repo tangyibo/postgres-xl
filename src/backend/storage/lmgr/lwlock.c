@@ -172,7 +172,7 @@ typedef struct lwlock_stats_key
 {
 	int			tranche;
 	void	   *instance;
-}	lwlock_stats_key;
+}			lwlock_stats_key;
 
 typedef struct lwlock_stats
 {
@@ -182,7 +182,7 @@ typedef struct lwlock_stats
 	int			block_count;
 	int			dequeue_self_count;
 	int			spin_delay_count;
-}	lwlock_stats;
+}			lwlock_stats;
 
 static HTAB *lwlock_stats_htab;
 static lwlock_stats lwlock_stats_dummy;
@@ -230,13 +230,13 @@ LOG_LWDEBUG(const char *where, LWLock *lock, const char *msg)
 #else							/* not LOCK_DEBUG */
 #define PRINT_LWDEBUG(a,b,c) ((void)0)
 #define LOG_LWDEBUG(a,b,c) ((void)0)
-#endif   /* LOCK_DEBUG */
+#endif							/* LOCK_DEBUG */
 
 #ifdef LWLOCK_STATS
 
 static void init_lwlock_stats(void);
 static void print_lwlock_stats(int code, Datum arg);
-static lwlock_stats *get_lwlock_stats_entry(LWLock *lockid);
+static lwlock_stats * get_lwlock_stats_entry(LWLock *lockid);
 
 static void
 init_lwlock_stats(void)
@@ -327,7 +327,7 @@ get_lwlock_stats_entry(LWLock *lock)
 	}
 	return lwstats;
 }
-#endif   /* LWLOCK_STATS */
+#endif							/* LWLOCK_STATS */
 
 
 /*
@@ -857,7 +857,7 @@ LWLockWaitListLock(LWLock *lock)
 static void
 LWLockWaitListUnlock(LWLock *lock)
 {
-	uint32 old_state PG_USED_FOR_ASSERTS_ONLY;
+	uint32		old_state PG_USED_FOR_ASSERTS_ONLY;
 
 	old_state = pg_atomic_fetch_and_u32(&lock->state, ~LW_FLAG_LOCKED);
 
@@ -1098,7 +1098,7 @@ LWLockDequeueSelf(LWLock *lock)
 #ifdef LOCK_DEBUG
 	{
 		/* not waiting anymore */
-		uint32 nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
+		uint32		nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
 
 		Assert(nwaiters < MAX_BACKENDS);
 	}
@@ -1135,7 +1135,7 @@ LWLockAcquire(LWLock *lock, LWLockMode mode)
 		lwstats->ex_acquire_count++;
 	else
 		lwstats->sh_acquire_count++;
-#endif   /* LWLOCK_STATS */
+#endif							/* LWLOCK_STATS */
 
 	/*
 	 * We can't wait if we haven't got a PGPROC.  This should only occur
@@ -1248,7 +1248,7 @@ LWLockAcquire(LWLock *lock, LWLockMode mode)
 #ifdef LOCK_DEBUG
 		{
 			/* not waiting anymore */
-			uint32 nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
+			uint32		nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
 
 			Assert(nwaiters < MAX_BACKENDS);
 		}
@@ -1406,7 +1406,7 @@ LWLockAcquireOrWait(LWLock *lock, LWLockMode mode)
 #ifdef LOCK_DEBUG
 			{
 				/* not waiting anymore */
-				uint32 nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
+				uint32		nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
 
 				Assert(nwaiters < MAX_BACKENDS);
 			}
@@ -1622,7 +1622,7 @@ LWLockWaitForVar(LWLock *lock, uint64 *valptr, uint64 oldval, uint64 *newval)
 #ifdef LOCK_DEBUG
 		{
 			/* not waiting anymore */
-			uint32 nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
+			uint32		nwaiters PG_USED_FOR_ASSERTS_ONLY = pg_atomic_fetch_sub_u32(&lock->nwaiters, 1);
 
 			Assert(nwaiters < MAX_BACKENDS);
 		}

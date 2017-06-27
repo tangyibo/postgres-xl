@@ -112,7 +112,7 @@ emit_log_hook_type emit_log_hook = NULL;
 
 /* GUC parameters */
 int			Log_error_verbosity = PGERROR_VERBOSE;
-char	   *Log_line_prefix = NULL;		/* format for extra log line info */
+char	   *Log_line_prefix = NULL; /* format for extra log line info */
 int			Log_destination = LOG_DESTINATION_STDERR;
 char	   *Log_destination_string = NULL;
 bool		syslog_sequence_numbers = true;
@@ -404,7 +404,7 @@ errstart(int elevel, const char *filename, int lineno,
 		 * because it suggests an infinite loop of errors during error
 		 * recovery.
 		 */
-		errordata_stack_depth = -1;		/* make room on stack */
+		errordata_stack_depth = -1; /* make room on stack */
 		ereport(PANIC, (errmsg_internal("ERRORDATA_STACK_SIZE exceeded")));
 	}
 
@@ -675,7 +675,7 @@ errcode_for_file_access(void)
 		case ENOTDIR:			/* Not a directory */
 		case EISDIR:			/* Is a directory */
 #if defined(ENOTEMPTY) && (ENOTEMPTY != EEXIST) /* same code on AIX */
-		case ENOTEMPTY: /* Directory not empty */
+		case ENOTEMPTY:			/* Directory not empty */
 #endif
 			edata->sqlerrcode = ERRCODE_WRONG_OBJECT_TYPE;
 			break;
@@ -1369,7 +1369,7 @@ elog_start(const char *filename, int lineno,
 		 * else failure to convert it to client encoding could cause further
 		 * recursion.
 		 */
-		errordata_stack_depth = -1;		/* make room on stack */
+		errordata_stack_depth = -1; /* make room on stack */
 		ereport(PANIC, (errmsg_internal("ERRORDATA_STACK_SIZE exceeded")));
 	}
 
@@ -1750,7 +1750,7 @@ ReThrowError(ErrorData *edata)
 		 * because it suggests an infinite loop of errors during error
 		 * recovery.
 		 */
-		errordata_stack_depth = -1;		/* make room on stack */
+		errordata_stack_depth = -1; /* make room on stack */
 		ereport(PANIC, (errmsg_internal("ERRORDATA_STACK_SIZE exceeded")));
 	}
 
@@ -1881,7 +1881,7 @@ GetErrorContextStack(void)
 		 * because it suggests an infinite loop of errors during error
 		 * recovery.
 		 */
-		errordata_stack_depth = -1;		/* make room on stack */
+		errordata_stack_depth = -1; /* make room on stack */
 		ereport(PANIC, (errmsg_internal("ERRORDATA_STACK_SIZE exceeded")));
 	}
 
@@ -1947,7 +1947,7 @@ DebugFileOpen(void)
 					   0666)) < 0)
 			ereport(FATAL,
 					(errcode_for_file_access(),
-				  errmsg("could not open file \"%s\": %m", OutputFileName)));
+					 errmsg("could not open file \"%s\": %m", OutputFileName)));
 		istty = isatty(fd);
 		close(fd);
 
@@ -2118,7 +2118,7 @@ write_syslog(int level, const char *line)
 			syslog(level, "%s", line);
 	}
 }
-#endif   /* HAVE_SYSLOG */
+#endif							/* HAVE_SYSLOG */
 
 #ifdef WIN32
 /*
@@ -2150,7 +2150,7 @@ write_eventlog(int level, const char *line, int len)
 	if (evtHandle == INVALID_HANDLE_VALUE)
 	{
 		evtHandle = RegisterEventSource(NULL,
-						 event_source ? event_source : DEFAULT_EVENT_SOURCE);
+										event_source ? event_source : DEFAULT_EVENT_SOURCE);
 		if (evtHandle == NULL)
 		{
 			evtHandle = INVALID_HANDLE_VALUE;
@@ -2222,7 +2222,7 @@ write_eventlog(int level, const char *line, int len)
 				 &line,
 				 NULL);
 }
-#endif   /* WIN32 */
+#endif							/* WIN32 */
 
 static void
 write_console(const char *line, int len)
@@ -3128,7 +3128,7 @@ send_message_to_server_log(ErrorData *edata)
 
 		write_syslog(syslog_level, buf.data);
 	}
-#endif   /* HAVE_SYSLOG */
+#endif							/* HAVE_SYSLOG */
 
 #ifdef WIN32
 	/* Write to eventlog, if enabled */
@@ -3136,7 +3136,7 @@ send_message_to_server_log(ErrorData *edata)
 	{
 		write_eventlog(edata->elevel, buf.data, buf.len);
 	}
-#endif   /* WIN32 */
+#endif							/* WIN32 */
 
 	/* Write to stderr, if enabled */
 	if ((Log_destination & LOG_DESTINATION_STDERR) || whereToSendOutput == DestDebug)
@@ -3404,7 +3404,7 @@ send_message_to_frontend(ErrorData *edata)
 			err_sendstring(&msgbuf, edata->funcname);
 		}
 
-		pq_sendbyte(&msgbuf, '\0');		/* terminator */
+		pq_sendbyte(&msgbuf, '\0'); /* terminator */
 	}
 	else
 	{

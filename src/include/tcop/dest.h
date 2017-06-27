@@ -120,11 +120,11 @@ struct _DestReceiver
 {
 	/* Called for each tuple to be output: */
 	bool		(*receiveSlot) (TupleTableSlot *slot,
-											DestReceiver *self);
+								DestReceiver *self);
 	/* Per-executor-run initialization and shutdown: */
 	void		(*rStartup) (DestReceiver *self,
-										 int operation,
-										 TupleDesc typeinfo);
+							 int operation,
+							 TupleDesc typeinfo);
 	void		(*rShutdown) (DestReceiver *self);
 	/* Destroy the receiver object itself (if dynamically allocated) */
 	void		(*rDestroy) (DestReceiver *self);
@@ -133,7 +133,7 @@ struct _DestReceiver
 	/* Private fields might appear beyond this point... */
 };
 
-extern DestReceiver *None_Receiver;		/* permanent receiver for DestNone */
+extern DestReceiver *None_Receiver; /* permanent receiver for DestNone */
 
 /* The primary destination management functions */
 
@@ -146,4 +146,4 @@ extern void EndCommand(const char *commandTag, CommandDest dest);
 extern void NullCommand(CommandDest dest);
 extern void ReadyForQuery(CommandDest dest);
 
-#endif   /* DEST_H */
+#endif							/* DEST_H */

@@ -183,8 +183,8 @@ typedef struct
 {
 	Oid			db_oid;			/* oid of the database */
 	char	   *db_name;		/* database name */
-	char		db_tablespace[MAXPGPATH];		/* database default tablespace
-												 * path */
+	char		db_tablespace[MAXPGPATH];	/* database default tablespace
+											 * path */
 	char	   *db_collate;
 	char	   *db_ctype;
 	int			db_encoding;
@@ -272,7 +272,7 @@ typedef struct
 	uint32		major_version;	/* PG_VERSION of cluster */
 	char		major_version_str[64];	/* string PG_VERSION of cluster */
 	uint32		bin_version;	/* version returned from pg_ctl */
-	const char *tablespace_suffix;		/* directory specification */
+	const char *tablespace_suffix;	/* directory specification */
 } ClusterInfo;
 
 
@@ -332,7 +332,7 @@ void		output_check_banner(bool live_check);
 void		check_and_dump_old_cluster(bool live_check);
 void		check_new_cluster(void);
 void		report_clusters_compatible(void);
-void		issue_warnings(void);
+void		issue_warnings_and_set_wal_level(void);
 void output_completion_banner(char *analyze_script_file_name,
 						 char *deletion_script_file_name);
 void		check_cluster_versions(void);
@@ -397,9 +397,9 @@ void		get_sock_dir(ClusterInfo *cluster, bool live_check);
 /* relfilenode.c */
 
 void transfer_all_new_tablespaces(DbInfoArr *old_db_arr,
-				  DbInfoArr *new_db_arr, char *old_pgdata, char *new_pgdata);
+							 DbInfoArr *new_db_arr, char *old_pgdata, char *new_pgdata);
 void transfer_all_new_dbs(DbInfoArr *old_db_arr,
-				   DbInfoArr *new_db_arr, char *old_pgdata, char *new_pgdata,
+					 DbInfoArr *new_db_arr, char *old_pgdata, char *new_pgdata,
 					 char *old_tablespace);
 
 /* tablespace.c */

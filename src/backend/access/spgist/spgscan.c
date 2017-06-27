@@ -25,11 +25,11 @@
 
 
 typedef void (*storeRes_func) (SpGistScanOpaque so, ItemPointer heapPtr,
-								 Datum leafValue, bool isnull, bool recheck);
+							   Datum leafValue, bool isnull, bool recheck);
 
 typedef struct ScanStackEntry
 {
-	Datum		reconstructedValue;		/* value reconstructed from parent */
+	Datum		reconstructedValue; /* value reconstructed from parent */
 	void	   *traversalValue; /* opclass-specific traverse value */
 	int			level;			/* level of items on this page */
 	ItemPointerData ptr;		/* block and offset to scan from */
@@ -430,7 +430,7 @@ redirect:
 				}
 			}
 		}
-		else	/* page is inner */
+		else					/* page is inner */
 		{
 			SpGistInnerTuple innerTuple;
 			spgInnerConsistentIn in;
@@ -442,7 +442,7 @@ redirect:
 			MemoryContext oldCtx;
 
 			innerTuple = (SpGistInnerTuple) PageGetItem(page,
-												PageGetItemId(page, offset));
+														PageGetItemId(page, offset));
 
 			if (innerTuple->tupstate != SPGIST_LIVE)
 			{

@@ -232,8 +232,8 @@ next_token(char **lineptr, char *buf, int bufsz,
 			*buf = '\0';
 			ereport(elevel,
 					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-			   errmsg("authentication file token too long, skipping: \"%s\"",
-					  start_buf)));
+					 errmsg("authentication file token too long, skipping: \"%s\"",
+							start_buf)));
 			*err_msg = "authentication file token too long";
 			/* Discard remainder of line */
 			while ((c = (*(*lineptr)++)) != '\0')
@@ -646,7 +646,7 @@ check_db(const char *dbname, const char *role, Oid roleid, List *tokens)
 }
 
 static bool
-ipv4eq(struct sockaddr_in * a, struct sockaddr_in * b)
+ipv4eq(struct sockaddr_in *a, struct sockaddr_in *b)
 {
 	return (a->sin_addr.s_addr == b->sin_addr.s_addr);
 }
@@ -654,7 +654,7 @@ ipv4eq(struct sockaddr_in * a, struct sockaddr_in * b)
 #ifdef HAVE_IPV6
 
 static bool
-ipv6eq(struct sockaddr_in6 * a, struct sockaddr_in6 * b)
+ipv6eq(struct sockaddr_in6 *a, struct sockaddr_in6 *b)
 {
 	int			i;
 
@@ -664,7 +664,7 @@ ipv6eq(struct sockaddr_in6 * a, struct sockaddr_in6 * b)
 
 	return true;
 }
-#endif   /* HAVE_IPV6 */
+#endif							/* HAVE_IPV6 */
 
 /*
  * Check whether host name matches pattern.
@@ -747,7 +747,7 @@ check_hostname(hbaPort *port, const char *hostname)
 			if (gai->ai_addr->sa_family == AF_INET)
 			{
 				if (ipv4eq((struct sockaddr_in *) gai->ai_addr,
-						   (struct sockaddr_in *) & port->raddr.addr))
+						   (struct sockaddr_in *) &port->raddr.addr))
 				{
 					found = true;
 					break;
@@ -757,7 +757,7 @@ check_hostname(hbaPort *port, const char *hostname)
 			else if (gai->ai_addr->sa_family == AF_INET6)
 			{
 				if (ipv6eq((struct sockaddr_in6 *) gai->ai_addr,
-						   (struct sockaddr_in6 *) & port->raddr.addr))
+						   (struct sockaddr_in6 *) &port->raddr.addr))
 				{
 					found = true;
 					break;
@@ -783,7 +783,7 @@ check_hostname(hbaPort *port, const char *hostname)
  * Check to see if a connecting IP matches the given address and netmask.
  */
 static bool
-check_ip(SockAddr *raddr, struct sockaddr * addr, struct sockaddr * mask)
+check_ip(SockAddr *raddr, struct sockaddr *addr, struct sockaddr *mask)
 {
 	if (raddr->addr.ss_family == addr->sa_family &&
 		pg_range_sockaddr(&raddr->addr,
@@ -797,7 +797,7 @@ check_ip(SockAddr *raddr, struct sockaddr * addr, struct sockaddr * mask)
  * pg_foreach_ifaddr callback: does client addr match this machine interface?
  */
 static void
-check_network_callback(struct sockaddr * addr, struct sockaddr * netmask,
+check_network_callback(struct sockaddr *addr, struct sockaddr *netmask,
 					   void *cb_data)
 {
 	check_network_data *cn = (check_network_data *) cb_data;
@@ -811,7 +811,7 @@ check_network_callback(struct sockaddr * addr, struct sockaddr * netmask,
 	{
 		/* Make an all-ones netmask of appropriate length for family */
 		pg_sockaddr_cidr_mask(&mask, NULL, addr->sa_family);
-		cn->result = check_ip(cn->raddr, addr, (struct sockaddr *) & mask);
+		cn->result = check_ip(cn->raddr, addr, (struct sockaddr *) &mask);
 	}
 	else
 	{
@@ -1006,7 +1006,7 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 			{
 				ereport(elevel,
 						(errcode(ERRCODE_CONFIG_FILE_ERROR),
-				errmsg("hostssl record cannot match because SSL is disabled"),
+						 errmsg("hostssl record cannot match because SSL is disabled"),
 						 errhint("Set ssl = on in postgresql.conf."),
 						 errcontext("line %d of configuration file \"%s\"",
 									line_num, HbaFileName)));
@@ -1016,13 +1016,13 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 			ereport(elevel,
 					(errcode(ERRCODE_CONFIG_FILE_ERROR),
 					 errmsg("hostssl record cannot match because SSL is not supported by this build"),
-			  errhint("Compile with --with-openssl to use SSL connections."),
+					 errhint("Compile with --with-openssl to use SSL connections."),
 					 errcontext("line %d of configuration file \"%s\"",
 								line_num, HbaFileName)));
 			*err_msg = "hostssl record cannot match because SSL is not supported by this build";
 #endif
 		}
-		else if (token->string[4] == 'n')		/* "hostnossl" */
+		else if (token->string[4] == 'n')	/* "hostnossl" */
 		{
 			parsedline->conntype = ctHostNoSSL;
 		}
@@ -1181,8 +1181,8 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 							(errcode(ERRCODE_CONFIG_FILE_ERROR),
 							 errmsg("specifying both host name and CIDR mask is invalid: \"%s\"",
 									token->string),
-						   errcontext("line %d of configuration file \"%s\"",
-									  line_num, HbaFileName)));
+							 errcontext("line %d of configuration file \"%s\"",
+										line_num, HbaFileName)));
 					*err_msg = psprintf("specifying both host name and CIDR mask is invalid: \"%s\"",
 										token->string);
 					return NULL;
@@ -1195,8 +1195,8 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 							(errcode(ERRCODE_CONFIG_FILE_ERROR),
 							 errmsg("invalid CIDR mask in address \"%s\"",
 									token->string),
-						   errcontext("line %d of configuration file \"%s\"",
-									  line_num, HbaFileName)));
+							 errcontext("line %d of configuration file \"%s\"",
+										line_num, HbaFileName)));
 					*err_msg = psprintf("invalid CIDR mask in address \"%s\"",
 										token->string);
 					return NULL;
@@ -1212,10 +1212,10 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 				{
 					ereport(elevel,
 							(errcode(ERRCODE_CONFIG_FILE_ERROR),
-						  errmsg("end-of-line before netmask specification"),
+							 errmsg("end-of-line before netmask specification"),
 							 errhint("Specify an address range in CIDR notation, or provide a separate netmask."),
-						   errcontext("line %d of configuration file \"%s\"",
-									  line_num, HbaFileName)));
+							 errcontext("line %d of configuration file \"%s\"",
+										line_num, HbaFileName)));
 					*err_msg = "end-of-line before netmask specification";
 					return NULL;
 				}
@@ -1225,8 +1225,8 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 					ereport(elevel,
 							(errcode(ERRCODE_CONFIG_FILE_ERROR),
 							 errmsg("multiple values specified for netmask"),
-						   errcontext("line %d of configuration file \"%s\"",
-									  line_num, HbaFileName)));
+							 errcontext("line %d of configuration file \"%s\"",
+										line_num, HbaFileName)));
 					*err_msg = "multiple values specified for netmask";
 					return NULL;
 				}
@@ -1240,8 +1240,8 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 							(errcode(ERRCODE_CONFIG_FILE_ERROR),
 							 errmsg("invalid IP mask \"%s\": %s",
 									token->string, gai_strerror(ret)),
-						   errcontext("line %d of configuration file \"%s\"",
-									  line_num, HbaFileName)));
+							 errcontext("line %d of configuration file \"%s\"",
+										line_num, HbaFileName)));
 					*err_msg = psprintf("invalid IP mask \"%s\": %s",
 										token->string, gai_strerror(ret));
 					if (gai_result)
@@ -1258,8 +1258,8 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 					ereport(elevel,
 							(errcode(ERRCODE_CONFIG_FILE_ERROR),
 							 errmsg("IP address and mask do not match"),
-						   errcontext("line %d of configuration file \"%s\"",
-									  line_num, HbaFileName)));
+							 errcontext("line %d of configuration file \"%s\"",
+										line_num, HbaFileName)));
 					*err_msg = "IP address and mask do not match";
 					return NULL;
 				}
@@ -1398,7 +1398,7 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 	{
 		ereport(elevel,
 				(errcode(ERRCODE_CONFIG_FILE_ERROR),
-		   errmsg("gssapi authentication is not supported on local sockets"),
+				 errmsg("gssapi authentication is not supported on local sockets"),
 				 errcontext("line %d of configuration file \"%s\"",
 							line_num, HbaFileName)));
 		*err_msg = "gssapi authentication is not supported on local sockets";
@@ -1410,7 +1410,7 @@ parse_hba_line(TokenizedLine *tok_line, int elevel)
 	{
 		ereport(elevel,
 				(errcode(ERRCODE_CONFIG_FILE_ERROR),
-			errmsg("peer authentication is only supported on local sockets"),
+				 errmsg("peer authentication is only supported on local sockets"),
 				 errcontext("line %d of configuration file \"%s\"",
 							line_num, HbaFileName)));
 		*err_msg = "peer authentication is only supported on local sockets";
@@ -1651,7 +1651,7 @@ parse_hba_auth_opt(char *name, char *val, HbaLine *hbaline,
 		{
 			ereport(elevel,
 					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-			errmsg("clientcert can only be configured for \"hostssl\" rows"),
+					 errmsg("clientcert can only be configured for \"hostssl\" rows"),
 					 errcontext("line %d of configuration file \"%s\"",
 								line_num, HbaFileName)));
 			*err_msg = "clientcert can only be configured for \"hostssl\" rows";
@@ -1714,7 +1714,7 @@ parse_hba_auth_opt(char *name, char *val, HbaLine *hbaline,
 		{
 			ereport(elevel,
 					(errcode(ERRCODE_CONFIG_FILE_ERROR),
-			errmsg("unsupported LDAP URL scheme: %s", urldata->lud_scheme)));
+					 errmsg("unsupported LDAP URL scheme: %s", urldata->lud_scheme)));
 			*err_msg = psprintf("unsupported LDAP URL scheme: %s",
 								urldata->lud_scheme);
 			ldap_free_urldesc(urldata);
@@ -1726,7 +1726,7 @@ parse_hba_auth_opt(char *name, char *val, HbaLine *hbaline,
 		hbaline->ldapbasedn = pstrdup(urldata->lud_dn);
 
 		if (urldata->lud_attrs)
-			hbaline->ldapsearchattribute = pstrdup(urldata->lud_attrs[0]);		/* only use first one */
+			hbaline->ldapsearchattribute = pstrdup(urldata->lud_attrs[0]);	/* only use first one */
 		hbaline->ldapscope = urldata->lud_scope;
 		if (urldata->lud_filter)
 		{
@@ -1743,7 +1743,7 @@ parse_hba_auth_opt(char *name, char *val, HbaLine *hbaline,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("LDAP URLs not supported on this platform")));
 		*err_msg = "LDAP URLs not supported on this platform";
-#endif   /* not OpenLDAP */
+#endif							/* not OpenLDAP */
 	}
 	else if (strcmp(name, "ldaptls") == 0)
 	{
@@ -2041,8 +2041,8 @@ check_hba(hbaPort *port)
 					else
 					{
 						if (!check_ip(&port->raddr,
-									  (struct sockaddr *) & hba->addr,
-									  (struct sockaddr *) & hba->mask))
+									  (struct sockaddr *) &hba->addr,
+									  (struct sockaddr *) &hba->mask))
 							continue;
 					}
 					break;
@@ -2723,8 +2723,8 @@ check_ident_usermap(IdentLine *identLine, const char *usermap_name,
 				pg_regerror(r, &identLine->re, errstr, sizeof(errstr));
 				ereport(LOG,
 						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
-					 errmsg("regular expression match for \"%s\" failed: %s",
-							identLine->ident_user + 1, errstr)));
+						 errmsg("regular expression match for \"%s\" failed: %s",
+								identLine->ident_user + 1, errstr)));
 				*error_p = true;
 			}
 
@@ -2743,7 +2743,7 @@ check_ident_usermap(IdentLine *identLine, const char *usermap_name,
 				ereport(LOG,
 						(errcode(ERRCODE_INVALID_REGULAR_EXPRESSION),
 						 errmsg("regular expression \"%s\" has no subexpressions as requested by backreference in \"%s\"",
-							identLine->ident_user + 1, identLine->pg_role)));
+								identLine->ident_user + 1, identLine->pg_role)));
 				*error_p = true;
 				return;
 			}

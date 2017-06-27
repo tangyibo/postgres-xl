@@ -150,7 +150,7 @@ gbt_uuid_consistent(PG_FUNCTION_ARGS)
 
 	PG_RETURN_BOOL(
 				   gbt_num_consistent(&key, (void *) query, &strategy,
-									GIST_LEAF(entry), &tinfo, fcinfo->flinfo)
+									  GIST_LEAF(entry), &tinfo, fcinfo->flinfo)
 		);
 }
 
@@ -171,7 +171,7 @@ static double
 uuid_2_double(const pg_uuid_t *u)
 {
 	uint64		uu[2];
-	const double two64 = 18446744073709551616.0;		/* 2^64 */
+	const double two64 = 18446744073709551616.0;	/* 2^64 */
 
 	/* Source data may not be suitably aligned, so copy */
 	memcpy(uu, u->data, UUID_LEN);
@@ -220,8 +220,8 @@ Datum
 gbt_uuid_picksplit(PG_FUNCTION_ARGS)
 {
 	PG_RETURN_POINTER(gbt_num_picksplit(
-									(GistEntryVector *) PG_GETARG_POINTER(0),
-									  (GIST_SPLITVEC *) PG_GETARG_POINTER(1),
+										(GistEntryVector *) PG_GETARG_POINTER(0),
+										(GIST_SPLITVEC *) PG_GETARG_POINTER(1),
 										&tinfo, fcinfo->flinfo
 										));
 }

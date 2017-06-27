@@ -95,7 +95,7 @@ typedef struct ProcArrayStruct
 	int			numKnownAssignedXids;	/* current # of valid entries */
 	int			tailKnownAssignedXids;	/* index of oldest valid element */
 	int			headKnownAssignedXids;	/* index of newest element, + 1 */
-	slock_t		known_assigned_xids_lck;		/* protects head/tail pointers */
+	slock_t		known_assigned_xids_lck;	/* protects head/tail pointers */
 
 	/*
 	 * Highest subxid that has been removed from KnownAssignedXids array to
@@ -169,7 +169,7 @@ static void DisplayXidCache(void);
 #define xc_by_known_assigned_inc()	((void) 0)
 #define xc_no_overflow_inc()		((void) 0)
 #define xc_slow_answer_inc()		((void) 0)
-#endif   /* XIDCACHE_DEBUG */
+#endif							/* XIDCACHE_DEBUG */
 
 #ifdef PGXC  /* PGXC_DATANODE */
 
@@ -419,7 +419,7 @@ ProcArrayRemove(PGPROC *proc, TransactionId latestXid)
 			/* Keep the PGPROC array sorted. See notes above */
 			memmove(&arrayP->pgprocnos[index], &arrayP->pgprocnos[index + 1],
 					(arrayP->numProcs - index - 1) * sizeof(int));
-			arrayP->pgprocnos[arrayP->numProcs - 1] = -1;		/* for debugging */
+			arrayP->pgprocnos[arrayP->numProcs - 1] = -1;	/* for debugging */
 			arrayP->numProcs--;
 			LWLockRelease(ProcArrayLock);
 			return;
@@ -501,7 +501,7 @@ ProcArrayEndTransaction(PGPROC *proc, TransactionId latestXid)
 		pgxact->xmin = InvalidTransactionId;
 		/* must be cleared with xid/xmin: */
 		pgxact->vacuumFlags &= ~PROC_VACUUM_STATE_MASK;
-		pgxact->delayChkpt = false;		/* be sure this is cleared in abort */
+		pgxact->delayChkpt = false; /* be sure this is cleared in abort */
 		proc->recoveryConflictPending = false;
 
 		Assert(pgxact->nxids == 0);
@@ -801,8 +801,8 @@ ProcArrayApplyRecoveryInfo(RunningTransactions running)
 			}
 			else
 				elog(trace_recovery(DEBUG1),
-				  "recovery snapshot waiting for non-overflowed snapshot or "
-				"until oldest active xid on standby is at least %u (now %u)",
+					 "recovery snapshot waiting for non-overflowed snapshot or "
+					 "until oldest active xid on standby is at least %u (now %u)",
 					 standbySnapshotPendingXmin,
 					 running->oldestRunningXid);
 			return;
@@ -1472,7 +1472,7 @@ GetOldestXminInternal(Relation rel, int flags, bool computeLocal,
 
 		if (allDbs ||
 			proc->databaseId == MyDatabaseId ||
-			proc->databaseId == 0)		/* always include WalSender */
+			proc->databaseId == 0)	/* always include WalSender */
 		{
 			/* Fetch xid just once - see GetNewTransactionId */
 			TransactionId xid = pgxact->xid;
@@ -3353,7 +3353,7 @@ DisplayXidCache(void)
 			xc_no_overflow,
 			xc_slow_answer);
 }
-#endif   /* XIDCACHE_DEBUG */
+#endif							/* XIDCACHE_DEBUG */
 
 
 #ifdef PGXC
@@ -3773,7 +3773,7 @@ RecordKnownAssignedTransactionIds(TransactionId xid)
  */
 void
 ExpireTreeKnownAssignedTransactionIds(TransactionId xid, int nsubxids,
-							   TransactionId *subxids, TransactionId max_xid)
+									  TransactionId *subxids, TransactionId max_xid)
 {
 	Assert(standbyState >= STANDBY_INITIALIZED);
 

@@ -111,15 +111,16 @@ WalSndCtlData *WalSndCtl = NULL;
 WalSnd	   *MyWalSnd = NULL;
 
 /* Global state */
-bool		am_walsender = false;		/* Am I a walsender process? */
-bool		am_cascading_walsender = false;		/* Am I cascading WAL to
-												 * another standby? */
+bool		am_walsender = false;	/* Am I a walsender process? */
+bool		am_cascading_walsender = false; /* Am I cascading WAL to another
+											 * standby? */
 bool		am_db_walsender = false;	/* Connected to a database? */
 
 /* User-settable parameters for walsender */
-int			max_wal_senders = 0;	/* the maximum number of concurrent walsenders */
-int			wal_sender_timeout = 60 * 1000;		/* maximum time to send one
-												 * WAL data message */
+int			max_wal_senders = 0;	/* the maximum number of concurrent
+									 * walsenders */
+int			wal_sender_timeout = 60 * 1000; /* maximum time to send one WAL
+											 * data message */
 bool		log_replication_commands = false;
 
 /*
@@ -214,7 +215,7 @@ static struct
 	int			write_head;
 	int			read_heads[NUM_SYNC_REP_WAIT_MODE];
 	WalTimeSample last_read[NUM_SYNC_REP_WAIT_MODE];
-}	LagTracker;
+}			LagTracker;
 
 /* Signal handlers */
 static void WalSndLastCycleHandler(SIGNAL_ARGS);
@@ -449,16 +450,16 @@ SendTimeLineHistory(TimeLineHistoryCmd *cmd)
 	pq_sendstring(&buf, "filename");	/* col name */
 	pq_sendint(&buf, 0, 4);		/* table oid */
 	pq_sendint(&buf, 0, 2);		/* attnum */
-	pq_sendint(&buf, TEXTOID, 4);		/* type oid */
+	pq_sendint(&buf, TEXTOID, 4);	/* type oid */
 	pq_sendint(&buf, -1, 2);	/* typlen */
 	pq_sendint(&buf, 0, 4);		/* typmod */
 	pq_sendint(&buf, 0, 2);		/* format code */
 
 	/* second field */
-	pq_sendstring(&buf, "content");		/* col name */
+	pq_sendstring(&buf, "content"); /* col name */
 	pq_sendint(&buf, 0, 4);		/* table oid */
 	pq_sendint(&buf, 0, 2);		/* attnum */
-	pq_sendint(&buf, BYTEAOID, 4);		/* type oid */
+	pq_sendint(&buf, BYTEAOID, 4);	/* type oid */
 	pq_sendint(&buf, -1, 2);	/* typlen */
 	pq_sendint(&buf, 0, 4);		/* typmod */
 	pq_sendint(&buf, 0, 2);		/* format code */
@@ -486,7 +487,7 @@ SendTimeLineHistory(TimeLineHistoryCmd *cmd)
 	if (lseek(fd, 0, SEEK_SET) != 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-			errmsg("could not seek to beginning of file \"%s\": %m", path)));
+				 errmsg("could not seek to beginning of file \"%s\": %m", path)));
 
 	pq_sendint(&buf, histfilelen, 4);	/* col2 len */
 
@@ -527,7 +528,7 @@ StartReplication(StartReplicationCmd *cmd)
 	if (ThisTimeLineID == 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-		errmsg("IDENTIFY_SYSTEM has not been run before START_REPLICATION")));
+				 errmsg("IDENTIFY_SYSTEM has not been run before START_REPLICATION")));
 
 	/*
 	 * We assume here that we're logging enough information in the WAL for
@@ -749,7 +750,7 @@ StartReplication(StartReplicationCmd *cmd)
  */
 static int
 logical_read_xlog_page(XLogReaderState *state, XLogRecPtr targetPagePtr, int reqLen,
-				XLogRecPtr targetRecPtr, char *cur_page, TimeLineID *pageTLI)
+					   XLogRecPtr targetRecPtr, char *cur_page, TimeLineID *pageTLI)
 {
 	XLogRecPtr	flushptr;
 	int			count;
@@ -1747,7 +1748,7 @@ ProcessStandbyReplyMessage(void)
 	writePtr = pq_getmsgint64(&reply_message);
 	flushPtr = pq_getmsgint64(&reply_message);
 	applyPtr = pq_getmsgint64(&reply_message);
-	(void) pq_getmsgint64(&reply_message);		/* sendTime; not used ATM */
+	(void) pq_getmsgint64(&reply_message);	/* sendTime; not used ATM */
 	replyRequested = pq_getmsgbyte(&reply_message);
 
 	elog(DEBUG2, "write %X/%X flush %X/%X apply %X/%X%s",
@@ -1910,7 +1911,7 @@ ProcessStandbyHSFeedbackMessage(void)
 	 * byte. See XLogWalRcvSendHSFeedback() in walreceiver.c for the creation
 	 * of this message.
 	 */
-	(void) pq_getmsgint64(&reply_message);		/* sendTime; not used ATM */
+	(void) pq_getmsgint64(&reply_message);	/* sendTime; not used ATM */
 	feedbackXmin = pq_getmsgint(&reply_message, 4);
 	feedbackEpoch = pq_getmsgint(&reply_message, 4);
 	feedbackCatalogXmin = pq_getmsgint(&reply_message, 4);
@@ -1977,7 +1978,7 @@ ProcessStandbyHSFeedbackMessage(void)
 	 * XXX: It might make sense to generalize the ephemeral slot concept and
 	 * always use the slot mechanism to handle the feedback xmin.
 	 */
-	if (MyReplicationSlot != NULL)		/* XXX: persistency configurable? */
+	if (MyReplicationSlot != NULL)	/* XXX: persistency configurable? */
 		PhysicalReplicationSlotNewXmin(feedbackXmin, feedbackCatalogXmin);
 	else
 	{
@@ -1999,7 +2000,7 @@ ProcessStandbyHSFeedbackMessage(void)
 static long
 WalSndComputeSleeptime(TimestampTz now)
 {
-	long		sleeptime = 10000;		/* 10 s */
+	long		sleeptime = 10000;	/* 10 s */
 
 	if (wal_sender_timeout > 0 && last_reply_timestamp > 0)
 	{
@@ -2058,7 +2059,7 @@ WalSndCheckTimeOut(TimestampTz now)
 		 * standby.
 		 */
 		ereport(COMMERROR,
-		(errmsg("terminating walsender process due to replication timeout")));
+				(errmsg("terminating walsender process due to replication timeout")));
 
 		WalSndShutdown();
 	}
@@ -2146,8 +2147,8 @@ WalSndLoop(WalSndSendDataCallback send_data)
 			if (MyWalSnd->state == WALSNDSTATE_CATCHUP)
 			{
 				ereport(DEBUG1,
-					 (errmsg("standby \"%s\" has now caught up with primary",
-							 application_name)));
+						(errmsg("standby \"%s\" has now caught up with primary",
+								application_name)));
 				WalSndSetState(WALSNDSTATE_STREAMING);
 			}
 
@@ -2371,7 +2372,7 @@ retry:
 					ereport(ERROR,
 							(errcode_for_file_access(),
 							 errmsg("requested WAL segment %s has already been removed",
-								XLogFileNameP(curFileTimeLine, sendSegNo))));
+									XLogFileNameP(curFileTimeLine, sendSegNo))));
 				else
 					ereport(ERROR,
 							(errcode_for_file_access(),
@@ -2387,9 +2388,9 @@ retry:
 			if (lseek(sendFile, (off_t) startoff, SEEK_SET) < 0)
 				ereport(ERROR,
 						(errcode_for_file_access(),
-				  errmsg("could not seek in log segment %s to offset %u: %m",
-						 XLogFileNameP(curFileTimeLine, sendSegNo),
-						 startoff)));
+						 errmsg("could not seek in log segment %s to offset %u: %m",
+								XLogFileNameP(curFileTimeLine, sendSegNo),
+								startoff)));
 			sendOff = startoff;
 		}
 
@@ -3442,6 +3443,16 @@ LagTrackerRead(int head, XLogRecPtr lsn, TimestampTz now)
 			(LagTracker.read_heads[head] + 1) % LAG_TRACKER_BUFFER_SIZE;
 	}
 
+	/*
+	 * If the lag tracker is empty, that means the standby has processed
+	 * everything we've ever sent so we should now clear 'last_read'.  If we
+	 * didn't do that, we'd risk using a stale and irrelevant sample for
+	 * interpolation at the beginning of the next burst of WAL after a period
+	 * of idleness.
+	 */
+	if (LagTracker.read_heads[head] == LagTracker.write_head)
+		LagTracker.last_read[head].time = 0;
+
 	if (time > now)
 	{
 		/* If the clock somehow went backwards, treat as not found. */
@@ -3458,9 +3469,14 @@ LagTrackerRead(int head, XLogRecPtr lsn, TimestampTz now)
 		 * eventually start moving again and cross one of our samples before
 		 * we can show the lag increasing.
 		 */
-		if (LagTracker.read_heads[head] != LagTracker.write_head &&
-			LagTracker.last_read[head].time != 0)
+		if (LagTracker.read_heads[head] == LagTracker.write_head)
 		{
+			/* There are no future samples, so we can't interpolate. */
+			return -1;
+		}
+		else if (LagTracker.last_read[head].time != 0)
+		{
+			/* We can interpolate between last_read and the next sample. */
 			double		fraction;
 			WalTimeSample prev = LagTracker.last_read[head];
 			WalTimeSample next = LagTracker.buffer[LagTracker.read_heads[head]];
@@ -3493,8 +3509,14 @@ LagTrackerRead(int head, XLogRecPtr lsn, TimestampTz now)
 		}
 		else
 		{
-			/* Couldn't interpolate due to lack of data. */
-			return -1;
+			/*
+			 * We have only a future sample, implying that we were entirely
+			 * caught up but and now there is a new burst of WAL and the
+			 * standby hasn't processed the first sample yet.  Until the
+			 * standby reaches the future sample the best we can do is report
+			 * the hypothetical lag if that sample were to be replayed now.
+			 */
+			time = LagTracker.buffer[LagTracker.read_heads[head]].time;
 		}
 	}
 

@@ -95,7 +95,7 @@ PG_FUNCTION_INFO_V1(xml_is_well_formed);
 Datum
 xml_is_well_formed(PG_FUNCTION_ARGS)
 {
-	text	   *t = PG_GETARG_TEXT_PP(0);		/* document buffer */
+	text	   *t = PG_GETARG_TEXT_PP(0);	/* document buffer */
 	bool		result = false;
 	int32		docsize = VARSIZE_ANY_EXHDR(t);
 	xmlDocPtr	doctree;
@@ -187,7 +187,7 @@ pgxmlNodeSetToText(xmlNodeSetPtr nodeset,
 			if (plainsep != NULL)
 			{
 				xmlBufferWriteCHAR(buf,
-							  xmlXPathCastNodeToString(nodeset->nodeTab[i]));
+								   xmlXPathCastNodeToString(nodeset->nodeTab[i]));
 
 				/* If this isn't the last entry, write the plain sep. */
 				if (i < (nodeset->nodeNr) - 1)
@@ -249,7 +249,7 @@ Datum
 xpath_nodeset(PG_FUNCTION_ARGS)
 {
 	text	   *document = PG_GETARG_TEXT_PP(0);
-	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);		/* XPath expression */
+	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);	/* XPath expression */
 	xmlChar    *toptag = pgxml_texttoxmlchar(PG_GETARG_TEXT_PP(2));
 	xmlChar    *septag = pgxml_texttoxmlchar(PG_GETARG_TEXT_PP(3));
 	xmlChar    *xpath;
@@ -282,7 +282,7 @@ Datum
 xpath_list(PG_FUNCTION_ARGS)
 {
 	text	   *document = PG_GETARG_TEXT_PP(0);
-	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);		/* XPath expression */
+	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);	/* XPath expression */
 	xmlChar    *plainsep = pgxml_texttoxmlchar(PG_GETARG_TEXT_PP(2));
 	xmlChar    *xpath;
 	text	   *xpres;
@@ -311,7 +311,7 @@ Datum
 xpath_string(PG_FUNCTION_ARGS)
 {
 	text	   *document = PG_GETARG_TEXT_PP(0);
-	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);		/* XPath expression */
+	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);	/* XPath expression */
 	xmlChar    *xpath;
 	int32		pathsize;
 	text	   *xpres;
@@ -352,7 +352,7 @@ Datum
 xpath_number(PG_FUNCTION_ARGS)
 {
 	text	   *document = PG_GETARG_TEXT_PP(0);
-	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);		/* XPath expression */
+	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);	/* XPath expression */
 	xmlChar    *xpath;
 	float4		fRes;
 	xmlXPathObjectPtr res;
@@ -384,7 +384,7 @@ Datum
 xpath_bool(PG_FUNCTION_ARGS)
 {
 	text	   *document = PG_GETARG_TEXT_PP(0);
-	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);		/* XPath expression */
+	text	   *xpathsupp = PG_GETARG_TEXT_PP(1);	/* XPath expression */
 	xmlChar    *xpath;
 	int			bRes;
 	xmlXPathObjectPtr res;
@@ -579,8 +579,8 @@ xpath_table(PG_FUNCTION_ARGS)
 	if (!(rsinfo->allowedModes & SFRM_Materialize))
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-			   errmsg("xpath_table requires Materialize mode, but it is not "
-					  "allowed in this context")));
+				 errmsg("xpath_table requires Materialize mode, but it is not "
+						"allowed in this context")));
 
 	/*
 	 * The tuplestore must exist in a higher context than this function call
@@ -720,7 +720,7 @@ xpath_table(PG_FUNCTION_ARGS)
 			/* Parse the document */
 			if (xmldoc)
 				doctree = xmlParseMemory(xmldoc, strlen(xmldoc));
-			else	/* treat NULL as not well-formed */
+			else				/* treat NULL as not well-formed */
 				doctree = NULL;
 
 			if (doctree == NULL)

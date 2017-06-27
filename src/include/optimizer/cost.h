@@ -40,8 +40,8 @@ typedef enum
 {
 	CONSTRAINT_EXCLUSION_OFF,	/* do not use c_e */
 	CONSTRAINT_EXCLUSION_ON,	/* apply c_e to all rels */
-	CONSTRAINT_EXCLUSION_PARTITION		/* apply c_e to otherrels only */
-}	ConstraintExclusionType;
+	CONSTRAINT_EXCLUSION_PARTITION	/* apply c_e to otherrels only */
+}			ConstraintExclusionType;
 
 
 /*
@@ -207,7 +207,7 @@ extern void set_namedtuplestore_size_estimates(PlannerInfo *root, RelOptInfo *re
 extern void set_foreign_size_estimates(PlannerInfo *root, RelOptInfo *rel);
 extern PathTarget *set_pathtarget_cost_width(PlannerInfo *root, PathTarget *target);
 extern double compute_bitmap_pages(PlannerInfo *root, RelOptInfo *baserel,
-				Path *bitmapqual, int loop_count, Cost *cost, double *tuple);
+					 Path *bitmapqual, int loop_count, Cost *cost, double *tuple);
 
 /*
  * prototypes for clausesel.c
@@ -228,4 +228,4 @@ extern void cost_gather_merge(GatherMergePath *path, PlannerInfo *root,
 				  Cost input_startup_cost, Cost input_total_cost,
 				  double *rows);
 
-#endif   /* COST_H */
+#endif							/* COST_H */

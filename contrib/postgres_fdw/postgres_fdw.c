@@ -756,10 +756,10 @@ get_useful_ecs_for_relation(PlannerInfo *root, RelOptInfo *rel)
 		 */
 		if (bms_overlap(relids, restrictinfo->right_ec->ec_relids))
 			useful_eclass_list = list_append_unique_ptr(useful_eclass_list,
-													 restrictinfo->right_ec);
+														restrictinfo->right_ec);
 		else if (bms_overlap(relids, restrictinfo->left_ec->ec_relids))
 			useful_eclass_list = list_append_unique_ptr(useful_eclass_list,
-													  restrictinfo->left_ec);
+														restrictinfo->left_ec);
 	}
 
 	return useful_eclass_list;
@@ -899,14 +899,14 @@ postgresGetForeignPaths(PlannerInfo *root,
 	 * to estimate cost and size of this path.
 	 */
 	path = create_foreignscan_path(root, baserel,
-								   NULL,		/* default pathtarget */
+								   NULL,	/* default pathtarget */
 								   fpinfo->rows,
 								   fpinfo->startup_cost,
 								   fpinfo->total_cost,
 								   NIL, /* no pathkeys */
-								   NULL,		/* no outer rel either */
-								   NULL,		/* no extra plan */
-								   NIL);		/* no fdw_private list */
+								   NULL,	/* no outer rel either */
+								   NULL,	/* no extra plan */
+								   NIL);	/* no fdw_private list */
 	add_path(baserel, (Path *) path);
 
 	/* Add paths with pathkeys */
@@ -999,9 +999,9 @@ postgresGetForeignPaths(PlannerInfo *root,
 			arg.current = NULL;
 			clauses = generate_implied_equalities_for_column(root,
 															 baserel,
-												   ec_member_matches_foreign,
+															 ec_member_matches_foreign,
 															 (void *) &arg,
-											   baserel->lateral_referencers);
+															 baserel->lateral_referencers);
 
 			/* Done if there are no more expressions in the foreign rel */
 			if (arg.current == NULL)
@@ -1075,7 +1075,7 @@ postgresGetForeignPaths(PlannerInfo *root,
 									   rows,
 									   startup_cost,
 									   total_cost,
-									   NIL,		/* no pathkeys */
+									   NIL, /* no pathkeys */
 									   param_info->ppi_req_outer,
 									   NULL,
 									   NIL);	/* no fdw_private list */
@@ -1332,7 +1332,7 @@ postgresBeginForeignScan(ForeignScanState *node, int eflags)
 	fsstate->query = strVal(list_nth(fsplan->fdw_private,
 									 FdwScanPrivateSelectSql));
 	fsstate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private,
-											   FdwScanPrivateRetrievedAttrs);
+												 FdwScanPrivateRetrievedAttrs);
 	fsstate->fetch_size = intVal(list_nth(fsplan->fdw_private,
 										  FdwScanPrivateFetchSize));
 
@@ -1591,7 +1591,7 @@ postgresPlanForeignModify(PlannerInfo *root,
 			/* bit numbers are offset by FirstLowInvalidHeapAttributeNumber */
 			AttrNumber	attno = col + FirstLowInvalidHeapAttributeNumber;
 
-			if (attno <= InvalidAttrNumber)		/* shouldn't happen */
+			if (attno <= InvalidAttrNumber) /* shouldn't happen */
 				elog(ERROR, "system-column update is not supported");
 			targetAttrs = lappend_int(targetAttrs, attno);
 		}
@@ -1710,7 +1710,7 @@ postgresBeginForeignModify(ModifyTableState *mtstate,
 	fmstate->has_returning = intVal(list_nth(fdw_private,
 											 FdwModifyPrivateHasReturning));
 	fmstate->retrieved_attrs = (List *) list_nth(fdw_private,
-											 FdwModifyPrivateRetrievedAttrs);
+												 FdwModifyPrivateRetrievedAttrs);
 
 	/* Create context for per-tuple temp workspace. */
 	fmstate->temp_cxt = AllocSetContextCreate(estate->es_query_cxt,
@@ -2173,7 +2173,7 @@ postgresPlanDirectModify(PlannerInfo *root,
 			AttrNumber	attno = col + FirstLowInvalidHeapAttributeNumber;
 			TargetEntry *tle;
 
-			if (attno <= InvalidAttrNumber)		/* shouldn't happen */
+			if (attno <= InvalidAttrNumber) /* shouldn't happen */
 				elog(ERROR, "system-column update is not supported");
 
 			tle = get_tle_by_resno(subplan->targetlist, attno);
@@ -2311,11 +2311,11 @@ postgresBeginDirectModify(ForeignScanState *node, int eflags)
 	dmstate->query = strVal(list_nth(fsplan->fdw_private,
 									 FdwDirectModifyPrivateUpdateSql));
 	dmstate->has_returning = intVal(list_nth(fsplan->fdw_private,
-										FdwDirectModifyPrivateHasReturning));
+											 FdwDirectModifyPrivateHasReturning));
 	dmstate->retrieved_attrs = (List *) list_nth(fsplan->fdw_private,
-									   FdwDirectModifyPrivateRetrievedAttrs);
+												 FdwDirectModifyPrivateRetrievedAttrs);
 	dmstate->set_processed = intVal(list_nth(fsplan->fdw_private,
-										FdwDirectModifyPrivateSetProcessed));
+											 FdwDirectModifyPrivateSetProcessed));
 
 	/* Create context for per-tuple temp workspace. */
 	dmstate->temp_cxt = AllocSetContextCreate(estate->es_query_cxt,
@@ -2725,8 +2725,8 @@ estimate_path_cost_size(PlannerInfo *root,
 			/* Get number of grouping columns and possible number of groups */
 			numGroupCols = list_length(root->parse->groupClause);
 			numGroups = estimate_num_groups(root,
-							get_sortgrouplist_exprs(root->parse->groupClause,
-													fpinfo->grouped_tlist),
+											get_sortgrouplist_exprs(root->parse->groupClause,
+																	fpinfo->grouped_tlist),
 											input_rows, NULL);
 
 			/*
@@ -3763,7 +3763,7 @@ analyze_row_processor(PGresult *res, int row, PgFdwAnalyzeState *astate)
 		astate->rows[pos] = make_tuple_from_result_row(res, row,
 													   astate->rel,
 													   astate->attinmeta,
-													 astate->retrieved_attrs,
+													   astate->retrieved_attrs,
 													   NULL,
 													   astate->temp_cxt);
 
@@ -3836,8 +3836,8 @@ postgresImportForeignSchema(ImportForeignSchemaStmt *stmt, Oid serverOid)
 		if (PQntuples(res) != 1)
 			ereport(ERROR,
 					(errcode(ERRCODE_FDW_SCHEMA_NOT_FOUND),
-			  errmsg("schema \"%s\" is not present on foreign server \"%s\"",
-					 stmt->remote_schema, server->servername)));
+					 errmsg("schema \"%s\" is not present on foreign server \"%s\"",
+							stmt->remote_schema, server->servername)));
 
 		PQclear(res);
 		res = NULL;
@@ -4205,23 +4205,23 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	{
 		case JOIN_INNER:
 			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
-										  list_copy(fpinfo_i->remote_conds));
+											   list_copy(fpinfo_i->remote_conds));
 			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
-										  list_copy(fpinfo_o->remote_conds));
+											   list_copy(fpinfo_o->remote_conds));
 			break;
 
 		case JOIN_LEFT:
 			fpinfo->joinclauses = list_concat(fpinfo->joinclauses,
-										  list_copy(fpinfo_i->remote_conds));
+											  list_copy(fpinfo_i->remote_conds));
 			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
-										  list_copy(fpinfo_o->remote_conds));
+											   list_copy(fpinfo_o->remote_conds));
 			break;
 
 		case JOIN_RIGHT:
 			fpinfo->joinclauses = list_concat(fpinfo->joinclauses,
-										  list_copy(fpinfo_o->remote_conds));
+											  list_copy(fpinfo_o->remote_conds));
 			fpinfo->remote_conds = list_concat(fpinfo->remote_conds,
-										  list_copy(fpinfo_i->remote_conds));
+											   list_copy(fpinfo_i->remote_conds));
 			break;
 
 		case JOIN_FULL:
@@ -4305,7 +4305,7 @@ foreign_join_ok(PlannerInfo *root, RelOptInfo *joinrel, JoinType jointype,
 	 * Note that since this joinrel is at the end of the join_rel_list list
 	 * when we are called, we can get the position by list_length.
 	 */
-	Assert(fpinfo->relation_index == 0);		/* shouldn't be set yet */
+	Assert(fpinfo->relation_index == 0);	/* shouldn't be set yet */
 	fpinfo->relation_index =
 		list_length(root->parse->rtable) + list_length(root->join_rel_list);
 
@@ -4316,7 +4316,7 @@ static void
 add_paths_with_pathkeys_for_rel(PlannerInfo *root, RelOptInfo *rel,
 								Path *epq_path)
 {
-	List	   *useful_pathkeys_list = NIL;		/* List of all pathkeys */
+	List	   *useful_pathkeys_list = NIL; /* List of all pathkeys */
 	ListCell   *lc;
 
 	useful_pathkeys_list = get_useful_pathkeys_for_relation(root, rel);
@@ -4568,7 +4568,7 @@ postgresGetForeignJoinPaths(PlannerInfo *root,
 									   rows,
 									   startup_cost,
 									   total_cost,
-									   NIL,		/* no pathkeys */
+									   NIL, /* no pathkeys */
 									   NULL,	/* no required_outer */
 									   epq_path,
 									   NIL);	/* no fdw_private */

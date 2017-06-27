@@ -34,4 +34,4 @@ extern int relation_is_updatable(Oid reloid,
 extern List *QueryRewriteCTAS(Query *parsetree);
 #endif
 
-#endif   /* REWRITEHANDLER_H */
+#endif							/* REWRITEHANDLER_H */

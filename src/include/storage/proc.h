@@ -120,7 +120,7 @@ struct PGPROC
 								 * the distributed session */
 #endif
 
-	bool		isBackgroundWorker;		/* true if background worker. */
+	bool		isBackgroundWorker; /* true if background worker. */
 
 	/*
 	 * While in hot standby mode, shows that a conflict signal has been sent
@@ -188,7 +188,7 @@ struct PGPROC
 
 	/* Lock manager data, recording fast-path locks taken by this backend. */
 	uint64		fpLockBits;		/* lock modes held for each fast-path slot */
-	Oid			fpRelId[FP_LOCK_SLOTS_PER_BACKEND];		/* slots for rel oids */
+	Oid			fpRelId[FP_LOCK_SLOTS_PER_BACKEND]; /* slots for rel oids */
 	bool		fpVXIDLock;		/* are we holding a fast-path VXID lock? */
 	LocalTransactionId fpLocalTransactionId;	/* lxid for fast-path VXID
 												 * lock */
@@ -198,7 +198,7 @@ struct PGPROC
 	 * leader to get the LWLock protecting these fields.
 	 */
 	PGPROC	   *lockGroupLeader;	/* lock group leader, if I'm a member */
-	dlist_head	lockGroupMembers;		/* list of members, if I'm a leader */
+	dlist_head	lockGroupMembers;	/* list of members, if I'm a leader */
 	dlist_node	lockGroupLink;	/* my member link, if I'm a member */
 };
 
@@ -331,4 +331,4 @@ extern PGPROC *AuxiliaryPidGetProc(int pid);
 extern void BecomeLockGroupLeader(void);
 extern bool BecomeLockGroupMember(PGPROC *leader, int pid);
 
-#endif   /* PROC_H */
+#endif							/* PROC_H */

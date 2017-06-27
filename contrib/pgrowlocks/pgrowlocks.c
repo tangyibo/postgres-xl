@@ -97,7 +97,19 @@ pgrowlocks(PG_FUNCTION_ARGS)
 
 		relname = PG_GETARG_TEXT_PP(0);
 		relrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
-		rel = heap_openrv(relrv, AccessShareLock);
+		rel = relation_openrv(relrv, AccessShareLock);
+
+		if (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
+			ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("\"%s\" is a partitioned table",
+							RelationGetRelationName(rel)),
+					 errdetail("Partitioned tables do not contain rows.")));
+		else if (rel->rd_rel->relkind != RELKIND_RELATION)
+			ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("\"%s\" is not a table",
+							RelationGetRelationName(rel))));
 
 		/*
 		 * check permissions: must have SELECT on table or be in
@@ -153,7 +165,7 @@ pgrowlocks(PG_FUNCTION_ARGS)
 			values = (char **) palloc(mydata->ncolumns * sizeof(char *));
 
 			values[Atnum_tid] = (char *) DirectFunctionCall1(tidout,
-											PointerGetDatum(&tuple->t_self));
+															 PointerGetDatum(&tuple->t_self));
 
 			values[Atnum_xmax] = palloc(NCHARS * sizeof(char));
 			snprintf(values[Atnum_xmax], NCHARS, "%d", xmax);

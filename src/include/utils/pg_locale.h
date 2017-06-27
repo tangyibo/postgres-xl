@@ -93,7 +93,7 @@ extern char *get_collation_actual_version(char collprovider, const char *collcol
 
 #ifdef USE_ICU
 extern int32_t icu_to_uchar(UChar **buff_uchar, const char *buff, size_t nbytes);
-extern int32_t icu_from_uchar(char **result, UChar *buff_uchar, int32_t len_uchar);
+extern int32_t icu_from_uchar(char **result, const UChar *buff_uchar, int32_t len_uchar);
 #endif
 
 /* These functions convert from/to libc's wchar_t, *not* pg_wchar_t */
@@ -104,4 +104,4 @@ extern size_t char2wchar(wchar_t *to, size_t tolen,
 		   const char *from, size_t fromlen, pg_locale_t locale);
 #endif
 
-#endif   /* _PG_LOCALE_ */
+#endif							/* _PG_LOCALE_ */

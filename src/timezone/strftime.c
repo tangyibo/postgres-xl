@@ -120,7 +120,7 @@ static char *_yconv(int, int, bool, bool, char *, const char *);
 
 size_t
 pg_strftime(char *s, size_t maxsize, const char *format,
-			const struct pg_tm * t)
+			const struct pg_tm *t)
 {
 	char	   *p;
 	int			warn;
@@ -134,7 +134,7 @@ pg_strftime(char *s, size_t maxsize, const char *format,
 }
 
 static char *
-_fmt(const char *format, const struct pg_tm * t, char *pt, const char *ptlim,
+_fmt(const char *format, const struct pg_tm *t, char *pt, const char *ptlim,
 	 int *warnp)
 {
 	for (; *format; ++format)
@@ -245,7 +245,7 @@ _fmt(const char *format, const struct pg_tm * t, char *pt, const char *ptlim,
 					 */
 					pt = _add("kitchen sink", pt, ptlim);
 					continue;
-#endif   /* defined KITCHEN_SINK */
+#endif							/* defined KITCHEN_SINK */
 				case 'l':
 
 					/*

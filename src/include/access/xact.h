@@ -62,13 +62,12 @@ extern bool XactDeferrable;
 typedef enum
 {
 	SYNCHRONOUS_COMMIT_OFF,		/* asynchronous commit */
-	SYNCHRONOUS_COMMIT_LOCAL_FLUSH,		/* wait for local flush only */
+	SYNCHRONOUS_COMMIT_LOCAL_FLUSH, /* wait for local flush only */
 	SYNCHRONOUS_COMMIT_REMOTE_WRITE,	/* wait for local flush and remote
 										 * write */
 	SYNCHRONOUS_COMMIT_REMOTE_FLUSH,	/* wait for local and remote flush */
-	SYNCHRONOUS_COMMIT_REMOTE_APPLY		/* wait for local flush and remote
-										 * apply */
-}	SyncCommitLevel;
+	SYNCHRONOUS_COMMIT_REMOTE_APPLY /* wait for local flush and remote apply */
+}			SyncCommitLevel;
 
 /* Define the default setting for synchronous_commit */
 #define SYNCHRONOUS_COMMIT_ON	SYNCHRONOUS_COMMIT_REMOTE_FLUSH
@@ -124,7 +123,7 @@ typedef enum
 } SubXactEvent;
 
 typedef void (*SubXactCallback) (SubXactEvent event, SubTransactionId mySubid,
-									SubTransactionId parentSubid, void *arg);
+								 SubTransactionId parentSubid, void *arg);
 
 #ifdef PGXC
 /*
@@ -460,4 +459,4 @@ extern void EnterParallelMode(void);
 extern void ExitParallelMode(void);
 extern bool IsInParallelMode(void);
 
-#endif   /* XACT_H */
+#endif							/* XACT_H */

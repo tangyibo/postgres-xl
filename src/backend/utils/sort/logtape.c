@@ -161,7 +161,7 @@ struct LogicalTapeSet
 	 * blocks that have been allocated for a tape, but have not been written
 	 * to the underlying file yet.
 	 */
-	long		nBlocksAllocated;		/* # of blocks allocated */
+	long		nBlocksAllocated;	/* # of blocks allocated */
 	long		nBlocksWritten; /* # of blocks used in underlying file */
 
 	/*
@@ -357,7 +357,7 @@ ltsReleaseBlock(LogicalTapeSet *lts, long blocknum)
 	{
 		lts->freeBlocksLen *= 2;
 		lts->freeBlocks = (long *) repalloc(lts->freeBlocks,
-										  lts->freeBlocksLen * sizeof(long));
+											lts->freeBlocksLen * sizeof(long));
 	}
 
 	/*

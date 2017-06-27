@@ -294,7 +294,7 @@ check_timezone(char **newval, void **extra, GucSource source)
 		 */
 		interval = DatumGetIntervalP(DirectFunctionCall3(interval_in,
 														 CStringGetDatum(val),
-												ObjectIdGetDatum(InvalidOid),
+														 ObjectIdGetDatum(InvalidOid),
 														 Int32GetDatum(-1)));
 
 		pfree(val);
@@ -791,7 +791,7 @@ assign_client_encoding(const char *newval, void *extra)
 		 */
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-		errmsg("cannot change client_encoding during a parallel operation")));
+				 errmsg("cannot change client_encoding during a parallel operation")));
 	}
 
 	/* We do not expect an error if PrepareClientEncoding succeeded */

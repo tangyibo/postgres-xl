@@ -86,7 +86,7 @@ typedef struct ReplicationSlotOnDisk
 #define ReplicationSlotOnDiskV2Size \
 	sizeof(ReplicationSlotOnDisk) - ReplicationSlotOnDiskConstantSize
 
-#define SLOT_MAGIC		0x1051CA1		/* format identifier */
+#define SLOT_MAGIC		0x1051CA1	/* format identifier */
 #define SLOT_VERSION	2		/* version for new files */
 
 /* Control array for replication slot management */
@@ -200,8 +200,8 @@ ReplicationSlotValidateName(const char *name, int elevel)
 		{
 			ereport(elevel,
 					(errcode(ERRCODE_INVALID_NAME),
-			errmsg("replication slot name \"%s\" contains invalid character",
-				   name),
+					 errmsg("replication slot name \"%s\" contains invalid character",
+							name),
 					 errhint("Replication slot names may only contain lower case letters, numbers, and the underscore character.")));
 			return false;
 		}
@@ -1352,15 +1352,15 @@ RestoreSlotFromDisk(const char *name)
 	if (cp.version != SLOT_VERSION)
 		ereport(PANIC,
 				(errcode_for_file_access(),
-			errmsg("replication slot file \"%s\" has unsupported version %u",
-				   path, cp.version)));
+				 errmsg("replication slot file \"%s\" has unsupported version %u",
+						path, cp.version)));
 
 	/* boundary check on length */
 	if (cp.length != ReplicationSlotOnDiskV2Size)
 		ereport(PANIC,
 				(errcode_for_file_access(),
-			   errmsg("replication slot file \"%s\" has corrupted length %u",
-					  path, cp.length)));
+				 errmsg("replication slot file \"%s\" has corrupted length %u",
+						path, cp.length)));
 
 	/* Now that we know the size, read the entire file */
 	pgstat_report_wait_start(WAIT_EVENT_REPLICATION_SLOT_READ);

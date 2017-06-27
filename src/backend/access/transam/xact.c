@@ -208,18 +208,18 @@ typedef struct TransactionStateData
 	TBlockState blockState;		/* high-level state */
 	int			nestingLevel;	/* transaction nesting depth */
 	int			gucNestLevel;	/* GUC context nesting depth */
-	MemoryContext curTransactionContext;		/* my xact-lifetime context */
+	MemoryContext curTransactionContext;	/* my xact-lifetime context */
 	ResourceOwner curTransactionOwner;	/* my query resources */
 	TransactionId *childXids;	/* subcommitted child XIDs, in XID order */
 	int			nChildXids;		/* # of subcommitted child XIDs */
 	int			maxChildXids;	/* allocated size of childXids[] */
 	Oid			prevUser;		/* previous CurrentUserId setting */
 	int			prevSecContext; /* previous SecurityRestrictionContext */
-	bool		prevXactReadOnly;		/* entry-time xact r/o state */
-	bool		startedInRecovery;		/* did we start in recovery? */
+	bool		prevXactReadOnly;	/* entry-time xact r/o state */
+	bool		startedInRecovery;	/* did we start in recovery? */
 	bool		didLogXid;		/* has xid been included in WAL record? */
-	int			parallelModeLevel;		/* Enter/ExitParallelMode counter */
-	struct TransactionStateData *parent;		/* back link to parent */
+	int			parallelModeLevel;	/* Enter/ExitParallelMode counter */
+	struct TransactionStateData *parent;	/* back link to parent */
 #ifdef XCP
 	int				waitedForXidsCount;	/* count of xids we waited to finish */
 	TransactionId	*waitedForXids;		/* xids we waited to finish */
@@ -1782,7 +1782,7 @@ AtSubCommit_childXids(void)
 								   new_maxChildXids * sizeof(TransactionId));
 		else
 			new_childXids = repalloc(s->parent->childXids,
-								   new_maxChildXids * sizeof(TransactionId));
+									 new_maxChildXids * sizeof(TransactionId));
 
 		s->parent->childXids = new_childXids;
 		s->parent->maxChildXids = new_maxChildXids;
@@ -2910,7 +2910,7 @@ PrepareTransaction(void)
 	if (XactHasExportedSnapshots())
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		errmsg("cannot PREPARE a transaction that has exported snapshots")));
+				 errmsg("cannot PREPARE a transaction that has exported snapshots")));
 
 	/* Prevent cancel/die interrupt while cleaning up */
 	HOLD_INTERRUPTS();
@@ -3396,8 +3396,7 @@ CleanupTransaction(void)
 	 * do abort cleanup processing
 	 */
 	AtCleanup_Portals();		/* now safe to release portal memory */
-	AtEOXact_Snapshot(false, true);		/* and release the transaction's
-										 * snapshots */
+	AtEOXact_Snapshot(false, true); /* and release the transaction's snapshots */
 
 	CurrentResourceOwner = NULL;	/* and resource owner */
 	if (TopTransactionResourceOwner)
@@ -4618,7 +4617,7 @@ DefineSavepoint(char *name)
 	if (IsInParallelMode())
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-			errmsg("cannot define savepoints during a parallel operation")));
+				 errmsg("cannot define savepoints during a parallel operation")));
 
 	switch (s->blockState)
 	{
@@ -4626,7 +4625,7 @@ DefineSavepoint(char *name)
 		case TBLOCK_SUBINPROGRESS:
 			/* Normal subtransaction start */
 			PushTransaction();
-			s = CurrentTransactionState;		/* changed by push */
+			s = CurrentTransactionState;	/* changed by push */
 
 			/*
 			 * Savepoint names, like the TransactionState block itself, live
@@ -4685,7 +4684,7 @@ ReleaseSavepoint(List *options)
 	if (IsInParallelMode())
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-		   errmsg("cannot release savepoints during a parallel operation")));
+				 errmsg("cannot release savepoints during a parallel operation")));
 
 	switch (s->blockState)
 	{
@@ -4798,7 +4797,7 @@ RollbackToSavepoint(List *options)
 	if (IsInParallelMode())
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-		errmsg("cannot rollback to savepoints during a parallel operation")));
+				 errmsg("cannot rollback to savepoints during a parallel operation")));
 
 	switch (s->blockState)
 	{
@@ -4927,7 +4926,7 @@ BeginInternalSubTransaction(char *name)
 	if (IsInParallelMode())
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-		errmsg("cannot start subtransactions during a parallel operation")));
+				 errmsg("cannot start subtransactions during a parallel operation")));
 
 	switch (s->blockState)
 	{
@@ -4938,7 +4937,7 @@ BeginInternalSubTransaction(char *name)
 		case TBLOCK_SUBINPROGRESS:
 			/* Normal subtransaction start */
 			PushTransaction();
-			s = CurrentTransactionState;		/* changed by push */
+			s = CurrentTransactionState;	/* changed by push */
 
 			/*
 			 * Savepoint names, like the TransactionState block itself, live
@@ -4994,7 +4993,7 @@ ReleaseCurrentSubTransaction(void)
 	if (IsInParallelMode())
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TRANSACTION_STATE),
-		errmsg("cannot commit subtransactions during a parallel operation")));
+				 errmsg("cannot commit subtransactions during a parallel operation")));
 
 	if (s->blockState != TBLOCK_SUBINPROGRESS)
 		elog(ERROR, "ReleaseCurrentSubTransaction: unexpected state %s",
@@ -6277,13 +6276,13 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 		 * recovered. It's unlikely but it's good to be safe.
 		 */
 		TransactionIdAsyncCommitTree(
-							  xid, parsed->nsubxacts, parsed->subxacts, lsn);
+									 xid, parsed->nsubxacts, parsed->subxacts, lsn);
 
 		/*
 		 * We must mark clog before we update the ProcArray.
 		 */
 		ExpireTreeKnownAssignedTransactionIds(
-						  xid, parsed->nsubxacts, parsed->subxacts, max_xid);
+											  xid, parsed->nsubxacts, parsed->subxacts, max_xid);
 
 		/*
 		 * Send any cache invalidations attached to the commit. We must
@@ -6292,7 +6291,7 @@ xact_redo_commit(xl_xact_parsed_commit *parsed,
 		 */
 		ProcessCommittedInvalidationMessages(
 											 parsed->msgs, parsed->nmsgs,
-						  XactCompletionRelcacheInitFileInval(parsed->xinfo),
+											 XactCompletionRelcacheInitFileInval(parsed->xinfo),
 											 parsed->dbId, parsed->tsId);
 
 		/*
@@ -6431,7 +6430,7 @@ xact_redo_abort(xl_xact_parsed_abort *parsed, TransactionId xid)
 		 * We must update the ProcArray after we have marked clog.
 		 */
 		ExpireTreeKnownAssignedTransactionIds(
-						  xid, parsed->nsubxacts, parsed->subxacts, max_xid);
+											  xid, parsed->nsubxacts, parsed->subxacts, max_xid);
 
 		/*
 		 * There are no flat files that need updating, nor invalidation

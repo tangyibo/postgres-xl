@@ -130,9 +130,9 @@ static int	completion_max_records;
  * the completion callback functions.  Ugly but there is no better way.
  */
 static const char *completion_charp;	/* to pass a string */
-static const char *const * completion_charpp;	/* to pass a list of strings */
-static const char *completion_info_charp;		/* to pass a second string */
-static const char *completion_info_charp2;		/* to pass a third string */
+static const char *const *completion_charpp;	/* to pass a list of strings */
+static const char *completion_info_charp;	/* to pass a second string */
+static const char *completion_info_charp2;	/* to pass a third string */
 static const SchemaQuery *completion_squery;	/* to pass a SchemaQuery */
 static bool completion_case_sensitive;	/* completion is case sensitive */
 
@@ -1030,8 +1030,8 @@ static const pgsql_thing_t words_after_create[] = {
 	{"CONFIGURATION", Query_for_list_of_ts_configurations, NULL, THING_NO_SHOW},
 	{"CONVERSION", "SELECT pg_catalog.quote_ident(conname) FROM pg_catalog.pg_conversion WHERE substring(pg_catalog.quote_ident(conname),1,%d)='%s'"},
 	{"DATABASE", Query_for_list_of_databases},
-	{"DICTIONARY", Query_for_list_of_ts_dictionaries, NULL, THING_NO_SHOW},
 	{"DEFAULT PRIVILEGES", NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
+	{"DICTIONARY", Query_for_list_of_ts_dictionaries, NULL, THING_NO_SHOW},
 	{"DOMAIN", NULL, &Query_for_list_of_domains},
 	{"EVENT TRIGGER", NULL, NULL},
 	{"EXTENSION", Query_for_list_of_extensions},
@@ -1059,8 +1059,8 @@ static const pgsql_thing_t words_after_create[] = {
 	{"SYSTEM", NULL, NULL, THING_NO_CREATE | THING_NO_DROP},
 	{"TABLE", NULL, &Query_for_list_of_tables},
 	{"TABLESPACE", Query_for_list_of_tablespaces},
-	{"TEMP", NULL, NULL, THING_NO_DROP | THING_NO_ALTER},		/* for CREATE TEMP TABLE
-																 * ... */
+	{"TEMP", NULL, NULL, THING_NO_DROP | THING_NO_ALTER},	/* for CREATE TEMP TABLE
+															 * ... */
 	{"TEMPLATE", Query_for_list_of_ts_templates, NULL, THING_NO_SHOW},
 	{"TEMPORARY", NULL, NULL, THING_NO_DROP | THING_NO_ALTER},	/* for CREATE TEMPORARY
 																 * TABLE ... */
@@ -1068,8 +1068,8 @@ static const pgsql_thing_t words_after_create[] = {
 	{"TRANSFORM", NULL, NULL},
 	{"TRIGGER", "SELECT pg_catalog.quote_ident(tgname) FROM pg_catalog.pg_trigger WHERE substring(pg_catalog.quote_ident(tgname),1,%d)='%s' AND NOT tgisinternal"},
 	{"TYPE", NULL, &Query_for_list_of_datatypes},
-	{"UNIQUE", NULL, NULL, THING_NO_DROP | THING_NO_ALTER},		/* for CREATE UNIQUE
-																 * INDEX ... */
+	{"UNIQUE", NULL, NULL, THING_NO_DROP | THING_NO_ALTER}, /* for CREATE UNIQUE
+															 * INDEX ... */
 	{"UNLOGGED", NULL, NULL, THING_NO_DROP | THING_NO_ALTER},	/* for CREATE UNLOGGED
 																 * TABLE ... */
 	{"USER", Query_for_list_of_roles},
@@ -1093,7 +1093,7 @@ static void append_variable_names(char ***varnames, int *nvars,
 					  int *maxvars, const char *varname,
 					  const char *prefix, const char *suffix);
 static char **complete_from_variables(const char *text,
-					const char *prefix, const char *suffix, bool need_value);
+						const char *prefix, const char *suffix, bool need_value);
 static char *complete_from_files(const char *text, int state);
 
 static char *pg_strdup_keyword_case(const char *s, const char *ref);
@@ -1995,11 +1995,11 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_LIST5("(", "DEFAULT", "NOT NULL", "STATISTICS", "STORAGE");
 	/* ALTER TABLE ALTER [COLUMN] <foo> SET ( */
 	else if (Matches8("ALTER", "TABLE", MatchAny, "ALTER", "COLUMN", MatchAny, "SET", "(") ||
-		 Matches7("ALTER", "TABLE", MatchAny, "ALTER", MatchAny, "SET", "("))
+			 Matches7("ALTER", "TABLE", MatchAny, "ALTER", MatchAny, "SET", "("))
 		COMPLETE_WITH_LIST2("n_distinct", "n_distinct_inherited");
 	/* ALTER TABLE ALTER [COLUMN] <foo> SET STORAGE */
 	else if (Matches8("ALTER", "TABLE", MatchAny, "ALTER", "COLUMN", MatchAny, "SET", "STORAGE") ||
-	Matches7("ALTER", "TABLE", MatchAny, "ALTER", MatchAny, "SET", "STORAGE"))
+			 Matches7("ALTER", "TABLE", MatchAny, "ALTER", MatchAny, "SET", "STORAGE"))
 		COMPLETE_WITH_LIST4("PLAIN", "EXTERNAL", "EXTENDED", "MAIN");
 	/* ALTER TABLE ALTER [COLUMN] <foo> DROP */
 	else if (Matches7("ALTER", "TABLE", MatchAny, "ALTER", "COLUMN", MatchAny, "DROP") ||
@@ -2257,7 +2257,7 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches4("COMMENT", "ON", "EVENT", "TRIGGER"))
 		COMPLETE_WITH_QUERY(Query_for_list_of_event_triggers);
 	else if (Matches4("COMMENT", "ON", MatchAny, MatchAnyExcept("IS")) ||
-		Matches5("COMMENT", "ON", MatchAny, MatchAny, MatchAnyExcept("IS")) ||
+			 Matches5("COMMENT", "ON", MatchAny, MatchAny, MatchAnyExcept("IS")) ||
 			 Matches6("COMMENT", "ON", MatchAny, MatchAny, MatchAny, MatchAnyExcept("IS")))
 		COMPLETE_WITH_CONST("IS");
 
@@ -2525,7 +2525,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_LIST8("INCREMENT BY", "MINVALUE", "MAXVALUE", "NO", "CACHE",
 							"CYCLE", "OWNED BY", "START WITH");
 	else if (TailMatches4("CREATE", "SEQUENCE", MatchAny, "NO") ||
-		TailMatches5("CREATE", "TEMP|TEMPORARY", "SEQUENCE", MatchAny, "NO"))
+			 TailMatches5("CREATE", "TEMP|TEMPORARY", "SEQUENCE", MatchAny, "NO"))
 		COMPLETE_WITH_LIST3("MINVALUE", "MAXVALUE", "CYCLE");
 
 /* CREATE SERVER <name> */
@@ -2604,7 +2604,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_LIST3("INSERT", "DELETE", "UPDATE");
 	/* complete CREATE TRIGGER <name> BEFORE,AFTER sth with OR,ON */
 	else if (TailMatches5("CREATE", "TRIGGER", MatchAny, "BEFORE|AFTER", MatchAny) ||
-	  TailMatches6("CREATE", "TRIGGER", MatchAny, "INSTEAD", "OF", MatchAny))
+			 TailMatches6("CREATE", "TRIGGER", MatchAny, "INSTEAD", "OF", MatchAny))
 		COMPLETE_WITH_LIST2("ON", "OR");
 
 	/*
@@ -2618,7 +2618,7 @@ psql_completion(const char *text, int start, int end)
 		COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_views, NULL);
 	else if (HeadMatches2("CREATE", "TRIGGER") && TailMatches2("ON", MatchAny))
 		COMPLETE_WITH_LIST7("NOT DEFERRABLE", "DEFERRABLE", "INITIALLY",
-						"REFERENCING", "FOR", "WHEN (", "EXECUTE PROCEDURE");
+							"REFERENCING", "FOR", "WHEN (", "EXECUTE PROCEDURE");
 	else if (HeadMatches2("CREATE", "TRIGGER") &&
 			 (TailMatches1("DEFERRABLE") || TailMatches2("INITIALLY", "IMMEDIATE|DEFERRED")))
 		COMPLETE_WITH_LIST4("REFERENCING", "FOR", "WHEN (", "EXECUTE PROCEDURE");
@@ -2909,7 +2909,7 @@ psql_completion(const char *text, int start, int end)
 		 */
 		if (HeadMatches3("ALTER", "DEFAULT", "PRIVILEGES"))
 			COMPLETE_WITH_LIST10("SELECT", "INSERT", "UPDATE",
-							   "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER",
+								 "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER",
 								 "EXECUTE", "USAGE", "ALL");
 		else
 			COMPLETE_WITH_QUERY(Query_for_list_of_roles
@@ -2963,8 +2963,8 @@ psql_completion(const char *text, int start, int end)
 			COMPLETE_WITH_LIST5("TABLES", "SEQUENCES", "FUNCTIONS", "TYPES", "SCHEMAS");
 		else
 			COMPLETE_WITH_SCHEMA_QUERY(Query_for_list_of_tsvmf,
-									" UNION SELECT 'ALL FUNCTIONS IN SCHEMA'"
-									" UNION SELECT 'ALL SEQUENCES IN SCHEMA'"
+									   " UNION SELECT 'ALL FUNCTIONS IN SCHEMA'"
+									   " UNION SELECT 'ALL SEQUENCES IN SCHEMA'"
 									   " UNION SELECT 'ALL TABLES IN SCHEMA'"
 									   " UNION SELECT 'DATABASE'"
 									   " UNION SELECT 'DOMAIN'"
@@ -3253,11 +3253,11 @@ psql_completion(const char *text, int start, int end)
 	else if (Matches2("BEGIN|START", "TRANSACTION") ||
 			 Matches2("BEGIN", "WORK") ||
 			 Matches1("BEGIN") ||
-		  Matches5("SET", "SESSION", "CHARACTERISTICS", "AS", "TRANSACTION"))
+			 Matches5("SET", "SESSION", "CHARACTERISTICS", "AS", "TRANSACTION"))
 		COMPLETE_WITH_LIST4("ISOLATION LEVEL", "READ", "DEFERRABLE", "NOT DEFERRABLE");
 	else if (Matches3("SET|BEGIN|START", "TRANSACTION|WORK", "NOT") ||
 			 Matches2("BEGIN", "NOT") ||
-	Matches6("SET", "SESSION", "CHARACTERISTICS", "AS", "TRANSACTION", "NOT"))
+			 Matches6("SET", "SESSION", "CHARACTERISTICS", "AS", "TRANSACTION", "NOT"))
 		COMPLETE_WITH_CONST("DEFERRABLE");
 	else if (Matches3("SET|BEGIN|START", "TRANSACTION|WORK", "ISOLATION") ||
 			 Matches2("BEGIN", "ISOLATION") ||
@@ -3871,7 +3871,7 @@ _complete_from_query(int is_schema_query, const char *text, int state)
 			{
 				appendPQExpBufferStr(&query_buffer,
 									 " AND c.relnamespace <> (SELECT oid FROM"
-				   " pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')");
+									 " pg_catalog.pg_namespace WHERE nspname = 'pg_catalog')");
 			}
 
 			/*
@@ -3879,14 +3879,14 @@ _complete_from_query(int is_schema_query, const char *text, int state)
 			 * one potential match among schema names.
 			 */
 			appendPQExpBuffer(&query_buffer, "\nUNION\n"
-						   "SELECT pg_catalog.quote_ident(n.nspname) || '.' "
+							  "SELECT pg_catalog.quote_ident(n.nspname) || '.' "
 							  "FROM pg_catalog.pg_namespace n "
 							  "WHERE substring(pg_catalog.quote_ident(n.nspname) || '.',1,%d)='%s'",
 							  char_length, e_text);
 			appendPQExpBuffer(&query_buffer,
 							  " AND (SELECT pg_catalog.count(*)"
 							  " FROM pg_catalog.pg_namespace"
-			" WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,%d) ="
+							  " WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,%d) ="
 							  " substring('%s',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) > 1",
 							  char_length, e_text);
 
@@ -3895,7 +3895,7 @@ _complete_from_query(int is_schema_query, const char *text, int state)
 			 * one schema matching the input-so-far.
 			 */
 			appendPQExpBuffer(&query_buffer, "\nUNION\n"
-					 "SELECT pg_catalog.quote_ident(n.nspname) || '.' || %s "
+							  "SELECT pg_catalog.quote_ident(n.nspname) || '.' || %s "
 							  "FROM %s, pg_catalog.pg_namespace n "
 							  "WHERE %s = n.oid AND ",
 							  qualresult,
@@ -3913,13 +3913,13 @@ _complete_from_query(int is_schema_query, const char *text, int state)
 			 * speed up the query
 			 */
 			appendPQExpBuffer(&query_buffer,
-			" AND substring(pg_catalog.quote_ident(n.nspname) || '.',1,%d) ="
+							  " AND substring(pg_catalog.quote_ident(n.nspname) || '.',1,%d) ="
 							  " substring('%s',1,pg_catalog.length(pg_catalog.quote_ident(n.nspname))+1)",
 							  char_length, e_text);
 			appendPQExpBuffer(&query_buffer,
 							  " AND (SELECT pg_catalog.count(*)"
 							  " FROM pg_catalog.pg_namespace"
-			" WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,%d) ="
+							  " WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,%d) ="
 							  " substring('%s',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) = 1",
 							  char_length, e_text);
 
@@ -4187,7 +4187,7 @@ pg_strdup_keyword_case(const char *s, const char *ref)
 
 	if (pset.comp_case == PSQL_COMP_CASE_LOWER ||
 		((pset.comp_case == PSQL_COMP_CASE_PRESERVE_LOWER ||
-	   pset.comp_case == PSQL_COMP_CASE_PRESERVE_UPPER) && islower(first)) ||
+		  pset.comp_case == PSQL_COMP_CASE_PRESERVE_UPPER) && islower(first)) ||
 		(pset.comp_case == PSQL_COMP_CASE_PRESERVE_LOWER && !isalpha(first)))
 	{
 		for (p = ret; *p; p++)
@@ -4457,6 +4457,6 @@ dequote_file_name(char *text, char quote_char)
 
 	return s;
 }
-#endif   /* NOT_USED */
+#endif							/* NOT_USED */
 
-#endif   /* USE_READLINE */
+#endif							/* USE_READLINE */

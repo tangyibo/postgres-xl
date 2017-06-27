@@ -121,7 +121,7 @@ BuildRelationExtStatistics(Relation onerel, double totalrows,
 													stat->columns, stats);
 			else if (t == STATS_EXT_DEPENDENCIES)
 				dependencies = statext_dependencies_build(numrows, rows,
-													   stat->columns, stats);
+														  stat->columns, stats);
 		}
 
 		/* store the statistics in the catalog */
@@ -353,7 +353,7 @@ multi_sort_init(int ndims)
 	Assert(ndims >= 2);
 
 	mss = (MultiSortSupport) palloc0(offsetof(MultiSortSupportData, ssup)
-									 +sizeof(SortSupportData) * ndims);
+									 + sizeof(SortSupportData) * ndims);
 
 	mss->ndims = ndims;
 

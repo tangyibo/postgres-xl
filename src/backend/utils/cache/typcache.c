@@ -152,7 +152,7 @@ static HTAB *RecordCacheHash = NULL;
 
 static TupleDesc *RecordCacheArray = NULL;
 static int32 RecordCacheArrayLen = 0;	/* allocated length of array */
-static int32 NextRecordTypmod = 0;		/* number of entries used */
+static int32 NextRecordTypmod = 0;	/* number of entries used */
 
 static void load_typcache_tupdesc(TypeCacheEntry *typentry);
 static void load_rangetype_info(TypeCacheEntry *typentry);
@@ -572,7 +572,7 @@ load_typcache_tupdesc(TypeCacheEntry *typentry)
 {
 	Relation	rel;
 
-	if (!OidIsValid(typentry->typrelid))		/* should not happen */
+	if (!OidIsValid(typentry->typrelid))	/* should not happen */
 		elog(ERROR, "invalid typrelid for composite type %u",
 			 typentry->type_id);
 	rel = relation_open(typentry->typrelid, AccessShareLock);
@@ -888,8 +888,8 @@ load_domaintype_info(TypeCacheEntry *typentry)
 static int
 dcs_cmp(const void *a, const void *b)
 {
-	const DomainConstraintState *const * ca = (const DomainConstraintState *const *) a;
-	const DomainConstraintState *const * cb = (const DomainConstraintState *const *) b;
+	const DomainConstraintState *const *ca = (const DomainConstraintState *const *) a;
+	const DomainConstraintState *const *cb = (const DomainConstraintState *const *) b;
 
 	return strcmp((*ca)->name, (*cb)->name);
 }

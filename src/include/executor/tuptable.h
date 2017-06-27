@@ -116,7 +116,7 @@ typedef struct TupleTableSlot
 	NodeTag		type;
 	bool		tts_isempty;	/* true = slot is empty */
 	bool		tts_shouldFree; /* should pfree tts_tuple? */
-	bool		tts_shouldFreeMin;		/* should pfree tts_mintuple? */
+	bool		tts_shouldFreeMin;	/* should pfree tts_mintuple? */
 	bool		tts_slow;		/* saved state for slot_deform_tuple */
 	HeapTuple	tts_tuple;		/* physical tuple, or NULL if virtual */
 #ifdef PGXC
@@ -186,4 +186,4 @@ extern void slot_getallattrs(TupleTableSlot *slot);
 extern void slot_getsomeattrs(TupleTableSlot *slot, int attnum);
 extern bool slot_attisnull(TupleTableSlot *slot, int attnum);
 
-#endif   /* TUPTABLE_H */
+#endif							/* TUPTABLE_H */

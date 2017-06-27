@@ -200,7 +200,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is a partitioned table",
 							RelationGetRelationName(rel)),
-				 errdetail("Partitioned tables cannot have ROW triggers.")));
+					 errdetail("Partitioned tables cannot have ROW triggers.")));
 	}
 	else if (rel->rd_rel->relkind == RELKIND_VIEW)
 	{
@@ -230,21 +230,21 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is a foreign table",
 							RelationGetRelationName(rel)),
-			  errdetail("Foreign tables cannot have INSTEAD OF triggers.")));
+					 errdetail("Foreign tables cannot have INSTEAD OF triggers.")));
 
 		if (TRIGGER_FOR_TRUNCATE(stmt->events))
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is a foreign table",
 							RelationGetRelationName(rel)),
-				errdetail("Foreign tables cannot have TRUNCATE triggers.")));
+					 errdetail("Foreign tables cannot have TRUNCATE triggers.")));
 
 		if (stmt->isconstraint)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is a foreign table",
 							RelationGetRelationName(rel)),
-			  errdetail("Foreign tables cannot have constraint triggers.")));
+					 errdetail("Foreign tables cannot have constraint triggers.")));
 	}
 	else
 		ereport(ERROR,
@@ -319,7 +319,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 		if (stmt->whenClause)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("INSTEAD OF triggers cannot have WHEN conditions")));
+					 errmsg("INSTEAD OF triggers cannot have WHEN conditions")));
 		if (stmt->columns != NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -403,7 +403,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 				if (newtablename != NULL)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					errmsg("NEW TABLE cannot be specified multiple times")));
+							 errmsg("NEW TABLE cannot be specified multiple times")));
 
 				newtablename = tt->name;
 			}
@@ -418,7 +418,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 				if (oldtablename != NULL)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-					errmsg("OLD TABLE cannot be specified multiple times")));
+							 errmsg("OLD TABLE cannot be specified multiple times")));
 
 				oldtablename = tt->name;
 			}
@@ -428,7 +428,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 			strcmp(newtablename, oldtablename) == 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-			errmsg("OLD TABLE name and NEW TABLE name cannot be the same")));
+					 errmsg("OLD TABLE name and NEW TABLE name cannot be the same")));
 	}
 
 	/*
@@ -553,9 +553,9 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 		if (funcrettype == OPAQUEOID)
 		{
 			ereport(WARNING,
-				 (errmsg("changing return type of function %s from %s to %s",
-						 NameListToString(stmt->funcname),
-						 "opaque", "trigger")));
+					(errmsg("changing return type of function %s from %s to %s",
+							NameListToString(stmt->funcname),
+							"opaque", "trigger")));
 			SetFunctionReturnType(funcoid, TRIGGEROID);
 		}
 		else
@@ -600,11 +600,11 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 											  stmt->initdeferred,
 											  true,
 											  RelationGetRelid(rel),
-											  NULL,		/* no conkey */
+											  NULL, /* no conkey */
 											  0,
-											  InvalidOid,		/* no domain */
-											  InvalidOid,		/* no index */
-											  InvalidOid,		/* no foreign key */
+											  InvalidOid,	/* no domain */
+											  InvalidOid,	/* no index */
+											  InvalidOid,	/* no foreign key */
 											  NULL,
 											  NULL,
 											  NULL,
@@ -613,14 +613,14 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 											  ' ',
 											  ' ',
 											  ' ',
-											  NULL,		/* no exclusion */
-											  NULL,		/* no check constraint */
+											  NULL, /* no exclusion */
+											  NULL, /* no check constraint */
 											  NULL,
 											  NULL,
-											  true,		/* islocal */
-											  0,		/* inhcount */
-											  true,		/* isnoinherit */
-											  isInternal);		/* is_internal */
+											  true, /* islocal */
+											  0,	/* inhcount */
+											  true, /* isnoinherit */
+											  isInternal);	/* is_internal */
 	}
 
 	/*
@@ -673,8 +673,8 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 			if (namestrcmp(&(pg_trigger->tgname), trigname) == 0)
 				ereport(ERROR,
 						(errcode(ERRCODE_DUPLICATE_OBJECT),
-				  errmsg("trigger \"%s\" for relation \"%s\" already exists",
-						 trigname, RelationGetRelationName(rel))));
+						 errmsg("trigger \"%s\" for relation \"%s\" already exists",
+								trigname, RelationGetRelationName(rel))));
 		}
 		systable_endscan(tgscan);
 	}
@@ -686,7 +686,7 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 
 	values[Anum_pg_trigger_tgrelid - 1] = ObjectIdGetDatum(RelationGetRelid(rel));
 	values[Anum_pg_trigger_tgname - 1] = DirectFunctionCall1(namein,
-												  CStringGetDatum(trigname));
+															 CStringGetDatum(trigname));
 	values[Anum_pg_trigger_tgfoid - 1] = ObjectIdGetDatum(funcoid);
 	values[Anum_pg_trigger_tgtype - 1] = Int16GetDatum(tgtype);
 	values[Anum_pg_trigger_tgenabled - 1] = CharGetDatum(TRIGGER_FIRES_ON_ORIGIN);
@@ -732,13 +732,13 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 		}
 		values[Anum_pg_trigger_tgnargs - 1] = Int16GetDatum(nargs);
 		values[Anum_pg_trigger_tgargs - 1] = DirectFunctionCall1(byteain,
-													  CStringGetDatum(args));
+																 CStringGetDatum(args));
 	}
 	else
 	{
 		values[Anum_pg_trigger_tgnargs - 1] = Int16GetDatum(0);
 		values[Anum_pg_trigger_tgargs - 1] = DirectFunctionCall1(byteain,
-														CStringGetDatum(""));
+																 CStringGetDatum(""));
 	}
 
 	/* build column number array if it's a column-specific trigger */
@@ -762,8 +762,8 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 			if (attnum == InvalidAttrNumber)
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
-					errmsg("column \"%s\" of relation \"%s\" does not exist",
-						   name, RelationGetRelationName(rel))));
+						 errmsg("column \"%s\" of relation \"%s\" does not exist",
+								name, RelationGetRelationName(rel))));
 
 			/* Check for duplicates */
 			for (j = i - 1; j >= 0; j--)
@@ -789,12 +789,12 @@ CreateTrigger(CreateTrigStmt *stmt, const char *queryString,
 
 	if (oldtablename)
 		values[Anum_pg_trigger_tgoldtable - 1] = DirectFunctionCall1(namein,
-											  CStringGetDatum(oldtablename));
+																	 CStringGetDatum(oldtablename));
 	else
 		nulls[Anum_pg_trigger_tgoldtable - 1] = true;
 	if (newtablename)
 		values[Anum_pg_trigger_tgnewtable - 1] = DirectFunctionCall1(namein,
-											  CStringGetDatum(newtablename));
+																	 CStringGetDatum(newtablename));
 	else
 		nulls[Anum_pg_trigger_tgnewtable - 1] = true;
 
@@ -1080,9 +1080,9 @@ ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid)
 		MemoryContext oldContext;
 
 		ereport(NOTICE,
-		(errmsg("ignoring incomplete trigger group for constraint \"%s\" %s",
-				constr_name, buf.data),
-		 errdetail_internal("%s", _(funcdescr[funcnum]))));
+				(errmsg("ignoring incomplete trigger group for constraint \"%s\" %s",
+						constr_name, buf.data),
+				 errdetail_internal("%s", _(funcdescr[funcnum]))));
 		oldContext = MemoryContextSwitchTo(TopMemoryContext);
 		info = (OldTriggerInfo *) palloc0(sizeof(OldTriggerInfo));
 		info->args = copyObject(stmt->args);
@@ -1096,9 +1096,9 @@ ConvertTriggerToFK(CreateTrigStmt *stmt, Oid funcoid)
 	{
 		/* Second trigger of set */
 		ereport(NOTICE,
-		(errmsg("ignoring incomplete trigger group for constraint \"%s\" %s",
-				constr_name, buf.data),
-		 errdetail_internal("%s", _(funcdescr[funcnum]))));
+				(errmsg("ignoring incomplete trigger group for constraint \"%s\" %s",
+						constr_name, buf.data),
+				 errdetail_internal("%s", _(funcdescr[funcnum]))));
 	}
 	else
 	{
@@ -1574,8 +1574,8 @@ EnableDisableTrigger(Relation rel, const char *tgname,
 			if (!superuser())
 				ereport(ERROR,
 						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					  errmsg("permission denied: \"%s\" is a system trigger",
-							 NameStr(oldtrig->tgname))));
+						 errmsg("permission denied: \"%s\" is a system trigger",
+								NameStr(oldtrig->tgname))));
 		}
 
 		found = true;
@@ -1682,7 +1682,7 @@ RelationBuildTriggers(Relation relation)
 
 		build->tgoid = HeapTupleGetOid(htup);
 		build->tgname = DatumGetCString(DirectFunctionCall1(nameout,
-										 NameGetDatum(&pg_trigger->tgname)));
+															NameGetDatum(&pg_trigger->tgname)));
 		build->tgfoid = pg_trigger->tgfoid;
 		build->tgtype = pg_trigger->tgtype;
 		build->tgenabled = pg_trigger->tgenabled;
@@ -2035,7 +2035,7 @@ equalTriggerDescs(TriggerDesc *trigdesc1, TriggerDesc *trigdesc2)
 		return false;
 	return true;
 }
-#endif   /* NOT_USED */
+#endif							/* NOT_USED */
 
 /*
  * Call a trigger function.
@@ -2190,7 +2190,7 @@ ExecBSInsertTriggers(EState *estate, ResultRelInfo *relinfo)
 		if (newtuple)
 			ereport(ERROR,
 					(errcode(ERRCODE_E_R_I_E_TRIGGER_PROTOCOL_VIOLATED),
-				  errmsg("BEFORE STATEMENT trigger cannot return a value")));
+					 errmsg("BEFORE STATEMENT trigger cannot return a value")));
 	}
 }
 
@@ -2396,7 +2396,7 @@ ExecBSDeleteTriggers(EState *estate, ResultRelInfo *relinfo)
 		if (newtuple)
 			ereport(ERROR,
 					(errcode(ERRCODE_E_R_I_E_TRIGGER_PROTOCOL_VIOLATED),
-				  errmsg("BEFORE STATEMENT trigger cannot return a value")));
+					 errmsg("BEFORE STATEMENT trigger cannot return a value")));
 	}
 }
 
@@ -2607,7 +2607,7 @@ ExecBSUpdateTriggers(EState *estate, ResultRelInfo *relinfo)
 		if (newtuple)
 			ereport(ERROR,
 					(errcode(ERRCODE_E_R_I_E_TRIGGER_PROTOCOL_VIOLATED),
-				  errmsg("BEFORE STATEMENT trigger cannot return a value")));
+					 errmsg("BEFORE STATEMENT trigger cannot return a value")));
 	}
 }
 
@@ -2749,7 +2749,7 @@ ExecARUpdateTriggers(EState *estate, ResultRelInfo *relinfo,
 	TriggerDesc *trigdesc = relinfo->ri_TrigDesc;
 
 	if (trigdesc && (trigdesc->trig_update_after_row ||
-		 trigdesc->trig_update_old_table || trigdesc->trig_update_new_table))
+					 trigdesc->trig_update_old_table || trigdesc->trig_update_new_table))
 	{
 		HeapTuple	trigtuple;
 
@@ -2886,7 +2886,7 @@ ExecBSTruncateTriggers(EState *estate, ResultRelInfo *relinfo)
 		if (newtuple)
 			ereport(ERROR,
 					(errcode(ERRCODE_E_R_I_E_TRIGGER_PROTOCOL_VIOLATED),
-				  errmsg("BEFORE STATEMENT trigger cannot return a value")));
+					 errmsg("BEFORE STATEMENT trigger cannot return a value")));
 	}
 }
 
@@ -3061,7 +3061,7 @@ TriggerEnabled(EState *estate, ResultRelInfo *relinfo,
 			trigger->tgenabled == TRIGGER_DISABLED)
 			return false;
 	}
-	else	/* ORIGIN or LOCAL role */
+	else						/* ORIGIN or LOCAL role */
 	{
 		if (trigger->tgenabled == TRIGGER_FIRES_ON_REPLICA ||
 			trigger->tgenabled == TRIGGER_DISABLED)
@@ -3267,8 +3267,7 @@ typedef SetConstraintStateData *SetConstraintState;
  */
 typedef uint32 TriggerFlags;
 
-#define AFTER_TRIGGER_OFFSET			0x0FFFFFFF		/* must be low-order
-														 * bits */
+#define AFTER_TRIGGER_OFFSET			0x0FFFFFFF	/* must be low-order bits */
 #define AFTER_TRIGGER_DONE				0x10000000
 #define AFTER_TRIGGER_IN_PROGRESS		0x20000000
 /* bits describing the size and tuple sources of this event */
@@ -3302,13 +3301,13 @@ typedef struct AfterTriggerEventDataOneCtid
 {
 	TriggerFlags ate_flags;		/* status bits and offset to shared data */
 	ItemPointerData ate_ctid1;	/* inserted, deleted, or old updated tuple */
-}	AfterTriggerEventDataOneCtid;
+}			AfterTriggerEventDataOneCtid;
 
 /* AfterTriggerEventData, minus ate_ctid1 and ate_ctid2 */
 typedef struct AfterTriggerEventDataZeroCtids
 {
 	TriggerFlags ate_flags;		/* status bits and offset to shared data */
-}	AfterTriggerEventDataZeroCtids;
+}			AfterTriggerEventDataZeroCtids;
 
 #define SizeofTriggerEvent(evt) \
 	(((evt)->ate_flags & AFTER_TRIGGER_TUP_BITS) == AFTER_TRIGGER_2CTID ? \
@@ -3329,7 +3328,7 @@ typedef struct AfterTriggerEventDataZeroCtids
  */
 typedef struct AfterTriggerEventChunk
 {
-	struct AfterTriggerEventChunk *next;		/* list link */
+	struct AfterTriggerEventChunk *next;	/* list link */
 	char	   *freeptr;		/* start of free space in chunk */
 	char	   *endfree;		/* end of free space in chunk */
 	char	   *endptr;			/* end of chunk */
@@ -3421,7 +3420,7 @@ typedef struct AfterTriggersData
 {
 	CommandId	firing_counter; /* next firing ID to assign */
 	SetConstraintState state;	/* the active S C state */
-	AfterTriggerEventList events;		/* deferred-event list */
+	AfterTriggerEventList events;	/* deferred-event list */
 	int			query_depth;	/* current query list index */
 	AfterTriggerEventList *query_stack; /* events pending from each query */
 	Tuplestorestate **fdw_tuplestores;	/* foreign tuples for one row from
@@ -3434,7 +3433,7 @@ typedef struct AfterTriggersData
 	/* these fields are just for resetting at subtrans abort: */
 
 	SetConstraintState *state_stack;	/* stacked S C states */
-	AfterTriggerEventList *events_stack;		/* stacked list pointers */
+	AfterTriggerEventList *events_stack;	/* stacked list pointers */
 	int		   *depth_stack;	/* stacked query_depths */
 	CommandId  *firing_stack;	/* stacked firing_counters */
 	int			maxtransdepth;	/* allocated len of above arrays */
@@ -4070,7 +4069,7 @@ afterTriggerInvokeEvents(AfterTriggerEventList *events,
 						slot1 = MakeSingleTupleTableSlot(rel->rd_att);
 						slot2 = MakeSingleTupleTableSlot(rel->rd_att);
 					}
-					if (trigdesc == NULL)		/* should not happen */
+					if (trigdesc == NULL)	/* should not happen */
 						elog(ERROR, "relation %u has no triggers",
 							 evtshared->ats_relid);
 				}
@@ -4144,7 +4143,7 @@ AfterTriggerBeginXact(void)
 	/*
 	 * Initialize after-trigger state structure to empty
 	 */
-	afterTriggers.firing_counter = (CommandId) 1;		/* mustn't be 0 */
+	afterTriggers.firing_counter = (CommandId) 1;	/* mustn't be 0 */
 	afterTriggers.query_depth = -1;
 
 	/*
@@ -4834,7 +4833,7 @@ AfterTriggerSetState(ConstraintsSetStmt *stmt)
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cross-database references are not implemented: \"%s.%s.%s\"",
-							 constraint->catalogname, constraint->schemaname,
+									constraint->catalogname, constraint->schemaname,
 									constraint->relname)));
 			}
 
@@ -5194,8 +5193,8 @@ AfterTriggerSaveEvent(EState *estate, ResultRelInfo *relinfo,
 
 		/* If transition tables are the only reason we're here, return. */
 		if ((event == TRIGGER_EVENT_DELETE && !trigdesc->trig_delete_after_row) ||
-		(event == TRIGGER_EVENT_INSERT && !trigdesc->trig_insert_after_row) ||
-		 (event == TRIGGER_EVENT_UPDATE && !trigdesc->trig_update_after_row))
+			(event == TRIGGER_EVENT_INSERT && !trigdesc->trig_insert_after_row) ||
+			(event == TRIGGER_EVENT_UPDATE && !trigdesc->trig_update_after_row))
 			return;
 	}
 

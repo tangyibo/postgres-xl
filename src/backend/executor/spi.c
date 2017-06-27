@@ -43,7 +43,7 @@ int			SPI_result;
 
 static _SPI_connection *_SPI_stack = NULL;
 static _SPI_connection *_SPI_current = NULL;
-static int	_SPI_stack_depth = 0;		/* allocated size of _SPI_stack */
+static int	_SPI_stack_depth = 0;	/* allocated size of _SPI_stack */
 static int	_SPI_connected = -1;	/* current stack index */
 
 static Portal SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
@@ -123,7 +123,7 @@ SPI_connect(void)
 	_SPI_current->lastoid = InvalidOid;
 	_SPI_current->tuptable = NULL;
 	slist_init(&_SPI_current->tuptables);
-	_SPI_current->procCxt = NULL;		/* in case we fail to create 'em */
+	_SPI_current->procCxt = NULL;	/* in case we fail to create 'em */
 	_SPI_current->execCxt = NULL;
 	_SPI_current->connectSubid = GetCurrentSubTransactionId();
 	_SPI_current->queryEnv = NULL;
@@ -153,7 +153,7 @@ SPI_finish(void)
 {
 	int			res;
 
-	res = _SPI_begin_call(false);		/* live in procedure memory */
+	res = _SPI_begin_call(false);	/* live in procedure memory */
 	if (res < 0)
 		return res;
 
@@ -645,7 +645,7 @@ SPI_saveplan(SPIPlanPtr plan)
 		return NULL;
 	}
 
-	SPI_result = _SPI_begin_call(false);		/* don't change context */
+	SPI_result = _SPI_begin_call(false);	/* don't change context */
 	if (SPI_result < 0)
 		return NULL;
 
@@ -1285,7 +1285,7 @@ SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
 	if (!(portal->cursorOptions & (CURSOR_OPT_SCROLL | CURSOR_OPT_NO_SCROLL)))
 	{
 		if (list_length(stmt_list) == 1 &&
-		 linitial_node(PlannedStmt, stmt_list)->commandType != CMD_UTILITY &&
+			linitial_node(PlannedStmt, stmt_list)->commandType != CMD_UTILITY &&
 			linitial_node(PlannedStmt, stmt_list)->rowMarks == NIL &&
 			ExecSupportsBackwardScan(linitial_node(PlannedStmt, stmt_list)->planTree))
 			portal->cursorOptions |= CURSOR_OPT_SCROLL;
@@ -1301,7 +1301,7 @@ SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
 	if (portal->cursorOptions & CURSOR_OPT_SCROLL)
 	{
 		if (list_length(stmt_list) == 1 &&
-		 linitial_node(PlannedStmt, stmt_list)->commandType != CMD_UTILITY &&
+			linitial_node(PlannedStmt, stmt_list)->commandType != CMD_UTILITY &&
 			linitial_node(PlannedStmt, stmt_list)->rowMarks != NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -1334,8 +1334,8 @@ SPI_cursor_open_internal(const char *name, SPIPlanPtr plan,
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					/* translator: %s is a SQL statement name */
-					   errmsg("%s is not allowed in a non-volatile function",
-							  CreateCommandTag((Node *) pstmt))));
+							 errmsg("%s is not allowed in a non-volatile function",
+									CreateCommandTag((Node *) pstmt))));
 				else
 					PreventCommandIfParallelMode(CreateCommandTag((Node *) pstmt));
 			}
@@ -1768,7 +1768,7 @@ spi_printtup(TupleTableSlot *slot, DestReceiver *self)
 		tuptable->free = tuptable->alloced;
 		tuptable->alloced += tuptable->free;
 		tuptable->vals = (HeapTuple *) repalloc_huge(tuptable->vals,
-									  tuptable->alloced * sizeof(HeapTuple));
+													 tuptable->alloced * sizeof(HeapTuple));
 	}
 
 	tuptable->vals[tuptable->alloced - tuptable->free] =
@@ -1890,7 +1890,7 @@ _SPI_pgxc_prepare_plan(const char *src, List *src_parsetree, SPIPlanPtr plan)
 						   plan->parserSetup,
 						   plan->parserSetupArg,
 						   plan->cursor_options,
-						   false);		/* not fixed result */
+						   false);	/* not fixed result */
 
 		plancache_list = lappend(plancache_list, plansource);
 	}
@@ -1957,7 +1957,7 @@ _SPI_prepare_oneshot_plan(const char *src, SPIPlanPtr plan)
 
 		plansource = CreateOneShotCachedPlan(parsetree,
 											 src,
-										  CreateCommandTag(parsetree->stmt));
+											 CreateCommandTag(parsetree->stmt));
 
 		plancache_list = lappend(plancache_list, plansource);
 	}
@@ -2068,8 +2068,8 @@ _SPI_execute_plan(SPIPlanPtr plan, ParamListInfo paramLI,
 				stmt_list = pg_analyze_and_rewrite_params(parsetree,
 														  src,
 														  plan->parserSetup,
-														plan->parserSetupArg,
-													 _SPI_current->queryEnv);
+														  plan->parserSetupArg,
+														  _SPI_current->queryEnv);
 			}
 			else
 			{
@@ -2144,8 +2144,8 @@ _SPI_execute_plan(SPIPlanPtr plan, ParamListInfo paramLI,
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				/* translator: %s is a SQL statement name */
-					   errmsg("%s is not allowed in a non-volatile function",
-							  CreateCommandTag((Node *) stmt))));
+						 errmsg("%s is not allowed in a non-volatile function",
+								CreateCommandTag((Node *) stmt))));
 
 			if (IsInParallelMode() && !CommandIsReadOnly(stmt))
 				PreventCommandIfParallelMode(CreateCommandTag((Node *) stmt));
@@ -2749,7 +2749,7 @@ SPI_register_relation(EphemeralNamedRelation enr)
 	if (enr == NULL || enr->md.name == NULL)
 		return SPI_ERROR_ARGUMENT;
 
-	res = _SPI_begin_call(false);		/* keep current memory context */
+	res = _SPI_begin_call(false);	/* keep current memory context */
 	if (res < 0)
 		return res;
 
@@ -2783,7 +2783,7 @@ SPI_unregister_relation(const char *name)
 	if (name == NULL)
 		return SPI_ERROR_ARGUMENT;
 
-	res = _SPI_begin_call(false);		/* keep current memory context */
+	res = _SPI_begin_call(false);	/* keep current memory context */
 	if (res < 0)
 		return res;
 

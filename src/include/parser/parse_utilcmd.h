@@ -38,4 +38,4 @@ extern bool CheckLocalIndexColumn (char loctype, char *partcolname, char *indexc
 extern PartitionBoundSpec *transformPartitionBound(ParseState *pstate, Relation parent,
 						PartitionBoundSpec *spec);
 
-#endif   /* PARSE_UTILCMD_H */
+#endif							/* PARSE_UTILCMD_H */

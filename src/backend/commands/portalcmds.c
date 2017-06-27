@@ -513,7 +513,7 @@ PersistHoldablePortal(Portal portal)
 		/*
 		 * Now shut down the inner executor.
 		 */
-		portal->queryDesc = NULL;		/* prevent double shutdown */
+		portal->queryDesc = NULL;	/* prevent double shutdown */
 		ExecutorFinish(queryDesc);
 		ExecutorEnd(queryDesc);
 		FreeQueryDesc(queryDesc);

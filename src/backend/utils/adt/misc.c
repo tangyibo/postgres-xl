@@ -313,7 +313,7 @@ pg_terminate_backend(PG_FUNCTION_ARGS)
 	if (r == SIGNAL_BACKEND_NOSUPERUSER)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-			(errmsg("must be a superuser to terminate superuser process"))));
+				 (errmsg("must be a superuser to terminate superuser process"))));
 
 	if (r == SIGNAL_BACKEND_NOPERMISSION)
 		ereport(ERROR,
@@ -355,7 +355,7 @@ pg_rotate_logfile(PG_FUNCTION_ARGS)
 	if (!Logging_collector)
 	{
 		ereport(WARNING,
-		(errmsg("rotation not possible because log collection not active")));
+				(errmsg("rotation not possible because log collection not active")));
 		PG_RETURN_BOOL(false);
 	}
 
@@ -422,7 +422,7 @@ pg_tablespace_databases(PG_FUNCTION_ARGS)
 							 errmsg("could not open directory \"%s\": %m",
 									fctx->location)));
 				ereport(WARNING,
-					  (errmsg("%u is not a tablespace OID", tablespaceOid)));
+						(errmsg("%u is not a tablespace OID", tablespaceOid)));
 			}
 		}
 		funcctx->user_fctx = fctx;
@@ -801,9 +801,9 @@ parse_ident(PG_FUNCTION_ARGS)
 				if (endp == NULL)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						   errmsg("string is not a valid identifier: \"%s\"",
-								  text_to_cstring(qualname)),
-						   errdetail("String has unclosed double quotes.")));
+							 errmsg("string is not a valid identifier: \"%s\"",
+									text_to_cstring(qualname)),
+							 errdetail("String has unclosed double quotes.")));
 				if (endp[1] != '"')
 					break;
 				memmove(endp, endp + 1, strlen(endp));
@@ -964,7 +964,7 @@ pg_current_logfile(PG_FUNCTION_ARGS)
 		{
 			/* Uh oh.  No newline found, so file content is corrupted. */
 			elog(ERROR,
-			   "missing newline character in \"%s\"", LOG_METAINFO_DATAFILE);
+				 "missing newline character in \"%s\"", LOG_METAINFO_DATAFILE);
 			break;
 		}
 		*nlpos = '\0';

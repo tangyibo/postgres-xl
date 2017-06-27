@@ -96,7 +96,7 @@ shm_toc_allocate(shm_toc *toc, Size nbytes)
 	total_bytes = vtoc->toc_total_bytes;
 	allocated_bytes = vtoc->toc_allocated_bytes;
 	nentry = vtoc->toc_nentry;
-	toc_bytes = offsetof(shm_toc, toc_entry) +nentry * sizeof(shm_toc_entry)
+	toc_bytes = offsetof(shm_toc, toc_entry) + nentry * sizeof(shm_toc_entry)
 		+ allocated_bytes;
 
 	/* Check for memory exhaustion and overflow. */
@@ -132,7 +132,7 @@ shm_toc_freespace(shm_toc *toc)
 	nentry = vtoc->toc_nentry;
 	SpinLockRelease(&toc->toc_mutex);
 
-	toc_bytes = offsetof(shm_toc, toc_entry) +nentry * sizeof(shm_toc_entry);
+	toc_bytes = offsetof(shm_toc, toc_entry) + nentry * sizeof(shm_toc_entry);
 	Assert(allocated_bytes + BUFFERALIGN(toc_bytes) <= total_bytes);
 	return total_bytes - (allocated_bytes + BUFFERALIGN(toc_bytes));
 }
@@ -176,7 +176,7 @@ shm_toc_insert(shm_toc *toc, uint64 key, void *address)
 	total_bytes = vtoc->toc_total_bytes;
 	allocated_bytes = vtoc->toc_allocated_bytes;
 	nentry = vtoc->toc_nentry;
-	toc_bytes = offsetof(shm_toc, toc_entry) +nentry * sizeof(shm_toc_entry)
+	toc_bytes = offsetof(shm_toc, toc_entry) + nentry * sizeof(shm_toc_entry)
 		+ allocated_bytes;
 
 	/* Check for memory exhaustion and overflow. */
@@ -253,6 +253,6 @@ Size
 shm_toc_estimate(shm_toc_estimator *e)
 {
 	return add_size(offsetof(shm_toc, toc_entry),
-				 add_size(mul_size(e->number_of_keys, sizeof(shm_toc_entry)),
-						  e->space_for_chunks));
+					add_size(mul_size(e->number_of_keys, sizeof(shm_toc_entry)),
+							 e->space_for_chunks));
 }

@@ -147,14 +147,14 @@ static Expr *inline_function(Oid funcid, Oid result_type, Oid result_collid,
 static Node *substitute_actual_parameters(Node *expr, int nargs, List *args,
 							 int *usecounts);
 static Node *substitute_actual_parameters_mutator(Node *node,
-							  substitute_actual_parameters_context *context);
+									 substitute_actual_parameters_context *context);
 static void sql_inline_error_callback(void *arg);
 static Expr *evaluate_expr(Expr *expr, Oid result_type, int32 result_typmod,
 			  Oid result_collation);
 static Query *substitute_actual_srf_parameters(Query *expr,
 								 int nargs, List *args);
 static Node *substitute_actual_srf_parameters_mutator(Node *node,
-						  substitute_actual_srf_parameters_context *context);
+										 substitute_actual_srf_parameters_context *context);
 static bool tlist_matches_coltypelist(List *tlist, List *coltypelist);
 
 
@@ -1011,7 +1011,7 @@ contain_volatile_functions_not_nextval_walker(Node *node, void *context)
 		return false;
 	/* Check for volatile functions in node itself */
 	if (check_functions_in_node(node,
-							  contain_volatile_functions_not_nextval_checker,
+								contain_volatile_functions_not_nextval_checker,
 								context))
 		return true;
 
@@ -1026,11 +1026,11 @@ contain_volatile_functions_not_nextval_walker(Node *node, void *context)
 	{
 		/* Recurse into subselects */
 		return query_tree_walker((Query *) node,
-							   contain_volatile_functions_not_nextval_walker,
+								 contain_volatile_functions_not_nextval_walker,
 								 context, 0);
 	}
 	return expression_tree_walker(node,
-							   contain_volatile_functions_not_nextval_walker,
+								  contain_volatile_functions_not_nextval_walker,
 								  context);
 }
 
@@ -1399,7 +1399,7 @@ contain_context_dependent_node(Node *clause)
 	return contain_context_dependent_node_walker(clause, &flags);
 }
 
-#define CCDN_IN_CASEEXPR	0x0001		/* CaseTestExpr okay here? */
+#define CCDN_IN_CASEEXPR	0x0001	/* CaseTestExpr okay here? */
 
 static bool
 contain_context_dependent_node_walker(Node *node, int *flags)
@@ -1432,7 +1432,7 @@ contain_context_dependent_node_walker(Node *node, int *flags)
 			 */
 			*flags |= CCDN_IN_CASEEXPR;
 			res = expression_tree_walker(node,
-									   contain_context_dependent_node_walker,
+										 contain_context_dependent_node_walker,
 										 (void *) flags);
 			*flags = save_flags;
 			return res;
@@ -2434,7 +2434,7 @@ estimate_expression_value(PlannerInfo *root, Node *node)
 {
 	eval_const_expressions_context context;
 
-	context.boundParams = root->glob->boundParams;		/* bound Params */
+	context.boundParams = root->glob->boundParams;	/* bound Params */
 	/* we do not need to mark the plan as depending on inlined functions */
 	context.root = NULL;
 	context.active_fns = NIL;	/* nothing being recursively simplified */
@@ -2675,7 +2675,7 @@ eval_const_expressions_mutator(Node *node,
 				 * self.
 				 */
 				args = (List *) expression_tree_mutator((Node *) expr->args,
-											  eval_const_expressions_mutator,
+														eval_const_expressions_mutator,
 														(void *) context);
 
 				/*
@@ -2712,8 +2712,8 @@ eval_const_expressions_mutator(Node *node,
 					 * Need to get OID of underlying function.  Okay to
 					 * scribble on input to this extent.
 					 */
-					set_opfuncid((OpExpr *) expr);		/* rely on struct
-														 * equivalence */
+					set_opfuncid((OpExpr *) expr);	/* rely on struct
+													 * equivalence */
 
 					/*
 					 * Code for op/func reduction is pretty bulky, so split it
@@ -2943,7 +2943,7 @@ eval_const_expressions_mutator(Node *node,
 												-1,
 												InvalidOid,
 												sizeof(Oid),
-											  ObjectIdGetDatum(intypioparam),
+												ObjectIdGetDatum(intypioparam),
 												false,
 												true),
 									  makeConst(INT4OID,
@@ -3009,7 +3009,7 @@ eval_const_expressions_mutator(Node *node,
 				 */
 				if (arg && IsA(arg, Const) &&
 					(!OidIsValid(newexpr->elemfuncid) ||
-				func_volatile(newexpr->elemfuncid) == PROVOLATILE_IMMUTABLE))
+					 func_volatile(newexpr->elemfuncid) == PROVOLATILE_IMMUTABLE))
 					return (Node *) evaluate_expr((Expr *) newexpr,
 												  newexpr->resulttype,
 												  newexpr->resulttypmod,
@@ -3114,7 +3114,7 @@ eval_const_expressions_mutator(Node *node,
 				if (newarg && IsA(newarg, Const))
 				{
 					context->case_val = newarg;
-					newarg = NULL;		/* not needed anymore, see above */
+					newarg = NULL;	/* not needed anymore, see above */
 				}
 				else
 					context->case_val = NULL;
@@ -3286,7 +3286,7 @@ eval_const_expressions_mutator(Node *node,
 				if (newargs == NIL)
 					return (Node *) makeNullConst(coalesceexpr->coalescetype,
 												  -1,
-											   coalesceexpr->coalescecollid);
+												  coalesceexpr->coalescecollid);
 
 				newcoalesce = makeNode(CoalesceExpr);
 				newcoalesce->coalescetype = coalesceexpr->coalescetype;
@@ -3365,7 +3365,7 @@ eval_const_expressions_mutator(Node *node,
 						fselect->fieldnum <= list_length(rowexpr->args))
 					{
 						Node	   *fld = (Node *) list_nth(rowexpr->args,
-													  fselect->fieldnum - 1);
+															fselect->fieldnum - 1);
 
 						if (rowtype_field_matches(rowexpr->row_typeid,
 												  fselect->fieldnum,
@@ -3463,7 +3463,7 @@ eval_const_expressions_mutator(Node *node,
 						default:
 							elog(ERROR, "unrecognized nulltesttype: %d",
 								 (int) ntest->nulltesttype);
-							result = false;		/* keep compiler quiet */
+							result = false; /* keep compiler quiet */
 							break;
 					}
 
@@ -3517,7 +3517,7 @@ eval_const_expressions_mutator(Node *node,
 						default:
 							elog(ERROR, "unrecognized booltesttype: %d",
 								 (int) btest->booltesttype);
-							result = false;		/* keep compiler quiet */
+							result = false; /* keep compiler quiet */
 							break;
 					}
 
@@ -3900,7 +3900,7 @@ simplify_function(Oid funcid, Oid result_type, int32 result_typmod,
 	{
 		args = expand_function_arguments(args, result_type, func_tuple);
 		args = (List *) expression_tree_mutator((Node *) args,
-											  eval_const_expressions_mutator,
+												eval_const_expressions_mutator,
 												(void *) context);
 		/* Argument processing done, give it back to the caller */
 		*args_p = args;
@@ -4263,7 +4263,7 @@ evaluate_function(Oid funcid, Oid result_type, int32 result_typmod,
 	newexpr->funcretset = false;
 	newexpr->funcvariadic = funcvariadic;
 	newexpr->funcformat = COERCE_EXPLICIT_CALL; /* doesn't matter */
-	newexpr->funccollid = result_collid;		/* doesn't matter */
+	newexpr->funccollid = result_collid;	/* doesn't matter */
 	newexpr->inputcollid = input_collid;
 	newexpr->args = args;
 	newexpr->location = -1;
@@ -4623,7 +4623,7 @@ substitute_actual_parameters(Node *expr, int nargs, List *args,
 
 static Node *
 substitute_actual_parameters_mutator(Node *node,
-							   substitute_actual_parameters_context *context)
+									 substitute_actual_parameters_context *context)
 {
 	if (node == NULL)
 		return NULL;
@@ -4943,7 +4943,7 @@ inline_set_returning_function(PlannerInfo *root, RangeTblEntry *rte)
 
 	querytree_list = pg_analyze_and_rewrite_params(linitial(raw_parsetree_list),
 												   src,
-									   (ParserSetupHook) sql_fn_parser_setup,
+												   (ParserSetupHook) sql_fn_parser_setup,
 												   pinfo, NULL);
 	if (list_length(querytree_list) != 1)
 		goto fail;
@@ -5066,7 +5066,7 @@ substitute_actual_srf_parameters(Query *expr, int nargs, List *args)
 
 static Node *
 substitute_actual_srf_parameters_mutator(Node *node,
-						   substitute_actual_srf_parameters_context *context)
+										 substitute_actual_srf_parameters_context *context)
 {
 	Node	   *result;
 
@@ -5076,7 +5076,7 @@ substitute_actual_srf_parameters_mutator(Node *node,
 	{
 		context->sublevels_up++;
 		result = (Node *) query_tree_mutator((Query *) node,
-									substitute_actual_srf_parameters_mutator,
+											 substitute_actual_srf_parameters_mutator,
 											 (void *) context,
 											 0);
 		context->sublevels_up--;

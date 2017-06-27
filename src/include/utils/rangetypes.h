@@ -40,8 +40,8 @@ typedef struct
 #define RANGE_UB_INF		0x10	/* upper bound is +infinity */
 #define RANGE_LB_NULL		0x20	/* lower bound is null (NOT USED) */
 #define RANGE_UB_NULL		0x40	/* upper bound is null (NOT USED) */
-#define RANGE_CONTAIN_EMPTY 0x80/* marks a GiST internal-page entry whose
-								 * subtree contains some empty ranges */
+#define RANGE_CONTAIN_EMPTY 0x80	/* marks a GiST internal-page entry whose
+									 * subtree contains some empty ranges */
 
 #define RANGE_HAS_LBOUND(flags) (!((flags) & (RANGE_EMPTY | \
 											  RANGE_LB_NULL | \
@@ -136,4 +136,4 @@ extern bool bounds_adjacent(TypeCacheEntry *typcache, RangeBound bound1,
 				RangeBound bound2);
 extern RangeType *make_empty_range(TypeCacheEntry *typcache);
 
-#endif   /* RANGETYPES_H */
+#endif							/* RANGETYPES_H */

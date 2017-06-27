@@ -142,7 +142,7 @@ old_9_3_check_for_line_data_type_usage(ClusterInfo *cluster)
 								"		c.relnamespace = n.oid AND "
 		/* exclude possible orphaned temp tables */
 								"		n.nspname !~ '^pg_temp_' AND "
-						 "		n.nspname !~ '^pg_toast_temp_' AND "
+								"		n.nspname !~ '^pg_toast_temp_' AND "
 								"		n.nspname NOT IN ('pg_catalog', 'information_schema')");
 
 		ntups = PQntuples(res);
@@ -243,7 +243,7 @@ old_9_6_check_for_unknown_data_type_usage(ClusterInfo *cluster)
 								"		c.relnamespace = n.oid AND "
 		/* exclude possible orphaned temp tables */
 								"		n.nspname !~ '^pg_temp_' AND "
-						 "		n.nspname !~ '^pg_toast_temp_' AND "
+								"		n.nspname !~ '^pg_toast_temp_' AND "
 								"		n.nspname NOT IN ('pg_catalog', 'information_schema')");
 
 		ntups = PQntuples(res);
@@ -393,7 +393,7 @@ old_9_6_invalidate_hash_indexes(ClusterInfo *cluster, bool check_mode)
 				   "reindexed with the REINDEX command.  The file:\n"
 				   "    %s\n"
 				   "when executed by psql by the database superuser will recreate all invalid\n"
-			  "indexes; until then, none of these indexes will be used.\n\n",
+				   "indexes; until then, none of these indexes will be used.\n\n",
 				   output_path);
 	}
 	else

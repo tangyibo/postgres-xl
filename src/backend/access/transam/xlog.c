@@ -89,8 +89,8 @@ extern uint32 bootstrap_data_checksum_version;
 
 
 /* User-settable parameters */
-int			max_wal_size_mb = 1024;		/* 1 GB */
-int			min_wal_size_mb = 80;		/* 80 MB */
+int			max_wal_size_mb = 1024; /* 1 GB */
+int			min_wal_size_mb = 80;	/* 80 MB */
 int			wal_keep_segments = 0;
 int			XLOGbuffers = -1;
 int			XLogArchiveTimeout = 0;
@@ -586,8 +586,7 @@ typedef struct XLogCtlData
 	XLogRecPtr	asyncXactLSN;	/* LSN of newest async commit/abort */
 	XLogRecPtr	replicationSlotMinLSN;	/* oldest LSN needed by any slot */
 
-	XLogSegNo	lastRemovedSegNo;		/* latest removed/recycled XLOG
-										 * segment */
+	XLogSegNo	lastRemovedSegNo;	/* latest removed/recycled XLOG segment */
 
 	/* Fake LSN counter, for unlogged relations. Protected by ulsn_lck. */
 	XLogRecPtr	unloggedLSN;
@@ -788,7 +787,7 @@ static int	readFile = -1;
 static XLogSegNo readSegNo = 0;
 static uint32 readOff = 0;
 static uint32 readLen = 0;
-static XLogSource readSource = 0;		/* XLOG_FROM_* code */
+static XLogSource readSource = 0;	/* XLOG_FROM_* code */
 
 /*
  * Keeps track of which source we're currently reading from. This is
@@ -816,14 +815,14 @@ typedef struct XLogPageReadPrivate
  * XLogReceiptSource tracks where we last successfully read some WAL.)
  */
 static TimestampTz XLogReceiptTime = 0;
-static XLogSource XLogReceiptSource = 0;		/* XLOG_FROM_* code */
+static XLogSource XLogReceiptSource = 0;	/* XLOG_FROM_* code */
 
 /* State information for XLOG reading */
 static XLogRecPtr ReadRecPtr;	/* start of last record read */
 static XLogRecPtr EndRecPtr;	/* end+1 of last record read */
 
-static XLogRecPtr minRecoveryPoint;		/* local copy of
-										 * ControlFile->minRecoveryPoint */
+static XLogRecPtr minRecoveryPoint; /* local copy of
+									 * ControlFile->minRecoveryPoint */
 static TimeLineID minRecoveryPointTLI;
 static bool updateMinRecoveryPoint = true;
 
@@ -1437,7 +1436,7 @@ checkXLogConsistency(XLogReaderState *record)
 		if (memcmp(replay_image_masked, master_image_masked, BLCKSZ) != 0)
 		{
 			elog(FATAL,
-			   "inconsistent page found, rel %u/%u/%u, forknum %u, blkno %u",
+				 "inconsistent page found, rel %u/%u/%u, forknum %u, blkno %u",
 				 rnode.spcNode, rnode.dbNode, rnode.relNode,
 				 forknum, blkno);
 		}
@@ -1682,7 +1681,7 @@ WALInsertLockUpdateInsertingAt(XLogRecPtr insertingAt)
 		 * WALInsertLockAcquireExclusive.
 		 */
 		LWLockUpdateVar(&WALInsertLocks[NUM_XLOGINSERT_LOCKS - 1].l.lock,
-					 &WALInsertLocks[NUM_XLOGINSERT_LOCKS - 1].l.insertingAt,
+						&WALInsertLocks[NUM_XLOGINSERT_LOCKS - 1].l.insertingAt,
 						insertingAt);
 	}
 	else
@@ -2024,7 +2023,7 @@ XLogRecPtrToBytePos(XLogRecPtr ptr)
 	{
 		result = fullsegs * UsableBytesInSegment +
 			(XLOG_BLCKSZ - SizeOfXLogLongPHD) + /* account for first page */
-			(fullpages - 1) * UsableBytesInPage;		/* full pages */
+			(fullpages - 1) * UsableBytesInPage;	/* full pages */
 		if (offset > 0)
 		{
 			Assert(offset >= SizeOfXLogShortPHD);
@@ -2457,9 +2456,9 @@ XLogWrite(XLogwrtRqst WriteRqst, bool flexible)
 				if (lseek(openLogFile, (off_t) startoffset, SEEK_SET) < 0)
 					ereport(PANIC,
 							(errcode_for_file_access(),
-					 errmsg("could not seek in log file %s to offset %u: %m",
-							XLogFileNameP(ThisTimeLineID, openLogSegNo),
-							startoffset)));
+							 errmsg("could not seek in log file %s to offset %u: %m",
+									XLogFileNameP(ThisTimeLineID, openLogSegNo),
+									startoffset)));
 				openLogOff = startoffset;
 			}
 
@@ -2481,7 +2480,7 @@ XLogWrite(XLogwrtRqst WriteRqst, bool flexible)
 							(errcode_for_file_access(),
 							 errmsg("could not write to log file %s "
 									"at offset %u, length %zu: %m",
-								 XLogFileNameP(ThisTimeLineID, openLogSegNo),
+									XLogFileNameP(ThisTimeLineID, openLogSegNo),
 									openLogOff, nbytes)));
 				}
 				nleft -= written;
@@ -2512,7 +2511,7 @@ XLogWrite(XLogwrtRqst WriteRqst, bool flexible)
 				/* signal that we need to wakeup walsenders later */
 				WalSndWakeupRequest();
 
-				LogwrtResult.Flush = LogwrtResult.Write;		/* end of page */
+				LogwrtResult.Flush = LogwrtResult.Write;	/* end of page */
 
 				if (XLogArchivingActive())
 					XLogArchiveNotifySeg(openLogSegNo);
@@ -2728,7 +2727,7 @@ UpdateMinRecoveryPoint(XLogRecPtr lsn, bool force)
 
 		if (!force && newMinRecoveryPoint < lsn)
 			elog(WARNING,
-			   "xlog min recovery request %X/%X is past current point %X/%X",
+				 "xlog min recovery request %X/%X is past current point %X/%X",
 				 (uint32) (lsn >> 32), (uint32) lsn,
 				 (uint32) (newMinRecoveryPoint >> 32),
 				 (uint32) newMinRecoveryPoint);
@@ -2743,10 +2742,10 @@ UpdateMinRecoveryPoint(XLogRecPtr lsn, bool force)
 			minRecoveryPointTLI = newMinRecoveryPointTLI;
 
 			ereport(DEBUG2,
-				(errmsg("updated min recovery point to %X/%X on timeline %u",
-						(uint32) (minRecoveryPoint >> 32),
-						(uint32) minRecoveryPoint,
-						newMinRecoveryPointTLI)));
+					(errmsg("updated min recovery point to %X/%X on timeline %u",
+							(uint32) (minRecoveryPoint >> 32),
+							(uint32) minRecoveryPoint,
+							newMinRecoveryPointTLI)));
 		}
 	}
 	LWLockRelease(ControlFileLock);
@@ -2786,7 +2785,7 @@ XLogFlush(XLogRecPtr record)
 		elog(LOG, "xlog flush request %X/%X; write %X/%X; flush %X/%X",
 			 (uint32) (record >> 32), (uint32) record,
 			 (uint32) (LogwrtResult.Write >> 32), (uint32) LogwrtResult.Write,
-		   (uint32) (LogwrtResult.Flush >> 32), (uint32) LogwrtResult.Flush);
+			 (uint32) (LogwrtResult.Flush >> 32), (uint32) LogwrtResult.Flush);
 #endif
 
 	START_CRIT_SECTION();
@@ -2918,9 +2917,9 @@ XLogFlush(XLogRecPtr record)
 	 */
 	if (LogwrtResult.Flush < record)
 		elog(ERROR,
-		"xlog flush request %X/%X is not satisfied --- flushed only to %X/%X",
+			 "xlog flush request %X/%X is not satisfied --- flushed only to %X/%X",
 			 (uint32) (record >> 32), (uint32) record,
-		   (uint32) (LogwrtResult.Flush >> 32), (uint32) LogwrtResult.Flush);
+			 (uint32) (LogwrtResult.Flush >> 32), (uint32) LogwrtResult.Flush);
 }
 
 /*
@@ -3037,7 +3036,7 @@ XLogBackgroundFlush(void)
 			 (uint32) (WriteRqst.Write >> 32), (uint32) WriteRqst.Write,
 			 (uint32) (WriteRqst.Flush >> 32), (uint32) WriteRqst.Flush,
 			 (uint32) (LogwrtResult.Write >> 32), (uint32) LogwrtResult.Write,
-		   (uint32) (LogwrtResult.Flush >> 32), (uint32) LogwrtResult.Flush);
+			 (uint32) (LogwrtResult.Flush >> 32), (uint32) LogwrtResult.Flush);
 #endif
 
 	START_CRIT_SECTION();
@@ -3536,7 +3535,7 @@ XLogFileOpen(XLogSegNo segno)
 	if (fd < 0)
 		ereport(PANIC,
 				(errcode_for_file_access(),
-			errmsg("could not open write-ahead log file \"%s\": %m", path)));
+				 errmsg("could not open write-ahead log file \"%s\": %m", path)));
 
 	return fd;
 }
@@ -3979,7 +3978,7 @@ RemoveXlogFile(const char *segname, XLogRecPtr PriorRedoPtr, XLogRecPtr endptr)
 	/*
 	 * Initialize info about where to try to recycle to.
 	 */
-	XLByteToPrevSeg(endptr, endlogSegNo);
+	XLByteToSeg(endptr, endlogSegNo);
 	if (PriorRedoPtr == InvalidXLogRecPtr)
 		recycleSegNo = endlogSegNo + 10;
 	else
@@ -4030,8 +4029,8 @@ RemoveXlogFile(const char *segname, XLogRecPtr PriorRedoPtr, XLogRecPtr endptr)
 		{
 			ereport(LOG,
 					(errcode_for_file_access(),
-			   errmsg("could not rename old write-ahead log file \"%s\": %m",
-					  path)));
+					 errmsg("could not rename old write-ahead log file \"%s\": %m",
+							path)));
 			return;
 		}
 		rc = durable_unlink(newpath, LOG);
@@ -4136,7 +4135,7 @@ CleanupBackupHistory(void)
 /*
  * Attempt to read an XLOG record.
  *
- * If RecPtr is not NULL, try to read a record at that position.  Otherwise
+ * If RecPtr is valid, try to read a record at that position.  Otherwise
  * try to read a record just after the last one previously read.
  *
  * If no valid record is available, returns NULL, or fails if emode is PANIC.
@@ -4185,7 +4184,7 @@ ReadRecord(XLogReaderState *xlogreader, XLogRecPtr RecPtr, int emode,
 			if (errormsg)
 				ereport(emode_for_corrupt_record(emode,
 												 RecPtr ? RecPtr : EndRecPtr),
-				(errmsg_internal("%s", errormsg) /* already translated */ ));
+						(errmsg_internal("%s", errormsg) /* already translated */ ));
 		}
 
 		/*
@@ -4202,10 +4201,10 @@ ReadRecord(XLogReaderState *xlogreader, XLogRecPtr RecPtr, int emode,
 			XLogFileName(fname, xlogreader->readPageTLI, segno);
 			ereport(emode_for_corrupt_record(emode,
 											 RecPtr ? RecPtr : EndRecPtr),
-			(errmsg("unexpected timeline ID %u in log segment %s, offset %u",
-					xlogreader->latestPageTLI,
-					fname,
-					offset)));
+					(errmsg("unexpected timeline ID %u in log segment %s, offset %u",
+							xlogreader->latestPageTLI,
+							fname,
+							offset)));
 			record = NULL;
 		}
 
@@ -4381,7 +4380,7 @@ static void
 WriteControlFile(void)
 {
 	int			fd;
-	char		buffer[PG_CONTROL_SIZE];		/* need not be aligned */
+	char		buffer[PG_CONTROL_SIZE];	/* need not be aligned */
 
 	/*
 	 * Initialize version and compatibility-check fields
@@ -4499,8 +4498,8 @@ ReadControlFile(void)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized with PG_CONTROL_VERSION %d (0x%08x),"
-		 " but the server was compiled with PG_CONTROL_VERSION %d (0x%08x).",
-			ControlFile->pg_control_version, ControlFile->pg_control_version,
+						   " but the server was compiled with PG_CONTROL_VERSION %d (0x%08x).",
+						   ControlFile->pg_control_version, ControlFile->pg_control_version,
 						   PG_CONTROL_VERSION, PG_CONTROL_VERSION),
 				 errhint("This could be a problem of mismatched byte ordering.  It looks like you need to initdb.")));
 
@@ -4508,8 +4507,8 @@ ReadControlFile(void)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized with PG_CONTROL_VERSION %d,"
-				  " but the server was compiled with PG_CONTROL_VERSION %d.",
-						ControlFile->pg_control_version, PG_CONTROL_VERSION),
+						   " but the server was compiled with PG_CONTROL_VERSION %d.",
+						   ControlFile->pg_control_version, PG_CONTROL_VERSION),
 				 errhint("It looks like you need to initdb.")));
 
 	/* Now check the CRC. */
@@ -4532,15 +4531,15 @@ ReadControlFile(void)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized with CATALOG_VERSION_NO %d,"
-				  " but the server was compiled with CATALOG_VERSION_NO %d.",
-						ControlFile->catalog_version_no, CATALOG_VERSION_NO),
+						   " but the server was compiled with CATALOG_VERSION_NO %d.",
+						   ControlFile->catalog_version_no, CATALOG_VERSION_NO),
 				 errhint("It looks like you need to initdb.")));
 	if (ControlFile->maxAlign != MAXIMUM_ALIGNOF)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-		   errdetail("The database cluster was initialized with MAXALIGN %d,"
-					 " but the server was compiled with MAXALIGN %d.",
-					 ControlFile->maxAlign, MAXIMUM_ALIGNOF),
+				 errdetail("The database cluster was initialized with MAXALIGN %d,"
+						   " but the server was compiled with MAXALIGN %d.",
+						   ControlFile->maxAlign, MAXIMUM_ALIGNOF),
 				 errhint("It looks like you need to initdb.")));
 	if (ControlFile->floatFormat != FLOATFORMAT_VALUE)
 		ereport(FATAL,
@@ -4550,58 +4549,58 @@ ReadControlFile(void)
 	if (ControlFile->blcksz != BLCKSZ)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-			 errdetail("The database cluster was initialized with BLCKSZ %d,"
-					   " but the server was compiled with BLCKSZ %d.",
-					   ControlFile->blcksz, BLCKSZ),
+				 errdetail("The database cluster was initialized with BLCKSZ %d,"
+						   " but the server was compiled with BLCKSZ %d.",
+						   ControlFile->blcksz, BLCKSZ),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->relseg_size != RELSEG_SIZE)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-		errdetail("The database cluster was initialized with RELSEG_SIZE %d,"
-				  " but the server was compiled with RELSEG_SIZE %d.",
-				  ControlFile->relseg_size, RELSEG_SIZE),
+				 errdetail("The database cluster was initialized with RELSEG_SIZE %d,"
+						   " but the server was compiled with RELSEG_SIZE %d.",
+						   ControlFile->relseg_size, RELSEG_SIZE),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->xlog_blcksz != XLOG_BLCKSZ)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-		errdetail("The database cluster was initialized with XLOG_BLCKSZ %d,"
-				  " but the server was compiled with XLOG_BLCKSZ %d.",
-				  ControlFile->xlog_blcksz, XLOG_BLCKSZ),
+				 errdetail("The database cluster was initialized with XLOG_BLCKSZ %d,"
+						   " but the server was compiled with XLOG_BLCKSZ %d.",
+						   ControlFile->xlog_blcksz, XLOG_BLCKSZ),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->xlog_seg_size != XLOG_SEG_SIZE)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized with XLOG_SEG_SIZE %d,"
-					   " but the server was compiled with XLOG_SEG_SIZE %d.",
+						   " but the server was compiled with XLOG_SEG_SIZE %d.",
 						   ControlFile->xlog_seg_size, XLOG_SEG_SIZE),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->nameDataLen != NAMEDATALEN)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-		errdetail("The database cluster was initialized with NAMEDATALEN %d,"
-				  " but the server was compiled with NAMEDATALEN %d.",
-				  ControlFile->nameDataLen, NAMEDATALEN),
+				 errdetail("The database cluster was initialized with NAMEDATALEN %d,"
+						   " but the server was compiled with NAMEDATALEN %d.",
+						   ControlFile->nameDataLen, NAMEDATALEN),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->indexMaxKeys != INDEX_MAX_KEYS)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized with INDEX_MAX_KEYS %d,"
-					  " but the server was compiled with INDEX_MAX_KEYS %d.",
+						   " but the server was compiled with INDEX_MAX_KEYS %d.",
 						   ControlFile->indexMaxKeys, INDEX_MAX_KEYS),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->toast_max_chunk_size != TOAST_MAX_CHUNK_SIZE)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized with TOAST_MAX_CHUNK_SIZE %d,"
-				" but the server was compiled with TOAST_MAX_CHUNK_SIZE %d.",
-			  ControlFile->toast_max_chunk_size, (int) TOAST_MAX_CHUNK_SIZE),
+						   " but the server was compiled with TOAST_MAX_CHUNK_SIZE %d.",
+						   ControlFile->toast_max_chunk_size, (int) TOAST_MAX_CHUNK_SIZE),
 				 errhint("It looks like you need to recompile or initdb.")));
 	if (ControlFile->loblksize != LOBLKSIZE)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-		  errdetail("The database cluster was initialized with LOBLKSIZE %d,"
-					" but the server was compiled with LOBLKSIZE %d.",
-					ControlFile->loblksize, (int) LOBLKSIZE),
+				 errdetail("The database cluster was initialized with LOBLKSIZE %d,"
+						   " but the server was compiled with LOBLKSIZE %d.",
+						   ControlFile->loblksize, (int) LOBLKSIZE),
 				 errhint("It looks like you need to recompile or initdb.")));
 
 #ifdef USE_FLOAT4_BYVAL
@@ -4609,14 +4608,14 @@ ReadControlFile(void)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized without USE_FLOAT4_BYVAL"
-					  " but the server was compiled with USE_FLOAT4_BYVAL."),
+						   " but the server was compiled with USE_FLOAT4_BYVAL."),
 				 errhint("It looks like you need to recompile or initdb.")));
 #else
 	if (ControlFile->float4ByVal != false)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-		errdetail("The database cluster was initialized with USE_FLOAT4_BYVAL"
-				  " but the server was compiled without USE_FLOAT4_BYVAL."),
+				 errdetail("The database cluster was initialized with USE_FLOAT4_BYVAL"
+						   " but the server was compiled without USE_FLOAT4_BYVAL."),
 				 errhint("It looks like you need to recompile or initdb.")));
 #endif
 
@@ -4625,14 +4624,14 @@ ReadControlFile(void)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
 				 errdetail("The database cluster was initialized without USE_FLOAT8_BYVAL"
-					  " but the server was compiled with USE_FLOAT8_BYVAL."),
+						   " but the server was compiled with USE_FLOAT8_BYVAL."),
 				 errhint("It looks like you need to recompile or initdb.")));
 #else
 	if (ControlFile->float8ByVal != false)
 		ereport(FATAL,
 				(errmsg("database files are incompatible with server"),
-		errdetail("The database cluster was initialized with USE_FLOAT8_BYVAL"
-				  " but the server was compiled without USE_FLOAT8_BYVAL."),
+				 errdetail("The database cluster was initialized with USE_FLOAT8_BYVAL"
+						   " but the server was compiled without USE_FLOAT8_BYVAL."),
 				 errhint("It looks like you need to recompile or initdb.")));
 #endif
 
@@ -4897,7 +4896,7 @@ XLOGShmemInit(void)
 
 	/* WAL insertion locks. Ensure they're aligned to the full padded size */
 	allocptr += sizeof(WALInsertLockPadded) -
-		((uintptr_t) allocptr) %sizeof(WALInsertLockPadded);
+		((uintptr_t) allocptr) % sizeof(WALInsertLockPadded);
 	WALInsertLocks = XLogCtl->Insert.WALInsertLocks =
 		(WALInsertLockPadded *) allocptr;
 	allocptr += sizeof(WALInsertLockPadded) * NUM_XLOGINSERT_LOCKS;
@@ -5077,7 +5076,7 @@ BootStrapXLOG(void)
 			errno = ENOSPC;
 		ereport(PANIC,
 				(errcode_for_file_access(),
-			  errmsg("could not write bootstrap write-ahead log file: %m")));
+				 errmsg("could not write bootstrap write-ahead log file: %m")));
 	}
 	pgstat_report_wait_end();
 
@@ -5085,13 +5084,13 @@ BootStrapXLOG(void)
 	if (pg_fsync(openLogFile) != 0)
 		ereport(PANIC,
 				(errcode_for_file_access(),
-			  errmsg("could not fsync bootstrap write-ahead log file: %m")));
+				 errmsg("could not fsync bootstrap write-ahead log file: %m")));
 	pgstat_report_wait_end();
 
 	if (close(openLogFile))
 		ereport(PANIC,
 				(errcode_for_file_access(),
-			  errmsg("could not close bootstrap write-ahead log file: %m")));
+				 errmsg("could not close bootstrap write-ahead log file: %m")));
 
 	openLogFile = -1;
 
@@ -5213,9 +5212,9 @@ readRecoveryCommandFile(void)
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				errmsg("invalid value for recovery parameter \"%s\": \"%s\"",
-					   "recovery_target_action",
-					   item->value),
+						 errmsg("invalid value for recovery parameter \"%s\": \"%s\"",
+								"recovery_target_action",
+								item->value),
 						 errhint("Valid values are \"pause\", \"promote\", and \"shutdown\".")));
 
 			ereport(DEBUG2,
@@ -5241,10 +5240,10 @@ readRecoveryCommandFile(void)
 			}
 			if (rtli)
 				ereport(DEBUG2,
-				   (errmsg_internal("recovery_target_timeline = %u", rtli)));
+						(errmsg_internal("recovery_target_timeline = %u", rtli)));
 			else
 				ereport(DEBUG2,
-					 (errmsg_internal("recovery_target_timeline = latest")));
+						(errmsg_internal("recovery_target_timeline = latest")));
 		}
 		else if (strcmp(item->name, "recovery_target_xid") == 0)
 		{
@@ -5253,8 +5252,8 @@ readRecoveryCommandFile(void)
 			if (errno == EINVAL || errno == ERANGE)
 				ereport(FATAL,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				  errmsg("recovery_target_xid is not a valid number: \"%s\"",
-						 item->value)));
+						 errmsg("recovery_target_xid is not a valid number: \"%s\"",
+								item->value)));
 			ereport(DEBUG2,
 					(errmsg_internal("recovery_target_xid = %u",
 									 recoveryTargetXid)));
@@ -5269,12 +5268,12 @@ readRecoveryCommandFile(void)
 			 */
 			recoveryTargetTime =
 				DatumGetTimestampTz(DirectFunctionCall3(timestamptz_in,
-												CStringGetDatum(item->value),
-												ObjectIdGetDatum(InvalidOid),
+														CStringGetDatum(item->value),
+														ObjectIdGetDatum(InvalidOid),
 														Int32GetDatum(-1)));
 			ereport(DEBUG2,
 					(errmsg_internal("recovery_target_time = '%s'",
-								   timestamptz_to_str(recoveryTargetTime))));
+									 timestamptz_to_str(recoveryTargetTime))));
 		}
 #ifdef PGXC
 		else if (strcmp(item->name, "recovery_target_barrier") == 0)
@@ -5322,10 +5321,10 @@ readRecoveryCommandFile(void)
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				errmsg("invalid value for recovery parameter \"%s\": \"%s\"",
-					   "recovery_target",
-					   item->value),
-					   errhint("The only allowed value is \"immediate\".")));
+						 errmsg("invalid value for recovery parameter \"%s\": \"%s\"",
+								"recovery_target",
+								item->value),
+						 errhint("The only allowed value is \"immediate\".")));
 			ereport(DEBUG2,
 					(errmsg_internal("recovery_target = '%s'",
 									 item->value)));
@@ -5434,7 +5433,7 @@ readRecoveryCommandFile(void)
 	if (StandbyModeRequested && !IsUnderPostmaster)
 		ereport(FATAL,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			errmsg("standby mode is not supported by single-user servers")));
+				 errmsg("standby mode is not supported by single-user servers")));
 
 	/* Enable fetching from archive recovery area */
 	ArchiveRecoveryRequested = true;
@@ -5659,9 +5658,9 @@ recoveryStopsBefore(XLogReaderState *record)
 		recoveryStopTime = 0;
 		recoveryStopName[0] = '\0';
 		ereport(LOG,
-			 (errmsg("recovery stopping before WAL location (LSN) \"%X/%X\"",
-					 (uint32) (recoveryStopLSN >> 32),
-					 (uint32) recoveryStopLSN)));
+				(errmsg("recovery stopping before WAL location (LSN) \"%X/%X\"",
+						(uint32) (recoveryStopLSN >> 32),
+						(uint32) recoveryStopLSN)));
 		return true;
 	}
 #ifdef PGXC
@@ -5846,9 +5845,9 @@ recoveryStopsAfter(XLogReaderState *record)
 			strlcpy(recoveryStopName, recordRestorePointData->rp_name, MAXFNAMELEN);
 
 			ereport(LOG,
-				(errmsg("recovery stopping at restore point \"%s\", time %s",
-						recoveryStopName,
-						timestamptz_to_str(recoveryStopTime))));
+					(errmsg("recovery stopping at restore point \"%s\", time %s",
+							recoveryStopName,
+							timestamptz_to_str(recoveryStopTime))));
 			return true;
 		}
 	}
@@ -5864,9 +5863,9 @@ recoveryStopsAfter(XLogReaderState *record)
 		recoveryStopTime = 0;
 		recoveryStopName[0] = '\0';
 		ereport(LOG,
-			  (errmsg("recovery stopping after WAL location (LSN) \"%X/%X\"",
-					  (uint32) (recoveryStopLSN >> 32),
-					  (uint32) recoveryStopLSN)));
+				(errmsg("recovery stopping after WAL location (LSN) \"%X/%X\"",
+						(uint32) (recoveryStopLSN >> 32),
+						(uint32) recoveryStopLSN)));
 		return true;
 	}
 
@@ -6304,20 +6303,20 @@ StartupXLOG(void)
 						str_time(ControlFile->time))));
 	else if (ControlFile->state == DB_IN_CRASH_RECOVERY)
 		ereport(LOG,
-		   (errmsg("database system was interrupted while in recovery at %s",
-				   str_time(ControlFile->time)),
-			errhint("This probably means that some data is corrupted and"
-					" you will have to use the last backup for recovery.")));
+				(errmsg("database system was interrupted while in recovery at %s",
+						str_time(ControlFile->time)),
+				 errhint("This probably means that some data is corrupted and"
+						 " you will have to use the last backup for recovery.")));
 	else if (ControlFile->state == DB_IN_ARCHIVE_RECOVERY)
 		ereport(LOG,
 				(errmsg("database system was interrupted while in recovery at log time %s",
 						str_time(ControlFile->checkPointCopy.time)),
 				 errhint("If this has occurred more than once some data might be corrupted"
-			  " and you might need to choose an earlier recovery target.")));
+						 " and you might need to choose an earlier recovery target.")));
 	else if (ControlFile->state == DB_IN_PRODUCTION)
 		ereport(LOG,
-			  (errmsg("database system was interrupted; last known up at %s",
-					  str_time(ControlFile->time))));
+				(errmsg("database system was interrupted; last known up at %s",
+						str_time(ControlFile->time))));
 
 	/* This is just to allow attaching to startup process with a debugger */
 #ifdef XLOG_REPLAY_DELAY
@@ -6418,7 +6417,7 @@ StartupXLOG(void)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
 				 errmsg("out of memory"),
-			 errdetail("Failed while allocating a WAL reading processor.")));
+				 errdetail("Failed while allocating a WAL reading processor.")));
 	xlogreader->system_identifier = ControlFile->system_identifier;
 
 	/*
@@ -6453,7 +6452,7 @@ StartupXLOG(void)
 			wasShutdown = ((record->xl_info & ~XLR_INFO_MASK) == XLOG_CHECKPOINT_SHUTDOWN);
 			ereport(DEBUG1,
 					(errmsg("checkpoint record is at %X/%X",
-				   (uint32) (checkPointLoc >> 32), (uint32) checkPointLoc)));
+							(uint32) (checkPointLoc >> 32), (uint32) checkPointLoc)));
 			InRecovery = true;	/* force recovery even if SHUTDOWNED */
 
 			/*
@@ -6499,8 +6498,8 @@ StartupXLOG(void)
 				if (symlink(ti->path, linkloc) < 0)
 					ereport(ERROR,
 							(errcode_for_file_access(),
-						  errmsg("could not create symbolic link \"%s\": %m",
-								 linkloc)));
+							 errmsg("could not create symbolic link \"%s\": %m",
+									linkloc)));
 
 				pfree(ti->oid);
 				pfree(ti->path);
@@ -6531,16 +6530,16 @@ StartupXLOG(void)
 			unlink(TABLESPACE_MAP_OLD);
 			if (durable_rename(TABLESPACE_MAP, TABLESPACE_MAP_OLD, DEBUG1) == 0)
 				ereport(LOG,
-				(errmsg("ignoring file \"%s\" because no file \"%s\" exists",
-						TABLESPACE_MAP, BACKUP_LABEL_FILE),
-				 errdetail("File \"%s\" was renamed to \"%s\".",
-						   TABLESPACE_MAP, TABLESPACE_MAP_OLD)));
+						(errmsg("ignoring file \"%s\" because no file \"%s\" exists",
+								TABLESPACE_MAP, BACKUP_LABEL_FILE),
+						 errdetail("File \"%s\" was renamed to \"%s\".",
+								   TABLESPACE_MAP, TABLESPACE_MAP_OLD)));
 			else
 				ereport(LOG,
-				(errmsg("ignoring file \"%s\" because no file \"%s\" exists",
-						TABLESPACE_MAP, BACKUP_LABEL_FILE),
-				 errdetail("Could not rename file \"%s\" to \"%s\": %m.",
-						   TABLESPACE_MAP, TABLESPACE_MAP_OLD)));
+						(errmsg("ignoring file \"%s\" because no file \"%s\" exists",
+								TABLESPACE_MAP, BACKUP_LABEL_FILE),
+						 errdetail("Could not rename file \"%s\" to \"%s\": %m.",
+								   TABLESPACE_MAP, TABLESPACE_MAP_OLD)));
 		}
 
 		/*
@@ -6581,7 +6580,7 @@ StartupXLOG(void)
 		{
 			ereport(DEBUG1,
 					(errmsg("checkpoint record is at %X/%X",
-				   (uint32) (checkPointLoc >> 32), (uint32) checkPointLoc)));
+							(uint32) (checkPointLoc >> 32), (uint32) checkPointLoc)));
 		}
 		else if (StandbyMode)
 		{
@@ -6600,12 +6599,12 @@ StartupXLOG(void)
 			{
 				ereport(LOG,
 						(errmsg("using previous checkpoint record at %X/%X",
-				   (uint32) (checkPointLoc >> 32), (uint32) checkPointLoc)));
-				InRecovery = true;		/* force recovery even if SHUTDOWNED */
+								(uint32) (checkPointLoc >> 32), (uint32) checkPointLoc)));
+				InRecovery = true;	/* force recovery even if SHUTDOWNED */
 			}
 			else
 				ereport(PANIC,
-					 (errmsg("could not locate a valid checkpoint record")));
+						(errmsg("could not locate a valid checkpoint record")));
 		}
 		memcpy(&checkPoint, XLogRecGetData(xlogreader), sizeof(CheckPoint));
 		wasShutdown = ((record->xl_info & ~XLR_INFO_MASK) == XLOG_CHECKPOINT_SHUTDOWN);
@@ -6658,7 +6657,7 @@ StartupXLOG(void)
 	 * history, too.
 	 */
 	if (!XLogRecPtrIsInvalid(ControlFile->minRecoveryPoint) &&
-	  tliOfPointInHistory(ControlFile->minRecoveryPoint - 1, expectedTLEs) !=
+		tliOfPointInHistory(ControlFile->minRecoveryPoint - 1, expectedTLEs) !=
 		ControlFile->minRecoveryPointTLI)
 		ereport(FATAL,
 				(errmsg("requested timeline %u does not contain minimum recovery point %X/%X on timeline %u",
@@ -6671,7 +6670,7 @@ StartupXLOG(void)
 
 	ereport(DEBUG1,
 			(errmsg_internal("redo record is at %X/%X; shutdown %s",
-				  (uint32) (checkPoint.redo >> 32), (uint32) checkPoint.redo,
+							 (uint32) (checkPoint.redo >> 32), (uint32) checkPoint.redo,
 							 wasShutdown ? "TRUE" : "FALSE")));
 	ereport(DEBUG1,
 			(errmsg_internal("next transaction ID: %u:%u; next OID: %u",
@@ -6679,13 +6678,13 @@ StartupXLOG(void)
 							 checkPoint.nextOid)));
 	ereport(DEBUG1,
 			(errmsg_internal("next MultiXactId: %u; next MultiXactOffset: %u",
-						 checkPoint.nextMulti, checkPoint.nextMultiOffset)));
+							 checkPoint.nextMulti, checkPoint.nextMultiOffset)));
 	ereport(DEBUG1,
-	   (errmsg_internal("oldest unfrozen transaction ID: %u, in database %u",
-						checkPoint.oldestXid, checkPoint.oldestXidDB)));
+			(errmsg_internal("oldest unfrozen transaction ID: %u, in database %u",
+							 checkPoint.oldestXid, checkPoint.oldestXidDB)));
 	ereport(DEBUG1,
 			(errmsg_internal("oldest MultiXactId: %u, in database %u",
-						 checkPoint.oldestMulti, checkPoint.oldestMultiDB)));
+							 checkPoint.oldestMulti, checkPoint.oldestMultiDB)));
 	ereport(DEBUG1,
 			(errmsg_internal("commit timestamp Xid oldest/newest: %u/%u",
 							 checkPoint.oldestCommitTsXid,
@@ -6875,7 +6874,7 @@ StartupXLOG(void)
 					ereport(FATAL,
 							(errmsg("backup_label contains data inconsistent with control file"),
 							 errhint("This means that the backup is corrupted and you will "
-							   "have to use another backup for recovery.")));
+									 "have to use another backup for recovery.")));
 				ControlFile->backupEndPoint = ControlFile->minRecoveryPoint;
 			}
 		}
@@ -7081,7 +7080,7 @@ StartupXLOG(void)
 
 			ereport(LOG,
 					(errmsg("redo starts at %X/%X",
-						 (uint32) (ReadRecPtr >> 32), (uint32) ReadRecPtr)));
+							(uint32) (ReadRecPtr >> 32), (uint32) ReadRecPtr)));
 
 			/*
 			 * main redo apply loop
@@ -7092,15 +7091,15 @@ StartupXLOG(void)
 
 #ifdef WAL_DEBUG
 				if (XLOG_DEBUG ||
-				 (rmid == RM_XACT_ID && trace_recovery_messages <= DEBUG2) ||
+					(rmid == RM_XACT_ID && trace_recovery_messages <= DEBUG2) ||
 					(rmid != RM_XACT_ID && trace_recovery_messages <= DEBUG3))
 				{
 					StringInfoData buf;
 
 					initStringInfo(&buf);
 					appendStringInfo(&buf, "REDO @ %X/%X; LSN %X/%X: ",
-							(uint32) (ReadRecPtr >> 32), (uint32) ReadRecPtr,
-							 (uint32) (EndRecPtr >> 32), (uint32) EndRecPtr);
+									 (uint32) (ReadRecPtr >> 32), (uint32) ReadRecPtr,
+									 (uint32) (EndRecPtr >> 32), (uint32) EndRecPtr);
 					xlog_outrec(&buf, xlogreader);
 					appendStringInfoString(&buf, " - ");
 					xlog_outdesc(&buf, xlogreader);
@@ -7353,12 +7352,12 @@ StartupXLOG(void)
 
 			ereport(LOG,
 					(errmsg("redo done at %X/%X",
-						 (uint32) (ReadRecPtr >> 32), (uint32) ReadRecPtr)));
+							(uint32) (ReadRecPtr >> 32), (uint32) ReadRecPtr)));
 			xtime = GetLatestXTime();
 			if (xtime)
 				ereport(LOG,
-					 (errmsg("last completed transaction was at log time %s",
-							 timestamptz_to_str(xtime))));
+						(errmsg("last completed transaction was at log time %s",
+								timestamptz_to_str(xtime))));
 
 			InRedo = false;
 		}
@@ -7449,7 +7448,7 @@ StartupXLOG(void)
 						 errhint("Online backup started with pg_start_backup() must be ended with pg_stop_backup(), and all WAL up to that point must be available at recovery.")));
 			else
 				ereport(FATAL,
-					  (errmsg("WAL ends before consistent recovery point")));
+						(errmsg("WAL ends before consistent recovery point")));
 		}
 	}
 
@@ -8104,7 +8103,7 @@ ReadCheckpointRecord(XLogReaderState *xlogreader, XLogRecPtr RecPtr,
 		{
 			case 1:
 				ereport(LOG,
-				(errmsg("invalid primary checkpoint link in control file")));
+						(errmsg("invalid primary checkpoint link in control file")));
 				break;
 			case 2:
 				ereport(LOG,
@@ -8112,7 +8111,7 @@ ReadCheckpointRecord(XLogReaderState *xlogreader, XLogRecPtr RecPtr,
 				break;
 			default:
 				ereport(LOG,
-				   (errmsg("invalid checkpoint link in backup_label file")));
+						(errmsg("invalid checkpoint link in backup_label file")));
 				break;
 		}
 		return NULL;
@@ -8156,7 +8155,7 @@ ReadCheckpointRecord(XLogReaderState *xlogreader, XLogRecPtr RecPtr,
 				break;
 			default:
 				ereport(LOG,
-				(errmsg("invalid resource manager ID in checkpoint record")));
+						(errmsg("invalid resource manager ID in checkpoint record")));
 				break;
 		}
 		return NULL;
@@ -8169,11 +8168,11 @@ ReadCheckpointRecord(XLogReaderState *xlogreader, XLogRecPtr RecPtr,
 		{
 			case 1:
 				ereport(LOG,
-				   (errmsg("invalid xl_info in primary checkpoint record")));
+						(errmsg("invalid xl_info in primary checkpoint record")));
 				break;
 			case 2:
 				ereport(LOG,
-				 (errmsg("invalid xl_info in secondary checkpoint record")));
+						(errmsg("invalid xl_info in secondary checkpoint record")));
 				break;
 			default:
 				ereport(LOG,
@@ -8188,11 +8187,11 @@ ReadCheckpointRecord(XLogReaderState *xlogreader, XLogRecPtr RecPtr,
 		{
 			case 1:
 				ereport(LOG,
-					(errmsg("invalid length of primary checkpoint record")));
+						(errmsg("invalid length of primary checkpoint record")));
 				break;
 			case 2:
 				ereport(LOG,
-				  (errmsg("invalid length of secondary checkpoint record")));
+						(errmsg("invalid length of secondary checkpoint record")));
 				break;
 			default:
 				ereport(LOG,
@@ -8503,14 +8502,14 @@ LogCheckpointEnd(bool restartpoint)
 	 */
 	longest_secs = (long) (CheckpointStats.ckpt_longest_sync / 1000000);
 	longest_usecs = CheckpointStats.ckpt_longest_sync -
-		(uint64) longest_secs *1000000;
+		(uint64) longest_secs * 1000000;
 
 	average_sync_time = 0;
 	if (CheckpointStats.ckpt_sync_rels > 0)
 		average_sync_time = CheckpointStats.ckpt_agg_sync_time /
 			CheckpointStats.ckpt_sync_rels;
 	average_secs = (long) (average_sync_time / 1000000);
-	average_usecs = average_sync_time - (uint64) average_secs *1000000;
+	average_usecs = average_sync_time - (uint64) average_secs * 1000000;
 
 	elog(LOG, "%s complete: wrote %d buffers (%.1f%%); "
 		 "%d WAL file(s) added, %d removed, %d recycled; "
@@ -8912,7 +8911,7 @@ CreateCheckPoint(int flags)
 	if (shutdown)
 	{
 		if (flags & CHECKPOINT_END_OF_RECOVERY)
-			LocalXLogInsertAllowed = -1;		/* return to "check" state */
+			LocalXLogInsertAllowed = -1;	/* return to "check" state */
 		else
 			LocalXLogInsertAllowed = 0; /* never again write WAL */
 	}
@@ -9177,7 +9176,7 @@ CreateRestartPoint(int flags)
 	if (!RecoveryInProgress())
 	{
 		ereport(DEBUG2,
-			  (errmsg("skipping restartpoint, recovery has already ended")));
+				(errmsg("skipping restartpoint, recovery has already ended")));
 		LWLockRelease(CheckpointLock);
 		return false;
 	}
@@ -9377,9 +9376,9 @@ CreateRestartPoint(int flags)
 	xtime = GetLatestXTime();
 	ereport((log_checkpoints ? LOG : DEBUG2),
 			(errmsg("recovery restart point at %X/%X",
-		 (uint32) (lastCheckPoint.redo >> 32), (uint32) lastCheckPoint.redo),
-		   xtime ? errdetail("last completed transaction was at log time %s",
-							 timestamptz_to_str(xtime)) : 0));
+					(uint32) (lastCheckPoint.redo >> 32), (uint32) lastCheckPoint.redo),
+			 xtime ? errdetail("last completed transaction was at log time %s",
+							   timestamptz_to_str(xtime)) : 0));
 
 	LWLockRelease(CheckpointLock);
 
@@ -9651,8 +9650,8 @@ checkTimeLineSwitch(XLogRecPtr lsn, TimeLineID newTLI, TimeLineID prevTLI)
 	 */
 	if (newTLI < ThisTimeLineID || !tliInHistory(newTLI, expectedTLEs))
 		ereport(PANIC,
-		 (errmsg("unexpected timeline ID %u (after %u) in checkpoint record",
-				 newTLI, ThisTimeLineID)));
+				(errmsg("unexpected timeline ID %u (after %u) in checkpoint record",
+						newTLI, ThisTimeLineID)));
 
 	/*
 	 * If we have not yet reached min recovery point, and we're about to
@@ -9743,7 +9742,7 @@ xlog_redo(XLogReaderState *record)
 			!XLogRecPtrIsInvalid(ControlFile->backupStartPoint) &&
 			XLogRecPtrIsInvalid(ControlFile->backupEndPoint))
 			ereport(PANIC,
-			(errmsg("online backup was canceled, recovery cannot continue")));
+					(errmsg("online backup was canceled, recovery cannot continue")));
 
 		/*
 		 * If we see a shutdown checkpoint, we know that nothing was running
@@ -10042,7 +10041,7 @@ xlog_outrec(StringInfo buf, XLogReaderState *record)
 			appendStringInfoString(buf, " FPW");
 	}
 }
-#endif   /* WAL_DEBUG */
+#endif							/* WAL_DEBUG */
 
 /*
  * Returns a string describing an XLogRecord, consisting of its identity
@@ -10146,7 +10145,7 @@ assign_xlog_sync_method(int new_sync_method, void *extra)
 				ereport(PANIC,
 						(errcode_for_file_access(),
 						 errmsg("could not fsync log segment %s: %m",
-							  XLogFileNameP(ThisTimeLineID, openLogSegNo))));
+								XLogFileNameP(ThisTimeLineID, openLogSegNo))));
 			pgstat_report_wait_end();
 			if (get_sync_bit(sync_method) != get_sync_bit(new_sync_method))
 				XLogFileClose();
@@ -10178,8 +10177,8 @@ issue_xlog_fsync(int fd, XLogSegNo segno)
 			if (pg_fsync_writethrough(fd) != 0)
 				ereport(PANIC,
 						(errcode_for_file_access(),
-					  errmsg("could not fsync write-through log file %s: %m",
-							 XLogFileNameP(ThisTimeLineID, segno))));
+						 errmsg("could not fsync write-through log file %s: %m",
+								XLogFileNameP(ThisTimeLineID, segno))));
 			break;
 #endif
 #ifdef HAVE_FDATASYNC
@@ -10287,7 +10286,7 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 	if (!backup_started_in_recovery && !XLogIsNeeded())
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-			  errmsg("WAL level not sufficient for making an online backup"),
+				 errmsg("WAL level not sufficient for making an online backup"),
 				 errhint("wal_level must be set to \"replica\" or \"logical\" at server start.")));
 
 	if (strlen(backupidstr) > MAXPGPATH)
@@ -10425,13 +10424,13 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 
 				if (!checkpointfpw || startpoint <= recptr)
 					ereport(ERROR,
-						  (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						   errmsg("WAL generated with full_page_writes=off was replayed "
-								  "since last restartpoint"),
-						   errhint("This means that the backup being taken on the standby "
-								   "is corrupt and should not be used. "
-								   "Enable full_page_writes and run CHECKPOINT on the master, "
-								   "and then try an online backup again.")));
+							(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+							 errmsg("WAL generated with full_page_writes=off was replayed "
+									"since last restartpoint"),
+							 errhint("This means that the backup being taken on the standby "
+									 "is corrupt and should not be used. "
+									 "Enable full_page_writes and run CHECKPOINT on the master, "
+									 "and then try an online backup again.")));
 
 				/*
 				 * During recovery, since we don't use the end-of-backup WAL
@@ -10555,7 +10554,7 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 			 */
 			ereport(WARNING,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				  errmsg("tablespaces are not supported on this platform")));
+					 errmsg("tablespaces are not supported on this platform")));
 #endif
 		}
 
@@ -10571,9 +10570,9 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 					"%Y-%m-%d %H:%M:%S %Z",
 					pg_localtime(&stamp_time, log_timezone));
 		appendStringInfo(labelfile, "START WAL LOCATION: %X/%X (file %s)\n",
-			 (uint32) (startpoint >> 32), (uint32) startpoint, xlogfilename);
+						 (uint32) (startpoint >> 32), (uint32) startpoint, xlogfilename);
 		appendStringInfo(labelfile, "CHECKPOINT LOCATION: %X/%X\n",
-					 (uint32) (checkpointloc >> 32), (uint32) checkpointloc);
+						 (uint32) (checkpointloc >> 32), (uint32) checkpointloc);
 		appendStringInfo(labelfile, "BACKUP METHOD: %s\n",
 						 exclusive ? "pg_start_backup" : "streamed");
 		appendStringInfo(labelfile, "BACKUP FROM: %s\n",
@@ -10640,10 +10639,10 @@ do_pg_start_backup(const char *backupidstr, bool fast, TimeLineID *starttli_p,
 				}
 				else
 					ereport(ERROR,
-						  (errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-						   errmsg("a backup is already in progress"),
-						   errhint("If you're sure there is no backup in progress, remove file \"%s\" and try again.",
-								   TABLESPACE_MAP)));
+							(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+							 errmsg("a backup is already in progress"),
+							 errhint("If you're sure there is no backup in progress, remove file \"%s\" and try again.",
+									 TABLESPACE_MAP)));
 
 				fp = AllocateFile(TABLESPACE_MAP, "w");
 
@@ -10805,7 +10804,7 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 	if (!backup_started_in_recovery && !XLogIsNeeded())
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-			  errmsg("WAL level not sufficient for making an online backup"),
+				 errmsg("WAL level not sufficient for making an online backup"),
 				 errhint("wal_level must be set to \"replica\" or \"logical\" at server start.")));
 
 	if (exclusive)
@@ -10984,12 +10983,12 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 		if (startpoint <= recptr)
 			ereport(ERROR,
 					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-			   errmsg("WAL generated with full_page_writes=off was replayed "
-					  "during online backup"),
-			 errhint("This means that the backup being taken on the standby "
-					 "is corrupt and should not be used. "
-				 "Enable full_page_writes and run CHECKPOINT on the master, "
-					 "and then try an online backup again.")));
+					 errmsg("WAL generated with full_page_writes=off was replayed "
+							"during online backup"),
+					 errhint("This means that the backup being taken on the standby "
+							 "is corrupt and should not be used. "
+							 "Enable full_page_writes and run CHECKPOINT on the master, "
+							 "and then try an online backup again.")));
 
 
 		LWLockAcquire(ControlFileLock, LW_SHARED);
@@ -11038,7 +11037,7 @@ do_pg_stop_backup(char *labelfile, bool waitforarchive, TimeLineID *stoptli_p)
 				 errmsg("could not create file \"%s\": %m",
 						histfilepath)));
 	fprintf(fp, "START WAL LOCATION: %X/%X (file %s)\n",
-		(uint32) (startpoint >> 32), (uint32) startpoint, startxlogfilename);
+			(uint32) (startpoint >> 32), (uint32) startpoint, startxlogfilename);
 	fprintf(fp, "STOP WAL LOCATION: %X/%X (file %s)\n",
 			(uint32) (stoppoint >> 32), (uint32) stoppoint, stopxlogfilename);
 	/* transfer remaining lines from label to history file */
@@ -11365,7 +11364,7 @@ read_tablespace_map(List **tablespaces)
 			if (sscanf(str, "%s %n", tbsoid, &n) != 1)
 				ereport(FATAL,
 						(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-					 errmsg("invalid data in file \"%s\"", TABLESPACE_MAP)));
+						 errmsg("invalid data in file \"%s\"", TABLESPACE_MAP)));
 			tbslinkpath = str + n;
 			i = 0;
 
@@ -11525,7 +11524,7 @@ XLogPageRead(XLogReaderState *xlogreader, XLogRecPtr targetPagePtr, int reqLen,
 	(XLogPageReadPrivate *) xlogreader->private_data;
 	int			emode = private->emode;
 	uint32		targetPageOff;
-	XLogSegNo targetSegNo PG_USED_FOR_ASSERTS_ONLY;
+	XLogSegNo	targetSegNo PG_USED_FOR_ASSERTS_ONLY;
 
 	XLByteToSeg(targetPagePtr, targetSegNo);
 	targetPageOff = targetPagePtr % XLogSegSize;
@@ -11838,7 +11837,7 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 					 */
 					now = GetCurrentTimestamp();
 					if (!TimestampDifferenceExceeds(last_fail_time, now,
-												wal_retrieve_retry_interval))
+													wal_retrieve_retry_interval))
 					{
 						long		secs,
 									wait_time;
@@ -11849,7 +11848,7 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 							(secs * 1000 + usecs / 1000);
 
 						WaitLatch(&XLogCtl->recoveryWakeupLatch,
-							 WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
+								  WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
 								  wait_time, WAIT_EVENT_RECOVERY_WAL_STREAM);
 						ResetLatch(&XLogCtl->recoveryWakeupLatch);
 						now = GetCurrentTimestamp();
@@ -11903,7 +11902,7 @@ WaitForWALToBecomeAvailable(XLogRecPtr RecPtr, bool randAccess,
 				 * file from pg_wal.
 				 */
 				readFile = XLogFileReadAnyTLI(readSegNo, DEBUG2,
-						 currentSource == XLOG_FROM_ARCHIVE ? XLOG_FROM_ANY :
+											  currentSource == XLOG_FROM_ARCHIVE ? XLOG_FROM_ANY :
 											  currentSource);
 				if (readFile >= 0)
 					return true;	/* success! */

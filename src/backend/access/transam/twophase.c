@@ -173,7 +173,7 @@ typedef struct GlobalTransactionData
 	 * track of the end LSN because that is the LSN we need to wait for prior
 	 * to commit.
 	 */
-	XLogRecPtr	prepare_start_lsn;		/* XLOG offset of prepare record start */
+	XLogRecPtr	prepare_start_lsn;	/* XLOG offset of prepare record start */
 	XLogRecPtr	prepare_end_lsn;	/* XLOG offset of prepare record end */
 	TransactionId xid;			/* The GXACT id */
 
@@ -183,7 +183,7 @@ typedef struct GlobalTransactionData
 	bool		ondisk;			/* TRUE if prepare state file is on disk */
 	bool		inredo;			/* TRUE if entry was added via xlog_redo */
 	char		gid[GIDSIZE];	/* The GID assigned to the prepared xact */
-}	GlobalTransactionData;
+}			GlobalTransactionData;
 
 /*
  * Two Phase Commit shared state.  Access to this struct is protected
@@ -397,7 +397,7 @@ MarkAsPreparing(TransactionId xid, const char *gid,
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 				 errmsg("prepared transactions are disabled"),
-			  errhint("Set max_prepared_transactions to a nonzero value.")));
+				 errhint("Set max_prepared_transactions to a nonzero value.")));
 
 	/* on first call, register the exit hook */
 	if (!twophaseExitRegistered)
@@ -593,13 +593,13 @@ LockGXact(const char *gid, Oid user)
 		if (gxact->locking_backend != InvalidBackendId)
 			ereport(ERROR,
 					(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
-				errmsg("prepared transaction with identifier \"%s\" is busy",
-					   gid)));
+					 errmsg("prepared transaction with identifier \"%s\" is busy",
+							gid)));
 
 		if (user != gxact->owner && !superuser_arg(user))
 			ereport(ERROR,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				  errmsg("permission denied to finish prepared transaction"),
+					 errmsg("permission denied to finish prepared transaction"),
 					 errhint("Must be superuser or the user that prepared the transaction.")));
 
 		/*
@@ -611,7 +611,7 @@ LockGXact(const char *gid, Oid user)
 		if (MyDatabaseId != proc->databaseId)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				  errmsg("prepared transaction belongs to another database"),
+					 errmsg("prepared transaction belongs to another database"),
 					 errhint("Connect to the database where the transaction was prepared to finish it.")));
 
 		/* OK for me to lock it */
@@ -633,10 +633,10 @@ LockGXact(const char *gid, Oid user)
 	if (!xc_maintenance_mode)
 	{
 #endif
-		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("prepared transaction with identifier \"%s\" does not exist",
-						gid)));
+	ereport(ERROR,
+			(errcode(ERRCODE_UNDEFINED_OBJECT),
+			 errmsg("prepared transaction with identifier \"%s\" does not exist",
+					gid)));
 #ifdef PGXC
 	}
 #endif
@@ -918,7 +918,7 @@ TwoPhaseGetDummyProc(TransactionId xid)
 /*
  * Header for a 2PC state file
  */
-#define TWOPHASE_MAGIC	0x57F94533		/* format identifier */
+#define TWOPHASE_MAGIC	0x57F94533	/* format identifier */
 
 typedef struct TwoPhaseFileHeader
 {
@@ -968,7 +968,7 @@ static struct xllist
 	uint32		num_chunks;
 	uint32		bytes_free;		/* free bytes left in tail block */
 	uint32		total_len;		/* total data bytes in chain */
-}	records;
+}			records;
 
 
 /*
@@ -1044,7 +1044,7 @@ StartPrepare(GlobalTransaction gxact)
 	hdr.nabortrels = smgrGetPendingDeletes(false, &abortrels);
 	hdr.ninvalmsgs = xactGetCommittedInvalidationMessages(&invalmsgs,
 														  &hdr.initfileinval);
-	hdr.gidlen = strlen(gxact->gid) + 1;		/* Include '\0' */
+	hdr.gidlen = strlen(gxact->gid) + 1;	/* Include '\0' */
 
 	save_state_data(&hdr, sizeof(TwoPhaseFileHeader));
 	save_state_data(gxact->gid, hdr.gidlen);
@@ -1324,7 +1324,7 @@ XlogReadTwoPhaseData(XLogRecPtr lsn, char **buf, int *len)
 		ereport(ERROR,
 				(errcode(ERRCODE_OUT_OF_MEMORY),
 				 errmsg("out of memory"),
-			 errdetail("Failed while allocating a WAL reading processor.")));
+				 errdetail("Failed while allocating a WAL reading processor.")));
 
 	record = XLogReadRecord(xlogreader, lsn, &errormsg);
 	if (record == NULL)
@@ -1338,9 +1338,9 @@ XlogReadTwoPhaseData(XLogRecPtr lsn, char **buf, int *len)
 		(XLogRecGetInfo(xlogreader) & XLOG_XACT_OPMASK) != XLOG_XACT_PREPARE)
 		ereport(ERROR,
 				(errcode_for_file_access(),
-		errmsg("expected two-phase state data is not present in WAL at %X/%X",
-			   (uint32) (lsn >> 32),
-			   (uint32) lsn)));
+				 errmsg("expected two-phase state data is not present in WAL at %X/%X",
+						(uint32) (lsn >> 32),
+						(uint32) lsn)));
 
 	if (len != NULL)
 		*len = XLogRecGetDataLen(xlogreader);
@@ -1589,8 +1589,8 @@ RemoveTwoPhaseFile(TransactionId xid, bool giveWarning)
 		if (errno != ENOENT || giveWarning)
 			ereport(WARNING,
 					(errcode_for_file_access(),
-				   errmsg("could not remove two-phase state file \"%s\": %m",
-						  path)));
+					 errmsg("could not remove two-phase state file \"%s\": %m",
+							path)));
 }
 
 /*
@@ -2092,8 +2092,8 @@ ProcessTwoPhaseBuffer(TransactionId xid,
 		else
 		{
 			ereport(WARNING,
-			(errmsg("removing future two-phase state from memory for \"%u\"",
-					xid)));
+					(errmsg("removing future two-phase state from memory for \"%u\"",
+							xid)));
 			PrepareRedoRemove(xid, true);
 		}
 		return NULL;
@@ -2106,8 +2106,8 @@ ProcessTwoPhaseBuffer(TransactionId xid,
 		if (buf == NULL)
 		{
 			ereport(WARNING,
-				  (errmsg("removing corrupt two-phase state file for \"%u\"",
-						  xid)));
+					(errmsg("removing corrupt two-phase state file for \"%u\"",
+							xid)));
 			RemoveTwoPhaseFile(xid, true);
 			return NULL;
 		}
@@ -2125,15 +2125,15 @@ ProcessTwoPhaseBuffer(TransactionId xid,
 		if (fromdisk)
 		{
 			ereport(WARNING,
-				  (errmsg("removing corrupt two-phase state file for \"%u\"",
-						  xid)));
+					(errmsg("removing corrupt two-phase state file for \"%u\"",
+							xid)));
 			RemoveTwoPhaseFile(xid, true);
 		}
 		else
 		{
 			ereport(WARNING,
-			(errmsg("removing corrupt two-phase state from memory for \"%u\"",
-					xid)));
+					(errmsg("removing corrupt two-phase state from memory for \"%u\"",
+							xid)));
 			PrepareRedoRemove(xid, true);
 		}
 		pfree(buf);
@@ -2226,7 +2226,7 @@ RecordTransactionCommitPrepared(TransactionId xid,
 								 nchildren, children, nrels, rels,
 								 ninvalmsgs, invalmsgs,
 								 initfileinval, false,
-						MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
+								 MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
 								 xid);
 
 
@@ -2311,7 +2311,7 @@ RecordTransactionAbortPrepared(TransactionId xid,
 	recptr = XactLogAbortRecord(GetCurrentTimestamp(),
 								nchildren, children,
 								nrels, rels,
-						MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
+								MyXactFlags | XACT_FLAGS_ACQUIREDACCESSEXCLUSIVELOCK,
 								xid);
 
 	/* Always flush, since we're about to remove the 2PC state file */

@@ -357,8 +357,8 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 			/* Build targetlist using the completed indexprs data */
 			info->indextlist = build_index_tlist(root, info, relation);
 
-			info->indrestrictinfo = NIL;		/* set later, in indxpath.c */
-			info->predOK = false;		/* set later, in indxpath.c */
+			info->indrestrictinfo = NIL;	/* set later, in indxpath.c */
+			info->predOK = false;	/* set later, in indxpath.c */
 			info->unique = index->indisunique;
 			info->immediate = index->indimmediate;
 			info->hypothetical = false;
@@ -633,7 +633,7 @@ infer_arbiter_indexes(PlannerInfo *root)
 					 errmsg("whole row unique index inference specifications are not supported")));
 
 		inferAttrs = bms_add_member(inferAttrs,
-								 attno - FirstLowInvalidHeapAttributeNumber);
+									attno - FirstLowInvalidHeapAttributeNumber);
 	}
 
 	/*
@@ -728,7 +728,7 @@ infer_arbiter_indexes(PlannerInfo *root)
 
 			if (attno != 0)
 				indexedAttrs = bms_add_member(indexedAttrs,
-								 attno - FirstLowInvalidHeapAttributeNumber);
+											  attno - FirstLowInvalidHeapAttributeNumber);
 		}
 
 		/* Non-expression attributes (if any) must match */
@@ -840,7 +840,7 @@ infer_collation_opclass_match(InferenceElem *elem, Relation idxRel,
 							  List *idxExprs)
 {
 	AttrNumber	natt;
-	Oid			inferopfamily = InvalidOid;		/* OID of opclass opfamily */
+	Oid			inferopfamily = InvalidOid; /* OID of opclass opfamily */
 	Oid			inferopcinputtype = InvalidOid; /* OID of opclass input type */
 	int			nplain = 0;		/* # plain attrs observed */
 
@@ -1632,7 +1632,7 @@ build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
 
 			if (indexkey < 0)
 				att_tup = SystemAttributeDefinition(indexkey,
-										   heapRelation->rd_rel->relhasoids);
+													heapRelation->rd_rel->relhasoids);
 			else
 				att_tup = heapRelation->rd_att->attrs[indexkey - 1];
 

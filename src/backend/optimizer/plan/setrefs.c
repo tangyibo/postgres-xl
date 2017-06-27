@@ -313,7 +313,7 @@ add_rtes_to_flat_rtable(PlannerInfo *root, bool recursing)
 
 			if (rel != NULL)
 			{
-				Assert(rel->relid == rti);		/* sanity check on array */
+				Assert(rel->relid == rti);	/* sanity check on array */
 
 				/*
 				 * The subquery might never have been planned at all, if it
@@ -1441,13 +1441,13 @@ fix_expr_common(PlannerInfo *root, Node *node)
 	{
 		set_sa_opfuncid((ScalarArrayOpExpr *) node);
 		record_plan_function_dependency(root,
-									 ((ScalarArrayOpExpr *) node)->opfuncid);
+										((ScalarArrayOpExpr *) node)->opfuncid);
 	}
 	else if (IsA(node, ArrayCoerceExpr))
 	{
 		if (OidIsValid(((ArrayCoerceExpr *) node)->elemfuncid))
 			record_plan_function_dependency(root,
-									 ((ArrayCoerceExpr *) node)->elemfuncid);
+											((ArrayCoerceExpr *) node)->elemfuncid);
 	}
 	else if (IsA(node, Const))
 	{
@@ -1957,7 +1957,7 @@ set_dummy_tlist_references(Plan *plan, int rtoffset)
 		}
 		else
 		{
-			newvar->varnoold = 0;		/* wasn't ever a plain Var */
+			newvar->varnoold = 0;	/* wasn't ever a plain Var */
 			newvar->varoattno = 0;
 		}
 
@@ -2186,7 +2186,7 @@ search_indexed_tlist_for_sortgroupref(Expr *node,
 			Var		   *newvar;
 
 			newvar = makeVarFromTargetEntry(newvarno, tle);
-			newvar->varnoold = 0;		/* wasn't ever a plain Var */
+			newvar->varnoold = 0;	/* wasn't ever a plain Var */
 			newvar->varoattno = 0;
 			return newvar;
 		}
@@ -2563,7 +2563,7 @@ record_plan_function_dependency(PlannerInfo *root, Oid funcid)
 		 */
 		inval_item->cacheId = PROCOID;
 		inval_item->hashValue = GetSysCacheHashValue1(PROCOID,
-												   ObjectIdGetDatum(funcid));
+													  ObjectIdGetDatum(funcid));
 
 		root->glob->invalItems = lappend(root->glob->invalItems, inval_item);
 	}

@@ -84,7 +84,7 @@ num_word(Cash value)
 	}
 
 	return buf;
-}	/* num_word() */
+}								/* num_word() */
 
 /* cash_in()
  * Convert a string to a cash data type.
@@ -132,7 +132,7 @@ cash_in(PG_FUNCTION_ARGS)
 		dsymbol = '.';
 	if (*lconvert->mon_thousands_sep != '\0')
 		ssymbol = lconvert->mon_thousands_sep;
-	else	/* ssymbol should not equal dsymbol */
+	else						/* ssymbol should not equal dsymbol */
 		ssymbol = (dsymbol != ',') ? "," : ".";
 	csymbol = (*lconvert->currency_symbol != '\0') ? lconvert->currency_symbol : "$";
 	psymbol = (*lconvert->positive_sign != '\0') ? lconvert->positive_sign : "+";
@@ -347,7 +347,7 @@ cash_out(PG_FUNCTION_ARGS)
 		dsymbol = '.';
 	if (*lconvert->mon_thousands_sep != '\0')
 		ssymbol = lconvert->mon_thousands_sep;
-	else	/* ssymbol should not equal dsymbol */
+	else						/* ssymbol should not equal dsymbol */
 		ssymbol = (dsymbol != ',') ? "," : ".";
 	csymbol = (*lconvert->currency_symbol != '\0') ? lconvert->currency_symbol : "$";
 
@@ -971,10 +971,10 @@ cash_words(PG_FUNCTION_ARGS)
 	val = (uint64) value;
 
 	m0 = val % INT64CONST(100); /* cents */
-	m1 = (val / INT64CONST(100)) % 1000;		/* hundreds */
-	m2 = (val / INT64CONST(100000)) % 1000;		/* thousands */
+	m1 = (val / INT64CONST(100)) % 1000;	/* hundreds */
+	m2 = (val / INT64CONST(100000)) % 1000; /* thousands */
 	m3 = (val / INT64CONST(100000000)) % 1000;	/* millions */
-	m4 = (val / INT64CONST(100000000000)) % 1000;		/* billions */
+	m4 = (val / INT64CONST(100000000000)) % 1000;	/* billions */
 	m5 = (val / INT64CONST(100000000000000)) % 1000;	/* trillions */
 	m6 = (val / INT64CONST(100000000000000000)) % 1000; /* quadrillions */
 

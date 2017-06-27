@@ -62,7 +62,7 @@
 #include "replication/logical.h"
 #include "replication/reorderbuffer.h"
 #include "replication/slot.h"
-#include "replication/snapbuild.h"		/* just for SnapBuildSnapDecRefcount */
+#include "replication/snapbuild.h"	/* just for SnapBuildSnapDecRefcount */
 #include "storage/bufmgr.h"
 #include "storage/fd.h"
 #include "storage/sinval.h"
@@ -124,8 +124,8 @@ typedef struct ReorderBufferToastEnt
 	Size		num_chunks;		/* number of chunks we've already seen */
 	Size		size;			/* combined size of chunks seen */
 	dlist_head	chunks;			/* linked list of chunks */
-	struct varlena *reconstructed;		/* reconstructed varlena now pointed
-										 * to in main tup */
+	struct varlena *reconstructed;	/* reconstructed varlena now pointed to in
+									 * main tup */
 } ReorderBufferToastEnt;
 
 /* Disk serialization support datastructures */
@@ -157,7 +157,7 @@ static const Size max_changes_in_memory = 4096;
  * major bottleneck, especially when spilling to disk while decoding batch
  * workloads.
  */
-static const Size max_cached_tuplebufs = 4096 * 2;		/* ~8MB */
+static const Size max_cached_tuplebufs = 4096 * 2;	/* ~8MB */
 
 /* ---------------------------------------
  * primary reorderbuffer support routines
@@ -180,8 +180,7 @@ static void AssertTXNLsnOrder(ReorderBuffer *rb);
  * ---------------------------------------
  */
 static ReorderBufferIterTXNState *ReorderBufferIterTXNInit(ReorderBuffer *rb, ReorderBufferTXN *txn);
-static ReorderBufferChange *
-			ReorderBufferIterTXNNext(ReorderBuffer *rb, ReorderBufferIterTXNState *state);
+static ReorderBufferChange *ReorderBufferIterTXNNext(ReorderBuffer *rb, ReorderBufferIterTXNState *state);
 static void ReorderBufferIterTXNFinish(ReorderBuffer *rb,
 						   ReorderBufferIterTXNState *state);
 static void ReorderBufferExecuteInvalidations(ReorderBuffer *rb, ReorderBufferTXN *txn);
@@ -893,7 +892,7 @@ ReorderBufferIterTXNInit(ReorderBuffer *rb, ReorderBufferTXN *txn)
 	{
 		ReorderBufferChange *cur_change;
 
-		if (txn->nentries != txn->nentries_mem)
+		if (txn->serialized)
 		{
 			/* serialize remaining changes */
 			ReorderBufferSerializeTXN(rb, txn);
@@ -922,7 +921,7 @@ ReorderBufferIterTXNInit(ReorderBuffer *rb, ReorderBufferTXN *txn)
 		{
 			ReorderBufferChange *cur_change;
 
-			if (cur_txn->nentries != cur_txn->nentries_mem)
+			if (cur_txn->serialized)
 			{
 				/* serialize remaining changes */
 				ReorderBufferSerializeTXN(rb, cur_txn);
@@ -1142,7 +1141,7 @@ ReorderBufferCleanupTXN(ReorderBuffer *rb, ReorderBufferTXN *txn)
 	Assert(found);
 
 	/* remove entries spilled to disk */
-	if (txn->nentries != txn->nentries_mem)
+	if (txn->serialized)
 		ReorderBufferRestoreCleanup(rb, txn);
 
 	/* deallocate */
@@ -1404,7 +1403,7 @@ ReorderBufferCommit(ReorderBuffer *rb, TransactionId xid,
 					Assert(snapshot_now);
 
 					reloid = RelidByRelfilenode(change->data.tp.relnode.spcNode,
-											change->data.tp.relnode.relNode);
+												change->data.tp.relnode.relNode);
 
 					/*
 					 * Catalog tuple without data, emitted while catalog was
@@ -1566,7 +1565,7 @@ ReorderBufferCommit(ReorderBuffer *rb, TransactionId xid,
 						{
 							/* we don't use the global one anymore */
 							snapshot_now = ReorderBufferCopySnap(rb, snapshot_now,
-															txn, command_id);
+																 txn, command_id);
 						}
 
 						snapshot_now->curcid = command_id;
@@ -2124,6 +2123,7 @@ ReorderBufferSerializeTXN(ReorderBuffer *rb, ReorderBufferTXN *txn)
 	Assert(spilled == txn->nentries_mem);
 	Assert(dlist_is_empty(&txn->changes));
 	txn->nentries_mem = 0;
+	txn->serialized = true;
 
 	if (fd != -1)
 		CloseTransientFile(fd);
@@ -2384,7 +2384,7 @@ ReorderBufferRestoreChanges(ReorderBuffer *rb, ReorderBufferTXN *txn,
 		else if (readBytes < 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
-				errmsg("could not read from reorderbuffer spill file: %m")));
+					 errmsg("could not read from reorderbuffer spill file: %m")));
 		else if (readBytes != sizeof(ReorderBufferDiskChange))
 			ereport(ERROR,
 					(errcode_for_file_access(),
@@ -2395,7 +2395,7 @@ ReorderBufferRestoreChanges(ReorderBuffer *rb, ReorderBufferTXN *txn,
 		ondisk = (ReorderBufferDiskChange *) rb->outbuf;
 
 		ReorderBufferSerializeReserve(rb,
-							 sizeof(ReorderBufferDiskChange) + ondisk->size);
+									  sizeof(ReorderBufferDiskChange) + ondisk->size);
 		ondisk = (ReorderBufferDiskChange *) rb->outbuf;
 
 		pgstat_report_wait_start(WAIT_EVENT_REORDER_BUFFER_READ);
@@ -2406,13 +2406,13 @@ ReorderBufferRestoreChanges(ReorderBuffer *rb, ReorderBufferTXN *txn,
 		if (readBytes < 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
-				errmsg("could not read from reorderbuffer spill file: %m")));
+					 errmsg("could not read from reorderbuffer spill file: %m")));
 		else if (readBytes != ondisk->size - sizeof(ReorderBufferDiskChange))
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not read from reorderbuffer spill file: read %d instead of %u bytes",
 							readBytes,
-				(uint32) (ondisk->size - sizeof(ReorderBufferDiskChange)))));
+							(uint32) (ondisk->size - sizeof(ReorderBufferDiskChange)))));
 
 		/*
 		 * ok, read a full change from disk, now restore it into proper
@@ -2521,7 +2521,7 @@ ReorderBufferRestoreChange(ReorderBuffer *rb, ReorderBufferTXN *txn,
 				memcpy(&change->data.msg.message_size, data, sizeof(Size));
 				data += sizeof(Size);
 				change->data.msg.message = MemoryContextAlloc(rb->context,
-											  change->data.msg.message_size);
+															  change->data.msg.message_size);
 				memcpy(change->data.msg.message, data,
 					   change->data.msg.message_size);
 				data += change->data.msg.message_size;
@@ -2867,7 +2867,7 @@ ReorderBufferToastReplace(ReorderBuffer *rb, ReorderBufferTXN *txn,
 			cchange = dlist_container(ReorderBufferChange, node, it.cur);
 			ctup = cchange->data.tp.newtuple;
 			chunk = DatumGetPointer(
-						  fastgetattr(&ctup->tuple, 3, toast_desc, &isnull));
+									fastgetattr(&ctup->tuple, 3, toast_desc, &isnull));
 
 			Assert(!isnull);
 			Assert(!VARATT_IS_EXTERNAL(chunk));

@@ -101,7 +101,7 @@ statext_ndistinct_build(double totalrows, int numrows, HeapTuple *rows,
 			item->attrs = NULL;
 			for (j = 0; j < k; j++)
 				item->attrs = bms_add_member(item->attrs,
-										stats[combination[j]]->attr->attnum);
+											 stats[combination[j]]->attr->attnum);
 			item->ndistinct =
 				ndistinct_for_combination(totalrows, numrows, rows,
 										  stats, k, combination);
@@ -166,7 +166,7 @@ statext_ndistinct_serialize(MVNDistinct *ndistinct)
 	 * for each item, including number of items for each.
 	 */
 	len = VARHDRSZ + SizeOfMVNDistinct +
-		ndistinct->nitems * (offsetof(MVNDistinctItem, attrs) +sizeof(int));
+		ndistinct->nitems * (offsetof(MVNDistinctItem, attrs) + sizeof(int));
 
 	/* and also include space for the actual attribute numbers */
 	for (i = 0; i < ndistinct->nitems; i++)
@@ -275,8 +275,8 @@ statext_ndistinct_deserialize(bytea *data)
 	if (VARSIZE_ANY_EXHDR(data) < minimum_size)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATA_CORRUPTED),
-			   errmsg("invalid MVNDistinct size %zd (expected at least %zd)",
-					  VARSIZE_ANY_EXHDR(data), minimum_size)));
+				 errmsg("invalid MVNDistinct size %zd (expected at least %zd)",
+						VARSIZE_ANY_EXHDR(data), minimum_size)));
 
 	/*
 	 * Allocate space for the ndistinct items (no space for each item's
@@ -513,10 +513,10 @@ estimate_ndistinct(double totalrows, int numrows, int d, int f1)
 				denom,
 				ndistinct;
 
-	numer = (double) numrows *(double) d;
+	numer = (double) numrows * (double) d;
 
 	denom = (double) (numrows - f1) +
-		(double) f1 *(double) numrows / totalrows;
+		(double) f1 * (double) numrows / totalrows;
 
 	ndistinct = numer / denom;
 

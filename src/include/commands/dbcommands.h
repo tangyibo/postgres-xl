@@ -35,4 +35,4 @@ extern void check_encoding_locale_matches(int encoding, const char *collate, con
 extern bool IsSetTableSpace(AlterDatabaseStmt *stmt);
 #endif
 
-#endif   /* DBCOMMANDS_H */
+#endif							/* DBCOMMANDS_H */

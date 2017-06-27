@@ -63,7 +63,7 @@ struct copy_options
 
 
 static void
-free_copy_options(struct copy_options * ptr)
+free_copy_options(struct copy_options *ptr)
 {
 	if (!ptr)
 		return;
@@ -102,7 +102,7 @@ parse_slash_copy(const char *args)
 
 	result = pg_malloc0(sizeof(struct copy_options));
 
-	result->before_tofrom = pg_strdup("");		/* initialize for appending */
+	result->before_tofrom = pg_strdup("");	/* initialize for appending */
 
 	token = strtokx(args, whitespace, ".,()", "\"",
 					0, false, false, pset.encoding);
@@ -629,8 +629,7 @@ handleCopyIn(PGconn *conn, FILE *copystream, bool isbinary, PGresult **res)
 					/*
 					 * This code erroneously assumes '\.' on a line alone
 					 * inside a quoted CSV string terminates the \copy.
-					 * http://www.postgresql.org/message-id/E1TdNVQ-0001ju-GO@w
-					 * rigleys.postgresql.org
+					 * http://www.postgresql.org/message-id/E1TdNVQ-0001ju-GO@wrigleys.postgresql.org
 					 */
 					if (strcmp(buf, "\\.\n") == 0 ||
 						strcmp(buf, "\\.\r\n") == 0)

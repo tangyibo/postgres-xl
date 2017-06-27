@@ -75,21 +75,21 @@
  * Timer definitions.
  * ----------
  */
-#define PGSTAT_STAT_INTERVAL	500		/* Minimum time between stats file
-										 * updates; in milliseconds. */
+#define PGSTAT_STAT_INTERVAL	500 /* Minimum time between stats file
+									 * updates; in milliseconds. */
 
-#define PGSTAT_RETRY_DELAY		10		/* How long to wait between checks for
-										 * a new file; in milliseconds. */
+#define PGSTAT_RETRY_DELAY		10	/* How long to wait between checks for a
+									 * new file; in milliseconds. */
 
 #define PGSTAT_MAX_WAIT_TIME	10000	/* Maximum time to wait for a stats
 										 * file update; in milliseconds. */
 
-#define PGSTAT_INQ_INTERVAL		640		/* How often to ping the collector for
-										 * a new file; in milliseconds. */
+#define PGSTAT_INQ_INTERVAL		640 /* How often to ping the collector for a
+									 * new file; in milliseconds. */
 
-#define PGSTAT_RESTART_INTERVAL 60		/* How often to attempt to restart a
-										 * failed statistics collector; in
-										 * seconds. */
+#define PGSTAT_RESTART_INTERVAL 60	/* How often to attempt to restart a
+									 * failed statistics collector; in
+									 * seconds. */
 
 #define PGSTAT_POLL_LOOP_COUNT	(PGSTAT_MAX_WAIT_TIME / PGSTAT_RETRY_DELAY)
 #define PGSTAT_INQ_LOOP_COUNT	(PGSTAT_INQ_INTERVAL / PGSTAT_RETRY_DELAY)
@@ -214,7 +214,7 @@ typedef struct PgStat_SubXactStatus
 {
 	int			nest_level;		/* subtransaction nest level */
 	struct PgStat_SubXactStatus *prev;	/* higher-level subxact if any */
-	PgStat_TableXactStatus *first;		/* head of list for this subxact */
+	PgStat_TableXactStatus *first;	/* head of list for this subxact */
 } PgStat_SubXactStatus;
 
 static PgStat_SubXactStatus *pgStatXactStack = NULL;
@@ -227,9 +227,9 @@ PgStat_Counter pgStatBlockWriteTime = 0;
 /* Record that's written to 2PC state file when pgstat state is persisted */
 typedef struct TwoPhasePgStatRecord
 {
-	PgStat_Counter tuples_inserted;		/* tuples inserted in xact */
-	PgStat_Counter tuples_updated;		/* tuples updated in xact */
-	PgStat_Counter tuples_deleted;		/* tuples deleted in xact */
+	PgStat_Counter tuples_inserted; /* tuples inserted in xact */
+	PgStat_Counter tuples_updated;	/* tuples updated in xact */
+	PgStat_Counter tuples_deleted;	/* tuples deleted in xact */
 	PgStat_Counter inserted_pre_trunc;	/* tuples inserted prior to truncate */
 	PgStat_Counter updated_pre_trunc;	/* tuples updated prior to truncate */
 	PgStat_Counter deleted_pre_trunc;	/* tuples deleted prior to truncate */
@@ -376,7 +376,7 @@ pgstat_init(void)
 	 * compile-time cross-check that we didn't.
 	 */
 	StaticAssertStmt(sizeof(PgStat_Msg) <= PGSTAT_MAX_MSG_SIZE,
-				   "maximum stats message size exceeds PGSTAT_MAX_MSG_SIZE");
+					 "maximum stats message size exceeds PGSTAT_MAX_MSG_SIZE");
 
 	/*
 	 * Create the UDP socket for sending and receiving statistic messages
@@ -416,7 +416,7 @@ pgstat_init(void)
 
 		if (++tries > 1)
 			ereport(LOG,
-			(errmsg("trying another address for the statistics collector")));
+					(errmsg("trying another address for the statistics collector")));
 
 		/*
 		 * Create the socket.
@@ -425,7 +425,7 @@ pgstat_init(void)
 		{
 			ereport(LOG,
 					(errcode_for_socket_access(),
-			errmsg("could not create socket for statistics collector: %m")));
+					 errmsg("could not create socket for statistics collector: %m")));
 			continue;
 		}
 
@@ -437,14 +437,14 @@ pgstat_init(void)
 		{
 			ereport(LOG,
 					(errcode_for_socket_access(),
-			  errmsg("could not bind socket for statistics collector: %m")));
+					 errmsg("could not bind socket for statistics collector: %m")));
 			closesocket(pgStatSock);
 			pgStatSock = PGINVALID_SOCKET;
 			continue;
 		}
 
 		alen = sizeof(pgStatAddr);
-		if (getsockname(pgStatSock, (struct sockaddr *) & pgStatAddr, &alen) < 0)
+		if (getsockname(pgStatSock, (struct sockaddr *) &pgStatAddr, &alen) < 0)
 		{
 			ereport(LOG,
 					(errcode_for_socket_access(),
@@ -460,11 +460,11 @@ pgstat_init(void)
 		 * provides a kernel-level check that only packets from this same
 		 * address will be received.
 		 */
-		if (connect(pgStatSock, (struct sockaddr *) & pgStatAddr, alen) < 0)
+		if (connect(pgStatSock, (struct sockaddr *) &pgStatAddr, alen) < 0)
 		{
 			ereport(LOG,
 					(errcode_for_socket_access(),
-			errmsg("could not connect socket for statistics collector: %m")));
+					 errmsg("could not connect socket for statistics collector: %m")));
 			closesocket(pgStatSock);
 			pgStatSock = PGINVALID_SOCKET;
 			continue;
@@ -613,7 +613,7 @@ retry2:
 
 startup_failed:
 	ereport(LOG,
-	  (errmsg("disabling statistics collector for lack of working socket")));
+			(errmsg("disabling statistics collector for lack of working socket")));
 
 	if (addrs)
 		pg_freeaddrinfo_all(hints.ai_family, addrs);
@@ -711,7 +711,7 @@ pgstat_forkexec(void)
 
 	return postmaster_forkexec(ac, av);
 }
-#endif   /* EXEC_BACKEND */
+#endif							/* EXEC_BACKEND */
 
 
 /*
@@ -1108,7 +1108,7 @@ pgstat_vacuum_stat(void)
 		if (msg.m_nentries >= PGSTAT_NUM_TABPURGE)
 		{
 			len = offsetof(PgStat_MsgTabpurge, m_tableid[0])
-				+msg.m_nentries * sizeof(Oid);
+				+ msg.m_nentries * sizeof(Oid);
 
 			pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_TABPURGE);
 			msg.m_databaseid = MyDatabaseId;
@@ -1124,7 +1124,7 @@ pgstat_vacuum_stat(void)
 	if (msg.m_nentries > 0)
 	{
 		len = offsetof(PgStat_MsgTabpurge, m_tableid[0])
-			+msg.m_nentries * sizeof(Oid);
+			+ msg.m_nentries * sizeof(Oid);
 
 		pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_TABPURGE);
 		msg.m_databaseid = MyDatabaseId;
@@ -1168,7 +1168,7 @@ pgstat_vacuum_stat(void)
 			if (f_msg.m_nentries >= PGSTAT_NUM_FUNCPURGE)
 			{
 				len = offsetof(PgStat_MsgFuncpurge, m_functionid[0])
-					+f_msg.m_nentries * sizeof(Oid);
+					+ f_msg.m_nentries * sizeof(Oid);
 
 				pgstat_send(&f_msg, len);
 
@@ -1182,7 +1182,7 @@ pgstat_vacuum_stat(void)
 		if (f_msg.m_nentries > 0)
 		{
 			len = offsetof(PgStat_MsgFuncpurge, m_functionid[0])
-				+f_msg.m_nentries * sizeof(Oid);
+				+ f_msg.m_nentries * sizeof(Oid);
 
 			pgstat_send(&f_msg, len);
 		}
@@ -1285,13 +1285,13 @@ pgstat_drop_relation(Oid relid)
 	msg.m_tableid[0] = relid;
 	msg.m_nentries = 1;
 
-	len = offsetof(PgStat_MsgTabpurge, m_tableid[0]) +sizeof(Oid);
+	len = offsetof(PgStat_MsgTabpurge, m_tableid[0]) + sizeof(Oid);
 
 	pgstat_setheader(&msg.m_hdr, PGSTAT_MTYPE_TABPURGE);
 	msg.m_databaseid = MyDatabaseId;
 	pgstat_send(&msg, len);
 }
-#endif   /* NOT_USED */
+#endif							/* NOT_USED */
 
 
 /* ----------
@@ -2676,11 +2676,11 @@ BackendStatusShmemSize(void)
 					mul_size(NAMEDATALEN, NumBackendStatSlots));
 	/* BackendActivityBuffer: */
 	size = add_size(size,
-			mul_size(pgstat_track_activity_query_size, NumBackendStatSlots));
+					mul_size(pgstat_track_activity_query_size, NumBackendStatSlots));
 #ifdef USE_SSL
 	/* BackendSslStatusBuffer: */
 	size = add_size(size,
-				  mul_size(sizeof(PgBackendSSLStatus), NumBackendStatSlots));
+					mul_size(sizeof(PgBackendSSLStatus), NumBackendStatSlots));
 #endif
 	return size;
 }
@@ -3301,13 +3301,13 @@ pgstat_read_current_status(void)
 
 	localtable = (LocalPgBackendStatus *)
 		MemoryContextAlloc(pgStatLocalContext,
-						 sizeof(LocalPgBackendStatus) * NumBackendStatSlots);
+						   sizeof(LocalPgBackendStatus) * NumBackendStatSlots);
 	localappname = (char *)
 		MemoryContextAlloc(pgStatLocalContext,
 						   NAMEDATALEN * NumBackendStatSlots);
 	localactivity = (char *)
 		MemoryContextAlloc(pgStatLocalContext,
-					 pgstat_track_activity_query_size * NumBackendStatSlots);
+						   pgstat_track_activity_query_size * NumBackendStatSlots);
 #ifdef USE_SSL
 	localsslstatus = (PgBackendSSLStatus *)
 		MemoryContextAlloc(pgStatLocalContext,
@@ -4406,13 +4406,13 @@ PgstatCollectorMain(int argc, char *argv[])
 
 				case PGSTAT_MTYPE_RESETSHAREDCOUNTER:
 					pgstat_recv_resetsharedcounter(
-									   (PgStat_MsgResetsharedcounter *) &msg,
+												   (PgStat_MsgResetsharedcounter *) &msg,
 												   len);
 					break;
 
 				case PGSTAT_MTYPE_RESETSINGLECOUNTER:
 					pgstat_recv_resetsinglecounter(
-									   (PgStat_MsgResetsinglecounter *) &msg,
+												   (PgStat_MsgResetsinglecounter *) &msg,
 												   len);
 					break;
 
@@ -4464,7 +4464,7 @@ PgstatCollectorMain(int argc, char *argv[])
 		/* Sleep until there's something to do */
 #ifndef WIN32
 		wr = WaitLatchOrSocket(MyLatch,
-					 WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_SOCKET_READABLE,
+							   WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_SOCKET_READABLE,
 							   pgStatSock, -1L,
 							   WAIT_EVENT_PGSTAT_MAIN);
 #else
@@ -4480,7 +4480,7 @@ PgstatCollectorMain(int argc, char *argv[])
 		 * backend_read_statsfile.
 		 */
 		wr = WaitLatchOrSocket(MyLatch,
-		WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_SOCKET_READABLE | WL_TIMEOUT,
+							   WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_SOCKET_READABLE | WL_TIMEOUT,
 							   pgStatSock,
 							   2 * 1000L /* msec */ ,
 							   WAIT_EVENT_PGSTAT_MAIN);
@@ -4759,8 +4759,8 @@ pgstat_write_statsfiles(bool permanent, bool allDbs)
 	{
 		ereport(LOG,
 				(errcode_for_file_access(),
-			   errmsg("could not write temporary statistics file \"%s\": %m",
-					  tmpfile)));
+				 errmsg("could not write temporary statistics file \"%s\": %m",
+						tmpfile)));
 		FreeFile(fpout);
 		unlink(tmpfile);
 	}
@@ -4768,8 +4768,8 @@ pgstat_write_statsfiles(bool permanent, bool allDbs)
 	{
 		ereport(LOG,
 				(errcode_for_file_access(),
-			   errmsg("could not close temporary statistics file \"%s\": %m",
-					  tmpfile)));
+				 errmsg("could not close temporary statistics file \"%s\": %m",
+						tmpfile)));
 		unlink(tmpfile);
 	}
 	else if (rename(tmpfile, statfile) < 0)
@@ -4894,8 +4894,8 @@ pgstat_write_db_statsfile(PgStat_StatDBEntry *dbentry, bool permanent)
 	{
 		ereport(LOG,
 				(errcode_for_file_access(),
-			   errmsg("could not write temporary statistics file \"%s\": %m",
-					  tmpfile)));
+				 errmsg("could not write temporary statistics file \"%s\": %m",
+						tmpfile)));
 		FreeFile(fpout);
 		unlink(tmpfile);
 	}
@@ -4903,8 +4903,8 @@ pgstat_write_db_statsfile(PgStat_StatDBEntry *dbentry, bool permanent)
 	{
 		ereport(LOG,
 				(errcode_for_file_access(),
-			   errmsg("could not close temporary statistics file \"%s\": %m",
-					  tmpfile)));
+				 errmsg("could not close temporary statistics file \"%s\": %m",
+						tmpfile)));
 		unlink(tmpfile);
 	}
 	else if (rename(tmpfile, statfile) < 0)
@@ -5023,8 +5023,19 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 	{
 		ereport(pgStatRunningInCollector ? LOG : WARNING,
 				(errmsg("corrupted statistics file \"%s\"", statfile)));
+		memset(&globalStats, 0, sizeof(globalStats));
 		goto done;
 	}
+
+	/*
+	 * In the collector, disregard the timestamp we read from the permanent
+	 * stats file; we should be willing to write a temp stats file immediately
+	 * upon the first request from any backend.  This only matters if the old
+	 * file's timestamp is less than PGSTAT_STAT_INTERVAL ago, but that's not
+	 * an unusual scenario.
+	 */
+	if (pgStatRunningInCollector)
+		globalStats.stats_timestamp = 0;
 
 	/*
 	 * Read archiver stats struct
@@ -5033,6 +5044,7 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 	{
 		ereport(pgStatRunningInCollector ? LOG : WARNING,
 				(errmsg("corrupted statistics file \"%s\"", statfile)));
+		memset(&archiverStats, 0, sizeof(archiverStats));
 		goto done;
 	}
 
@@ -5062,7 +5074,7 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 				 * Add to the DB hash
 				 */
 				dbentry = (PgStat_StatDBEntry *) hash_search(dbhash,
-												  (void *) &dbbuf.databaseid,
+															 (void *) &dbbuf.databaseid,
 															 HASH_ENTER,
 															 &found);
 				if (found)
@@ -5076,6 +5088,15 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 				memcpy(dbentry, &dbbuf, sizeof(PgStat_StatDBEntry));
 				dbentry->tables = NULL;
 				dbentry->functions = NULL;
+
+				/*
+				 * In the collector, disregard the timestamp we read from the
+				 * permanent stats file; we should be willing to write a temp
+				 * stats file immediately upon the first request from any
+				 * backend.
+				 */
+				if (pgStatRunningInCollector)
+					dbentry->stats_timestamp = 0;
 
 				/*
 				 * Don't create tables/functions hashtables for uninteresting
@@ -5095,7 +5116,7 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 				dbentry->tables = hash_create("Per-database table",
 											  PGSTAT_TAB_HASH_SIZE,
 											  &hash_ctl,
-									  HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
+											  HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
 
 				hash_ctl.keysize = sizeof(Oid);
 				hash_ctl.entrysize = sizeof(PgStat_StatFuncEntry);
@@ -5103,7 +5124,7 @@ pgstat_read_statsfiles(Oid onlydb, bool permanent, bool deep)
 				dbentry->functions = hash_create("Per-database function",
 												 PGSTAT_FUNCTION_HASH_SIZE,
 												 &hash_ctl,
-									  HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
+												 HASH_ELEM | HASH_BLOBS | HASH_CONTEXT);
 
 				/*
 				 * If requested, read the data from the database-specific
@@ -5229,8 +5250,8 @@ pgstat_read_db_statsfile(Oid databaseid, HTAB *tabhash, HTAB *funchash,
 					break;
 
 				tabentry = (PgStat_StatTabEntry *) hash_search(tabhash,
-													(void *) &tabbuf.tableid,
-														 HASH_ENTER, &found);
+															   (void *) &tabbuf.tableid,
+															   HASH_ENTER, &found);
 
 				if (found)
 				{
@@ -5263,8 +5284,8 @@ pgstat_read_db_statsfile(Oid databaseid, HTAB *tabhash, HTAB *funchash,
 					break;
 
 				funcentry = (PgStat_StatFuncEntry *) hash_search(funchash,
-												(void *) &funcbuf.functionid,
-														 HASH_ENTER, &found);
+																 (void *) &funcbuf.functionid,
+																 HASH_ENTER, &found);
 
 				if (found)
 				{
@@ -5731,7 +5752,7 @@ pgstat_recv_tabstat(PgStat_MsgTabstat *msg, int len)
 		PgStat_TableEntry *tabmsg = &(msg->m_entry[i]);
 
 		tabentry = (PgStat_StatTabEntry *) hash_search(dbentry->tables,
-													(void *) &(tabmsg->t_id),
+													   (void *) &(tabmsg->t_id),
 													   HASH_ENTER, &found);
 
 		if (!found)
@@ -6216,7 +6237,7 @@ pgstat_recv_funcstat(PgStat_MsgFuncstat *msg, int len)
 	for (i = 0; i < msg->m_nentries; i++, funcmsg++)
 	{
 		funcentry = (PgStat_StatFuncEntry *) hash_search(dbentry->functions,
-												   (void *) &(funcmsg->f_id),
+														 (void *) &(funcmsg->f_id),
 														 HASH_ENTER, &found);
 
 		if (!found)

@@ -10,7 +10,7 @@ typedef int64 timestamp;
 typedef int64 TimestampTz;
 
 #ifdef __cplusplus
-extern		"C"
+extern "C"
 {
 #endif
 
@@ -27,4 +27,4 @@ extern int	PGTYPEStimestamp_sub_interval(timestamp * tin, interval * span, times
 }
 #endif
 
-#endif   /* PGTYPES_TIMESTAMP */
+#endif							/* PGTYPES_TIMESTAMP */

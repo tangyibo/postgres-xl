@@ -97,4 +97,4 @@ extern void ResourceOwnerForgetPreparedStmt(ResourceOwner owner,
 						char *stmt);
 #endif
 
-#endif   /* RESOWNER_PRIVATE_H */
+#endif							/* RESOWNER_PRIVATE_H */

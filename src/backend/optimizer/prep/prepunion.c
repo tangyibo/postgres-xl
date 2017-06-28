@@ -312,6 +312,19 @@ recurse_set_operations(Node *setOp, PlannerInfo *root,
 		subpath = get_cheapest_fractional_path(final_rel,
 											   root->tuple_fraction);
 
+#ifdef XCP
+		/*
+		  * create remote_subplan_path if needed, and we'll use this path to
+		  * create remote_subplan at the top.
+		  */
+		if(subpath->distribution)
+		{
+			subpath = create_remotesubplan_path(NULL, subpath, NULL);
+
+			subroot->distribution = NULL;
+		}
+#endif
+
 		/*
 		 * Stick a SubqueryScanPath atop that.
 		 *

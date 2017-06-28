@@ -107,68 +107,6 @@ static Expr * pgxc_find_distcol_expr(Index varno,
 					   Node *quals);
 #endif
 
-static const unsigned int xc_mod_m[] =
-{
-  0x00000000, 0x55555555, 0x33333333, 0xc71c71c7,
-  0x0f0f0f0f, 0xc1f07c1f, 0x3f03f03f, 0xf01fc07f,
-  0x00ff00ff, 0x07fc01ff, 0x3ff003ff, 0xffc007ff,
-  0xff000fff, 0xfc001fff, 0xf0003fff, 0xc0007fff,
-  0x0000ffff, 0x0001ffff, 0x0003ffff, 0x0007ffff,
-  0x000fffff, 0x001fffff, 0x003fffff, 0x007fffff,
-  0x00ffffff, 0x01ffffff, 0x03ffffff, 0x07ffffff,
-  0x0fffffff, 0x1fffffff, 0x3fffffff, 0x7fffffff
-};
-
-static const unsigned int xc_mod_q[][6] =
-{
-  { 0,  0,  0,  0,  0,  0}, {16,  8,  4,  2,  1,  1}, {16,  8,  4,  2,  2,  2},
-  {15,  6,  3,  3,  3,  3}, {16,  8,  4,  4,  4,  4}, {15,  5,  5,  5,  5,  5},
-  {12,  6,  6,  6 , 6,  6}, {14,  7,  7,  7,  7,  7}, {16,  8,  8,  8,  8,  8},
-  { 9,  9,  9,  9,  9,  9}, {10, 10, 10, 10, 10, 10}, {11, 11, 11, 11, 11, 11},
-  {12, 12, 12, 12, 12, 12}, {13, 13, 13, 13, 13, 13}, {14, 14, 14, 14, 14, 14},
-  {15, 15, 15, 15, 15, 15}, {16, 16, 16, 16, 16, 16}, {17, 17, 17, 17, 17, 17},
-  {18, 18, 18, 18, 18, 18}, {19, 19, 19, 19, 19, 19}, {20, 20, 20, 20, 20, 20},
-  {21, 21, 21, 21, 21, 21}, {22, 22, 22, 22, 22, 22}, {23, 23, 23, 23, 23, 23},
-  {24, 24, 24, 24, 24, 24}, {25, 25, 25, 25, 25, 25}, {26, 26, 26, 26, 26, 26},
-  {27, 27, 27, 27, 27, 27}, {28, 28, 28, 28, 28, 28}, {29, 29, 29, 29, 29, 29},
-  {30, 30, 30, 30, 30, 30}, {31, 31, 31, 31, 31, 31}
-};
-
-static const unsigned int xc_mod_r[][6] =
-{
-  {0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000},
-  {0x0000ffff, 0x000000ff, 0x0000000f, 0x00000003, 0x00000001, 0x00000001},
-  {0x0000ffff, 0x000000ff, 0x0000000f, 0x00000003, 0x00000003, 0x00000003},
-  {0x00007fff, 0x0000003f, 0x00000007, 0x00000007, 0x00000007, 0x00000007},
-  {0x0000ffff, 0x000000ff, 0x0000000f, 0x0000000f, 0x0000000f, 0x0000000f},
-  {0x00007fff, 0x0000001f, 0x0000001f, 0x0000001f, 0x0000001f, 0x0000001f},
-  {0x00000fff, 0x0000003f, 0x0000003f, 0x0000003f, 0x0000003f, 0x0000003f},
-  {0x00003fff, 0x0000007f, 0x0000007f, 0x0000007f, 0x0000007f, 0x0000007f},
-  {0x0000ffff, 0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff, 0x000000ff},
-  {0x000001ff, 0x000001ff, 0x000001ff, 0x000001ff, 0x000001ff, 0x000001ff},
-  {0x000003ff, 0x000003ff, 0x000003ff, 0x000003ff, 0x000003ff, 0x000003ff},
-  {0x000007ff, 0x000007ff, 0x000007ff, 0x000007ff, 0x000007ff, 0x000007ff},
-  {0x00000fff, 0x00000fff, 0x00000fff, 0x00000fff, 0x00000fff, 0x00000fff},
-  {0x00001fff, 0x00001fff, 0x00001fff, 0x00001fff, 0x00001fff, 0x00001fff},
-  {0x00003fff, 0x00003fff, 0x00003fff, 0x00003fff, 0x00003fff, 0x00003fff},
-  {0x00007fff, 0x00007fff, 0x00007fff, 0x00007fff, 0x00007fff, 0x00007fff},
-  {0x0000ffff, 0x0000ffff, 0x0000ffff, 0x0000ffff, 0x0000ffff, 0x0000ffff},
-  {0x0001ffff, 0x0001ffff, 0x0001ffff, 0x0001ffff, 0x0001ffff, 0x0001ffff},
-  {0x0003ffff, 0x0003ffff, 0x0003ffff, 0x0003ffff, 0x0003ffff, 0x0003ffff},
-  {0x0007ffff, 0x0007ffff, 0x0007ffff, 0x0007ffff, 0x0007ffff, 0x0007ffff},
-  {0x000fffff, 0x000fffff, 0x000fffff, 0x000fffff, 0x000fffff, 0x000fffff},
-  {0x001fffff, 0x001fffff, 0x001fffff, 0x001fffff, 0x001fffff, 0x001fffff},
-  {0x003fffff, 0x003fffff, 0x003fffff, 0x003fffff, 0x003fffff, 0x003fffff},
-  {0x007fffff, 0x007fffff, 0x007fffff, 0x007fffff, 0x007fffff, 0x007fffff},
-  {0x00ffffff, 0x00ffffff, 0x00ffffff, 0x00ffffff, 0x00ffffff, 0x00ffffff},
-  {0x01ffffff, 0x01ffffff, 0x01ffffff, 0x01ffffff, 0x01ffffff, 0x01ffffff},
-  {0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff, 0x03ffffff},
-  {0x07ffffff, 0x07ffffff, 0x07ffffff, 0x07ffffff, 0x07ffffff, 0x07ffffff},
-  {0x0fffffff, 0x0fffffff, 0x0fffffff, 0x0fffffff, 0x0fffffff, 0x0fffffff},
-  {0x1fffffff, 0x1fffffff, 0x1fffffff, 0x1fffffff, 0x1fffffff, 0x1fffffff},
-  {0x3fffffff, 0x3fffffff, 0x3fffffff, 0x3fffffff, 0x3fffffff, 0x3fffffff},
-  {0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff, 0x7fffffff}
-};
 
 /*
  * GetPreferredReplicationNode
@@ -258,54 +196,13 @@ GetAnyDataNode(Bitmapset *nodes)
 
 /*
  * compute_modulo
- * This function performs modulo in an optimized way
- * It optimizes modulo of any positive number by
- * 1,2,3,4,7,8,15,16,31,32,63,64 and so on
- * for the rest of the denominators it uses % operator
- * The optimized algos have been taken from
- * http://www-graphics.stanford.edu/~seander/bithacks.html
+ *	Computes modulo of two 64-bit unsigned values.
  */
 static int
-compute_modulo(unsigned int numerator, unsigned int denominator)
+compute_modulo(uint64 numerator, uint64 denominator)
 {
-	unsigned int d;
-	unsigned int m;
-	unsigned int s;
-	unsigned int mask;
-	int k;
-	unsigned int q, r;
+	Assert(denominator > 0);
 
-	if (numerator == 0)
-		return 0;
-
-	/* Check if denominator is a power of 2 */
-	if ((denominator & (denominator - 1)) == 0)
-		return numerator & (denominator - 1);
-
-	/* Check if (denominator+1) is a power of 2 */
-	d = denominator + 1;
-	if ((d & (d - 1)) == 0)
-	{
-		/* Which power of 2 is this number */
-		s = 0;
-		mask = 0x01;
-		for (k = 0; k < 32; k++)
-		{
-			if ((d & mask) == mask)
-				break;
-			s++;
-			mask = mask << 1;
-		}
-
-		m = (numerator & xc_mod_m[s]) + ((numerator >> s) & xc_mod_m[s]);
-
-		for (q = 0, r = 0; m > denominator; q++, r++)
-			m = (m >> xc_mod_q[s][q]) + (m & xc_mod_r[s][r]);
-
-		m = m == denominator ? 0 : m;
-
-		return m;
-	}
 	return numerator % denominator;
 }
 
@@ -364,54 +261,28 @@ GetRelationHashColumn(RelationLocInfo * rel_loc_info)
 }
 
 /*
- * IsHashColumn - return whether or not column for relation is hashed.
- *
- */
-bool
-IsHashColumn(RelationLocInfo *rel_loc_info, char *part_col_name)
-{
-	bool		ret_value = false;
-
-	if (!rel_loc_info || !part_col_name)
-		ret_value = false;
-	else if (rel_loc_info->locatorType != LOCATOR_TYPE_HASH)
-		ret_value = false;
-	else
-		ret_value = !strcmp(part_col_name, rel_loc_info->partAttrName);
-
-	return ret_value;
-}
-
-
-/*
- * IsHashColumnForRelId - return whether or not column for relation is hashed.
- *
- */
-bool
-IsHashColumnForRelId(Oid relid, char *part_col_name)
-{
-	RelationLocInfo *rel_loc_info = GetRelationLocInfo(relid);
-
-	return IsHashColumn(rel_loc_info, part_col_name);
-}
-
-/*
  * IsDistColumnForRelId - return whether or not column for relation is used for hash or modulo distribution
  *
  */
 bool
 IsDistColumnForRelId(Oid relid, char *part_col_name)
 {
-	bool bRet;
 	RelationLocInfo *rel_loc_info;
 
-	rel_loc_info = GetRelationLocInfo(relid);
-	bRet = false;
+	/* if no column is specified, we're done */
+	if (!part_col_name)
+		return false;
 
-	bRet = IsHashColumn(rel_loc_info, part_col_name);
-	if (bRet == false)
-		IsModuloColumn(rel_loc_info, part_col_name);
-	return bRet;
+	/* if no locator, we're done too */
+	if (!(rel_loc_info = GetRelationLocInfo(relid)))
+		return false;
+
+	/* is the table distributed by column value */
+	if (!IsRelationDistributedByValue(rel_loc_info))
+		return false;
+
+	/* does the column name match the distribution column */
+	return !strcmp(part_col_name, rel_loc_info->partAttrName);
 }
 
 
@@ -448,37 +319,6 @@ GetRelationModuloColumn(RelationLocInfo * rel_loc_info)
 	}
 
 	return column_str;
-}
-
-/*
- * IsModuloColumn - return whether or not column for relation is used for modulo distribution.
- *
- */
-bool
-IsModuloColumn(RelationLocInfo *rel_loc_info, char *part_col_name)
-{
-	bool		ret_value = false;
-
-	if (!rel_loc_info || !part_col_name)
-		ret_value = false;
-	else if (rel_loc_info->locatorType != LOCATOR_TYPE_MODULO)
-		ret_value = false;
-	else
-		ret_value = !strcmp(part_col_name, rel_loc_info->partAttrName);
-
-	return ret_value;
-}
-
-
-/*
- * IsModuloColumnForRelId - return whether or not column for relation is used for modulo distribution.
- */
-bool
-IsModuloColumnForRelId(Oid relid, char *part_col_name)
-{
-	RelationLocInfo *rel_loc_info = GetRelationLocInfo(relid);
-
-	return IsModuloColumn(rel_loc_info, part_col_name);
 }
 
 /*
@@ -737,7 +577,6 @@ RelationBuildLocator(Relation rel)
 		 */
 		offset = compute_modulo(abs(rand()), list_length(relationLocInfo->rl_nodeList));
 
-		srand(time(NULL));
 		relationLocInfo->roundRobinNode = relationLocInfo->rl_nodeList->head; /* initialize */
 		for (j = 0; j < offset && relationLocInfo->roundRobinNode->next != NULL; j++)
 			relationLocInfo->roundRobinNode = relationLocInfo->roundRobinNode->next;
@@ -861,6 +700,8 @@ modulo_value_len(Oid dataType)
 		case RELTIMEOID:
 		case DATEOID:
 			return 4;
+		case INT8OID:
+			return 8;
 		default:
 			return -1;
 	}
@@ -1063,7 +904,8 @@ createLocator(char locatorType, RelationAccessType accessType,
 						Assert(false);
 						break;
 				}
-				locator->roundRobinNode = -1;
+				/* randomize choice of the initial node */
+				locator->roundRobinNode = (abs(rand()) % locator->nodeCount) - 1;
 			}
 			else
 			{
@@ -1428,18 +1270,20 @@ locate_modulo_insert(Locator *self, Datum value, bool isnull,
 		index = 0;
 	else
 	{
-		unsigned int mod32;
+		uint64 val;
 
-		if (self->valuelen == 4)
-			mod32 = (unsigned int) (GET_4_BYTES(value));
+		if (self->valuelen == 8)
+			val = (uint64) (GET_8_BYTES(value));
+		else if (self->valuelen == 4)
+			val = (uint64) (GET_4_BYTES(value));
 		else if (self->valuelen == 2)
-			mod32 = (unsigned int) (GET_2_BYTES(value));
+			val = (uint64) (GET_2_BYTES(value));
 		else if (self->valuelen == 1)
-			mod32 = (unsigned int) (GET_1_BYTE(value));
+			val = (uint64) (GET_1_BYTE(value));
 		else
-			mod32 = 0;
+			val = 0;
 
-		index = compute_modulo(mod32, self->nodeCount);
+		index = compute_modulo(val, self->nodeCount);
 	}
 	switch (self->listType)
 	{
@@ -1504,19 +1348,21 @@ locate_modulo_select(Locator *self, Datum value, bool isnull,
 	}
 	else
 	{
-		unsigned int mod32;
-		int 		 index;
+		uint64	val;
+		int 	index;
 
-		if (self->valuelen == 4)
-			mod32 = (unsigned int) (GET_4_BYTES(value));
+		if (self->valuelen == 8)
+			val = (uint64) (GET_8_BYTES(value));
+		else if (self->valuelen == 4)
+			val = (unsigned int) (GET_4_BYTES(value));
 		else if (self->valuelen == 2)
-			mod32 = (unsigned int) (GET_2_BYTES(value));
+			val = (unsigned int) (GET_2_BYTES(value));
 		else if (self->valuelen == 1)
-			mod32 = (unsigned int) (GET_1_BYTE(value));
+			val = (unsigned int) (GET_1_BYTE(value));
 		else
-			mod32 = 0;
+			val = 0;
 
-		index = compute_modulo(mod32, self->nodeCount);
+		index = compute_modulo(val, self->nodeCount);
 
 		switch (self->listType)
 		{

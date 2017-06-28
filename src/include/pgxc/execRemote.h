@@ -87,6 +87,7 @@ typedef struct ResponseCombiner
 	PGXCNodeHandle **connections;		/* Datanode connections being combined */
 	int			conn_count;				/* count of active connections */
 	int			current_conn;			/* used to balance load when reading from connections */
+	long		current_conn_rows_consumed;
 	CombineType combine_type;			/* see CombineType enum */
 	int			command_complete_count; /* count of received CommandComplete messages */
 	RequestType request_type;			/* see RequestType enum */

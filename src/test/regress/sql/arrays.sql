@@ -94,7 +94,7 @@ SELECT a[1:3],
 
 SELECT b[1:1][2][2],
        d[1:1][2]
-   FROM arrtest;
+   FROM arrtest ORDER BY 1, 2;
 
 INSERT INTO arrtest(a) VALUES('{1,null,3}');
 SELECT a FROM arrtest ORDER BY 1;
@@ -137,19 +137,19 @@ CREATE TEMP TABLE arrtest_s (
 INSERT INTO arrtest_s VALUES ('{1,2,3,4,5}', '{{1,2,3}, {4,5,6}, {7,8,9}}');
 INSERT INTO arrtest_s VALUES ('[0:4]={1,2,3,4,5}', '[0:2][0:2]={{1,2,3}, {4,5,6}, {7,8,9}}');
 
-SELECT * FROM arrtest_s;
-SELECT a[:3], b[:2][:2] FROM arrtest_s;
-SELECT a[2:], b[2:][2:] FROM arrtest_s;
+SELECT * FROM arrtest_s ORDER BY a, b;
+SELECT a[:3], b[:2][:2] FROM arrtest_s ORDER BY a, b;
+SELECT a[2:], b[2:][2:] FROM arrtest_s ORDER BY a, b;
 SELECT a[:], b[:] FROM arrtest_s;
 
 -- updates
 UPDATE arrtest_s SET a[:3] = '{11, 12, 13}', b[:2][:2] = '{{11,12}, {14,15}}'
   WHERE array_lower(a,1) = 1;
-SELECT * FROM arrtest_s;
+SELECT * FROM arrtest_s ORDER BY a, b;
 UPDATE arrtest_s SET a[3:] = '{23, 24, 25}', b[2:][2:] = '{{25,26}, {28,29}}';
-SELECT * FROM arrtest_s;
+SELECT * FROM arrtest_s ORDER BY a, b;
 UPDATE arrtest_s SET a[:] = '{11, 12, 13, 14, 15}';
-SELECT * FROM arrtest_s;
+SELECT * FROM arrtest_s ORDER BY a, b;
 UPDATE arrtest_s SET a[:] = '{23, 24, 25}';  -- fail, too small
 INSERT INTO arrtest_s VALUES(NULL, NULL);
 UPDATE arrtest_s SET a[:] = '{11, 12, 13, 14, 15}';  -- fail, no good with null

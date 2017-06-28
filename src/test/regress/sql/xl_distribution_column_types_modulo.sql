@@ -12,7 +12,7 @@ CREATE TABLE xl_dcm (
 ) DISTRIBUTE BY MODULO (product_id);
 
 --integer
-CREATE TABLE xl_dcm (
+CREATE TABLE xl_dcm0 (
     product_no integer,
     product_id integer PRIMARY KEY,
     name text,

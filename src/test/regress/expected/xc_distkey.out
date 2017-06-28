@@ -201,39 +201,41 @@ ERROR:  relation "f4_tab" does not exist
 LINE 1: select * from f4_tab where a = 10.987654::float4;
                       ^
 create table i8_tab(a int8) distribute by modulo(a);
-ERROR:  Column a is not modulo distributable data type
 insert into i8_tab values(8446744073709551359);
-ERROR:  relation "i8_tab" does not exist
-LINE 1: insert into i8_tab values(8446744073709551359);
-                    ^
 insert into i8_tab values(78902);
-ERROR:  relation "i8_tab" does not exist
-LINE 1: insert into i8_tab values(78902);
-                    ^
 insert into i8_tab values(NULL);
-ERROR:  relation "i8_tab" does not exist
-LINE 1: insert into i8_tab values(NULL);
-                    ^
 select * from i8_tab order by a;
-ERROR:  relation "i8_tab" does not exist
-LINE 1: select * from i8_tab order by a;
-                      ^
+          a          
+---------------------
+               78902
+ 8446744073709551359
+                    
+(3 rows)
+
 select * from i8_tab where a = 8446744073709551359::int8;
-ERROR:  relation "i8_tab" does not exist
-LINE 1: select * from i8_tab where a = 8446744073709551359::int8;
-                      ^
+          a          
+---------------------
+ 8446744073709551359
+(1 row)
+
 select * from i8_tab where a = 8446744073709551359;
-ERROR:  relation "i8_tab" does not exist
-LINE 1: select * from i8_tab where a = 8446744073709551359;
-                      ^
+          a          
+---------------------
+ 8446744073709551359
+(1 row)
+
 select * from i8_tab where a = 78902::int8;
-ERROR:  relation "i8_tab" does not exist
-LINE 1: select * from i8_tab where a = 78902::int8;
-                      ^
+   a   
+-------
+ 78902
+(1 row)
+
 select * from i8_tab where a = 78902;
-ERROR:  relation "i8_tab" does not exist
-LINE 1: select * from i8_tab where a = 78902;
-                      ^
+   a   
+-------
+ 78902
+(1 row)
+
 create table i2_tab(a int2) distribute by modulo(a);
 insert into i2_tab values(123);
 insert into i2_tab values(456);

@@ -870,7 +870,6 @@ nextval_internal(Oid relid, bool check_permissions)
 	{
 		/* forced log to satisfy local demand for values */
 		fetch = log = fetch + SEQ_LOG_VALS;
-		logit = true;
 	}
 	else
 	{
@@ -880,7 +879,6 @@ nextval_internal(Oid relid, bool check_permissions)
 		{
 			/* last update of seq was before checkpoint */
 			fetch = log = fetch + SEQ_LOG_VALS;
-			logit = true;
 		}
 	}
 

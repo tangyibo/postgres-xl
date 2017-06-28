@@ -2935,7 +2935,7 @@ select * from nestjsonb where j @> '{"c":3}';
  {"a": [["b", {"x": 1}], ["b", {"x": 2}]], "c": 3}
 (1 row)
 
-select * from nestjsonb where j @> '[[14]]';
+select * from nestjsonb where j @> '[[14]]' order by j;
         j        
 -----------------
  [[14, 2, 3]]
@@ -2956,7 +2956,7 @@ select * from nestjsonb where j @> '{"c":3}';
  {"a": [["b", {"x": 1}], ["b", {"x": 2}]], "c": 3}
 (1 row)
 
-select * from nestjsonb where j @> '[[14]]';
+select * from nestjsonb where j @> '[[14]]' order by j;
         j        
 -----------------
  [[14, 2, 3]]

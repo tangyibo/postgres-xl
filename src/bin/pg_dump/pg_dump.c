@@ -6168,12 +6168,9 @@ getTables(Archive *fout, int *numTables)
 	i_owning_tab = PQfnumber(res, "owning_tab");
 	i_owning_col = PQfnumber(res, "owning_col");
 #ifdef PGXC
-	if (fout->isPostgresXL)
-	{
-		i_pgxclocatortype = PQfnumber(res, "pgxclocatortype");
-		i_pgxcattnum = PQfnumber(res, "pgxcattnum");
-		i_pgxc_node_names = PQfnumber(res, "pgxc_node_names");
-	}
+	i_pgxclocatortype = PQfnumber(res, "pgxclocatortype");
+	i_pgxcattnum = PQfnumber(res, "pgxcattnum");
+	i_pgxc_node_names = PQfnumber(res, "pgxc_node_names");
 #endif
 	i_reltablespace = PQfnumber(res, "reltablespace");
 	i_reloptions = PQfnumber(res, "reloptions");

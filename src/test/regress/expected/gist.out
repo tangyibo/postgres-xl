@@ -20,7 +20,7 @@ vacuum analyze gist_point_tbl;
 --
 -- Test Index-only plans on GiST indexes
 --
-create table gist_tbl (b box, p point, c circle);
+create table gist_tbl (b box, p point, c circle) distribute by replication;
 insert into gist_tbl
 select box(point(0.05*i, 0.05*i), point(0.05*i, 0.05*i)),
        point(0.05*i, 0.05*i),
@@ -38,7 +38,7 @@ select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5));
                           QUERY PLAN                          
 --------------------------------------------------------------
  Remote Fast Query Execution
-   Node/s: datanode_1, datanode_2
+   Node/s: datanode_1
    ->  Index Only Scan using gist_tbl_point_index on gist_tbl
          Index Cond: (p <@ '(0.5,0.5),(0,0)'::box)
 (4 rows)
@@ -48,16 +48,16 @@ select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5));
       p      
 -------------
  (0,0)
- (0.1,0.1)
- (0.2,0.2)
- (0.3,0.3)
- (0.4,0.4)
- (0.5,0.5)
  (0.05,0.05)
+ (0.1,0.1)
  (0.15,0.15)
+ (0.2,0.2)
  (0.25,0.25)
+ (0.3,0.3)
  (0.35,0.35)
+ (0.4,0.4)
  (0.45,0.45)
+ (0.5,0.5)
 (11 rows)
 
 -- Also test an index-only knn-search
@@ -66,11 +66,12 @@ select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5))
 order by p <-> point(0.201, 0.201);
                           QUERY PLAN                          
 --------------------------------------------------------------
- Remote Subquery Scan on all (datanode_1,datanode_2)
+ Remote Fast Query Execution
+   Node/s: datanode_1
    ->  Index Only Scan using gist_tbl_point_index on gist_tbl
          Index Cond: (p <@ '(0.5,0.5),(0,0)'::box)
          Order By: (p <-> '(0.201,0.201)'::point)
-(4 rows)
+(5 rows)
 
 select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5))
 order by p <-> point(0.201, 0.201);
@@ -95,11 +96,12 @@ select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5))
 order by point(0.101, 0.101) <-> p;
                           QUERY PLAN                          
 --------------------------------------------------------------
- Remote Subquery Scan on all (datanode_1,datanode_2)
+ Remote Fast Query Execution
+   Node/s: datanode_1
    ->  Index Only Scan using gist_tbl_point_index on gist_tbl
          Index Cond: (p <@ '(0.5,0.5),(0,0)'::box)
          Order By: (p <-> '(0.101,0.101)'::point)
-(4 rows)
+(5 rows)
 
 select p from gist_tbl where p <@ box(point(0,0), point(0.5, 0.5))
 order by point(0.101, 0.101) <-> p;
@@ -161,7 +163,7 @@ select b from gist_tbl where b <@ box(point(5,5), point(6,6));
                          QUERY PLAN                         
 ------------------------------------------------------------
  Remote Fast Query Execution
-   Node/s: datanode_1, datanode_2
+   Node/s: datanode_1
    ->  Index Only Scan using gist_tbl_box_index on gist_tbl
          Index Cond: (b <@ '(6,6),(5,5)'::box)
 (4 rows)
@@ -171,26 +173,26 @@ select b from gist_tbl where b <@ box(point(5,5), point(6,6));
             b            
 -------------------------
  (5,5),(5,5)
- (5.1,5.1),(5.1,5.1)
- (5.2,5.2),(5.2,5.2)
- (5.3,5.3),(5.3,5.3)
- (5.4,5.4),(5.4,5.4)
- (5.5,5.5),(5.5,5.5)
- (5.6,5.6),(5.6,5.6)
- (5.7,5.7),(5.7,5.7)
- (5.8,5.8),(5.8,5.8)
- (5.9,5.9),(5.9,5.9)
- (6,6),(6,6)
  (5.05,5.05),(5.05,5.05)
+ (5.1,5.1),(5.1,5.1)
  (5.15,5.15),(5.15,5.15)
+ (5.2,5.2),(5.2,5.2)
  (5.25,5.25),(5.25,5.25)
+ (5.3,5.3),(5.3,5.3)
  (5.35,5.35),(5.35,5.35)
+ (5.4,5.4),(5.4,5.4)
  (5.45,5.45),(5.45,5.45)
+ (5.5,5.5),(5.5,5.5)
  (5.55,5.55),(5.55,5.55)
+ (5.6,5.6),(5.6,5.6)
  (5.65,5.65),(5.65,5.65)
+ (5.7,5.7),(5.7,5.7)
  (5.75,5.75),(5.75,5.75)
+ (5.8,5.8),(5.8,5.8)
  (5.85,5.85),(5.85,5.85)
+ (5.9,5.9),(5.9,5.9)
  (5.95,5.95),(5.95,5.95)
+ (6,6),(6,6)
 (21 rows)
 
 drop index gist_tbl_box_index;
@@ -203,7 +205,7 @@ where p <@ box(point(5,5), point(6, 6));
                        QUERY PLAN                        
 ---------------------------------------------------------
  Remote Fast Query Execution
-   Node/s: datanode_1, datanode_2
+   Node/s: datanode_1
    ->  Index Scan using gist_tbl_multi_index on gist_tbl
          Index Cond: (p <@ '(6,6),(5,5)'::box)
 (4 rows)
@@ -215,16 +217,16 @@ and p <@ box(point(5,5), point(6, 6));
             b            |      p      
 -------------------------+-------------
  (5,5),(5,5)             | (5,5)
- (5.1,5.1),(5.1,5.1)     | (5.1,5.1)
- (5.2,5.2),(5.2,5.2)     | (5.2,5.2)
- (5.3,5.3),(5.3,5.3)     | (5.3,5.3)
- (5.4,5.4),(5.4,5.4)     | (5.4,5.4)
- (5.5,5.5),(5.5,5.5)     | (5.5,5.5)
  (5.05,5.05),(5.05,5.05) | (5.05,5.05)
+ (5.1,5.1),(5.1,5.1)     | (5.1,5.1)
  (5.15,5.15),(5.15,5.15) | (5.15,5.15)
+ (5.2,5.2),(5.2,5.2)     | (5.2,5.2)
  (5.25,5.25),(5.25,5.25) | (5.25,5.25)
+ (5.3,5.3),(5.3,5.3)     | (5.3,5.3)
  (5.35,5.35),(5.35,5.35) | (5.35,5.35)
+ (5.4,5.4),(5.4,5.4)     | (5.4,5.4)
  (5.45,5.45),(5.45,5.45) | (5.45,5.45)
+ (5.5,5.5),(5.5,5.5)     | (5.5,5.5)
 (11 rows)
 
 drop index gist_tbl_multi_index;

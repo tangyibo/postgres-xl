@@ -241,7 +241,7 @@ NOTICE:  no matching relations in tablespace "regress_tblspace_renamed" found
 -- Should succeed
 DROP TABLESPACE regress_tblspace_renamed;
 DROP SCHEMA testschema CASCADE;
-NOTICE:  drop cascades to 3 other objects
+NOTICE:  drop cascades to 4 other objects
 DETAIL:  drop cascades to table testschema.foo
 drop cascades to table testschema.asselect
 drop cascades to table testschema.atable

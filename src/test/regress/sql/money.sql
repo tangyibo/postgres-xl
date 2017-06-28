@@ -120,6 +120,11 @@ SELECT 12345678901234567::int8::money;
 SELECT 12345678901234567::numeric::money;
 SELECT (-1234567890)::int4::money;
 SELECT (-12345678901234567)::int8::money;
+SELECT (-12345678901234567)::numeric::money;
+
+-- Cast from money
+SELECT '12345678901234567'::money::numeric;
+SELECT '-12345678901234567'::money::numeric;
 
 INSERT INTO money_data VALUES ('$223.459');
 INSERT INTO money_data VALUES ('$323.459');
@@ -136,8 +141,3 @@ INSERT INTO money_data2 VALUES (5, '$523.459');
 SELECT sum(m) FROM money_data2;
 DROP TABLE money_data2;
 
-SELECT (-12345678901234567)::numeric::money;
-
--- Cast from money
-SELECT '12345678901234567'::money::numeric;
-SELECT '-12345678901234567'::money::numeric;

@@ -201,6 +201,9 @@ SELECT * FROM foo ORDER BY f1 DESC NULLS LAST;
 explain (costs off)
 select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
 select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
+-- get the plan for the following query
+explain (costs off, timing off, summary off)
+select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';
 -- actually run the query with an analyze to use the partial index
 explain (costs off, analyze on, timing off, summary off)
 select * from onek2 where unique2 = 11 and stringu1 = 'ATAAAA';

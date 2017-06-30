@@ -197,8 +197,8 @@ SELECT f1 AS five FROM FLOAT8_TBL
   WHERE f1 BETWEEN -1e6 AND 1e6
 UNION
 SELECT f1 FROM INT4_TBL
-  WHERE f1 BETWEEN 0 AND 1000000 
-  ORDER BY 1;
+  WHERE f1 BETWEEN 0 AND 1000000
+ORDER BY 1;
          five          
 -----------------------
                -1004.3
@@ -446,7 +446,7 @@ LINE 1: ... int8_tbl EXCEPT SELECT q2 FROM int8_tbl ORDER BY q2 LIMIT 1...
                                                              ^
 HINT:  There is a column named "q2" in table "*SELECT* 2", but it cannot be referenced from this part of the query.
 -- But this should work:
-SELECT q1 FROM int8_tbl EXCEPT (((SELECT q2 FROM int8_tbl ORDER BY q2 LIMIT 1))) ORDER BY q1;
+SELECT q1 FROM int8_tbl EXCEPT (((SELECT q2 FROM int8_tbl ORDER BY q2 LIMIT 1))) ORDER BY 1;
         q1        
 ------------------
               123
@@ -764,13 +764,14 @@ select * from
    union all
    select *, 1 as x from int8_tbl b) ss
 where (x = 0) or (q1 >= q2 and q1 <= q2);
-                 QUERY PLAN                  
----------------------------------------------
- Append
-   ->  Seq Scan on int8_tbl a
-   ->  Seq Scan on int8_tbl b
-         Filter: ((q1 >= q2) AND (q1 <= q2))
-(4 rows)
+                    QUERY PLAN                     
+---------------------------------------------------
+ Remote Subquery Scan on all (datanode_1)
+   ->  Append
+         ->  Seq Scan on int8_tbl a
+         ->  Seq Scan on int8_tbl b
+               Filter: ((q1 >= q2) AND (q1 <= q2))
+(5 rows)
 
 select * from
   (select *, 0 as x from int8_tbl a

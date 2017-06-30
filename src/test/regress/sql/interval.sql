@@ -226,7 +226,7 @@ SELECT interval '1 2:03:04.5678' minute to second(2);
 -- test casting to restricted precision (bug #14479)
 SELECT f1, f1::INTERVAL DAY TO MINUTE AS "minutes",
   (f1 + INTERVAL '1 month')::INTERVAL MONTH::INTERVAL YEAR AS "years"
-  FROM interval_tbl;
+  FROM interval_tbl ORDER BY f1;
 
 -- test inputting and outputting SQL standard interval literals
 SET IntervalStyle TO sql_standard;

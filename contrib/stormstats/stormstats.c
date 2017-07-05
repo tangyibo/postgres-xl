@@ -20,11 +20,14 @@
 #include "funcapi.h"
 #include "stormstats.h"
 #include "storage/fd.h"
+#include "storage/shmem.h"
+#include "storage/lwlock.h"
 
 #include "pgxc/pgxc.h"
 #include "pgxc/pgxcnode.h"
 #include "pgxc/planner.h"
 #include "pgxc/execRemote.h"
+
 
 /* mark this dynamic library to be compatible with PG */
 PG_MODULE_MAGIC;
@@ -72,7 +75,7 @@ typedef struct LocalStatsEntry
 
 typedef struct StormSharedState
 {
-	LWLockId  lock;
+	LWLock *lock;
 } StormSharedState;
 
 static bool sp_save;			/* whether to save stats across shutdown */
@@ -109,25 +112,24 @@ static ProcessUtility_hook_type prev_ProcessUtility = NULL;
 static int max_tracked_dbs;
 
 static void
-ProcessUtility_callback(Node *parsetree,
-						const char *queryString,
-						ProcessUtilityContext context,
+ProcessUtility_callback(PlannedStmt *pstmt,
+						const char *queryString, ProcessUtilityContext context,
 						ParamListInfo params,
+						QueryEnvironment *queryEnv,
 						DestReceiver *dest,
-#ifdef PGXC
 						bool sentToRemote,
-#endif /* PGXC */
 						char *completionTag)
 {
+	Node   *parsetree;
+
 	elog( DEBUG1, "STORMSTATS: using plugin." );
 
-	standard_ProcessUtility(parsetree, queryString, context, params, dest,
-#ifdef PGXC
-							sentToRemote,
-#endif /* PGXC */
-							completionTag);
+	standard_ProcessUtility(pstmt, queryString, context, params, queryEnv,
+							dest, sentToRemote, completionTag);
 
 	stats_store(get_database_name(MyDatabaseId), CMD_UNKNOWN, false, true);
+
+	parsetree = pstmt->utilityStmt;
 
 	/*
 	 * Check if it's a CREATE/DROP DATABASE command. Update entries in the

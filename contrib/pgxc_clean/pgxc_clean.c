@@ -92,7 +92,8 @@ int			pgxc_clean_node_count;
 database_info *head_database_info;
 database_info *last_database_info;
 
-static char *password = NULL;
+static bool have_password = false;
+static char password[100];
 static char password_prompt[256];
 
 /* Funcs */
@@ -198,7 +199,10 @@ int main(int argc, char *argv[])
 	else
 		sprintf(password_prompt, "Password for user %s: ", username);
 	if (try_password_opt == TRI_YES)
-		password = simple_prompt(password_prompt, 100, false);
+	{
+		simple_prompt(password_prompt, password, sizeof(password), false);
+		have_password = true;
+	}
 
 	if (verbose_opt)
 	{
@@ -624,11 +628,12 @@ loginDatabase(char *host, int port, char *user, char *password, char *dbname, co
 
 		if (PQstatus(coord_conn) == CONNECTION_BAD &&
 			PQconnectionNeedsPassword(coord_conn) &&
-			password == NULL &&
+			!have_password &&
 			try_password_opt != TRI_NO)
 		{
 			PQfinish(coord_conn);
-			password = simple_prompt(password_prompt, 100, false);
+			simple_prompt(password_prompt, password, sizeof(password), false);
+			have_password = true;
 			new_pass = true;
 		}
 	} while (new_pass);

@@ -3433,6 +3433,13 @@ getObjectDescription(const ObjectAddress *object)
 				break;
 			}
 
+		/* XL: prefix the object with 'distributed' */
+		case OCLASS_PGXC_CLASS:
+			{
+				appendStringInfoString(&buffer, _("distributed "));
+				getRelationDescription(&buffer, object->objectId);
+			}
+
 			/*
 			 * There's intentionally no default: case here; we want the
 			 * compiler to warn if a new OCLASS hasn't been handled above.

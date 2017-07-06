@@ -4899,7 +4899,7 @@ DropStmtPreTreatment(DropStmt *stmt, const char *queryString, bool sentToRemote,
 				 * which the rule is dependent and define if this rule
 				 * has a dependency with a temporary object or not.
 				 */
-				List *objname = linitial(stmt->objects);
+				Node *objname = linitial(stmt->objects);
 				Relation    relation = NULL;
 
 				get_object_address(OBJECT_RULE,

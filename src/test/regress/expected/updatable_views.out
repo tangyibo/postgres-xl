@@ -1662,7 +1662,7 @@ EXPLAIN (costs off, nodes off) UPDATE rw_view1 SET a = a + 5;
 -----------------------------------------------------------------------------
  Remote Subquery Scan on any
    ->  Update on base_tbl b
-         ->  Hash Semi Join
+         ->  Hash Join
                Hash Cond: (b.a = r.a)
                ->  Seq Scan on base_tbl b
                ->  Hash
@@ -1871,28 +1871,22 @@ EXPLAIN (costs off, nodes off) SELECT * FROM rw_view1 WHERE snoop(person);
 (5 rows)
 
 EXPLAIN (costs off, nodes off) UPDATE rw_view1 SET person=person WHERE snoop(person);
-                           QUERY PLAN                            
------------------------------------------------------------------
- Remote Subquery Scan on all
-   ->  Update on base_tbl base_tbl_1
-         ->  Subquery Scan on base_tbl
-               Filter: snoop(base_tbl.person)
-               ->  LockRows
-                     ->  Seq Scan on base_tbl base_tbl_2
-                           Filter: (visibility = 'public'::text)
-(7 rows)
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
+ Remote Subquery Scan on any
+   ->  Update on base_tbl
+         ->  Seq Scan on base_tbl
+               Filter: ((visibility = 'public'::text) AND snoop(person))
+(4 rows)
 
 EXPLAIN (costs off, nodes off) DELETE FROM rw_view1 WHERE NOT snoop(person);
-                           QUERY PLAN                            
------------------------------------------------------------------
- Remote Subquery Scan on all
-   ->  Delete on base_tbl base_tbl_1
-         ->  Subquery Scan on base_tbl
-               Filter: (NOT snoop(base_tbl.person))
-               ->  LockRows
-                     ->  Seq Scan on base_tbl base_tbl_2
-                           Filter: (visibility = 'public'::text)
-(7 rows)
+                                  QUERY PLAN                                   
+-------------------------------------------------------------------------------
+ Remote Subquery Scan on any
+   ->  Delete on base_tbl
+         ->  Seq Scan on base_tbl
+               Filter: ((visibility = 'public'::text) AND (NOT snoop(person)))
+(4 rows)
 
 -- security barrier view on top of security barrier view
 CREATE VIEW rw_view2 WITH (security_barrier = true) AS
@@ -1944,32 +1938,22 @@ EXPLAIN (costs off, nodes off) SELECT * FROM rw_view2 WHERE snoop(person);
 (7 rows)
 
 EXPLAIN (costs off, nodes off) UPDATE rw_view2 SET person=person WHERE snoop(person);
-                              QUERY PLAN                               
------------------------------------------------------------------------
- Remote Subquery Scan on all
-   ->  Update on base_tbl base_tbl_1
-         ->  Subquery Scan on base_tbl
-               Filter: snoop(base_tbl.person)
-               ->  Subquery Scan on base_tbl_2
-                     Filter: snoop(base_tbl_2.person)
-                     ->  LockRows
-                           ->  Seq Scan on base_tbl base_tbl_3
-                                 Filter: (visibility = 'public'::text)
-(9 rows)
+                                        QUERY PLAN                                         
+-------------------------------------------------------------------------------------------
+ Remote Subquery Scan on any
+   ->  Update on base_tbl
+         ->  Seq Scan on base_tbl
+               Filter: ((visibility = 'public'::text) AND snoop(person) AND snoop(person))
+(4 rows)
 
 EXPLAIN (costs off, nodes off) DELETE FROM rw_view2 WHERE NOT snoop(person);
-                              QUERY PLAN                               
------------------------------------------------------------------------
- Remote Subquery Scan on all
-   ->  Delete on base_tbl base_tbl_1
-         ->  Subquery Scan on base_tbl
-               Filter: (NOT snoop(base_tbl.person))
-               ->  Subquery Scan on base_tbl_2
-                     Filter: snoop(base_tbl_2.person)
-                     ->  LockRows
-                           ->  Seq Scan on base_tbl base_tbl_3
-                                 Filter: (visibility = 'public'::text)
-(9 rows)
+                                           QUERY PLAN                                            
+-------------------------------------------------------------------------------------------------
+ Remote Subquery Scan on any
+   ->  Delete on base_tbl
+         ->  Seq Scan on base_tbl
+               Filter: ((visibility = 'public'::text) AND snoop(person) AND (NOT snoop(person)))
+(4 rows)
 
 DROP TABLE base_tbl CASCADE;
 NOTICE:  drop cascades to 2 other objects
@@ -1994,19 +1978,17 @@ SELECT * FROM rw_view1;
 (1 row)
 
 EXPLAIN (costs off, nodes off) DELETE FROM rw_view1 WHERE id = 1 AND snoop(data);
-                                  QUERY PLAN                                   
--------------------------------------------------------------------------------
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
  Remote Subquery Scan on any
    ->  Update on base_tbl base_tbl_1
          ->  Nested Loop
                ->  Index Scan using base_tbl_pkey on base_tbl base_tbl_1
                      Index Cond: (id = 1)
-               ->  Subquery Scan on base_tbl
-                     Filter: snoop(base_tbl.data)
-                     ->  Index Scan using base_tbl_pkey on base_tbl base_tbl_2
-                           Index Cond: (id = 1)
-                           Filter: (NOT deleted)
-(10 rows)
+               ->  Index Scan using base_tbl_pkey on base_tbl
+                     Index Cond: (id = 1)
+                     Filter: ((NOT deleted) AND snoop(data))
+(8 rows)
 
 DELETE FROM rw_view1 WHERE id = 1 AND snoop(data);
 EXPLAIN (costs off, nodes off) INSERT INTO rw_view1 VALUES (2, 'New row 2');

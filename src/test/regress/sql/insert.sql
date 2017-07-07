@@ -154,7 +154,7 @@ insert into range_parted values ('b', 1);
 insert into range_parted values ('b', 10);
 -- fail (partition key (b+0) is null)
 insert into range_parted values ('a');
-select tableoid::regclass, * from range_parted;
+select tableoid::regclass, * from range_parted order by 1, 2, 3;
 
 -- ok
 insert into list_parted values (null, 1);
@@ -328,7 +328,7 @@ insert into mcrparted5 values (30, 21, 20);
 insert into mcrparted4 values (30, 21, 20);	-- error
 
 -- check rows
-select tableoid::regclass::text, * from mcrparted order by 1;
+select tableoid::regclass::text, * from mcrparted order by 1, 2, 3, 4;
 
 -- cleanup
 drop table mcrparted;

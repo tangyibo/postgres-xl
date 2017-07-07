@@ -251,7 +251,7 @@ insert into range_parted values ('b', 10);
 insert into range_parted values ('a');
 ERROR:  no partition of relation "range_parted" found for row
 DETAIL:  Partition key of the failing row contains (a, (b + 0)) = (a, null).
-select tableoid::regclass, * from range_parted;
+select tableoid::regclass, * from range_parted order by 1, 2, 3;
  tableoid | a | b  
 ----------+---+----
  part1    | a |  1
@@ -476,17 +476,17 @@ insert into mcrparted4 values (30, 21, 20);	-- error
 ERROR:  new row for relation "mcrparted4" violates partition constraint
 DETAIL:  Failing row contains (30, 21, 20).
 -- check rows
-select tableoid::regclass::text, * from mcrparted order by 1;
+select tableoid::regclass::text, * from mcrparted order by 1, 2, 3, 4;
   tableoid  | a  |  b   |  c   
 ------------+----+------+------
  mcrparted0 |  0 |    1 |    1
  mcrparted0 |  0 |    1 |    1
+ mcrparted1 |  2 |    1 |    0
+ mcrparted1 |  2 |    1 |    0
  mcrparted1 |  9 | 1000 |    1
  mcrparted1 |  9 | 1000 |    1
  mcrparted1 | 10 |    5 |   -1
  mcrparted1 | 10 |    5 |   -1
- mcrparted1 |  2 |    1 |    0
- mcrparted1 |  2 |    1 |    0
  mcrparted2 | 10 |    6 | 1000
  mcrparted2 | 10 |    6 | 1000
  mcrparted2 | 10 | 1000 | 1000

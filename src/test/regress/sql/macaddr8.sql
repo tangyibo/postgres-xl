@@ -82,8 +82,8 @@ SELECT b =  '08:00:2b:01:02:03:04:05' FROM macaddr8_data WHERE a = 15; -- true
 SELECT b <> '08:00:2b:01:02:03:04:06' FROM macaddr8_data WHERE a = 15; -- true
 SELECT b <> '08:00:2b:01:02:03:04:05' FROM macaddr8_data WHERE a = 15; -- false
 
-SELECT ~b                       FROM macaddr8_data;
-SELECT  b & '00:00:00:ff:ff:ff' FROM macaddr8_data;
-SELECT  b | '01:02:03:04:05:06' FROM macaddr8_data;
+SELECT ~b                       FROM macaddr8_data ORDER BY 1;
+SELECT  b & '00:00:00:ff:ff:ff' FROM macaddr8_data ORDER BY 1;
+SELECT  b | '01:02:03:04:05:06' FROM macaddr8_data ORDER BY 1;
 
 DROP TABLE macaddr8_data;

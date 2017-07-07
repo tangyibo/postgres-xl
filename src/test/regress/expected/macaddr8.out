@@ -276,79 +276,79 @@ SELECT b <> '08:00:2b:01:02:03:04:05' FROM macaddr8_data WHERE a = 15; -- false
  f
 (1 row)
 
-SELECT ~b                       FROM macaddr8_data;
+SELECT ~b                       FROM macaddr8_data ORDER BY 1;
         ?column?         
 -------------------------
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fc
- f7:ff:d4:00:01:fe:fd:fb
- f7:ff:d4:00:01:fe:fd:fd
- f7:ff:d5:00:01:fe:fd:fc
  f7:ff:d3:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fb
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fc
+ f7:ff:d4:00:01:fe:fd:fd
+ f7:ff:d4:fe:fd:fc:fb:fa
+ f7:ff:d4:fe:fd:fc:fb:fa
+ f7:ff:d4:fe:fd:fc:fb:fa
+ f7:ff:d4:fe:fd:fc:fb:fa
+ f7:ff:d4:fe:fd:fc:fb:fa
+ f7:ff:d4:fe:fd:fc:fb:fa
+ f7:ff:d4:fe:fd:fc:fb:fa
  f7:ff:d5:00:01:fe:fd:fb
- f7:ff:d4:fe:fd:fc:fb:fa
- f7:ff:d4:fe:fd:fc:fb:fa
- f7:ff:d4:fe:fd:fc:fb:fa
- f7:ff:d4:fe:fd:fc:fb:fa
- f7:ff:d4:fe:fd:fc:fb:fa
- f7:ff:d4:fe:fd:fc:fb:fa
- f7:ff:d4:fe:fd:fc:fb:fa
+ f7:ff:d5:00:01:fe:fd:fc
 (20 rows)
 
-SELECT  b & '00:00:00:ff:ff:ff' FROM macaddr8_data;
+SELECT  b & '00:00:00:ff:ff:ff' FROM macaddr8_data ORDER BY 1;
         ?column?         
 -------------------------
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:03
- 00:00:00:ff:fe:01:02:04
+ 00:00:00:01:02:03:04:05
+ 00:00:00:01:02:03:04:05
+ 00:00:00:01:02:03:04:05
+ 00:00:00:01:02:03:04:05
+ 00:00:00:01:02:03:04:05
+ 00:00:00:01:02:03:04:05
+ 00:00:00:01:02:03:04:05
  00:00:00:ff:fe:01:02:02
  00:00:00:ff:fe:01:02:03
  00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
+ 00:00:00:ff:fe:01:02:03
  00:00:00:ff:fe:01:02:04
- 00:00:00:01:02:03:04:05
- 00:00:00:01:02:03:04:05
- 00:00:00:01:02:03:04:05
- 00:00:00:01:02:03:04:05
- 00:00:00:01:02:03:04:05
- 00:00:00:01:02:03:04:05
- 00:00:00:01:02:03:04:05
+ 00:00:00:ff:fe:01:02:04
 (20 rows)
 
-SELECT  b | '01:02:03:04:05:06' FROM macaddr8_data;
+SELECT  b | '01:02:03:04:05:06' FROM macaddr8_data ORDER BY 1;
         ?column?         
 -------------------------
- 09:02:2b:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:06
  09:02:2b:ff:fe:05:07:06
  09:02:2b:ff:fe:05:07:06
  09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:05:07:07
+ 09:02:2b:ff:fe:07:05:07
+ 09:02:2b:ff:fe:07:05:07
+ 09:02:2b:ff:fe:07:05:07
+ 09:02:2b:ff:fe:07:05:07
+ 09:02:2b:ff:fe:07:05:07
+ 09:02:2b:ff:fe:07:05:07
+ 09:02:2b:ff:fe:07:05:07
  09:02:2f:ff:fe:05:07:07
- 09:02:2b:ff:fe:05:07:06
- 09:02:2b:ff:fe:07:05:07
- 09:02:2b:ff:fe:07:05:07
- 09:02:2b:ff:fe:07:05:07
- 09:02:2b:ff:fe:07:05:07
- 09:02:2b:ff:fe:07:05:07
- 09:02:2b:ff:fe:07:05:07
- 09:02:2b:ff:fe:07:05:07
 (20 rows)
 
 DROP TABLE macaddr8_data;

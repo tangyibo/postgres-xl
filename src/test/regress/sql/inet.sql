@@ -101,12 +101,12 @@ SELECT * FROM inet_tbl WHERE i <<= '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i && '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i >>= '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i >> '192.168.1.0/24'::cidr ORDER BY i;
-SELECT * FROM inet_tbl WHERE i < '192.168.1.0/24'::cidr ORDER BY i;
-SELECT * FROM inet_tbl WHERE i <= '192.168.1.0/24'::cidr ORDER BY i;
+SELECT * FROM inet_tbl WHERE i < '192.168.1.0/24'::cidr ORDER BY i, c;
+SELECT * FROM inet_tbl WHERE i <= '192.168.1.0/24'::cidr ORDER BY i, c;
 SELECT * FROM inet_tbl WHERE i = '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i >= '192.168.1.0/24'::cidr ORDER BY i;
 SELECT * FROM inet_tbl WHERE i > '192.168.1.0/24'::cidr ORDER BY i;
-SELECT * FROM inet_tbl WHERE i <> '192.168.1.0/24'::cidr ORDER BY i;
+SELECT * FROM inet_tbl WHERE i <> '192.168.1.0/24'::cidr ORDER BY i, c;
 
 -- test index-only scans
 EXPLAIN (COSTS OFF)

@@ -3349,7 +3349,7 @@ select b.unique1 from
                ->  Remote Subquery Scan on all
                      Distribute results by H: tenthous
                      ->  Nested Loop Left Join
-                           Join Filter: (b.unique1 = (42))
+                           Join Filter: (b.unique1 = 42)
                            ->  Remote Subquery Scan on all
                                  Distribute results by H: unique1
                                  ->  Nested Loop
@@ -4222,7 +4222,7 @@ select id from a where id in (
             QUERY PLAN            
 ----------------------------------
  Remote Subquery Scan on all
-   ->  Hash Semi Join
+   ->  Hash Join
          Hash Cond: (a.id = b.id)
          ->  Seq Scan on a
          ->  Hash
@@ -4753,18 +4753,21 @@ select count(*) from tenk1 a,
 explain (num_nodes off, nodes off, costs off)
   select * from int8_tbl a,
     int8_tbl x left join lateral (select a.q1 from int4_tbl y) ss(z)
-      on x.q2 = ss.z;
-                   QUERY PLAN                   
-------------------------------------------------
+      on x.q2 = ss.z
+  order by a.q1, a.q2, x.q1, x.q2, ss.z;
+                      QUERY PLAN                      
+------------------------------------------------------
  Remote Subquery Scan on all
-   ->  Nested Loop
-         ->  Seq Scan on int8_tbl a
-         ->  Hash Right Join
-               Hash Cond: ((a.q1) = x.q2)
-               ->  Seq Scan on int4_tbl y
-               ->  Hash
-                     ->  Seq Scan on int8_tbl x
-(8 rows)
+   ->  Sort
+         Sort Key: a.q1, a.q2, x.q1, x.q2, (a.q1)
+         ->  Nested Loop
+               ->  Seq Scan on int8_tbl a
+               ->  Hash Right Join
+                     Hash Cond: ((a.q1) = x.q2)
+                     ->  Seq Scan on int4_tbl y
+                     ->  Hash
+                           ->  Seq Scan on int8_tbl x
+(10 rows)
 
 select * from int8_tbl a,
   int8_tbl x left join lateral (select a.q1 from int4_tbl y) ss(z)
@@ -5650,7 +5653,6 @@ SELECT count(*) FROM testr WHERE NOT EXISTS (SELECT * FROM testh WHERE testr.b =
   3000
 (1 row)
 
-
 --
 -- test that foreign key join estimation performs sanely for outer joins
 --
@@ -5835,44 +5837,48 @@ select * from j1 natural join j2;
 explain (verbose, costs off)
 select * from j1
 inner join (select distinct id from j3) j3 on j1.id = j3.id;
-               QUERY PLAN                
------------------------------------------
- Nested Loop
-   Output: j1.id, j3.id
-   Inner Unique: true
-   Join Filter: (j1.id = j3.id)
-   ->  Unique
-         Output: j3.id
-         ->  Sort
+                     QUERY PLAN                      
+-----------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   Output: j1.id, id
+   ->  Nested Loop
+         Output: j1.id, j3.id
+         Inner Unique: true
+         Join Filter: (j1.id = j3.id)
+         ->  Unique
                Output: j3.id
-               Sort Key: j3.id
-               ->  Seq Scan on public.j3
+               ->  Sort
                      Output: j3.id
-   ->  Seq Scan on public.j1
-         Output: j1.id
-(13 rows)
+                     Sort Key: j3.id
+                     ->  Seq Scan on public.j3
+                           Output: j3.id
+         ->  Seq Scan on public.j1
+               Output: j1.id
+(15 rows)
 
 -- ensure group by clause allows the inner to become unique
 explain (verbose, costs off)
 select * from j1
 inner join (select id from j3 group by id) j3 on j1.id = j3.id;
-               QUERY PLAN                
------------------------------------------
- Nested Loop
-   Output: j1.id, j3.id
-   Inner Unique: true
-   Join Filter: (j1.id = j3.id)
-   ->  Group
-         Output: j3.id
-         Group Key: j3.id
-         ->  Sort
+                     QUERY PLAN                      
+-----------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   Output: j1.id, id
+   ->  Nested Loop
+         Output: j1.id, j3.id
+         Inner Unique: true
+         Join Filter: (j1.id = j3.id)
+         ->  Group
                Output: j3.id
-               Sort Key: j3.id
-               ->  Seq Scan on public.j3
+               Group Key: j3.id
+               ->  Sort
                      Output: j3.id
-   ->  Seq Scan on public.j1
-         Output: j1.id
-(14 rows)
+                     Sort Key: j3.id
+                     ->  Seq Scan on public.j3
+                           Output: j3.id
+         ->  Seq Scan on public.j1
+               Output: j1.id
+(16 rows)
 
 drop table j1;
 drop table j2;
@@ -5892,65 +5898,81 @@ analyze j3;
 explain (verbose, costs off)
 select * from j1
 inner join j2 on j1.id1 = j2.id1;
-                QUERY PLAN                
-------------------------------------------
- Nested Loop
+                                           QUERY PLAN                                           
+------------------------------------------------------------------------------------------------
+ Remote Fast Query Execution
    Output: j1.id1, j1.id2, j2.id1, j2.id2
-   Join Filter: (j1.id1 = j2.id1)
-   ->  Seq Scan on public.j2
-         Output: j2.id1, j2.id2
-   ->  Seq Scan on public.j1
-         Output: j1.id1, j1.id2
-(7 rows)
+   Node/s: datanode_1, datanode_2
+   Remote query: SELECT j1.id1, j1.id2, j2.id1, j2.id2 FROM (j1 JOIN j2 ON ((j1.id1 = j2.id1)))
+   ->  Nested Loop
+         Output: j1.id1, j1.id2, j2.id1, j2.id2
+         Join Filter: (j1.id1 = j2.id1)
+         ->  Seq Scan on public.j2
+               Output: j2.id1, j2.id2
+         ->  Seq Scan on public.j1
+               Output: j1.id1, j1.id2
+(11 rows)
 
 -- ensure proper unique detection with multiple join quals
 explain (verbose, costs off)
 select * from j1
 inner join j2 on j1.id1 = j2.id1 and j1.id2 = j2.id2;
-                        QUERY PLAN                        
-----------------------------------------------------------
- Nested Loop
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
+ Remote Fast Query Execution
    Output: j1.id1, j1.id2, j2.id1, j2.id2
-   Inner Unique: true
-   Join Filter: ((j1.id1 = j2.id1) AND (j1.id2 = j2.id2))
-   ->  Seq Scan on public.j2
-         Output: j2.id1, j2.id2
-   ->  Seq Scan on public.j1
-         Output: j1.id1, j1.id2
-(8 rows)
+   Node/s: datanode_1, datanode_2
+   Remote query: SELECT j1.id1, j1.id2, j2.id1, j2.id2 FROM (j1 JOIN j2 ON (((j1.id1 = j2.id1) AND (j1.id2 = j2.id2))))
+   ->  Nested Loop
+         Output: j1.id1, j1.id2, j2.id1, j2.id2
+         Inner Unique: true
+         Join Filter: ((j1.id1 = j2.id1) AND (j1.id2 = j2.id2))
+         ->  Seq Scan on public.j2
+               Output: j2.id1, j2.id2
+         ->  Seq Scan on public.j1
+               Output: j1.id1, j1.id2
+(12 rows)
 
 -- ensure we don't detect the join to be unique when quals are not part of the
 -- join condition
 explain (verbose, costs off)
 select * from j1
 inner join j2 on j1.id1 = j2.id1 where j1.id2 = 1;
-                QUERY PLAN                
-------------------------------------------
- Nested Loop
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Remote Fast Query Execution
    Output: j1.id1, j1.id2, j2.id1, j2.id2
-   Join Filter: (j1.id1 = j2.id1)
-   ->  Seq Scan on public.j1
-         Output: j1.id1, j1.id2
-         Filter: (j1.id2 = 1)
-   ->  Seq Scan on public.j2
-         Output: j2.id1, j2.id2
-(8 rows)
+   Node/s: datanode_1, datanode_2
+   Remote query: SELECT j1.id1, j1.id2, j2.id1, j2.id2 FROM (j1 JOIN j2 ON ((j1.id1 = j2.id1))) WHERE (j1.id2 = 1)
+   ->  Nested Loop
+         Output: j1.id1, j1.id2, j2.id1, j2.id2
+         Join Filter: (j1.id1 = j2.id1)
+         ->  Seq Scan on public.j1
+               Output: j1.id1, j1.id2
+               Filter: (j1.id2 = 1)
+         ->  Seq Scan on public.j2
+               Output: j2.id1, j2.id2
+(12 rows)
 
 -- as above, but for left joins.
 explain (verbose, costs off)
 select * from j1
 left join j2 on j1.id1 = j2.id1 where j1.id2 = 1;
-                QUERY PLAN                
-------------------------------------------
- Nested Loop Left Join
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
+ Remote Fast Query Execution
    Output: j1.id1, j1.id2, j2.id1, j2.id2
-   Join Filter: (j1.id1 = j2.id1)
-   ->  Seq Scan on public.j1
-         Output: j1.id1, j1.id2
-         Filter: (j1.id2 = 1)
-   ->  Seq Scan on public.j2
-         Output: j2.id1, j2.id2
-(8 rows)
+   Node/s: datanode_1, datanode_2
+   Remote query: SELECT j1.id1, j1.id2, j2.id1, j2.id2 FROM (j1 LEFT JOIN j2 ON ((j1.id1 = j2.id1))) WHERE (j1.id2 = 1)
+   ->  Nested Loop Left Join
+         Output: j1.id1, j1.id2, j2.id1, j2.id2
+         Join Filter: (j1.id1 = j2.id1)
+         ->  Seq Scan on public.j1
+               Output: j1.id1, j1.id2
+               Filter: (j1.id2 = 1)
+         ->  Seq Scan on public.j2
+               Output: j2.id1, j2.id2
+(12 rows)
 
 -- validate logic in merge joins which skips mark and restore.
 -- it should only do this if all quals which were used to detect the unique

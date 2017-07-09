@@ -1427,7 +1427,7 @@ where virtualtransaction = (
         from pg_catalog.pg_locks
         where transactionid = txid_current()::integer)
 and locktype = 'relation'
-and relnamespace not in (select oid from pg_namespace where nspname = 'pg_catalog' or nspname = 'storm_catalog')
+and relnamespace not in (select oid from pg_namespace where nspname = 'pg_catalog')
 and c.relname != 'my_locks'
 group by c.relname;
 

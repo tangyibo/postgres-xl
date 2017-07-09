@@ -1251,49 +1251,6 @@ addRangeTableEntry(ParseState *pstate,
 	lockmode = isLockedRefname(pstate, refname) ? RowShareLock : AccessShareLock;
 	rel = parserOpenTable(pstate, relation, lockmode);
 	rte->relid = RelationGetRelid(rel);
-
-#ifdef XCP
-	if (IsUnderPostmaster && !superuser() &&
-				get_rel_namespace(rte->relid) == PG_CATALOG_NAMESPACE)
-	{
-		Oid relid = InvalidOid;
-		const char *relname = get_rel_name(rte->relid);
-		StringInfoData 	buf;
-
-		/* Check if the relname is in storm_catalog_remap_string */
-		initStringInfo(&buf);
-		appendStringInfoString(&buf, relname);
-		appendStringInfoChar(&buf, ',');
-
-		elog(DEBUG2, "the constructed name is %s", buf.data);
-
-		/*
-		 * The unqualified relation name should be satisfied from the
-		 * storm_catalog appropriately. Just provide a warning for now if
-		 * it is not..
-		 */
-		if (strstr(storm_catalog_remap_string, buf.data))
-		{
-			relid = RelnameGetRelid((const char *)relname);
-
-			if (get_rel_namespace(relid) != STORM_CATALOG_NAMESPACE)
-				ereport(WARNING,
-					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("Entry (%s) present in storm_catalog_remap_string "
-							"but object not picked from STORM_CATALOG",relname)));
-			else
-			{
-
-				/* close the existing relation and open the new one */
-				heap_close(rel, NoLock);
-
-				rel = relation_open(relid, NoLock);
-				rte->relid = RelationGetRelid(rel);
-			}
-		}
-	}
-#endif
-
 	rte->relkind = rel->rd_rel->relkind;
 
 	/*

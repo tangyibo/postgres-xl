@@ -710,11 +710,7 @@ RelationIsVisible(Oid relid)
 	 * list_member_oid() for them.
 	 */
 	relnamespace = relform->relnamespace;
-#ifdef XCP
-	if (relnamespace != PG_CATALOG_NAMESPACE && relnamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (relnamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, relnamespace))
 		visible = false;
 	else
@@ -809,11 +805,7 @@ TypeIsVisible(Oid typid)
 	 * list_member_oid() for them.
 	 */
 	typnamespace = typform->typnamespace;
-#ifdef XCP
-	if (typnamespace != PG_CATALOG_NAMESPACE && typnamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (typnamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, typnamespace))
 		visible = false;
 	else
@@ -1410,11 +1402,7 @@ FunctionIsVisible(Oid funcid)
 	 * list_member_oid() for them.
 	 */
 	pronamespace = procform->pronamespace;
-#ifdef XCP
-	if (pronamespace != PG_CATALOG_NAMESPACE && pronamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (pronamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, pronamespace))
 		visible = false;
 	else
@@ -1747,11 +1735,7 @@ OperatorIsVisible(Oid oprid)
 	 * list_member_oid() for them.
 	 */
 	oprnamespace = oprform->oprnamespace;
-#ifdef XCP
-	if (oprnamespace != PG_CATALOG_NAMESPACE && oprnamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (oprnamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, oprnamespace))
 		visible = false;
 	else
@@ -1837,11 +1821,7 @@ OpclassIsVisible(Oid opcid)
 	 * list_member_oid() for them.
 	 */
 	opcnamespace = opcform->opcnamespace;
-#ifdef XCP
-	if (opcnamespace != PG_CATALOG_NAMESPACE && opcnamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (opcnamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, opcnamespace))
 		visible = false;
 	else
@@ -1924,11 +1904,7 @@ OpfamilyIsVisible(Oid opfid)
 	 * list_member_oid() for them.
 	 */
 	opfnamespace = opfform->opfnamespace;
-#ifdef XCP
-	if (opfnamespace != PG_CATALOG_NAMESPACE && opfnamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (opfnamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, opfnamespace))
 		visible = false;
 	else
@@ -2060,11 +2036,7 @@ CollationIsVisible(Oid collid)
 	 * list_member_oid() for them.
 	 */
 	collnamespace = collform->collnamespace;
-#ifdef XCP
-	if (collnamespace != PG_CATALOG_NAMESPACE && collnamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (collnamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, collnamespace))
 		visible = false;
 	else
@@ -2147,11 +2119,7 @@ ConversionIsVisible(Oid conid)
 	 * list_member_oid() for them.
 	 */
 	connamespace = conform->connamespace;
-#ifdef XCP
-	if (connamespace != PG_CATALOG_NAMESPACE && connamespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (connamespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, connamespace))
 		visible = false;
 	else
@@ -2378,11 +2346,7 @@ TSParserIsVisible(Oid prsId)
 	 * list_member_oid() for them.
 	 */
 	namespace = form->prsnamespace;
-#ifdef XCP
-	if (namespace != PG_CATALOG_NAMESPACE && namespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (namespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, namespace))
 		visible = false;
 	else
@@ -2509,11 +2473,7 @@ TSDictionaryIsVisible(Oid dictId)
 	 * list_member_oid() for them.
 	 */
 	namespace = form->dictnamespace;
-#ifdef XCP
-	if (namespace != PG_CATALOG_NAMESPACE && namespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (namespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, namespace))
 		visible = false;
 	else
@@ -2639,11 +2599,7 @@ TSTemplateIsVisible(Oid tmplId)
 	 * list_member_oid() for them.
 	 */
 	namespace = form->tmplnamespace;
-#ifdef XCP
-	if (namespace != PG_CATALOG_NAMESPACE && namespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (namespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, namespace))
 		visible = false;
 	else
@@ -2770,11 +2726,7 @@ TSConfigIsVisible(Oid cfgid)
 	 * list_member_oid() for them.
 	 */
 	namespace = form->cfgnamespace;
-#ifdef XCP
-	if (namespace != PG_CATALOG_NAMESPACE && namespace != STORM_CATALOG_NAMESPACE &&
-#else
 	if (namespace != PG_CATALOG_NAMESPACE &&
-#endif
 		!list_member_oid(activeSearchPath, namespace))
 		visible = false;
 	else
@@ -3374,16 +3326,7 @@ GetOverrideSearchPath(MemoryContext context)
 			result->addTemp = true;
 		else
 		{
-#ifdef XCP
-			/*
-			 * The while loop assumes that you can only have one catalog schema
-			 * in the namespace. Not quite..
-			 */
-			Assert(linitial_oid(schemas) == STORM_CATALOG_NAMESPACE ||
-				   linitial_oid(schemas) == PG_CATALOG_NAMESPACE);
-#else
 			Assert(linitial_oid(schemas) == PG_CATALOG_NAMESPACE);
-#endif
 			result->addCatalog = true;
 		}
 		schemas = list_delete_first(schemas);
@@ -3439,11 +3382,6 @@ OverrideSearchPathMatchesCurrent(OverrideSearchPath *path)
 	/* If path->addCatalog, next item should be pg_catalog. */
 	if (path->addCatalog)
 	{
-		if (lc && lfirst_oid(lc) == STORM_CATALOG_NAMESPACE)
-			lc = lnext(lc);
-		else
-			return false;
-
 		if (lc && lfirst_oid(lc) == PG_CATALOG_NAMESPACE)
 			lc = lnext(lc);
 		else
@@ -3512,14 +3450,7 @@ PushOverrideSearchPath(OverrideSearchPath *newpath)
 	 * permissions for these.
 	 */
 	if (newpath->addCatalog)
-#ifdef XCP
-	{
 		oidlist = lcons_oid(PG_CATALOG_NAMESPACE, oidlist);
-		oidlist = lcons_oid(STORM_CATALOG_NAMESPACE, oidlist);
-	}
-#else
-		oidlist = lcons_oid(PG_CATALOG_NAMESPACE, oidlist);
-#endif
 
 	if (newpath->addTemp && OidIsValid(myTempNamespace))
 		oidlist = lcons_oid(myTempNamespace, oidlist);
@@ -3837,11 +3768,6 @@ recomputeNamespacePath(void)
 	 */
 	if (!list_member_oid(oidlist, PG_CATALOG_NAMESPACE))
 		oidlist = lcons_oid(PG_CATALOG_NAMESPACE, oidlist);
-
-#ifdef XCP
-	if (!list_member_oid(oidlist, STORM_CATALOG_NAMESPACE))
-		oidlist = lcons_oid(STORM_CATALOG_NAMESPACE, oidlist);
-#endif
 
 	if (OidIsValid(myTempNamespace) &&
 		!list_member_oid(oidlist, myTempNamespace))

@@ -274,7 +274,6 @@ extern int	tcp_keepalives_interval;
 extern int	tcp_keepalives_count;
 
 #ifdef XCP
-extern char	*storm_catalog_remap_string;
 extern char *global_session_string;
 #endif
 #ifdef TRACE_SORT

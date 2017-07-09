@@ -110,11 +110,6 @@ static void transformLockingClause(ParseState *pstate, Query *qry,
 static bool test_raw_expression_coverage(Node *node, void *context);
 #endif
 
-#ifdef XCP
-static void ParseAnalyze_rtable_walk(List *rtable);
-static void ParseAnalyze_substitute_func(FuncExpr *funcexpr);
-#endif
-
 /*
  * parse_analyze
  *		Analyze a raw parse tree and transform it to Query form.
@@ -3106,97 +3101,6 @@ applyLockingClause(Query *qry, Index rtindex,
 	rc->pushedDown = pushedDown;
 	qry->rowMarks = lappend(qry->rowMarks, rc);
 }
-
-#ifdef XCP
-post_parse_analyze_hook_type prev_ParseAnalyze_callback;
-
-/*
- * Check if the query contains references to any pg_catalog tables that should
- * be remapped to storm_catalog. The list is obtained from the
- * storm_catalog_remap_string GUC. Also do this only for normal users
- */
-void
-ParseAnalyze_callback(ParseState *pstate, Query *query)
-{
-	if (prev_ParseAnalyze_callback)
-		prev_ParseAnalyze_callback(pstate, query);
-
-	if (query && query->commandType == CMD_UTILITY)
-		return;
-	
-	ParseAnalyze_rtable_walk(query->rtable);
-}
-
-static void
-ParseAnalyze_rtable_walk(List *rtable)
-{
-	ListCell 		*item;
-
-	if (!IsUnderPostmaster || superuser())
-		return;
-
-	foreach(item, rtable)
-	{
-		RangeTblEntry *rte = (RangeTblEntry *) lfirst(item);
-
-		if (rte->rtekind == RTE_FUNCTION)
-		{
-			ListCell 		*lc;
-			foreach(lc, rte->functions)
-			{
-				RangeTblFunction *rtfunc = (RangeTblFunction *) lfirst(lc);
-				ParseAnalyze_substitute_func((FuncExpr *) rtfunc->funcexpr);
-			}
-		}
-		else if (rte->rtekind == RTE_SUBQUERY) /* recurse for subqueries */
-				 ParseAnalyze_rtable_walk(rte->subquery->rtable);
-	}
-}
-
-static void
-ParseAnalyze_substitute_func(FuncExpr *funcexpr)
-{
-	StringInfoData 	buf;
-	initStringInfo(&buf);
-
-	if (get_func_namespace(funcexpr->funcid) == PG_CATALOG_NAMESPACE)
-	{
-		Oid funcid = InvalidOid;
-		const char *funcname = get_func_name(funcexpr->funcid);
-
-		/* Check if the funcname is in storm_catalog_remap_string */
-		appendStringInfoString(&buf, funcname);
-		appendStringInfoChar(&buf, ',');
-
-		elog(DEBUG2, "the constructed name is %s", buf.data);
-
-		/*
-		 * The unqualified function name should be satisfied from the
-		 * storm_catalog appropriately. Just provide a warning for now if
-		 * it is not..
-		 */
-		if (strstr(storm_catalog_remap_string, buf.data))
-		{
-			Oid *argtypes = NULL;
-			int nargs;
-
-			get_func_signature(funcexpr->funcid, &argtypes, &nargs);
-			funcid = get_funcid(funcname, buildoidvector(argtypes, nargs),
-					STORM_CATALOG_NAMESPACE);
-		}
-		else
-			return;
-
-		if (get_func_namespace(funcid) != STORM_CATALOG_NAMESPACE)
-			ereport(WARNING,
-					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("Entry (%s) present in storm_catalog_remap_string "
-						 "but object not picked from STORM_CATALOG", funcname)));
-		else /* change the funcid to the storm_catalog one */
-			funcexpr->funcid = funcid;
-	}
-}
-#endif
 
 /*
  * Coverage testing for raw_expression_tree_walker().

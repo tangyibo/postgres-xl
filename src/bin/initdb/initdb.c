@@ -159,9 +159,6 @@ static char *conf_file;
 static char *conversion_file;
 static char *dictionary_file;
 static char *info_schema_file;
-#ifdef XCP
-static char *storm_cat_file;
-#endif
 static char *features_file;
 static char *system_views_file;
 static bool made_new_pgdata = false;
@@ -1766,9 +1763,6 @@ setup_privileges(FILE *cmdfd)
 		"  AND relacl IS NULL;\n\n",
 		"GRANT USAGE ON SCHEMA pg_catalog TO PUBLIC;\n\n",
 		"GRANT CREATE, USAGE ON SCHEMA public TO PUBLIC;\n\n",
-#ifdef XCP
-        "GRANT USAGE ON SCHEMA storm_catalog TO PUBLIC;\n",
-#endif
 		"REVOKE ALL ON pg_largeobject FROM PUBLIC;\n\n",
 		"INSERT INTO pg_init_privs "
 		"  (objoid, classoid, objsubid, initprivs, privtype)"
@@ -2633,9 +2627,6 @@ setup_data_file_paths(void)
 	set_input(&conversion_file, "conversion_create.sql");
 	set_input(&dictionary_file, "snowball_create.sql");
 	set_input(&info_schema_file, "information_schema.sql");
-#ifdef XCP
-	set_input(&storm_cat_file, "storm_catalog.sql");
-#endif
 	set_input(&features_file, "sql_features.txt");
 	set_input(&system_views_file, "system_views.sql");
 
@@ -2667,9 +2658,6 @@ setup_data_file_paths(void)
 	check_input(conversion_file);
 	check_input(dictionary_file);
 	check_input(info_schema_file);
-#ifdef XCP
-	check_input(storm_cat_file);
-#endif
 	check_input(features_file);
 	check_input(system_views_file);
 }

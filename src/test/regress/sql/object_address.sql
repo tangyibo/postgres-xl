@@ -142,9 +142,7 @@ WITH objects (type, name, args) AS (VALUES
 				-- toast table
 				('view', '{addr_nsp, genview}', '{}'),
 				('materialized view', '{addr_nsp, genmatview}', '{}'),
-				('foreign table', '{addr_nsp, genftable}', '{}'),
 				('table column', '{addr_nsp, gentable, b}', '{}'),
-				('foreign table column', '{addr_nsp, genftable, a}', '{}'),
 				('aggregate', '{addr_nsp, genaggr}', '{int4}'),
 				('function', '{pg_catalog, pg_identify_object}', '{pg_catalog.oid, pg_catalog.oid, int4}'),
 				('type', '{pg_catalog._int4}', '{}'),
@@ -165,7 +163,6 @@ WITH objects (type, name, args) AS (VALUES
 				('operator of access method', '{btree,integer_ops,1}', '{integer,integer}'),
 				('function of access method', '{btree,integer_ops,2}', '{integer,integer}'),
 				('rule', '{addr_nsp, genview, _RETURN}', '{}'),
-				('trigger', '{addr_nsp, gentable, t}', '{}'),
 				('schema', '{addr_nsp}', '{}'),
 				('text search parser', '{addr_ts_prs}', '{}'),
 				('text search dictionary', '{addr_ts_dict}', '{}'),
@@ -174,9 +171,6 @@ WITH objects (type, name, args) AS (VALUES
 				('role', '{regress_addr_user}', '{}'),
 				-- database
 				-- tablespace
-				('foreign-data wrapper', '{addr_fdw}', '{}'),
-				('server', '{addr_fserv}', '{}'),
-				('user mapping', '{regress_addr_user}', '{integer}'),
 				('default acl', '{regress_addr_user,public}', '{r}'),
 				('default acl', '{regress_addr_user}', '{r}'),
 				-- extension
@@ -184,9 +178,6 @@ WITH objects (type, name, args) AS (VALUES
 				('policy', '{addr_nsp, gentable, genpol}', '{}'),
 				('transform', '{int}', '{sql}'),
 				('access method', '{btree}', '{}'),
-				('publication', '{addr_pub}', '{}'),
-				('publication relation', '{addr_nsp, gentable}', '{addr_pub}'),
-				('subscription', '{addr_sub}', '{}'),
 				('statistics object', '{addr_nsp, gentable_stat}', '{}')
         )
 SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,

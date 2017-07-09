@@ -3018,6 +3018,9 @@ create_gather_merge_path(PlannerInfo *root, RelOptInfo *rel, Path *subpath,
 														  required_outer);
 	pathnode->path.parallel_aware = false;
 
+	/* distribution is the same as in the subpath */
+	pathnode->path.distribution = (Distribution *) copyObject(subpath->distribution);
+
 	pathnode->subpath = subpath;
 	pathnode->num_workers = subpath->parallel_workers;
 	pathnode->path.pathkeys = pathkeys;

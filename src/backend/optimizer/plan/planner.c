@@ -4312,6 +4312,14 @@ create_grouping_paths(PlannerInfo *root,
 												 NULL,
 												 &total_groups);
 
+					/*
+					 * If the grouping can't be fully pushed down, we'll push down the
+					 * first phase of the aggregate, and redistribute only the partial
+					 * results.
+					 */
+					if (! can_push_down_grouping(root, parse, gmpath))
+						gmpath = create_remotesubplan_path(root, gmpath, NULL);
+
 					if (parse->hasAggs)
 						add_path(grouped_rel, (Path *)
 								 create_agg_path(root,

@@ -122,7 +122,7 @@ BEGIN
 END;
 $$;
 ERROR:  Internal subtransactions not supported in Postgres-XL
-CONTEXT:  PL/pgSQL function inline_code_block line 23 during statement block entry
+CONTEXT:  PL/pgSQL function inline_code_block line 24 during statement block entry
 -- these object types cannot be qualified names
 SELECT pg_get_object_address('language', '{one}', '{}');
 ERROR:  language "one" does not exist

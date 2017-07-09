@@ -71,7 +71,6 @@ ALTER SUBSCRIPTION testsub SET (create_slot = false);
 
 \dRs+
 
-BEGIN;
 ALTER SUBSCRIPTION testsub ENABLE;
 
 \dRs
@@ -79,8 +78,6 @@ ALTER SUBSCRIPTION testsub ENABLE;
 ALTER SUBSCRIPTION testsub DISABLE;
 
 \dRs
-
-COMMIT;
 
 -- fail - must be owner of subscription
 SET ROLE regress_subscription_user_dummy;

@@ -18,138 +18,154 @@ LINE 1: CREATE SUBSCRIPTION testsub PUBLICATION foo;
 -- fail - cannot do CREATE SUBSCRIPTION CREATE SLOT inside transaction block
 BEGIN;
 CREATE SUBSCRIPTION testsub CONNECTION 'testconn' PUBLICATION testpub WITH (create_slot);
-ERROR:  CREATE SUBSCRIPTION ... WITH (create_slot = true) cannot run inside a transaction block
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 COMMIT;
 -- fail - invalid connection string
 CREATE SUBSCRIPTION testsub CONNECTION 'testconn' PUBLICATION testpub;
-ERROR:  invalid connection string syntax: missing "=" after "testconn" in connection info string
-
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 -- fail - duplicate publications
 CREATE SUBSCRIPTION testsub CONNECTION 'dbname=doesnotexist' PUBLICATION foo, testpub, foo WITH (connect = false);
-ERROR:  publication name "foo" used more than once
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 -- ok
 CREATE SUBSCRIPTION testsub CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (connect = false);
-WARNING:  tables were not subscribed, you will have to run ALTER SUBSCRIPTION ... REFRESH PUBLICATION to subscribe the tables
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 COMMENT ON SUBSCRIPTION testsub IS 'test subscription';
+ERROR:  subscription "testsub" does not exist
 SELECT obj_description(s.oid, 'pg_subscription') FROM pg_subscription s;
-  obj_description  
--------------------
- test subscription
-(1 row)
+ obj_description 
+-----------------
+(0 rows)
 
 -- fail - name already exists
 CREATE SUBSCRIPTION testsub CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (connect = false);
-ERROR:  subscription "testsub" already exists
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 -- fail - must be superuser
 SET SESSION AUTHORIZATION 'regress_subscription_user2';
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION foo WITH (connect = false);
-ERROR:  must be superuser to create subscriptions
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 SET SESSION AUTHORIZATION 'regress_subscription_user';
 -- fail - invalid option combinations
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (connect = false, copy_data = true);
-ERROR:  connect = false and copy_data = true are mutually exclusive options
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (connect = false, enabled = true);
-ERROR:  connect = false and enabled = true are mutually exclusive options
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (connect = false, create_slot = true);
-ERROR:  connect = false and create_slot = true are mutually exclusive options
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (slot_name = NONE, enabled = true);
-ERROR:  slot_name = NONE and enabled = true are mutually exclusive options
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (slot_name = NONE, create_slot = true);
-ERROR:  slot_name = NONE and create_slot = true are mutually exclusive options
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (slot_name = NONE);
-ERROR:  subscription with slot_name = NONE must also set enabled = false
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (slot_name = NONE, enabled = false);
-ERROR:  subscription with slot_name = NONE must also set create_slot = false
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION testsub2 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (slot_name = NONE, create_slot = false);
-ERROR:  subscription with slot_name = NONE must also set enabled = false
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 -- ok - with slot_name = NONE
 CREATE SUBSCRIPTION testsub3 CONNECTION 'dbname=doesnotexist' PUBLICATION testpub WITH (slot_name = NONE, connect = false);
-WARNING:  tables were not subscribed, you will have to run ALTER SUBSCRIPTION ... REFRESH PUBLICATION to subscribe the tables
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 -- fail
 ALTER SUBSCRIPTION testsub3 ENABLE;
-ERROR:  cannot enable subscription that does not have a slot name
+ERROR:  subscription "testsub3" does not exist
 ALTER SUBSCRIPTION testsub3 REFRESH PUBLICATION;
-ERROR:  ALTER SUBSCRIPTION ... REFRESH is not allowed for disabled subscriptions
+ERROR:  subscription "testsub3" does not exist
 DROP SUBSCRIPTION testsub3;
+ERROR:  subscription "testsub3" does not exist
 -- fail - invalid connection string
 ALTER SUBSCRIPTION testsub CONNECTION 'foobar';
-ERROR:  invalid connection string syntax: missing "=" after "foobar" in connection info string
-
+ERROR:  subscription "testsub" does not exist
 \dRs+
-                                         List of subscriptions
-  Name   |           Owner           | Enabled | Publication | Synchronous commit |      Conninfo       
----------+---------------------------+---------+-------------+--------------------+---------------------
- testsub | regress_subscription_user | f       | {testpub}   | off                | dbname=doesnotexist
-(1 row)
+                        List of subscriptions
+ Name | Owner | Enabled | Publication | Synchronous commit | Conninfo 
+------+-------+---------+-------------+--------------------+----------
+(0 rows)
 
 ALTER SUBSCRIPTION testsub SET PUBLICATION testpub2, testpub3 WITH (refresh = false);
+ERROR:  subscription "testsub" does not exist
 ALTER SUBSCRIPTION testsub CONNECTION 'dbname=doesnotexist2';
+ERROR:  subscription "testsub" does not exist
 ALTER SUBSCRIPTION testsub SET (slot_name = 'newname');
+ERROR:  subscription "testsub" does not exist
 -- fail
 ALTER SUBSCRIPTION doesnotexist CONNECTION 'dbname=doesnotexist2';
 ERROR:  subscription "doesnotexist" does not exist
 ALTER SUBSCRIPTION testsub SET (create_slot = false);
-ERROR:  unrecognized subscription parameter: create_slot
+ERROR:  subscription "testsub" does not exist
 \dRs+
-                                              List of subscriptions
-  Name   |           Owner           | Enabled |     Publication     | Synchronous commit |       Conninfo       
----------+---------------------------+---------+---------------------+--------------------+----------------------
- testsub | regress_subscription_user | f       | {testpub2,testpub3} | off                | dbname=doesnotexist2
-(1 row)
-
-BEGIN;
-ALTER SUBSCRIPTION testsub ENABLE;
-\dRs
                         List of subscriptions
-  Name   |           Owner           | Enabled |     Publication     
----------+---------------------------+---------+---------------------
- testsub | regress_subscription_user | t       | {testpub2,testpub3}
-(1 row)
+ Name | Owner | Enabled | Publication | Synchronous commit | Conninfo 
+------+-------+---------+-------------+--------------------+----------
+(0 rows)
+
+ALTER SUBSCRIPTION testsub ENABLE;
+ERROR:  subscription "testsub" does not exist
+\dRs
+        List of subscriptions
+ Name | Owner | Enabled | Publication 
+------+-------+---------+-------------
+(0 rows)
 
 ALTER SUBSCRIPTION testsub DISABLE;
+ERROR:  subscription "testsub" does not exist
 \dRs
-                        List of subscriptions
-  Name   |           Owner           | Enabled |     Publication     
----------+---------------------------+---------+---------------------
- testsub | regress_subscription_user | f       | {testpub2,testpub3}
-(1 row)
+        List of subscriptions
+ Name | Owner | Enabled | Publication 
+------+-------+---------+-------------
+(0 rows)
 
-COMMIT;
 -- fail - must be owner of subscription
 SET ROLE regress_subscription_user_dummy;
 ALTER SUBSCRIPTION testsub RENAME TO testsub_dummy;
-ERROR:  must be owner of subscription testsub
+ERROR:  subscription "testsub" does not exist
 RESET ROLE;
 ALTER SUBSCRIPTION testsub RENAME TO testsub_foo;
+ERROR:  subscription "testsub" does not exist
 ALTER SUBSCRIPTION testsub_foo SET (synchronous_commit = local);
+ERROR:  subscription "testsub_foo" does not exist
 ALTER SUBSCRIPTION testsub_foo SET (synchronous_commit = foobar);
-ERROR:  invalid value for parameter "synchronous_commit": "foobar"
-HINT:  Available values: local, remote_write, remote_apply, on, off.
+ERROR:  subscription "testsub_foo" does not exist
 \dRs+
-                                                List of subscriptions
-    Name     |           Owner           | Enabled |     Publication     | Synchronous commit |       Conninfo       
--------------+---------------------------+---------+---------------------+--------------------+----------------------
- testsub_foo | regress_subscription_user | f       | {testpub2,testpub3} | local              | dbname=doesnotexist2
-(1 row)
+                        List of subscriptions
+ Name | Owner | Enabled | Publication | Synchronous commit | Conninfo 
+------+-------+---------+-------------+--------------------+----------
+(0 rows)
 
 -- rename back to keep the rest simple
 ALTER SUBSCRIPTION testsub_foo RENAME TO testsub;
+ERROR:  subscription "testsub_foo" does not exist
 -- fail - new owner must be superuser
 ALTER SUBSCRIPTION testsub OWNER TO regress_subscription_user2;
-ERROR:  permission denied to change owner of subscription "testsub"
-HINT:  The owner of a subscription must be a superuser.
+ERROR:  subscription "testsub" does not exist
 ALTER ROLE regress_subscription_user2 SUPERUSER;
 -- now it works
 ALTER SUBSCRIPTION testsub OWNER TO regress_subscription_user2;
+ERROR:  subscription "testsub" does not exist
 -- fail - cannot do DROP SUBSCRIPTION inside transaction block with slot name
 BEGIN;
 DROP SUBSCRIPTION testsub;
-ERROR:  DROP SUBSCRIPTION cannot run inside a transaction block
+ERROR:  subscription "testsub" does not exist
 COMMIT;
 ALTER SUBSCRIPTION testsub SET (slot_name = NONE);
+ERROR:  subscription "testsub" does not exist
 -- now it works
 BEGIN;
 DROP SUBSCRIPTION testsub;
+ERROR:  subscription "testsub" does not exist
 COMMIT;
 DROP SUBSCRIPTION IF EXISTS testsub;
 NOTICE:  subscription "testsub" does not exist, skipping

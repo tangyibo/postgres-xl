@@ -48,8 +48,11 @@ CREATE TRANSFORM FOR int LANGUAGE SQL (
 	FROM SQL WITH FUNCTION varchar_transform(internal),
 	TO SQL WITH FUNCTION int4recv(internal));
 CREATE PUBLICATION addr_pub FOR TABLE addr_nsp.gentable;
+ERROR:  Postgres-XL does not support CREATE PUBLICATION
+DETAIL:  The feature is not currently supported
 CREATE SUBSCRIPTION addr_sub CONNECTION '' PUBLICATION bar WITH (connect = false, slot_name = NONE);
-WARNING:  tables were not subscribed, you will have to run ALTER SUBSCRIPTION ... REFRESH PUBLICATION to subscribe the tables
+ERROR:  Postgres-XL does not support CREATE SUBSCRIPTION
+DETAIL:  The feature is not currently supported
 CREATE STATISTICS addr_nsp.gentable_stat ON a, b FROM addr_nsp.gentable;
 -- test some error cases
 SELECT pg_get_object_address('stone', '{}', '{}');
@@ -237,7 +240,9 @@ SET client_min_messages TO 'warning';
 DROP FOREIGN DATA WRAPPER addr_fdw CASCADE;
 ERROR:  foreign-data wrapper "addr_fdw" does not exist
 DROP PUBLICATION addr_pub;
+ERROR:  publication "addr_pub" does not exist
 DROP SUBSCRIPTION addr_sub;
+ERROR:  subscription "addr_sub" does not exist
 DROP SCHEMA addr_nsp CASCADE;
 DROP OWNED BY regress_addr_user;
 DROP USER regress_addr_user;

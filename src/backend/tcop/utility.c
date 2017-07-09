@@ -2535,7 +2535,11 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_CreatePublicationStmt:
-				address = CreatePublication((CreatePublicationStmt *) parsetree);
+				/* Postgres-XC does not support publications */
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("Postgres-XL does not support CREATE PUBLICATION"),
+						 errdetail("The feature is not currently supported")));
 				break;
 
 			case T_AlterPublicationStmt:
@@ -2549,8 +2553,11 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_CreateSubscriptionStmt:
-				address = CreateSubscription((CreateSubscriptionStmt *) parsetree,
-											 isTopLevel);
+				/* Postgres-XC does not support subscriptions */
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("Postgres-XL does not support CREATE SUBSCRIPTION"),
+						 errdetail("The feature is not currently supported")));
 				break;
 
 			case T_AlterSubscriptionStmt:

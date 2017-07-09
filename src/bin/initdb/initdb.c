@@ -3023,12 +3023,6 @@ initialize_data_directory(void)
 
 	load_plpgsql(cmdfd);
 
-#ifdef XCP
-#ifdef NOT_USED
-	setup_storm();
-#endif
-#endif
-
 	vacuum_db(cmdfd);
 
 	make_template0(cmdfd);

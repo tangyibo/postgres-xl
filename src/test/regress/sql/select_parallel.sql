@@ -78,7 +78,6 @@ set enable_material to off;
 DO $$
 BEGIN
  SET effective_io_concurrency = 50;
-EXCEPTION WHEN invalid_parameter_value THEN
 END $$;
 set work_mem='64kB';  --set small work mem to force lossy pages
 explain (costs off)
@@ -126,6 +125,8 @@ explain (costs off)
   select stringu1::int2 from tenk1 where unique1 = 1;
 
 -- to increase the parallel query test coverage
+EXPLAIN (timing off, summary off, costs off) SELECT * FROM tenk1;
+
 EXPLAIN (analyze, timing off, summary off, costs off) SELECT * FROM tenk1;
 
 -- provoke error in worker

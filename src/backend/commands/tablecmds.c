@@ -314,6 +314,7 @@ static List *MergeAttributes(List *schema, List *supers, char relpersistence,
 static bool MergeCheckConstraint(List *constraints, char *name, Node *expr);
 static void MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel);
 static void MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel);
+static void MergeDistributionIntoExisting(Relation child_rel, Relation parent_rel);
 static void StoreCatalogInheritance(Oid relationId, List *supers,
 						bool child_is_partition);
 static void StoreCatalogInheritance1(Oid relationId, Oid parentOid,
@@ -11322,6 +11323,22 @@ CreateInheritance(Relation child_rel, Relation parent_rel)
 	/* Match up the constraints and bump coninhcount as needed */
 	MergeConstraintsIntoExisting(child_rel, parent_rel);
 
+	if (IS_PGXC_COORDINATOR)
+	{
+		/*
+		 * Match up the distribution mechanism.
+		 *
+		 * If do the check only on the coordinator since the distribution
+		 * information is not available on the datanodes. This should not cause
+		 * any problem since if the check fails on the coordinator, the entire
+		 * transaction will be aborted and changes will be rolled back on the
+		 * datanodes too. In fact, since we first run the command on the
+		 * coordinator, the error will be caught even before any changes are
+		 * made on the datanodes.
+		 */
+		MergeDistributionIntoExisting(child_rel, parent_rel);
+	}
+
 	/*
 	 * OK, it looks valid.  Make the catalog entries that show inheritance.
 	 */
@@ -11455,6 +11472,30 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel)
 						 errmsg("column \"%s\" in child table must be marked NOT NULL",
 								attributeName)));
 
+			/*
+			 * In Postgres-XL, we demand that the attribute positions of the
+			 * child and the parent table must match too. This seems overly
+			 * restrictive and may have other side-effects when one of the
+			 * tables have dropped columns, thus impacting the attribute
+			 * numbering. But having this restriction helps us generate far
+			 * more efficient plans without worrying too much about attribute
+			 * number mismatch.
+			 *
+			 * In common cases of partitioning, the parent table and the
+			 * partition tables will be created at the very beginning and if
+			 * altered, they will be altered together.
+			 */
+			if (attribute->attnum != childatt->attnum)
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("table \"%s\" contains column \"%s\" at "
+							 "position %d, but parent \"%s\" has it at position %d",
+								RelationGetRelationName(child_rel),
+								attributeName, childatt->attnum,
+								RelationGetRelationName(parent_rel),
+								attribute->attnum),
+						 errhint("Check for column ordering and dropped columns, if any"),
+						 errdetail("Postgres-XL requires attribute positions to match")));
 			/*
 			 * OK, bump the child column's inheritance count.  (If we fail
 			 * later on, this change will just roll back.)
@@ -11666,6 +11707,54 @@ MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel)
 
 	systable_endscan(parent_scan);
 	heap_close(catalog_relation, RowExclusiveLock);
+}
+
+static void
+MergeDistributionIntoExisting(Relation child_rel, Relation parent_rel)
+{
+	RelationLocInfo *parent_locinfo = RelationGetLocInfo(parent_rel);
+	RelationLocInfo *child_locinfo = RelationGetLocInfo(child_rel);
+	List *nodeList1, *nodeList2;
+
+
+	nodeList1 = parent_locinfo->rl_nodeList;
+	nodeList2 = child_locinfo->rl_nodeList;
+
+	/* Same locator type? */
+	if (parent_locinfo->locatorType != child_locinfo->locatorType)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				errmsg("table \"%s\" is using distribution type %c, but the "
+					"parent table \"%s\" is using distribution type %c",
+					RelationGetRelationName(child_rel),
+					child_locinfo->locatorType,
+					RelationGetRelationName(parent_rel),
+					parent_locinfo->locatorType),
+				errdetail("Distribution type for the child must be same as the parent")));
+
+
+	/* Same attribute number? */
+	if (parent_locinfo->partAttrNum != child_locinfo->partAttrNum)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				errmsg("table \"%s\" is distributed on column \"%s\", but the "
+					"parent table \"%s\" is distributed on column \"%s\"",
+					RelationGetRelationName(child_rel),
+					child_locinfo->partAttrName,
+					RelationGetRelationName(parent_rel),
+					parent_locinfo->partAttrName),
+				errdetail("Distribution column for the child must be same as the parent")));
+
+	/* Same node list? */
+	if (list_difference_int(nodeList1, nodeList2) != NIL ||
+		list_difference_int(nodeList2, nodeList1) != NIL)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				errmsg("child table \"%s\" and the parent table \"%s\" "
+					"are distributed on different sets of nodes",
+					RelationGetRelationName(child_rel),
+					RelationGetRelationName(parent_rel)),
+				errdetail("Distribution nodes for the child must be same as the parent")));
 }
 
 /*

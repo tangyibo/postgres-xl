@@ -2432,15 +2432,27 @@ create_append_path(RelOptInfo *rel, List *subpaths, Relids required_outer,
 	pathnode->path.pathkeys = NIL;	/* result is always considered unsorted */
 #ifdef XCP
 	/*
-	 * Append path is used to implement scans of inherited tables and some
-	 * "set" operations, like UNION ALL. While all inherited tables should
-	 * have the same distribution, UNION'ed queries may have different.
-	 * When paths being appended have the same distribution it is OK to push
-	 * Append down to the data nodes. If not, perform "coordinator" Append.
+	 * Append path is used to implement scans of partitioned tables, inherited
+	 * tables and some "set" operations, like UNION ALL. While all partitioned
+	 * and inherited tables should have the same distribution, UNION'ed queries
+	 * may have different.  When paths being appended have the same
+	 * distribution it is OK to push Append down to the data nodes. If not,
+	 * perform "coordinator" Append.
+	 *
+	 * Since we ensure that all partitions of a partitioned table are always
+	 * distributed by the same strategy on the same set of nodes, we can push
+	 * down MergeAppend of partitions of the table.
 	 */
-
+	if (partitioned_rels && subpaths)
+	{
+		/* Take distribution of the first node */
+		l = list_head(subpaths);
+		subpath = (Path *) lfirst(l);
+		distribution = copyObject(subpath->distribution);
+		pathnode->path.distribution = distribution;
+	}
 	/* Special case of the dummy relation, if the subpaths list is empty */
-	if (subpaths)
+	else if (subpaths)
 	{
 		/* Take distribution of the first node */
 		l = list_head(subpaths);
@@ -2558,70 +2570,81 @@ create_merge_append_path(PlannerInfo *root,
 	pathnode->path.parent = rel;
 #ifdef XCP
 	/*
-	 * It is safe to push down MergeAppend if all subpath distributions
-	 * are the same and these distributions are Replicated or distribution key
-	 * is the expression of the first pathkey.
+	 * Since we ensure that all partitions of a partitioned table are always
+	 * distributed by the same strategy on the same set of nodes, we can push
+	 * down MergeAppend of partitions of the table.
+	 *
+	 * For MergeAppend of non-partitions, it is safe to push down MergeAppend
+	 * if all subpath distributions are the same and these distributions are
+	 * Replicated or distribution key is the expression of the first pathkey.
 	 */
-	/* Take distribution of the first node */
 	l = list_head(subpaths);
 	subpath = (Path *) lfirst(l);
 	distribution = copyObject(subpath->distribution);
-	/*
-	 * Verify if it is safe to push down MergeAppend with this distribution.
-	 * TODO implement check of the second condition (distribution key is the
-	 * first pathkey)
-	 */
-	if (distribution == NULL || IsLocatorReplicated(distribution->distributionType))
-	{
-		/*
-		 * Check remaining subpaths, if all distributions equal to the first set
-		 * it as a distribution of the Append path; otherwise make up coordinator
-		 * Append
-		 */
-		while ((l = lnext(l)))
-		{
-			subpath = (Path *) lfirst(l);
 
-			/*
-			 * See comments in Append path
-			 */
-			if (distribution && equalDistribution(distribution, subpath->distribution))
-			{
-				if (subpath->distribution->restrictNodes)
-					distribution->restrictNodes = bms_union(
-							distribution->restrictNodes,
-							subpath->distribution->restrictNodes);
-			}
-			else
-			{
-				break;
-			}
-		}
-	}
-	if (l)
+	if (partitioned_rels)
 	{
-		List *newsubpaths = NIL;
-		foreach(l, subpaths)
-		{
-			subpath = (Path *) lfirst(l);
-			if (subpath->distribution)
-			{
-				/*
-				 * If an explicit sort is necessary, make sure it's pushed
-				 * down to the remote node (i.e. add it before the remote
-				 * subplan).
-				 */
-				subpath = redistribute_path(root, subpath, pathkeys,
-											LOCATOR_TYPE_NONE, NULL,
-											NULL, NULL);
-			}
-			newsubpaths = lappend(newsubpaths, subpath);
-		}
-		subpaths = newsubpaths;
-		pathnode->path.distribution = NULL;
+		pathnode->path.distribution = distribution;
 	}
 	else
-		pathnode->path.distribution = distribution;
+	{
+		/*
+		 * Verify if it is safe to push down MergeAppend with this distribution.
+		 * TODO implement check of the second condition (distribution key is the
+		 * first pathkey)
+		 */
+		if (distribution == NULL || IsLocatorReplicated(distribution->distributionType))
+		{
+			/*
+			 * Check remaining subpaths, if all distributions equal to the first set
+			 * it as a distribution of the Append path; otherwise make up coordinator
+			 * Append
+			 */
+			while ((l = lnext(l)))
+			{
+				subpath = (Path *) lfirst(l);
+
+				/*
+				 * See comments in Append path
+				 */
+				if (distribution && equalDistribution(distribution, subpath->distribution))
+				{
+					if (subpath->distribution->restrictNodes)
+						distribution->restrictNodes = bms_union(
+								distribution->restrictNodes,
+								subpath->distribution->restrictNodes);
+				}
+				else
+				{
+					break;
+				}
+			}
+		}
+		if (l)
+		{
+			List *newsubpaths = NIL;
+			foreach(l, subpaths)
+			{
+				subpath = (Path *) lfirst(l);
+				if (subpath->distribution)
+				{
+					/*
+					 * If an explicit sort is necessary, make sure it's pushed
+					 * down to the remote node (i.e. add it before the remote
+					 * subplan).
+					 */
+					subpath = redistribute_path(root, subpath, pathkeys,
+												LOCATOR_TYPE_NONE, NULL,
+												NULL, NULL);
+				}
+				newsubpaths = lappend(newsubpaths, subpath);
+			}
+			subpaths = newsubpaths;
+			pathnode->path.distribution = NULL;
+		}
+		else
+			pathnode->path.distribution = distribution;
+	}
 #endif
 
 	pathnode->path.pathtarget = rel->reltarget;

@@ -31,7 +31,7 @@ ERROR:  only simple column references are allowed in CREATE STATISTICS
 CREATE STATISTICS tst (unrecognized) ON relname, relnatts FROM pg_class;
 ERROR:  unrecognized statistic type "unrecognized"
 -- Ensure stats are dropped sanely, and test IF NOT EXISTS while at it
-CREATE TABLE ab1 (a INTEGER, b INTEGER, c INTEGER);
+CREATE TABLE ab1 (a INTEGER, b INTEGER, c INTEGER) DISTRIBUTE BY HASH(c);
 CREATE STATISTICS IF NOT EXISTS ab1_a_b_stats ON a, b FROM ab1;
 CREATE STATISTICS IF NOT EXISTS ab1_a_b_stats ON a, b FROM ab1;
 NOTICE:  statistics object "ab1_a_b_stats" already exists, skipping
@@ -94,9 +94,9 @@ CREATE SEQUENCE tststats.s;
 CREATE VIEW tststats.v AS SELECT * FROM tststats.t;
 CREATE MATERIALIZED VIEW tststats.mv AS SELECT * FROM tststats.t;
 CREATE TYPE tststats.ty AS (a int, b int, c text);
-CREATE FOREIGN DATA WRAPPER extstats_dummy_fdw;
-CREATE SERVER extstats_dummy_srv FOREIGN DATA WRAPPER extstats_dummy_fdw;
-CREATE FOREIGN TABLE tststats.f (a int, b int, c text) SERVER extstats_dummy_srv;
+-- CREATE FOREIGN DATA WRAPPER extstats_dummy_fdw;
+-- CREATE SERVER extstats_dummy_srv FOREIGN DATA WRAPPER extstats_dummy_fdw;
+-- CREATE FOREIGN TABLE tststats.f (a int, b int, c text) SERVER extstats_dummy_srv;
 CREATE TABLE tststats.pt (a int, b int, c text) PARTITION BY RANGE (a, b);
 CREATE TABLE tststats.pt1 PARTITION OF tststats.pt FOR VALUES FROM (-10, -10) TO (10, 10);
 CREATE STATISTICS tststats.s1 ON a, b FROM tststats.t;
@@ -109,22 +109,24 @@ ERROR:  relation "v" is not a table, foreign table, or materialized view
 CREATE STATISTICS tststats.s5 ON a, b FROM tststats.mv;
 CREATE STATISTICS tststats.s6 ON a, b FROM tststats.ty;
 ERROR:  relation "ty" is not a table, foreign table, or materialized view
-CREATE STATISTICS tststats.s7 ON a, b FROM tststats.f;
+-- CREATE STATISTICS tststats.s7 ON a, b FROM tststats.f;
 CREATE STATISTICS tststats.s8 ON a, b FROM tststats.pt;
 CREATE STATISTICS tststats.s9 ON a, b FROM tststats.pt1;
-DO $$
-DECLARE
-	relname text := reltoastrelid::regclass FROM pg_class WHERE oid = 'tststats.t'::regclass;
-BEGIN
-	EXECUTE 'CREATE STATISTICS tststats.s10 ON a, b FROM ' || relname;
-EXCEPTION WHEN wrong_object_type THEN
-	RAISE NOTICE 'stats on toast table not created';
-END;
-$$;
-NOTICE:  stats on toast table not created
+-- commented out, because there's no good way to catch the error on XL
+-- (due to not supporting subtransactions), and the error message varies
+-- depending on OID of the toast table
+-- DO $$
+-- DECLARE
+-- 	relname text := reltoastrelid::regclass FROM pg_class WHERE oid = 'tststats.t'::regclass;
+-- BEGIN
+-- 	EXECUTE 'CREATE STATISTICS tststats.s10 ON a, b FROM ' || relname;
+-- EXCEPTION WHEN wrong_object_type THEN
+-- 	RAISE NOTICE 'stats on toast table not created';
+-- END;
+-- $$;
 SET client_min_messages TO warning;
 DROP SCHEMA tststats CASCADE;
-DROP FOREIGN DATA WRAPPER extstats_dummy_fdw CASCADE;
+-- DROP FOREIGN DATA WRAPPER extstats_dummy_fdw CASCADE;
 RESET client_min_messages;
 -- n-distinct tests
 CREATE TABLE ndistinct (
@@ -144,58 +146,63 @@ ANALYZE ndistinct;
 -- Group Aggregate, due to over-estimate of the number of groups
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a, b
-   ->  Sort
-         Sort Key: a, b
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a, b
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY b, c;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: b, c
-   ->  Sort
-         Sort Key: b, c
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: b, c
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a, b, c
-   ->  Sort
-         Sort Key: a, b, c
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a, b, c
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c, d;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a, b, c, d
-   ->  Sort
-         Sort Key: a, b, c, d
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a, b, c, d
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY b, c, d;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: b, c, d
-   ->  Sort
-         Sort Key: b, c, d
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: b, c, d
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 -- correct command
 CREATE STATISTICS s10 ON a, b, c FROM ndistinct;
@@ -239,25 +246,27 @@ EXPLAIN (COSTS off)
 -- by the statistic and while it's NULL-only we assume 200 values for it
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c, d;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a, b, c, d
-   ->  Sort
-         Sort Key: a, b, c, d
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a, b, c, d
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY b, c, d;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: b, c, d
-   ->  Sort
-         Sort Key: b, c, d
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: b, c, d
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 TRUNCATE TABLE ndistinct;
 -- under-estimates when using only per-column statistics
@@ -309,21 +318,23 @@ EXPLAIN (COSTS off)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY b, c, d;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: b, c, d
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, d;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: a, d
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 DROP STATISTICS s10;
 SELECT stxkind, stxndistinct
@@ -336,48 +347,53 @@ SELECT stxkind, stxndistinct
 -- due to under-estimates
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: a, b
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: a, b, c
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c, d;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: a, b, c, d
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY b, c, d;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: b, c, d
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, d;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: a, d
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 -- functional dependencies tests
 CREATE TABLE functional_dependencies (
@@ -398,42 +414,50 @@ INSERT INTO functional_dependencies (a, b, c, filler1)
 ANALYZE functional_dependencies;
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1';
-                    QUERY PLAN                     
----------------------------------------------------
- Bitmap Heap Scan on functional_dependencies
-   Recheck Cond: ((a = 1) AND (b = '1'::text))
-   ->  Bitmap Index Scan on fdeps_abc_idx
-         Index Cond: ((a = 1) AND (b = '1'::text))
-(4 rows)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Bitmap Heap Scan on functional_dependencies
+         Recheck Cond: ((a = 1) AND (b = '1'::text))
+         ->  Bitmap Index Scan on fdeps_abc_idx
+               Index Cond: ((a = 1) AND (b = '1'::text))
+(6 rows)
 
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1' AND c = 1;
-                        QUERY PLAN                         
------------------------------------------------------------
- Index Scan using fdeps_abc_idx on functional_dependencies
-   Index Cond: ((a = 1) AND (b = '1'::text) AND (c = 1))
-(2 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Index Scan using fdeps_abc_idx on functional_dependencies
+         Index Cond: ((a = 1) AND (b = '1'::text) AND (c = 1))
+(4 rows)
 
 -- create statistics
 CREATE STATISTICS func_deps_stat (dependencies) ON a, b, c FROM functional_dependencies;
 ANALYZE functional_dependencies;
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1';
-                    QUERY PLAN                     
----------------------------------------------------
- Bitmap Heap Scan on functional_dependencies
-   Recheck Cond: ((a = 1) AND (b = '1'::text))
-   ->  Bitmap Index Scan on fdeps_abc_idx
-         Index Cond: ((a = 1) AND (b = '1'::text))
-(4 rows)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Bitmap Heap Scan on functional_dependencies
+         Recheck Cond: ((a = 1) AND (b = '1'::text))
+         ->  Bitmap Index Scan on fdeps_abc_idx
+               Index Cond: ((a = 1) AND (b = '1'::text))
+(6 rows)
 
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1' AND c = 1;
-                        QUERY PLAN                         
------------------------------------------------------------
- Index Scan using fdeps_abc_idx on functional_dependencies
-   Index Cond: ((a = 1) AND (b = '1'::text) AND (c = 1))
-(2 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Index Scan using fdeps_abc_idx on functional_dependencies
+         Index Cond: ((a = 1) AND (b = '1'::text) AND (c = 1))
+(4 rows)
 
 -- a => b, a => c, b => c
 TRUNCATE functional_dependencies;
@@ -443,67 +467,79 @@ INSERT INTO functional_dependencies (a, b, c, filler1)
 ANALYZE functional_dependencies;
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1';
-                        QUERY PLAN                         
------------------------------------------------------------
- Index Scan using fdeps_abc_idx on functional_dependencies
-   Index Cond: ((a = 1) AND (b = '1'::text))
-(2 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Index Scan using fdeps_abc_idx on functional_dependencies
+         Index Cond: ((a = 1) AND (b = '1'::text))
+(4 rows)
 
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1' AND c = 1;
-                        QUERY PLAN                         
------------------------------------------------------------
- Index Scan using fdeps_abc_idx on functional_dependencies
-   Index Cond: ((a = 1) AND (b = '1'::text) AND (c = 1))
-(2 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Index Scan using fdeps_abc_idx on functional_dependencies
+         Index Cond: ((a = 1) AND (b = '1'::text) AND (c = 1))
+(4 rows)
 
 -- create statistics
 CREATE STATISTICS func_deps_stat (dependencies) ON a, b, c FROM functional_dependencies;
 ANALYZE functional_dependencies;
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1';
-                    QUERY PLAN                     
----------------------------------------------------
- Bitmap Heap Scan on functional_dependencies
-   Recheck Cond: ((a = 1) AND (b = '1'::text))
-   ->  Bitmap Index Scan on fdeps_abc_idx
-         Index Cond: ((a = 1) AND (b = '1'::text))
-(4 rows)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Bitmap Heap Scan on functional_dependencies
+         Recheck Cond: ((a = 1) AND (b = '1'::text))
+         ->  Bitmap Index Scan on fdeps_abc_idx
+               Index Cond: ((a = 1) AND (b = '1'::text))
+(6 rows)
 
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1' AND c = 1;
-                    QUERY PLAN                     
----------------------------------------------------
- Bitmap Heap Scan on functional_dependencies
-   Recheck Cond: ((a = 1) AND (b = '1'::text))
-   Filter: (c = 1)
-   ->  Bitmap Index Scan on fdeps_ab_idx
-         Index Cond: ((a = 1) AND (b = '1'::text))
-(5 rows)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Bitmap Heap Scan on functional_dependencies
+         Recheck Cond: ((a = 1) AND (b = '1'::text))
+         Filter: (c = 1)
+         ->  Bitmap Index Scan on fdeps_ab_idx
+               Index Cond: ((a = 1) AND (b = '1'::text))
+(7 rows)
 
 -- check change of column type doesn't break it
 ALTER TABLE functional_dependencies ALTER COLUMN c TYPE numeric;
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1' AND c = 1;
-                    QUERY PLAN                     
----------------------------------------------------
- Bitmap Heap Scan on functional_dependencies
-   Recheck Cond: ((a = 1) AND (b = '1'::text))
-   Filter: (c = '1'::numeric)
-   ->  Bitmap Index Scan on fdeps_ab_idx
-         Index Cond: ((a = 1) AND (b = '1'::text))
-(5 rows)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Bitmap Heap Scan on functional_dependencies
+         Recheck Cond: ((a = 1) AND (b = '1'::text))
+         Filter: (c = '1'::numeric)
+         ->  Bitmap Index Scan on fdeps_ab_idx
+               Index Cond: ((a = 1) AND (b = '1'::text))
+(7 rows)
 
 ANALYZE functional_dependencies;
 EXPLAIN (COSTS OFF)
  SELECT * FROM functional_dependencies WHERE a = 1 AND b = '1' AND c = 1;
-                    QUERY PLAN                     
----------------------------------------------------
- Bitmap Heap Scan on functional_dependencies
-   Recheck Cond: ((a = 1) AND (b = '1'::text))
-   Filter: (c = '1'::numeric)
-   ->  Bitmap Index Scan on fdeps_ab_idx
-         Index Cond: ((a = 1) AND (b = '1'::text))
-(5 rows)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Bitmap Heap Scan on functional_dependencies
+         Recheck Cond: ((a = 1) AND (b = '1'::text))
+         Filter: (c = '1'::numeric)
+         ->  Bitmap Index Scan on fdeps_ab_idx
+               Index Cond: ((a = 1) AND (b = '1'::text))
+(7 rows)
 
 RESET random_page_cost;

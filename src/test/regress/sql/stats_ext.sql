@@ -19,7 +19,7 @@ CREATE STATISTICS tst ON (relpages, reltuples) FROM pg_class;
 CREATE STATISTICS tst (unrecognized) ON relname, relnatts FROM pg_class;
 
 -- Ensure stats are dropped sanely, and test IF NOT EXISTS while at it
-CREATE TABLE ab1 (a INTEGER, b INTEGER, c INTEGER);
+CREATE TABLE ab1 (a INTEGER, b INTEGER, c INTEGER) DISTRIBUTE BY HASH(c);
 CREATE STATISTICS IF NOT EXISTS ab1_a_b_stats ON a, b FROM ab1;
 CREATE STATISTICS IF NOT EXISTS ab1_a_b_stats ON a, b FROM ab1;
 DROP STATISTICS ab1_a_b_stats;
@@ -64,9 +64,9 @@ CREATE SEQUENCE tststats.s;
 CREATE VIEW tststats.v AS SELECT * FROM tststats.t;
 CREATE MATERIALIZED VIEW tststats.mv AS SELECT * FROM tststats.t;
 CREATE TYPE tststats.ty AS (a int, b int, c text);
-CREATE FOREIGN DATA WRAPPER extstats_dummy_fdw;
-CREATE SERVER extstats_dummy_srv FOREIGN DATA WRAPPER extstats_dummy_fdw;
-CREATE FOREIGN TABLE tststats.f (a int, b int, c text) SERVER extstats_dummy_srv;
+-- CREATE FOREIGN DATA WRAPPER extstats_dummy_fdw;
+-- CREATE SERVER extstats_dummy_srv FOREIGN DATA WRAPPER extstats_dummy_fdw;
+-- CREATE FOREIGN TABLE tststats.f (a int, b int, c text) SERVER extstats_dummy_srv;
 CREATE TABLE tststats.pt (a int, b int, c text) PARTITION BY RANGE (a, b);
 CREATE TABLE tststats.pt1 PARTITION OF tststats.pt FOR VALUES FROM (-10, -10) TO (10, 10);
 
@@ -76,22 +76,26 @@ CREATE STATISTICS tststats.s3 ON a, b FROM tststats.s;
 CREATE STATISTICS tststats.s4 ON a, b FROM tststats.v;
 CREATE STATISTICS tststats.s5 ON a, b FROM tststats.mv;
 CREATE STATISTICS tststats.s6 ON a, b FROM tststats.ty;
-CREATE STATISTICS tststats.s7 ON a, b FROM tststats.f;
+-- CREATE STATISTICS tststats.s7 ON a, b FROM tststats.f;
 CREATE STATISTICS tststats.s8 ON a, b FROM tststats.pt;
 CREATE STATISTICS tststats.s9 ON a, b FROM tststats.pt1;
-DO $$
-DECLARE
-	relname text := reltoastrelid::regclass FROM pg_class WHERE oid = 'tststats.t'::regclass;
-BEGIN
-	EXECUTE 'CREATE STATISTICS tststats.s10 ON a, b FROM ' || relname;
-EXCEPTION WHEN wrong_object_type THEN
-	RAISE NOTICE 'stats on toast table not created';
-END;
-$$;
+
+-- commented out, because there's no good way to catch the error on XL
+-- (due to not supporting subtransactions), and the error message varies
+-- depending on OID of the toast table
+-- DO $$
+-- DECLARE
+-- 	relname text := reltoastrelid::regclass FROM pg_class WHERE oid = 'tststats.t'::regclass;
+-- BEGIN
+-- 	EXECUTE 'CREATE STATISTICS tststats.s10 ON a, b FROM ' || relname;
+-- EXCEPTION WHEN wrong_object_type THEN
+-- 	RAISE NOTICE 'stats on toast table not created';
+-- END;
+-- $$;
 
 SET client_min_messages TO warning;
 DROP SCHEMA tststats CASCADE;
-DROP FOREIGN DATA WRAPPER extstats_dummy_fdw CASCADE;
+-- DROP FOREIGN DATA WRAPPER extstats_dummy_fdw CASCADE;
 RESET client_min_messages;
 
 -- n-distinct tests

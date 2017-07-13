@@ -27,6 +27,7 @@
 #include "catalog/catalog.h"
 #include "catalog/index.h"
 #include "catalog/indexing.h"
+#include "catalog/namespace.h"
 #include "catalog/pg_collation.h"
 #include "catalog/pg_inherits_fn.h"
 #include "catalog/pg_namespace.h"
@@ -1672,6 +1673,75 @@ update_attstats(Oid relid, bool inh, int natts, VacAttrStats **vacattrstats)
 }
 
 /*
+ *	update_ext_stats() -- update extended statistics
+ */
+static void
+update_ext_stats(Name nspname, Name name,
+				 bytea *ndistinct, bytea *dependencies)
+{
+	Oid			nspoid;
+	Relation	sd;
+	HeapTuple	stup,
+				oldtup;
+	int			i;
+	Datum		values[Natts_pg_statistic_ext];
+	bool		nulls[Natts_pg_statistic_ext];
+	bool		replaces[Natts_pg_statistic_ext];
+
+	nspoid = get_namespace_oid(NameStr(*nspname), false);
+
+	sd = heap_open(StatisticExtRelationId, RowExclusiveLock);
+
+	/*
+	 * Construct a new pg_statistic_ext tuple
+	 */
+	for (i = 0; i < Natts_pg_statistic_ext; ++i)
+	{
+		nulls[i] = false;
+		replaces[i] = false;
+	}
+
+	replaces[Anum_pg_statistic_ext_stxndistinct - 1] = true;
+	replaces[Anum_pg_statistic_ext_stxdependencies - 1] = true;
+
+	/* ndistinct */
+	if (ndistinct)
+		values[Anum_pg_statistic_ext_stxndistinct - 1] = PointerGetDatum(ndistinct);
+	else
+		nulls[Anum_pg_statistic_ext_stxndistinct - 1] = true;
+
+	/* dependencies */
+	if (dependencies)
+		values[Anum_pg_statistic_ext_stxdependencies - 1] = PointerGetDatum(dependencies);
+	else
+		nulls[Anum_pg_statistic_ext_stxdependencies - 1] = true;
+
+	/* Is there already a pg_statistic_ext tuple for this attribute? */
+	oldtup = SearchSysCache2(STATEXTNAMENSP,
+							 NameGetDatum(name),
+							 ObjectIdGetDatum(nspoid));
+
+	/*
+	 * We only expect data for extended statistics already defined on
+	 * the coordinator, so fail if we got something unexpected.
+	 */
+	if (!HeapTupleIsValid(oldtup))
+		elog(ERROR, "unknown extended statistic");
+
+	/* Yes, replace it */
+	stup = heap_modify_tuple(oldtup,
+							 RelationGetDescr(sd),
+							 values,
+							 nulls,
+							 replaces);
+	ReleaseSysCache(oldtup);
+	CatalogTupleUpdate(sd, &stup->t_self, stup);
+
+	heap_freetuple(stup);
+	heap_close(sd, RowExclusiveLock);
+}
+
+/*
  * Standard fetch function for use by compute_stats subroutines.
  *
  * This exists to provide some insulation between compute_stats routines
@@ -2890,6 +2960,7 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 	int 			i;
 	/* Number of data nodes from which attribute statistics are received. */
 	int			   *numnodes;
+	List		   *stat_oids;
 
 	/* Get the relation identifier */
 	relname = RelationGetRelationName(onerel);
@@ -3296,5 +3367,158 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 		}
 	}
 	update_attstats(RelationGetRelid(onerel), inh, attr_cnt, vacattrstats);
+
+	/*
+	 * Build extended statistics on the coordinator.
+	 *
+	 * We take an approach similar to the simple per-attribute stats by
+	 * fetching the already-built extended statistics, and pick data
+	 * from a random datanode on the assumption that the datanodes are
+	 * fairly similar in terms of data volume and distribution.
+	 *
+	 * That seems to be working fairly well, although there are likely
+	 * some weaknesses too - e.g. on distribution keys it may easily
+	 * neglect large portions of the data.
+	 */
+
+	/* Make up query string fetching data from pg_statistic_ext */
+	initStringInfo(&query);
+
+	appendStringInfo(&query, "SELECT ns.nspname, "
+									"stxname, "
+									"stxndistinct::bytea AS stxndistinct, "
+									"stxdependencies::bytea AS stxdependencies "
+								" FROM pg_statistic_ext s JOIN pg_class c "
+								"    ON s.stxrelid = c.oid "
+								"JOIN pg_namespace nc "
+								"    ON c.relnamespace = nc.oid "
+								"JOIN pg_namespace ns "
+								"    ON s.stxnamespace = ns.oid "
+								"WHERE nc.nspname = '%s' AND c.relname = '%s'",
+					nspname, relname);
+
+	/* Build up RemoteQuery */
+	step = makeNode(RemoteQuery);
+	step->combine_type = COMBINE_TYPE_NONE;
+	step->exec_nodes = NULL;
+	step->sql_statement = query.data;
+	step->force_autocommit = true;
+	step->exec_type = EXEC_ON_DATANODES;
+
+	/* Add targetlist entries */
+	step->scan.plan.targetlist = lappend(step->scan.plan.targetlist,
+										 make_relation_tle(NamespaceRelationId,
+														   "pg_namespace",
+														   "nspname"));
+
+	step->scan.plan.targetlist = lappend(step->scan.plan.targetlist,
+										 make_relation_tle(StatisticExtRelationId,
+														   "pg_statistic_ext",
+														   "stxname"));
+
+	step->scan.plan.targetlist = lappend(step->scan.plan.targetlist,
+										 make_relation_tle(StatisticExtRelationId,
+														   "pg_statistic_ext",
+														   "stxndistinct"));
+
+	step->scan.plan.targetlist = lappend(step->scan.plan.targetlist,
+										 make_relation_tle(StatisticExtRelationId,
+														   "pg_statistic_ext",
+														   "stxdependencies"));
+
+	/* Execute query on the data nodes */
+	estate = CreateExecutorState();
+
+	oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
+
+	/*
+	 * Take a fresh snapshot so that we see the effects of the ANALYZE
+	 * command on datanodes. That command is run in auto-commit mode
+	 * hence just bumping up the command ID is not good enough.
+	 */
+	PushActiveSnapshot(GetTransactionSnapshot());
+	estate->es_snapshot = GetActiveSnapshot();
+
+	node = ExecInitRemoteQuery(step, estate, 0);
+	MemoryContextSwitchTo(oldcontext);
+
+	/* get ready to combine results */
+	numnodes = (int *) palloc(attr_cnt * sizeof(int));
+	for (i = 0; i < attr_cnt; i++)
+		numnodes[i] = 0;
+
+	result = ExecRemoteQuery(node);
+	PopActiveSnapshot();
+
+	/*
+	 * We only want to update each statistics once, as we'd get errors
+	 * about self-updated tuples otherwise. So keep a list of OIDs for
+	 * stats we already updated, and check before each update.
+	 */
+	stat_oids = NIL;
+	while (result != NULL && !TupIsNull(result))
+	{
+		Datum 			value;
+		bool			isnull;
+		Name			nspname;
+		Name			stxname;
+		bytea		   *stxndistinct = NULL;
+		bytea		   *stxdependencies = NULL;
+
+		HeapTuple		htup;
+		Oid				nspoid;
+		Oid				stat_oid;
+		bool			updated;
+		ListCell	   *lc;
+
+		/* Process statistics from the data node */
+		value = slot_getattr(result, 1, &isnull); /* nspname */
+		nspname = DatumGetName(value);
+
+		value = slot_getattr(result, 2, &isnull); /* stxname */
+		stxname = DatumGetName(value);
+
+		value = slot_getattr(result, 3, &isnull); /* stxndistinct */
+		if (!isnull)
+			stxndistinct = DatumGetByteaP(value);
+
+		value = slot_getattr(result, 4, &isnull); /* stxdependencies */
+		if (!isnull)
+			stxdependencies = DatumGetByteaP(value);
+
+		nspoid = get_namespace_oid(NameStr(*nspname), false);
+
+		/* get OID of the statistics */
+		htup = SearchSysCache2(STATEXTNAMENSP,
+							   NameGetDatum(stxname),
+							   ObjectIdGetDatum(nspoid));
+
+		stat_oid = HeapTupleGetOid(htup);
+		ReleaseSysCache(htup);
+
+		/* see if we already updated this pg_statistic_ext tuple */
+		updated = false;
+		foreach(lc, stat_oids)
+		{
+			Oid oid = lfirst_oid(lc);
+
+			if (stat_oid == oid)
+			{
+				updated = true;
+				break;
+			}
+		}
+
+		/* if not, update it (with all the available data) */
+		if (!updated)
+		{
+			update_ext_stats(nspname, stxname, stxndistinct, stxdependencies);
+			stat_oids = lappend_oid(stat_oids, stat_oid);
+		}
+
+		/* fetch stats from next node */
+		result = ExecRemoteQuery(node);
+	}
+	ExecEndRemoteQuery(node);
 }
 #endif

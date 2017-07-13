@@ -211,36 +211,39 @@ SELECT stxkind, stxndistinct
   FROM pg_statistic_ext WHERE stxrelid = 'ndistinct'::regclass;
  stxkind |                      stxndistinct                       
 ---------+---------------------------------------------------------
- {d,f}   | {"3, 4": 301, "3, 6": 301, "4, 6": 301, "3, 4, 6": 301}
+ {d,f}   | {"3, 4": 161, "3, 6": 161, "4, 6": 161, "3, 4, 6": 161}
 (1 row)
 
 -- Hash Aggregate, thanks to estimates improved by the statistic
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: a, b
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY b, c;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: b, c
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c;
-         QUERY PLAN          
------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Group Key: a, b, c
-   ->  Seq Scan on ndistinct
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on ndistinct
+(4 rows)
 
 -- last two plans keep using Group Aggregate, because 'd' is not covered
 -- by the statistic and while it's NULL-only we assume 200 values for it
@@ -277,44 +280,47 @@ INSERT INTO ndistinct (a, b, c, filler1)
 ANALYZE ndistinct;
 SELECT stxkind, stxndistinct
   FROM pg_statistic_ext WHERE stxrelid = 'ndistinct'::regclass;
- stxkind |                        stxndistinct                         
----------+-------------------------------------------------------------
- {d,f}   | {"3, 4": 2550, "3, 6": 800, "4, 6": 1632, "3, 4, 6": 10000}
+ stxkind |                        stxndistinct                        
+---------+------------------------------------------------------------
+ {d,f}   | {"3, 4": 2378, "3, 6": 800, "4, 6": 1632, "3, 4, 6": 6060}
 (1 row)
 
 -- plans using Group Aggregate, thanks to using correct esimates
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a, b
-   ->  Sort
-         Sort Key: a, b
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a, b
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a, b, c
-   ->  Sort
-         Sort Key: a, b, c
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a, b, c
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY a, b, c, d;
-            QUERY PLAN             
------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  GroupAggregate
    Group Key: a, b, c, d
-   ->  Sort
-         Sort Key: a, b, c, d
-         ->  Seq Scan on ndistinct
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: a, b, c, d
+               ->  Seq Scan on ndistinct
+(6 rows)
 
 EXPLAIN (COSTS off)
  SELECT COUNT(*) FROM ndistinct GROUP BY b, c, d;

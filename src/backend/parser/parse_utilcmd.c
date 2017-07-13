@@ -361,6 +361,72 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 							  stmt->options);
 
 	/*
+	 * If the table is inherited then use the distribution strategy of the
+	 * parent. We must have already checked for multiple parents and raised an
+	 * ERROR since Postgres-XL does not support inheriting from multiple
+	 * parents.
+	 */
+	if (stmt->inhRelations && IS_PGXC_COORDINATOR && autodistribute)
+	{
+		RangeVar   *inh = (RangeVar *) linitial(stmt->inhRelations);
+		Relation	rel;
+
+		Assert(IsA(inh, RangeVar));
+		rel = heap_openrv(inh, AccessShareLock);
+		if ((rel->rd_rel->relkind != RELKIND_RELATION) &&
+			(rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE))
+			ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("inherited relation \"%s\" is not a table",
+							inh->relname)));
+
+		if (stmt->distributeby)
+		{
+			if (!rel->rd_locator_info)
+				ereport(ERROR,
+					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("parent table \"%s\" is not distributed, but "
+						 "distribution is specified for the child table \"%s\"",
+						 RelationGetRelationName(rel),
+						 stmt->relation->relname)));
+			ereport(WARNING,
+				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+				 errmsg("Inherited/partition tables inherit"
+					 " distribution from the parent"),
+				 errdetail("Explicitly specified distribution will be ignored")));
+		}
+		else
+			stmt->distributeby = makeNode(DistributeBy);
+
+
+		if (rel->rd_locator_info)
+		{
+			switch (rel->rd_locator_info->locatorType)
+			{
+				case LOCATOR_TYPE_HASH:
+					stmt->distributeby->disttype = DISTTYPE_HASH;
+					stmt->distributeby->colname =
+							pstrdup(rel->rd_locator_info->partAttrName);
+					break;
+				case LOCATOR_TYPE_MODULO:
+					stmt->distributeby->disttype = DISTTYPE_MODULO;
+					stmt->distributeby->colname =
+							pstrdup(rel->rd_locator_info->partAttrName);
+					break;
+				case LOCATOR_TYPE_REPLICATED:
+					stmt->distributeby->disttype = DISTTYPE_REPLICATION;
+					break;
+				case LOCATOR_TYPE_RROBIN:
+				default:
+					stmt->distributeby->disttype = DISTTYPE_ROUNDROBIN;
+					break;
+			}
+			stmt->subcluster = makeSubCluster(rel->rd_locator_info->rl_nodeList);
+		}
+		heap_close(rel, NoLock);
+	}
+
+	/*
 	 * transformIndexConstraints wants cxt.alist to contain only index
 	 * statements, so transfer anything we already have into save_alist.
 	 */
@@ -416,53 +482,6 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 		{
 			stmt->distributeby->disttype = DISTTYPE_REPLICATION;
 			stmt->distributeby->colname = NULL;
-		}
-		/*
-		 * If there are parent tables ingerit distribution of the first parent
-		 */
-		else if (cxt.fallback_source < FBS_UIDX && stmt->inhRelations)
-		{
-			RangeVar   *inh = (RangeVar *) linitial(stmt->inhRelations);
-			Relation	rel;
-
-			Assert(IsA(inh, RangeVar));
-			rel = heap_openrv(inh, AccessShareLock);
-			if ((rel->rd_rel->relkind != RELKIND_RELATION) &&
-				(rel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE))
-				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("inherited relation \"%s\" is not a table",
-								inh->relname)));
-
-			if (rel->rd_locator_info)
-			{
-				switch (rel->rd_locator_info->locatorType)
-				{
-					case LOCATOR_TYPE_HASH:
-						stmt->distributeby->disttype = DISTTYPE_HASH;
-						stmt->distributeby->colname =
-								pstrdup(rel->rd_locator_info->partAttrName);
-						break;
-					case LOCATOR_TYPE_MODULO:
-						stmt->distributeby->disttype = DISTTYPE_MODULO;
-						stmt->distributeby->colname =
-								pstrdup(rel->rd_locator_info->partAttrName);
-						break;
-					case LOCATOR_TYPE_REPLICATED:
-						stmt->distributeby->disttype = DISTTYPE_REPLICATION;
-						break;
-					case LOCATOR_TYPE_RROBIN:
-					default:
-						stmt->distributeby->disttype = DISTTYPE_ROUNDROBIN;
-						break;
-				}
-				/*
-				 * Use defined node, if nothing defined get from the parent
-				 */
-				if (stmt->subcluster == NULL)
-					stmt->subcluster = makeSubCluster(rel->rd_locator_info->rl_nodeList);
-			}
-			heap_close(rel, NoLock);
 		}
 		/*
 		 * If there are columns suitable for hash distribution distribute on

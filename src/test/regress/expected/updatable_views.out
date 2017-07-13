@@ -1313,6 +1313,8 @@ drop cascades to view rw_view3
 -- inheritance tests
 CREATE TABLE base_tbl_parent (a int) DISTRIBUTE BY REPLICATION;
 CREATE TABLE base_tbl_child (CHECK (a > 0)) INHERITS (base_tbl_parent) DISTRIBUTE BY REPLICATION;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 INSERT INTO base_tbl_parent SELECT * FROM generate_series(-8, -1);
 INSERT INTO base_tbl_child SELECT * FROM generate_series(1, 8);
 CREATE VIEW rw_view1 AS SELECT * FROM base_tbl_parent;
@@ -2032,16 +2034,22 @@ INSERT INTO t1
 SELECT i,i,'t1' FROM generate_series(1,10) g(i);
 ANALYZE t1;
 CREATE TABLE t11 (d text) INHERITS (t1) DISTRIBUTE BY REPLICATION;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 CREATE INDEX t11_a_idx ON t11(a);
 INSERT INTO t11
 SELECT i,i,'t11','t11d' FROM generate_series(1,10) g(i);
 ANALYZE t11;
 CREATE TABLE t12 (e int[]) INHERITS (t1) DISTRIBUTE BY REPLICATION;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 CREATE INDEX t12_a_idx ON t12(a);
 INSERT INTO t12
 SELECT i,i,'t12','{1,2}'::int[] FROM generate_series(1,10) g(i);
 ANALYZE t12;
 CREATE TABLE t111 () INHERITS (t11, t12) DISTRIBUTE BY REPLICATION;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 NOTICE:  merging multiple inherited definitions of column "a"
 NOTICE:  merging multiple inherited definitions of column "b"
 NOTICE:  merging multiple inherited definitions of column "c"

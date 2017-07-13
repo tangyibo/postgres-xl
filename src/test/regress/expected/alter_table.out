@@ -1462,6 +1462,8 @@ drop table test;
 -- test inheritance
 create table dropColumn (a int, b int, e int) distribute by replication;
 create table dropColumnChild (c int) inherits (dropColumn) distribute by replication;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 create table dropColumnAnother (d int) inherits (dropColumnChild);
 -- these two should fail
 alter table dropColumnchild drop column a;
@@ -1498,6 +1500,8 @@ ERROR:  column must be added to child tables too
 -- Test corner cases in dropping of inherited columns
 create table p1 (f1 int, f2 int) distribute by roundrobin;
 create table c1 (f1 int not null) inherits(p1) distribute by roundrobin;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 NOTICE:  merging column "f1" with inherited definition
 -- should be rejected since c1.f1 is inherited
 alter table c1 drop column f1;
@@ -1520,6 +1524,8 @@ drop table p1 cascade;
 NOTICE:  drop cascades to table c1
 create table p1 (f1 int, f2 int) distribute by roundrobin;
 create table c1 () inherits(p1) distribute by roundrobin;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 -- should be rejected since c1.f1 is inherited
 alter table c1 drop column f1;
 ERROR:  cannot drop inherited column "f1"
@@ -1534,6 +1540,8 @@ drop table p1 cascade;
 NOTICE:  drop cascades to table c1
 create table p1 (f1 int, f2 int) distribute by roundrobin;
 create table c1 () inherits(p1) distribute by roundrobin;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 -- should be rejected since c1.f1 is inherited
 alter table c1 drop column f1;
 ERROR:  cannot drop inherited column "f1"
@@ -1544,6 +1552,8 @@ drop table p1 cascade;
 NOTICE:  drop cascades to table c1
 create table p1 (f1 int, f2 int) distribute by roundrobin;
 create table c1 (f1 int not null) inherits(p1) distribute by roundrobin;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 NOTICE:  merging column "f1" with inherited definition
 -- should be rejected since c1.f1 is inherited
 alter table c1 drop column f1;

@@ -841,6 +841,8 @@ DETAIL:  Key columns "ptest4" and "ptest1" are of incompatible types: inet and i
 -- Basic 2 table case: 1 column of matching types.
 create table pktable_base (base1 int not null) DISTRIBUTE BY REPLICATION;
 create table pktable (ptest1 int, primary key(base1), unique(base1, ptest1)) inherits (pktable_base) DISTRIBUTE BY REPLICATION;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 create table fktable (ftest1 int references pktable(base1));
 -- now some ins, upd, del
 insert into pktable(base1) values (1);
@@ -901,6 +903,8 @@ drop table pktable_base;
 create table pktable_base(base1 int not null, base2 int) DISTRIBUTE BY REPLICATION;
 create table pktable(ptest1 int, ptest2 int, primary key(base1, ptest1), foreign key(base2, ptest2) references
                                              pktable(base1, ptest1)) inherits (pktable_base) DISTRIBUTE BY REPLICATION;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 insert into pktable (base1, ptest1, base2, ptest2) values (1, 1, 1, 1);
 insert into pktable (base1, ptest1, base2, ptest2) values (2, 1, 1, 1);
 insert into pktable (base1, ptest1, base2, ptest2) values (2, 2, 2, 1);

@@ -3,8 +3,14 @@
 --
 CREATE TABLE a (aa TEXT) distribute by roundrobin;
 CREATE TABLE b (bb TEXT) INHERITS (a) distribute by roundrobin;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 CREATE TABLE c (cc TEXT) INHERITS (a) distribute by roundrobin;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 CREATE TABLE d (dd TEXT) INHERITS (b,c,a) distribute by roundrobin;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 NOTICE:  merging multiple inherited definitions of column "aa"
 NOTICE:  merging multiple inherited definitions of column "aa"
 INSERT INTO a(aa) VALUES('aaa');

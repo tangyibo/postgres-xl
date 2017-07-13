@@ -946,6 +946,8 @@ create table t2(val int, val2 int) DISTRIBUTE BY REPLICATION;
 create table t3(val int, val2 int) DISTRIBUTE BY REPLICATION;
 create table p1(a int, b int) DISTRIBUTE BY REPLICATION;
 create table c1(d int, e int) inherits (p1) DISTRIBUTE BY REPLICATION;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 -- insert some rows in them
 insert into t1 values(1,11),(2,11);
 insert into t2 values(3,11),(4,11);

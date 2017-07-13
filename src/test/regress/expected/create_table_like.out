@@ -156,23 +156,23 @@ CREATE TABLE ctlt4 (a text, c text);
 ALTER TABLE ctlt4 ALTER COLUMN c SET STORAGE EXTERNAL;
 CREATE TABLE ctlt12_storage (LIKE ctlt1 INCLUDING STORAGE, LIKE ctlt2 INCLUDING STORAGE);
 \d+ ctlt12_storage
-                   Table "public.ctlt12_storage"
- Column | Type | Modifiers | Storage  | Stats target | Description 
---------+------+-----------+----------+--------------+-------------
- a      | text | not null  | main     |              | 
- b      | text |           | extended |              | 
- c      | text |           | external |              | 
+                             Table "public.ctlt12_storage"
+ Column | Type | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+------+-----------+----------+---------+----------+--------------+-------------
+ a      | text |           | not null |         | main     |              | 
+ b      | text |           |          |         | extended |              | 
+ c      | text |           |          |         | external |              | 
 Distribute By: HASH(a)
 Location Nodes: ALL DATANODES
 
 CREATE TABLE ctlt12_comments (LIKE ctlt1 INCLUDING COMMENTS, LIKE ctlt2 INCLUDING COMMENTS);
 \d+ ctlt12_comments
-                  Table "public.ctlt12_comments"
- Column | Type | Modifiers | Storage  | Stats target | Description 
---------+------+-----------+----------+--------------+-------------
- a      | text | not null  | extended |              | A
- b      | text |           | extended |              | B
- c      | text |           | extended |              | C
+                             Table "public.ctlt12_comments"
+ Column | Type | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+------+-----------+----------+---------+----------+--------------+-------------
+ a      | text |           | not null |         | extended |              | A
+ b      | text |           |          |         | extended |              | B
+ c      | text |           |          |         | extended |              | C
 Distribute By: HASH(a)
 Location Nodes: ALL DATANODES
 

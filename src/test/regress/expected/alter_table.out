@@ -2756,11 +2756,11 @@ ALTER TABLE IF EXISTS tt8 ALTER COLUMN f SET DEFAULT 0;
 ALTER TABLE IF EXISTS tt8 RENAME COLUMN f TO f1;
 ALTER TABLE IF EXISTS tt8 SET SCHEMA alter2;
 \d alter2.tt8
-      Table "alter2.tt8"
- Column |  Type   | Modifiers 
---------+---------+-----------
- a      | integer | 
- f1     | integer | default 0
+                Table "alter2.tt8"
+ Column |  Type   | Collation | Nullable | Default 
+--------+---------+-----------+----------+---------
+ a      | integer |           |          | 
+ f1     | integer |           |          | 0
 Check constraints:
     "tt8_f_check" CHECK (f1 >= 0 AND f1 <= 10)
 

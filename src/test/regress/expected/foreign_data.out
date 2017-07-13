@@ -60,7 +60,7 @@ ERROR:  Postgres-XL does not support FOREIGN DATA WRAPPER yet
 DETAIL:  The feature is not currently supported
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -74,7 +74,7 @@ ERROR:  Postgres-XL does not support FOREIGN DATA WRAPPER yet
 DETAIL:  The feature is not currently supported
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -90,7 +90,7 @@ ERROR:  Postgres-XL does not support FOREIGN DATA WRAPPER yet
 DETAIL:  The feature is not currently supported
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -105,7 +105,7 @@ ALTER FOREIGN DATA WRAPPER foo NO VALIDATOR;
 ERROR:  foreign-data wrapper "foo" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -119,7 +119,7 @@ ALTER FOREIGN DATA WRAPPER foo OPTIONS (ADD x '1', DROP x);
 ERROR:  foreign-data wrapper "foo" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -127,7 +127,7 @@ ALTER FOREIGN DATA WRAPPER foo OPTIONS (DROP a, SET b '3', ADD c '4');
 ERROR:  foreign-data wrapper "foo" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -137,7 +137,7 @@ ALTER FOREIGN DATA WRAPPER foo OPTIONS (b '4');             -- ERROR
 ERROR:  foreign-data wrapper "foo" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -150,7 +150,7 @@ ALTER FOREIGN DATA WRAPPER foo OPTIONS (ADD d '5');
 ERROR:  foreign-data wrapper "foo" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -166,7 +166,7 @@ HINT:  Must be superuser to alter a foreign-data wrapper.
 RESET ROLE;
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -174,7 +174,7 @@ ALTER FOREIGN DATA WRAPPER foo RENAME TO foo1;
 ERROR:  foreign-data wrapper "foo" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -187,7 +187,7 @@ DROP FOREIGN DATA WRAPPER IF EXISTS nonexistent;
 NOTICE:  foreign-data wrapper "nonexistent" does not exist, skipping
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -201,7 +201,7 @@ DROP ROLE regress_test_role_super;
 ERROR:  role "regress_test_role_super" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -222,19 +222,19 @@ CREATE USER MAPPING IF NOT EXISTS FOR current_user SERVER s1; -- NOTICE
 NOTICE:  user mapping for "regress_foreign_data_user" already exists for server s1, skipping
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
 \des+
                                        List of foreign servers
- Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW Options | Description 
+ Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW options | Description 
 ------+-------+----------------------+-------------------+------+---------+-------------+-------------
 (0 rows)
 
 \deu+
       List of user mappings
- Server | User name | FDW Options 
+ Server | User name | FDW options 
 --------+-----------+-------------
 (0 rows)
 
@@ -248,7 +248,7 @@ DROP FOREIGN DATA WRAPPER foo CASCADE;
 ERROR:  foreign-data wrapper "foo" does not exist
 \dew+
                            List of foreign-data wrappers
- Name | Owner | Handler | Validator | Access privileges | FDW Options | Description 
+ Name | Owner | Handler | Validator | Access privileges | FDW options | Description 
 ------+-------+---------+-----------+-------------------+-------------+-------------
 (0 rows)
 
@@ -303,7 +303,7 @@ ERROR:  Postgres-XL does not support SERVER yet
 DETAIL:  The feature is not currently supported
 \des+
                                        List of foreign servers
- Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW Options | Description 
+ Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW options | Description 
 ------+-------+----------------------+-------------------+------+---------+-------------+-------------
 (0 rows)
 SET ROLE regress_test_role;
@@ -320,7 +320,7 @@ DETAIL:  The feature is not currently supported
 RESET ROLE;
 \des+
                                        List of foreign servers
- Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW Options | Description 
+ Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW options | Description 
 ------+-------+----------------------+-------------------+------+---------+-------------+-------------
 (0 rows)
 
@@ -340,7 +340,7 @@ ERROR:  Postgres-XL does not support SERVER yet
 DETAIL:  The feature is not currently supported
 \des+
                                        List of foreign servers
- Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW Options | Description 
+ Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW options | Description 
 ------+-------+----------------------+-------------------+------+---------+-------------+-------------
 (0 rows)
 
@@ -365,7 +365,7 @@ GRANT USAGE ON FOREIGN SERVER s6 TO regress_test_role2 WITH GRANT OPTION;
 ERROR:  server "s6" does not exist
 \des+
                                        List of foreign servers
- Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW Options | Description 
+ Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW options | Description 
 ------+-------+----------------------+-------------------+------+---------+-------------+-------------
 (0 rows)
 
@@ -406,7 +406,7 @@ RESET ROLE;
 DROP ROLE regress_test_indirect;                            -- ERROR
 \des+
                                        List of foreign servers
- Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW Options | Description 
+ Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW options | Description 
 ------+-------+----------------------+-------------------+------+---------+-------------+-------------
 (0 rows)
 
@@ -414,7 +414,7 @@ ALTER SERVER s8 RENAME to s8new;
 ERROR:  server "s8" does not exist
 \des+
                                        List of foreign servers
- Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW Options | Description 
+ Name | Owner | Foreign-data wrapper | Access privileges | Type | Version | FDW options | Description 
 ------+-------+----------------------+-------------------+------+---------+-------------+-------------
 (0 rows)
 
@@ -557,7 +557,7 @@ ERROR:  server "t1" does not exist
 RESET ROLE;
 \deu+
       List of user mappings
- Server | User name | FDW Options 
+ Server | User name | FDW options 
 --------+-----------+-------------
 (0 rows)
 
@@ -645,7 +645,7 @@ ERROR:  relation "ft1" does not exist
 \d+ ft1
 \det+
                List of foreign tables
- Schema | Table | Server | FDW Options | Description 
+ Schema | Table | Server | FDW options | Description 
 --------+-------+--------+-------------+-------------
 (0 rows)
 
@@ -1185,12 +1185,12 @@ CREATE FOREIGN TABLE ft2 () INHERITS (pt1)
   SERVER s0 OPTIONS (delimiter ',', quote '"', "be quoted" 'value');
 ERROR:  server "s0" does not exist
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    |              | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Distribute By: HASH(c1)
 Location Nodes: ALL DATANODES
 
@@ -1256,17 +1256,17 @@ ALTER TABLE pt1 ADD COLUMN c6 integer;
 ALTER TABLE pt1 ADD COLUMN c7 integer NOT NULL;
 ALTER TABLE pt1 ADD COLUMN c8 integer;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    |              | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
- c4     | integer |           | plain    |              | 
- c5     | integer | default 0 | plain    |              | 
- c6     | integer |           | plain    |              | 
- c7     | integer | not null  | plain    |              | 
- c8     | integer |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    |              | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+ c4     | integer |           |          |         | plain    |              | 
+ c5     | integer |           |          | 0       | plain    |              | 
+ c6     | integer |           |          |         | plain    |              | 
+ c7     | integer |           | not null |         | plain    |              | 
+ c8     | integer |           |          |         | plain    |              | 
 Distribute By: HASH(c1)
 Location Nodes: ALL DATANODES
 
@@ -1286,17 +1286,17 @@ ALTER TABLE pt1 ALTER COLUMN c1 SET (n_distinct = 100);
 ALTER TABLE pt1 ALTER COLUMN c8 SET STATISTICS -1;
 ALTER TABLE pt1 ALTER COLUMN c8 SET STORAGE EXTERNAL;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
- c4     | integer | default 0 | plain    |              | 
- c5     | integer |           | plain    |              | 
- c6     | integer | not null  | plain    |              | 
- c7     | integer |           | plain    |              | 
- c8     | text    |           | external |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
+ c4     | integer |           |          | 0       | plain    |              | 
+ c5     | integer |           |          |         | plain    |              | 
+ c6     | integer |           | not null |         | plain    |              | 
+ c7     | integer |           |          |         | plain    |              | 
+ c8     | text    |           |          |         | external |              | 
 Distribute By: HASH(c1)
 Location Nodes: ALL DATANODES
 
@@ -1308,12 +1308,12 @@ ALTER TABLE pt1 DROP COLUMN c6;
 ALTER TABLE pt1 DROP COLUMN c7;
 ALTER TABLE pt1 DROP COLUMN c8;
 \d+ pt1
-                          Table "public.pt1"
- Column |  Type   | Modifiers | Storage  | Stats target | Description 
---------+---------+-----------+----------+--------------+-------------
- c1     | integer | not null  | plain    | 10000        | 
- c2     | text    |           | extended |              | 
- c3     | date    |           | plain    |              | 
+                                    Table "public.pt1"
+ Column |  Type   | Collation | Nullable | Default | Storage  | Stats target | Description 
+--------+---------+-----------+----------+---------+----------+--------------+-------------
+ c1     | integer |           | not null |         | plain    | 10000        | 
+ c2     | text    |           |          |         | extended |              | 
+ c3     | date    |           |          |         | plain    |              | 
 Distribute By: HASH(c1)
 Location Nodes: ALL DATANODES
 

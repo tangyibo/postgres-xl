@@ -458,11 +458,11 @@ SELECT nextval('xl_s1');
 CREATE TABLE xl_testtab (a serial, b int);
 ALTER TABLE xl_testtab RENAME TO xl_testtab_newname;
 \d+ xl_testtab_newname
-                                        Table "public.xl_testtab_newname"
- Column |  Type   |                       Modifiers                        | Storage | Stats target | Description 
---------+---------+--------------------------------------------------------+---------+--------------+-------------
- a      | integer | not null default nextval('xl_testtab_a_seq'::regclass) | plain   |              | 
- b      | integer |                                                        | plain   |              | 
+                                           Table "public.xl_testtab_newname"
+ Column |  Type   | Collation | Nullable |                Default                | Storage | Stats target | Description 
+--------+---------+-----------+----------+---------------------------------------+---------+--------------+-------------
+ a      | integer |           | not null | nextval('xl_testtab_a_seq'::regclass) | plain   |              | 
+ b      | integer |           |          |                                       | plain   |              | 
 Distribute By: HASH(a)
 Location Nodes: ALL DATANODES
 

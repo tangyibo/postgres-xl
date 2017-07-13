@@ -3642,7 +3642,7 @@ tuplesort_heap_replace_top(Tuplesortstate *state, SortTuple *tuple,
 						   bool checkIndex)
 {
 	SortTuple  *memtuples = state->memtuples;
-	int			i,
+	unsigned int i,
 				n;
 
 	Assert(!checkIndex || state->currentRun == RUN_FIRST);
@@ -3650,11 +3650,16 @@ tuplesort_heap_replace_top(Tuplesortstate *state, SortTuple *tuple,
 
 	CHECK_FOR_INTERRUPTS();
 
+	/*
+	 * state->memtupcount is "int", but we use "unsigned int" for i, j, n.
+	 * This prevents overflow in the "2 * i + 1" calculation, since at the top
+	 * of the loop we must have i < n <= INT_MAX <= UINT_MAX/2.
+	 */
 	n = state->memtupcount;
 	i = 0;						/* i is where the "hole" is */
 	for (;;)
 	{
-		int			j = 2 * i + 1;
+		unsigned int j = 2 * i + 1;
 
 		if (j >= n)
 			break;

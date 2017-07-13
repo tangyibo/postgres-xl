@@ -1354,6 +1354,11 @@ pg_newlocale_from_collation(Oid collid)
 			UCollator  *collator;
 			UErrorCode	status;
 
+			if (strcmp(collcollate, collctype) != 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("collations with different collate and ctype values are not supported by ICU")));
+
 			status = U_ZERO_ERROR;
 			collator = ucol_open(collcollate, &status);
 			if (U_FAILURE(status))
@@ -1506,14 +1511,22 @@ icu_to_uchar(UChar **buff_uchar, const char *buff, size_t nbytes)
 
 	init_icu_converter();
 
-	len_uchar = 2 * nbytes + 1; /* max length per docs */
-	*buff_uchar = palloc(len_uchar * sizeof(**buff_uchar));
 	status = U_ZERO_ERROR;
-	len_uchar = ucnv_toUChars(icu_converter, *buff_uchar, len_uchar,
+	len_uchar = ucnv_toUChars(icu_converter, NULL, 0,
+							  buff, nbytes, &status);
+	if (U_FAILURE(status) && status != U_BUFFER_OVERFLOW_ERROR)
+		ereport(ERROR,
+				(errmsg("ucnv_toUChars failed: %s", u_errorName(status))));
+
+	*buff_uchar = palloc((len_uchar + 1) * sizeof(**buff_uchar));
+
+	status = U_ZERO_ERROR;
+	len_uchar = ucnv_toUChars(icu_converter, *buff_uchar, len_uchar + 1,
 							  buff, nbytes, &status);
 	if (U_FAILURE(status))
 		ereport(ERROR,
 				(errmsg("ucnv_toUChars failed: %s", u_errorName(status))));
+
 	return len_uchar;
 }
 
@@ -1536,14 +1549,22 @@ icu_from_uchar(char **result, const UChar *buff_uchar, int32_t len_uchar)
 
 	init_icu_converter();
 
-	len_result = UCNV_GET_MAX_BYTES_FOR_STRING(len_uchar, ucnv_getMaxCharSize(icu_converter));
+	status = U_ZERO_ERROR;
+	len_result = ucnv_fromUChars(icu_converter, NULL, 0,
+								 buff_uchar, len_uchar, &status);
+	if (U_FAILURE(status) && status != U_BUFFER_OVERFLOW_ERROR)
+		ereport(ERROR,
+				(errmsg("ucnv_fromUChars failed: %s", u_errorName(status))));
+
 	*result = palloc(len_result + 1);
+
 	status = U_ZERO_ERROR;
 	len_result = ucnv_fromUChars(icu_converter, *result, len_result + 1,
 								 buff_uchar, len_uchar, &status);
 	if (U_FAILURE(status))
 		ereport(ERROR,
 				(errmsg("ucnv_fromUChars failed: %s", u_errorName(status))));
+
 	return len_result;
 }
 #endif							/* USE_ICU */

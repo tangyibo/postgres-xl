@@ -869,8 +869,8 @@ include_dir 'conf.d'
         Specifies the number of seconds of inactivity after which TCP
         should send a keepalive message to the client.  A value of 0 uses
         the system default.
-        This parameter is supported only on systems that support the
-        <symbol>TCP_KEEPIDLE</> or <symbol>TCP_KEEPALIVE</> symbols, and on
+        This parameter is supported only on systems that support
+        <symbol>TCP_KEEPIDLE</> or an equivalent socket option, and on
         Windows; on other systems, it must be zero.
         In sessions connected via a Unix-domain socket, this parameter is
         ignored and always reads as zero.
@@ -895,9 +895,9 @@ include_dir 'conf.d'
         Specifies the number of seconds after which a TCP keepalive message
         that is not acknowledged by the client should be retransmitted.
         A value of 0 uses the system default.
-        This parameter is supported only on systems that support the
-        <symbol>TCP_KEEPINTVL</> symbol, and on Windows; on other systems, it
-        must be zero.
+        This parameter is supported only on systems that support
+        <symbol>TCP_KEEPINTVL</> or an equivalent socket option, and on
+        Windows; on other systems, it must be zero.
         In sessions connected via a Unix-domain socket, this parameter is
         ignored and always reads as zero.
        </para>
@@ -919,10 +919,11 @@ include_dir 'conf.d'
       <listitem>
        <para>
         Specifies the number of TCP keepalives that can be lost before
-        the server's connection to the client is considered dead.  A value of 0
-        uses the system default.  This parameter is
-        supported only on systems that support the <symbol>TCP_KEEPCNT</>
-        symbol; on other systems, it must be zero.
+        the server's connection to the client is considered dead.
+        A value of 0 uses the system default.
+        This parameter is supported only on systems that support
+        <symbol>TCP_KEEPCNT</> or an equivalent socket option;
+        on other systems, it must be zero.
         In sessions connected via a Unix-domain socket, this parameter is
         ignored and always reads as zero.
        </para>
@@ -3099,7 +3100,19 @@ include_dir 'conf.d'
         (as shown by a state of <literal>streaming</literal> in the
         <link linkend="monitoring-stats-views-table">
         <literal>pg_stat_replication</></link> view).
-        Specifying more than one standby names can allow very high availability.
+        Specifying more than one synchronous standby can allow for very high
+        availability and protection against data loss.
+       </para>
+       <para>
+        The name of a standby server for this purpose is the
+        <varname>application_name</> setting of the standby, as set in the
+        standby's connection information.  In case of a physical replication
+        standby, this should be set in the <varname>primary_conninfo</>
+        setting in <filename>recovery.conf</filename>; the default
+        is <literal>walreceiver</literal>.  For logical replication, this can
+        be set in the connection information of the subscription, and it
+        defaults to the subscription name.  For other replication stream
+        consumers, consult their documentation.
        </para>
        <para>
         This parameter specifies a list of standby servers using
@@ -3161,15 +3174,12 @@ ANY <replaceable class="parameter">num_sync</replaceable> ( <replaceable class="
         as a synchronous standby.
        </para>
        <para>
-        The name of a standby server for this purpose is the
-        <varname>application_name</> setting of the standby, as set in the
-        <varname>primary_conninfo</> of the standby's WAL receiver.  There is
-        no mechanism to enforce uniqueness. In case of duplicates one of the
-        matching standbys will be considered as higher priority, though
-        exactly which one is indeterminate.
-        The special entry <literal>*</> matches any
-        <varname>application_name</>, including the default application name
-        of <literal>walreceiver</>.
+        The special entry <literal>*</> matches any standby name.
+       </para>
+       <para>
+        There is no mechanism to enforce uniqueness of standby names.  In case
+        of duplicates one of the matching standbys will be considered as
+        higher priority, though exactly which one is indeterminate.
        </para>
        <note>
         <para>

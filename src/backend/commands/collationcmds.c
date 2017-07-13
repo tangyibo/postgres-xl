@@ -64,7 +64,7 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 	char	   *collcollate = NULL;
 	char	   *collctype = NULL;
 	char	   *collproviderstr = NULL;
-	int			collencoding;
+	int			collencoding = 0;
 	char		collprovider = 0;
 	char	   *collversion = NULL;
 	Oid			newoid;
@@ -126,6 +126,7 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 		collcollate = pstrdup(NameStr(((Form_pg_collation) GETSTRUCT(tp))->collcollate));
 		collctype = pstrdup(NameStr(((Form_pg_collation) GETSTRUCT(tp))->collctype));
 		collprovider = ((Form_pg_collation) GETSTRUCT(tp))->collprovider;
+		collencoding = ((Form_pg_collation) GETSTRUCT(tp))->collencoding;
 
 		ReleaseSysCache(tp);
 
@@ -185,12 +186,15 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 				 errmsg("parameter \"lc_ctype\" must be specified")));
 
-	if (collprovider == COLLPROVIDER_ICU)
-		collencoding = -1;
-	else
+	if (!fromEl)
 	{
-		collencoding = GetDatabaseEncoding();
-		check_encoding_locale_matches(collencoding, collcollate, collctype);
+		if (collprovider == COLLPROVIDER_ICU)
+			collencoding = -1;
+		else
+		{
+			collencoding = GetDatabaseEncoding();
+			check_encoding_locale_matches(collencoding, collcollate, collctype);
+		}
 	}
 
 	if (!collversion)
@@ -353,6 +357,12 @@ pg_collation_actual_version(PG_FUNCTION_ARGS)
 }
 
 
+/* will we use "locale -a" in pg_import_system_collations? */
+#if defined(HAVE_LOCALE_T) && !defined(WIN32)
+#define READ_LOCALE_A_OUTPUT
+#endif
+
+#if defined(READ_LOCALE_A_OUTPUT) || defined(USE_ICU)
 /*
  * Check a string to see if it is pure ASCII
  */
@@ -367,11 +377,7 @@ is_all_ascii(const char *str)
 	}
 	return true;
 }
-
-/* will we use "locale -a" in pg_import_system_collations? */
-#if defined(HAVE_LOCALE_T) && !defined(WIN32)
-#define READ_LOCALE_A_OUTPUT
-#endif
+#endif							/* READ_LOCALE_A_OUTPUT || USE_ICU */
 
 #ifdef READ_LOCALE_A_OUTPUT
 /*

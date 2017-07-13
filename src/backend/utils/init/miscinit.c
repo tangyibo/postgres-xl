@@ -57,6 +57,7 @@
 #ifdef XCP
 #include "utils/snapmgr.h"
 #endif
+#include "utils/pidfile.h"
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
 #include "utils/varlena.h"
@@ -1284,8 +1285,9 @@ TouchSocketLockFiles(void)
  *
  * Note: because we don't truncate the file, if we were to rewrite a line
  * with less data than it had before, there would be garbage after the last
- * line.  We don't ever actually do that, so not worth adding another kernel
- * call to cover the possibility.
+ * line.  While we could fix that by adding a truncate call, that would make
+ * the file update non-atomic, which we'd rather avoid.  Therefore, callers
+ * should endeavor never to shorten a line once it's been written.
  */
 void
 AddToDataDirLockFile(int target_line, const char *str)
@@ -1328,17 +1330,24 @@ AddToDataDirLockFile(int target_line, const char *str)
 	srcptr = srcbuffer;
 	for (lineno = 1; lineno < target_line; lineno++)
 	{
-		if ((srcptr = strchr(srcptr, '\n')) == NULL)
-		{
-			elog(LOG, "incomplete data in \"%s\": found only %d newlines while trying to add line %d",
-				 DIRECTORY_LOCK_FILE, lineno - 1, target_line);
-			close(fd);
-			return;
-		}
-		srcptr++;
+		char	   *eol = strchr(srcptr, '\n');
+
+		if (eol == NULL)
+			break;				/* not enough lines in file yet */
+		srcptr = eol + 1;
 	}
 	memcpy(destbuffer, srcbuffer, srcptr - srcbuffer);
 	destptr = destbuffer + (srcptr - srcbuffer);
+
+	/*
+	 * Fill in any missing lines before the target line, in case lines are
+	 * added to the file out of order.
+	 */
+	for (; lineno < target_line; lineno++)
+	{
+		if (destptr < destbuffer + sizeof(destbuffer))
+			*destptr++ = '\n';
+	}
 
 	/*
 	 * Write or rewrite the target line.

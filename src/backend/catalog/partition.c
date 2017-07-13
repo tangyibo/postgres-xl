@@ -57,7 +57,8 @@
  *
  * In the case of range partitioning, ndatums will typically be far less than
  * 2 * nparts, because a partition's upper bound and the next partition's lower
- * bound are the same in most common cases, and we only store one of them.
+ * bound are the same in most common cases, and we only store one of them (the
+ * upper bound).
  *
  * In the case of list partitioning, the indexes array stores one entry for
  * every datum, which is the index of the partition that accepts a given datum.
@@ -745,78 +746,64 @@ check_new_partition_bound(char *relname, Relation parent,
 				if (partdesc->nparts > 0)
 				{
 					PartitionBoundInfo boundinfo = partdesc->boundinfo;
-					int			off1,
-								off2;
-					bool		equal = false;
+					int			offset;
+					bool		equal;
 
 					Assert(boundinfo && boundinfo->ndatums > 0 &&
 						   boundinfo->strategy == PARTITION_STRATEGY_RANGE);
 
 					/*
-					 * Firstly, find the greatest range bound that is less
-					 * than or equal to the new lower bound.
+					 * Test whether the new lower bound (which is treated
+					 * inclusively as part of the new partition) lies inside an
+					 * existing partition, or in a gap.
+					 *
+					 * If it's inside an existing partition, the bound at
+					 * offset + 1 will be the upper bound of that partition,
+					 * and its index will be >= 0.
+					 *
+					 * If it's in a gap, the bound at offset + 1 will be the
+					 * lower bound of the next partition, and its index will be
+					 * -1. This is also true if there is no next partition,
+					 * since the index array is initialised with an extra -1 at
+					 * the end.
 					 */
-					off1 = partition_bound_bsearch(key, boundinfo, lower, true,
-												   &equal);
+					offset = partition_bound_bsearch(key, boundinfo, lower,
+													 true, &equal);
 
-					/*
-					 * off1 == -1 means that all existing bounds are greater
-					 * than the new lower bound.  In that case and the case
-					 * where no partition is defined between the bounds at
-					 * off1 and off1 + 1, we have a "gap" in the range that
-					 * could be occupied by the new partition.  We confirm if
-					 * so by checking whether the new upper bound is confined
-					 * within the gap.
-					 */
-					if (!equal && boundinfo->indexes[off1 + 1] < 0)
+					if (boundinfo->indexes[offset + 1] < 0)
 					{
-						off2 = partition_bound_bsearch(key, boundinfo, upper,
-													   true, &equal);
-
 						/*
-						 * If the new upper bound is returned to be equal to
-						 * the bound at off2, the latter must be the upper
-						 * bound of some partition with which the new
-						 * partition clearly overlaps.
-						 *
-						 * Also, if bound at off2 is not same as the one
-						 * returned for the new lower bound (IOW, off1 !=
-						 * off2), then the new partition overlaps at least one
-						 * partition.
+						 * Check that the new partition will fit in the gap.
+						 * For it to fit, the new upper bound must be less than
+						 * or equal to the lower bound of the next partition,
+						 * if there is one.
 						 */
-						if (equal || off1 != off2)
+						if (offset + 1 < boundinfo->ndatums)
 						{
-							overlap = true;
+							int32		cmpval;
 
-							/*
-							 * The bound at off2 could be the lower bound of
-							 * the partition with which the new partition
-							 * overlaps.  In that case, use the upper bound
-							 * (that is, the bound at off2 + 1) to get the
-							 * index of that partition.
-							 */
-							if (boundinfo->indexes[off2] < 0)
-								with = boundinfo->indexes[off2 + 1];
-							else
-								with = boundinfo->indexes[off2];
+							cmpval = partition_bound_cmp(key, boundinfo,
+														 offset + 1, upper,
+														 true);
+							if (cmpval < 0)
+							{
+								/*
+								 * The new partition overlaps with the existing
+								 * partition between offset + 1 and offset + 2.
+								 */
+								overlap = true;
+								with = boundinfo->indexes[offset + 2];
+							}
 						}
 					}
 					else
 					{
 						/*
-						 * Equal has been set to true and there is no "gap"
-						 * between the bound at off1 and that at off1 + 1, so
-						 * the new partition will overlap some partition. In
-						 * the former case, the new lower bound is found to be
-						 * equal to the bound at off1, which could only ever
-						 * be true if the latter is the lower bound of some
-						 * partition.  It's clear in such a case that the new
-						 * partition overlaps that partition, whose index we
-						 * get using its upper bound (that is, using the bound
-						 * at off1 + 1).
+						 * The new partition overlaps with the existing
+						 * partition between offset and offset + 1.
 						 */
 						overlap = true;
-						with = boundinfo->indexes[off1 + 1];
+						with = boundinfo->indexes[offset + 1];
 					}
 				}
 
@@ -2150,7 +2137,14 @@ qsort_partition_rbound_cmp(const void *a, const void *b, void *arg)
  * partition_rbound_cmp
  *
  * Return for two range bounds whether the 1st one (specified in datum1,
- * content1, and lower1) is <=, =, >= the bound specified in *b2
+ * content1, and lower1) is <, =, or > the bound specified in *b2.
+ *
+ * Note that if the values of the two range bounds compare equal, then we take
+ * into account whether they are upper or lower bounds, and an upper bound is
+ * considered to be smaller than a lower bound. This is important to the way
+ * that RelationBuildPartitionDesc() builds the PartitionBoundInfoData
+ * structure, which only stores the upper bound of a common boundary between
+ * two contiguous partitions.
  */
 static int32
 partition_rbound_cmp(PartitionKey key,
@@ -2166,22 +2160,30 @@ partition_rbound_cmp(PartitionKey key,
 	for (i = 0; i < key->partnatts; i++)
 	{
 		/*
-		 * First, handle cases involving infinity, which don't require
-		 * invoking the comparison proc.
+		 * First, handle cases where the column is unbounded, which should not
+		 * invoke the comparison procedure, and should not consider any later
+		 * columns.
 		 */
-		if (content1[i] != RANGE_DATUM_FINITE &&
+		if (content1[i] != RANGE_DATUM_FINITE ||
 			content2[i] != RANGE_DATUM_FINITE)
-
+		{
 			/*
-			 * Both are infinity, so they are equal unless one is negative
-			 * infinity and other positive (or vice versa)
+			 * If the bound values are equal, fall through and compare whether
+			 * they are upper or lower bounds.
 			 */
-			return content1[i] == content2[i] ? 0
-				: (content1[i] < content2[i] ? -1 : 1);
-		else if (content1[i] != RANGE_DATUM_FINITE)
-			return content1[i] == RANGE_DATUM_NEG_INF ? -1 : 1;
-		else if (content2[i] != RANGE_DATUM_FINITE)
-			return content2[i] == RANGE_DATUM_NEG_INF ? 1 : -1;
+			if (content1[i] == content2[i])
+				break;
+
+			/* Otherwise, one bound is definitely larger than the other */
+			if (content1[i] == RANGE_DATUM_NEG_INF)
+				return -1;
+			else if (content1[i] == RANGE_DATUM_POS_INF)
+				return 1;
+			else if (content2[i] == RANGE_DATUM_NEG_INF)
+				return 1;
+			else if (content2[i] == RANGE_DATUM_POS_INF)
+				return -1;
+		}
 
 		cmpval = DatumGetInt32(FunctionCall2Coll(&key->partsupfunc[i],
 												 key->partcollation[i],
@@ -2289,7 +2291,7 @@ partition_bound_cmp(PartitionKey key, PartitionBoundInfo boundinfo,
 
 /*
  * Binary search on a collection of partition bounds. Returns greatest
- * bound in array boundinfo->datums which is less than or equal to *probe
+ * bound in array boundinfo->datums which is less than or equal to *probe.
  * If all bounds in the array are greater than *probe, -1 is returned.
  *
  * *probe could either be a partition bound or a Datum array representing

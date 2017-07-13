@@ -668,13 +668,9 @@ StartReplication(StartReplicationCmd *cmd)
 		sentPtr = cmd->startpoint;
 
 		/* Initialize shared memory status, too */
-		{
-			WalSnd	   *walsnd = MyWalSnd;
-
-			SpinLockAcquire(&walsnd->mutex);
-			walsnd->sentPtr = sentPtr;
-			SpinLockRelease(&walsnd->mutex);
-		}
+		SpinLockAcquire(&MyWalSnd->mutex);
+		MyWalSnd->sentPtr = sentPtr;
+		SpinLockRelease(&MyWalSnd->mutex);
 
 		SyncRepInitConfig();
 
@@ -764,15 +760,14 @@ logical_read_xlog_page(XLogReaderState *state, XLogRecPtr targetPagePtr, int req
 	/* make sure we have enough WAL available */
 	flushptr = WalSndWaitForWal(targetPagePtr + reqLen);
 
-	/* more than one block available */
-	if (targetPagePtr + XLOG_BLCKSZ <= flushptr)
-		count = XLOG_BLCKSZ;
-	/* not enough WAL synced, that can happen during shutdown */
-	else if (targetPagePtr + reqLen > flushptr)
+	/* fail if not (implies we are going to shut down) */
+	if (flushptr < targetPagePtr + reqLen)
 		return -1;
-	/* part of the page available */
+
+	if (targetPagePtr + XLOG_BLCKSZ <= flushptr)
+		count = XLOG_BLCKSZ;	/* more than one block available */
 	else
-		count = flushptr - targetPagePtr;
+		count = flushptr - targetPagePtr;	/* part of the page available */
 
 	/* now actually read the data, we know it's there */
 	XLogRead(cur_page, targetPagePtr, XLOG_BLCKSZ);
@@ -1094,13 +1089,9 @@ StartLogicalReplication(StartReplicationCmd *cmd)
 	sentPtr = MyReplicationSlot->data.confirmed_flush;
 
 	/* Also update the sent position status in shared memory */
-	{
-		WalSnd	   *walsnd = MyWalSnd;
-
-		SpinLockAcquire(&walsnd->mutex);
-		walsnd->sentPtr = MyReplicationSlot->data.restart_lsn;
-		SpinLockRelease(&walsnd->mutex);
-	}
+	SpinLockAcquire(&MyWalSnd->mutex);
+	MyWalSnd->sentPtr = MyReplicationSlot->data.restart_lsn;
+	SpinLockRelease(&MyWalSnd->mutex);
 
 	replication_active = true;
 
@@ -1266,7 +1257,11 @@ WalSndUpdateProgress(LogicalDecodingContext *ctx, XLogRecPtr lsn, TransactionId 
 }
 
 /*
- * Wait till WAL < loc is flushed to disk so it can be safely read.
+ * Wait till WAL < loc is flushed to disk so it can be safely sent to client.
+ *
+ * Returns end LSN of flushed WAL.  Normally this will be >= loc, but
+ * if we detect a shutdown request (either from postmaster or client)
+ * we will return early, so caller must always check.
  */
 static XLogRecPtr
 WalSndWaitForWal(XLogRecPtr loc)
@@ -1333,9 +1328,7 @@ WalSndWaitForWal(XLogRecPtr loc)
 			RecentFlushPtr = GetXLogReplayRecPtr(NULL);
 
 		/*
-		 * If postmaster asked us to stop, don't wait here anymore. This will
-		 * cause the xlogreader to return without reading a full record, which
-		 * is the fastest way to reach the mainloop which then can quit.
+		 * If postmaster asked us to stop, don't wait anymore.
 		 *
 		 * It's important to do this check after the recomputation of
 		 * RecentFlushPtr, so we can send all remaining data before shutting
@@ -1366,13 +1359,19 @@ WalSndWaitForWal(XLogRecPtr loc)
 		WalSndCaughtUp = true;
 
 		/*
-		 * Try to flush pending output to the client. Also wait for the socket
-		 * becoming writable, if there's still pending output after an attempt
-		 * to flush. Otherwise we might just sit on output data while waiting
-		 * for new WAL being generated.
+		 * Try to flush any pending output to the client.
 		 */
 		if (pq_flush_if_writable() != 0)
 			WalSndShutdown();
+
+		/*
+		 * If we have received CopyDone from the client, sent CopyDone
+		 * ourselves, and the output buffer is empty, it's time to exit
+		 * streaming, so fail the current WAL fetch request.
+		 */
+		if (streamingDoneReceiving && streamingDoneSending &&
+			!pq_is_send_pending())
+			break;
 
 		now = GetCurrentTimestamp();
 
@@ -1382,6 +1381,13 @@ WalSndWaitForWal(XLogRecPtr loc)
 		/* Send keepalive if the time has come */
 		WalSndKeepaliveIfNecessary(now);
 
+		/*
+		 * Sleep until something happens or we time out.  Also wait for the
+		 * socket becoming writable, if there's still pending output.
+		 * Otherwise we might sit on sendable output data while waiting for
+		 * new WAL to be generated.  (But if we have nothing to send, we don't
+		 * want to wake on socket-writable.)
+		 */
 		sleeptime = WalSndComputeSleeptime(now);
 
 		wakeEvents = WL_LATCH_SET | WL_POSTMASTER_DEATH |
@@ -1390,7 +1396,6 @@ WalSndWaitForWal(XLogRecPtr loc)
 		if (pq_is_send_pending())
 			wakeEvents |= WL_SOCKET_WRITEABLE;
 
-		/* Sleep until something happens or we time out */
 		WaitLatchOrSocket(MyLatch, wakeEvents,
 						  MyProcPort->sock, sleeptime,
 						  WAIT_EVENT_WAL_SENDER_WAIT_WAL);
@@ -2115,7 +2120,8 @@ WalSndLoop(WalSndSendDataCallback send_data)
 		 * ourselves, and the output buffer is empty, it's time to exit
 		 * streaming.
 		 */
-		if (!pq_is_send_pending() && streamingDoneSending && streamingDoneReceiving)
+		if (streamingDoneReceiving && streamingDoneSending &&
+			!pq_is_send_pending())
 			break;
 
 		/*
@@ -2878,10 +2884,12 @@ WalSndRqstFileReload(void)
 	{
 		WalSnd	   *walsnd = &WalSndCtl->walsnds[i];
 
-		if (walsnd->pid == 0)
-			continue;
-
 		SpinLockAcquire(&walsnd->mutex);
+		if (walsnd->pid == 0)
+		{
+			SpinLockRelease(&walsnd->mutex);
+			continue;
+		}
 		walsnd->needreload = true;
 		SpinLockRelease(&walsnd->mutex);
 	}
@@ -3057,7 +3065,6 @@ WalSndWaitStopping(void)
 
 		for (i = 0; i < max_wal_senders; i++)
 		{
-			WalSndState state;
 			WalSnd	   *walsnd = &WalSndCtl->walsnds[i];
 
 			SpinLockAcquire(&walsnd->mutex);
@@ -3068,14 +3075,13 @@ WalSndWaitStopping(void)
 				continue;
 			}
 
-			state = walsnd->state;
-			SpinLockRelease(&walsnd->mutex);
-
-			if (state != WALSNDSTATE_STOPPING)
+			if (walsnd->state != WALSNDSTATE_STOPPING)
 			{
 				all_stopped = false;
+				SpinLockRelease(&walsnd->mutex);
 				break;
 			}
+			SpinLockRelease(&walsnd->mutex);
 		}
 
 		/* safe to leave if confirmation is done for all WAL senders */
@@ -3196,14 +3202,18 @@ pg_stat_get_wal_senders(PG_FUNCTION_ARGS)
 		TimeOffset	flushLag;
 		TimeOffset	applyLag;
 		int			priority;
+		int			pid;
 		WalSndState state;
 		Datum		values[PG_STAT_GET_WAL_SENDERS_COLS];
 		bool		nulls[PG_STAT_GET_WAL_SENDERS_COLS];
 
-		if (walsnd->pid == 0)
-			continue;
-
 		SpinLockAcquire(&walsnd->mutex);
+		if (walsnd->pid == 0)
+		{
+			SpinLockRelease(&walsnd->mutex);
+			continue;
+		}
+		pid = walsnd->pid;
 		sentPtr = walsnd->sentPtr;
 		state = walsnd->state;
 		write = walsnd->write;
@@ -3216,7 +3226,7 @@ pg_stat_get_wal_senders(PG_FUNCTION_ARGS)
 		SpinLockRelease(&walsnd->mutex);
 
 		memset(nulls, 0, sizeof(nulls));
-		values[0] = Int32GetDatum(walsnd->pid);
+		values[0] = Int32GetDatum(pid);
 
 		if (!superuser())
 		{
@@ -3251,7 +3261,7 @@ pg_stat_get_wal_senders(PG_FUNCTION_ARGS)
 			 * which always returns an invalid flush location, as an
 			 * asynchronous standby.
 			 */
-			priority = XLogRecPtrIsInvalid(walsnd->flush) ? 0 : priority;
+			priority = XLogRecPtrIsInvalid(flush) ? 0 : priority;
 
 			if (writeLag < 0)
 				nulls[6] = true;

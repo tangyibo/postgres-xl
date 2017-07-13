@@ -136,6 +136,7 @@
 #include "utils/datetime.h"
 #include "utils/dynamic_loader.h"
 #include "utils/memutils.h"
+#include "utils/pidfile.h"
 #include "utils/ps_status.h"
 #ifdef PGXC
 #include "utils/resowner.h"
@@ -1443,6 +1444,12 @@ PostmasterMain(int argc, char *argv[])
 #endif
 
 	/*
+	 * Report postmaster status in the postmaster.pid file, to allow pg_ctl to
+	 * see what's happening.
+	 */
+	AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STARTING);
+
+	/*
 	 * We're ready to rock and roll...
 	 */
 	StartupPID = StartupDataBase();
@@ -2741,6 +2748,9 @@ pmdie(SIGNAL_ARGS)
 			Shutdown = SmartShutdown;
 			ereport(LOG,
 					(errmsg("received smart shutdown request")));
+
+			/* Report status */
+			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STOPPING);
 #ifdef USE_SYSTEMD
 			sd_notify(0, "STOPPING=1");
 #endif
@@ -2804,6 +2814,9 @@ pmdie(SIGNAL_ARGS)
 			Shutdown = FastShutdown;
 			ereport(LOG,
 					(errmsg("received fast shutdown request")));
+
+			/* Report status */
+			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STOPPING);
 #ifdef USE_SYSTEMD
 			sd_notify(0, "STOPPING=1");
 #endif
@@ -2880,6 +2893,9 @@ pmdie(SIGNAL_ARGS)
 			Shutdown = ImmediateShutdown;
 			ereport(LOG,
 					(errmsg("received immediate shutdown request")));
+
+			/* Report status */
+			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STOPPING);
 #ifdef USE_SYSTEMD
 			sd_notify(0, "STOPPING=1");
 #endif
@@ -3034,6 +3050,8 @@ reaper(SIGNAL_ARGS)
 			ereport(LOG,
 					(errmsg("database system is ready to accept connections")));
 
+			/* Report status */
+			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_READY);
 #ifdef USE_SYSTEMD
 			sd_notify(0, "READY=1");
 #endif
@@ -4726,6 +4744,7 @@ internal_forkexec(int argc, char *argv[], Port *port)
 static pid_t
 internal_forkexec(int argc, char *argv[], Port *port)
 {
+	int			retry_count = 0;
 	STARTUPINFO si;
 	PROCESS_INFORMATION pi;
 	int			i;
@@ -4742,6 +4761,9 @@ internal_forkexec(int argc, char *argv[], Port *port)
 	Assert(argv[argc] == NULL);
 	Assert(strncmp(argv[1], "--fork", 6) == 0);
 	Assert(argv[2] == NULL);
+
+	/* Resume here if we need to retry */
+retry:
 
 	/* Set up shared memory for parameter passing */
 	ZeroMemory(&sa, sizeof(sa));
@@ -4834,22 +4856,26 @@ internal_forkexec(int argc, char *argv[], Port *port)
 
 	/*
 	 * Reserve the memory region used by our main shared memory segment before
-	 * we resume the child process.
+	 * we resume the child process.  Normally this should succeed, but if ASLR
+	 * is active then it might sometimes fail due to the stack or heap having
+	 * gotten mapped into that range.  In that case, just terminate the
+	 * process and retry.
 	 */
 	if (!pgwin32_ReserveSharedMemoryRegion(pi.hProcess))
 	{
-		/*
-		 * Failed to reserve the memory, so terminate the newly created
-		 * process and give up.
-		 */
+		/* pgwin32_ReserveSharedMemoryRegion already made a log entry */
 		if (!TerminateProcess(pi.hProcess, 255))
 			ereport(LOG,
 					(errmsg_internal("could not terminate process that failed to reserve memory: error code %lu",
 									 GetLastError())));
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
-		return -1;				/* logging done made by
-								 * pgwin32_ReserveSharedMemoryRegion() */
+		if (++retry_count < 100)
+			goto retry;
+		ereport(LOG,
+				(errmsg("giving up after too many tries to reserve shared memory"),
+				 errhint("This might be caused by ASLR or antivirus software.")));
+		return -1;
 	}
 
 	/*
@@ -5239,10 +5265,18 @@ sigusr1_handler(SIGNAL_ARGS)
 		if (XLogArchivingAlways())
 			PgArchPID = pgarch_start();
 
-#ifdef USE_SYSTEMD
+		/*
+		 * If we aren't planning to enter hot standby mode later, treat
+		 * RECOVERY_STARTED as meaning we're out of startup, and report status
+		 * accordingly.
+		 */
 		if (!EnableHotStandby)
+		{
+			AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_STANDBY);
+#ifdef USE_SYSTEMD
 			sd_notify(0, "READY=1");
 #endif
+		}
 
 		pmState = PM_RECOVERY;
 	}
@@ -5258,6 +5292,8 @@ sigusr1_handler(SIGNAL_ARGS)
 		ereport(LOG,
 				(errmsg("database system is ready to accept read only connections")));
 
+		/* Report status */
+		AddToDataDirLockFile(LOCK_FILE_LINE_PM_STATUS, PM_STATUS_READY);
 #ifdef USE_SYSTEMD
 		sd_notify(0, "READY=1");
 #endif

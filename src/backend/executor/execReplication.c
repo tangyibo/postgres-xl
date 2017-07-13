@@ -417,7 +417,13 @@ ExecSimpleRelationInsert(EState *estate, TupleTableSlot *slot)
 
 		/* AFTER ROW INSERT Triggers */
 		ExecARInsertTriggers(estate, resultRelInfo, tuple,
-							 recheckIndexes);
+							 recheckIndexes, NULL);
+
+		/*
+		 * XXX we should in theory pass a TransitionCaptureState object to the
+		 * above to capture transition tuples, but after statement triggers
+		 * don't actually get fired by replication yet anyway
+		 */
 
 		list_free(recheckIndexes);
 	}
@@ -479,7 +485,7 @@ ExecSimpleRelationUpdate(EState *estate, EPQState *epqstate,
 		/* AFTER ROW UPDATE Triggers */
 		ExecARUpdateTriggers(estate, resultRelInfo,
 							 &searchslot->tts_tuple->t_self,
-							 NULL, tuple, recheckIndexes);
+							 NULL, tuple, recheckIndexes, NULL);
 
 		list_free(recheckIndexes);
 	}
@@ -522,7 +528,7 @@ ExecSimpleRelationDelete(EState *estate, EPQState *epqstate,
 
 		/* AFTER ROW DELETE Triggers */
 		ExecARDeleteTriggers(estate, resultRelInfo,
-							 &searchslot->tts_tuple->t_self, NULL);
+							 &searchslot->tts_tuple->t_self, NULL, NULL);
 
 		list_free(recheckIndexes);
 	}

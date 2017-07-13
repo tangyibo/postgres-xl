@@ -3169,28 +3169,70 @@ FETCH ABSOLUTE 1 FROM current_check_cursor;
 
 -- Still cannot UPDATE row 2 through cursor
 UPDATE current_check SET payload = payload || '_new' WHERE CURRENT OF current_check_cursor RETURNING *;
-ERROR:  WHERE CURRENT OF clause not yet supported
+ currentid | payload | rlsuser 
+-----------+---------+---------
+(0 rows)
+
 -- Can update row 4 through cursor, which is the next visible row
 FETCH RELATIVE 1 FROM current_check_cursor;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         4 | def     | regress_rls_bob
+(1 row)
+
 UPDATE current_check SET payload = payload || '_new' WHERE CURRENT OF current_check_cursor RETURNING *;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         4 | def_new | regress_rls_bob
+(1 row)
+
 SELECT * FROM current_check;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         2 | bcd     | regress_rls_bob
+         4 | def_new | regress_rls_bob
+(2 rows)
+
 -- Plan should be a subquery TID scan
 EXPLAIN (COSTS OFF) UPDATE current_check SET payload = payload WHERE CURRENT OF current_check_cursor;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+                         QUERY PLAN                          
+-------------------------------------------------------------
+ Update on current_check
+   ->  Tid Scan on current_check
+         TID Cond: CURRENT OF current_check_cursor
+         Filter: ((currentid = 4) AND ((currentid % 2) = 0))
+(4 rows)
+
 -- Similarly can only delete row 4
 FETCH ABSOLUTE 1 FROM current_check_cursor;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         2 | bcd     | regress_rls_bob
+(1 row)
+
 DELETE FROM current_check WHERE CURRENT OF current_check_cursor RETURNING *;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload | rlsuser 
+-----------+---------+---------
+(0 rows)
+
 FETCH RELATIVE 1 FROM current_check_cursor;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         4 | def     | regress_rls_bob
+(1 row)
+
 DELETE FROM current_check WHERE CURRENT OF current_check_cursor RETURNING *;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         4 | def_new | regress_rls_bob
+(1 row)
+
 SELECT * FROM current_check;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ currentid | payload |     rlsuser     
+-----------+---------+-----------------
+         2 | bcd     | regress_rls_bob
+(1 row)
+
 COMMIT;
 --
 -- check pg_stats view filtering
@@ -3282,41 +3324,30 @@ SELECT refclassid::regclass, deptype
 (2 rows)
 
 SAVEPOINT q;
-ERROR:  SAVEPOINT is not yet supported.
 DROP ROLE regress_rls_eve; --fails due to dependency on POLICY p
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ERROR:  role "regress_rls_eve" cannot be dropped because some objects depend on it
+DETAIL:  target of policy p on table tbl1
+privileges for table tbl1
 ROLLBACK TO q;
-ERROR:  no such savepoint
 ALTER POLICY p ON tbl1 TO regress_rls_frank USING (true);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 SAVEPOINT q;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 DROP ROLE regress_rls_eve; --fails due to dependency on GRANT SELECT
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ERROR:  role "regress_rls_eve" cannot be dropped because some objects depend on it
+DETAIL:  privileges for table tbl1
 ROLLBACK TO q;
-ERROR:  no such savepoint
 REVOKE ALL ON TABLE tbl1 FROM regress_rls_eve;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 SAVEPOINT q;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 DROP ROLE regress_rls_eve; --succeeds
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK TO q;
-ERROR:  no such savepoint
 SAVEPOINT q;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 DROP ROLE regress_rls_frank; --fails due to dependency on POLICY p
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ERROR:  role "regress_rls_frank" cannot be dropped because some objects depend on it
+DETAIL:  target of policy p on table tbl1
 ROLLBACK TO q;
-ERROR:  no such savepoint
 DROP POLICY p ON tbl1;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 SAVEPOINT q;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 DROP ROLE regress_rls_frank; -- succeeds
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK TO q;
-ERROR:  no such savepoint
 ROLLBACK; -- cleanup
 --
 -- Converting table to view

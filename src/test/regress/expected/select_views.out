@@ -340,6 +340,906 @@ SELECT * FROM street ORDER BY name,cname,thepath::text;
  Wp Railroad                        | [(-122.254,37.902),(-122.2506,37.891)]                                                                                                                                                                                                                                                                                                                                                                                                       | Berkeley
 (333 rows)
 
+SELECT name, #thepath FROM iexit ORDER BY name COLLATE "C", 2;
+                name                | ?column? 
+------------------------------------+----------
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        2
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        3
+ I- 580                             |        4
+ I- 580                             |        4
+ I- 580                             |        4
+ I- 580                             |        4
+ I- 580                             |        5
+ I- 580                             |        5
+ I- 580                             |        5
+ I- 580                             |        5
+ I- 580                             |        5
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        6
+ I- 580                             |        7
+ I- 580                             |        7
+ I- 580                             |        7
+ I- 580                             |        7
+ I- 580                             |        7
+ I- 580                             |        7
+ I- 580                             |        7
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        8
+ I- 580                             |        9
+ I- 580                             |        9
+ I- 580                             |        9
+ I- 580                             |        9
+ I- 580                             |        9
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       12
+ I- 580                             |       13
+ I- 580                             |       13
+ I- 580                             |       13
+ I- 580                             |       13
+ I- 580                             |       13
+ I- 580                             |       13
+ I- 580                             |       14
+ I- 580                             |       14
+ I- 580                             |       14
+ I- 580                             |       14
+ I- 580                             |       14
+ I- 580                             |       14
+ I- 580                             |       14
+ I- 580                             |       14
+ I- 580                             |       18
+ I- 580                             |       18
+ I- 580                             |       18
+ I- 580                             |       18
+ I- 580                             |       18
+ I- 580                             |       18
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       21
+ I- 580                             |       22
+ I- 580                             |       22
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        2
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        3
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        4
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        5
+ I- 580                        Ramp |        6
+ I- 580                        Ramp |        6
+ I- 580                        Ramp |        6
+ I- 580                        Ramp |        7
+ I- 580                        Ramp |        8
+ I- 580                        Ramp |        8
+ I- 580                        Ramp |        8
+ I- 580                        Ramp |        8
+ I- 580                        Ramp |        8
+ I- 580                        Ramp |        8
+ I- 580/I-680                  Ramp |        2
+ I- 580/I-680                  Ramp |        2
+ I- 580/I-680                  Ramp |        2
+ I- 580/I-680                  Ramp |        2
+ I- 580/I-680                  Ramp |        2
+ I- 580/I-680                  Ramp |        2
+ I- 580/I-680                  Ramp |        4
+ I- 580/I-680                  Ramp |        4
+ I- 580/I-680                  Ramp |        4
+ I- 580/I-680                  Ramp |        4
+ I- 580/I-680                  Ramp |        5
+ I- 580/I-680                  Ramp |        6
+ I- 580/I-680                  Ramp |        6
+ I- 580/I-680                  Ramp |        6
+ I- 680                             |        2
+ I- 680                             |        2
+ I- 680                             |        2
+ I- 680                             |        2
+ I- 680                             |        2
+ I- 680                             |        2
+ I- 680                             |        2
+ I- 680                             |        3
+ I- 680                             |        3
+ I- 680                             |        3
+ I- 680                             |        4
+ I- 680                             |        4
+ I- 680                             |        4
+ I- 680                             |        5
+ I- 680                             |        5
+ I- 680                             |        5
+ I- 680                             |        7
+ I- 680                             |        7
+ I- 680                             |        7
+ I- 680                             |        7
+ I- 680                             |        8
+ I- 680                             |        8
+ I- 680                             |        8
+ I- 680                             |        8
+ I- 680                             |       10
+ I- 680                             |       10
+ I- 680                             |       10
+ I- 680                             |       10
+ I- 680                             |       10
+ I- 680                             |       10
+ I- 680                             |       10
+ I- 680                             |       16
+ I- 680                             |       16
+ I- 680                             |       16
+ I- 680                             |       16
+ I- 680                             |       16
+ I- 680                             |       16
+ I- 680                             |       16
+ I- 680                             |       16
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        2
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        3
+ I- 680                        Ramp |        4
+ I- 680                        Ramp |        4
+ I- 680                        Ramp |        4
+ I- 680                        Ramp |        5
+ I- 680                        Ramp |        5
+ I- 680                        Ramp |        5
+ I- 680                        Ramp |        5
+ I- 680                        Ramp |        5
+ I- 680                        Ramp |        5
+ I- 680                        Ramp |        6
+ I- 680                        Ramp |        6
+ I- 680                        Ramp |        6
+ I- 680                        Ramp |        6
+ I- 680                        Ramp |        7
+ I- 680                        Ramp |        7
+ I- 680                        Ramp |        7
+ I- 680                        Ramp |        7
+ I- 680                        Ramp |        8
+ I- 680                        Ramp |        8
+ I- 680                        Ramp |        8
+ I- 680                        Ramp |        8
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        2
+ I- 80                              |        3
+ I- 80                              |        3
+ I- 80                              |        3
+ I- 80                              |        4
+ I- 80                              |        4
+ I- 80                              |        4
+ I- 80                              |        4
+ I- 80                              |        4
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |        5
+ I- 80                              |       11
+ I- 80                              |       11
+ I- 80                              |       11
+ I- 80                              |       11
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        2
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        3
+ I- 80                         Ramp |        4
+ I- 80                         Ramp |        4
+ I- 80                         Ramp |        4
+ I- 80                         Ramp |        4
+ I- 80                         Ramp |        5
+ I- 80                         Ramp |        5
+ I- 80                         Ramp |        5
+ I- 80                         Ramp |        5
+ I- 80                         Ramp |        5
+ I- 80                         Ramp |        5
+ I- 80                         Ramp |        5
+ I- 80                         Ramp |        7
+ I- 80                         Ramp |        7
+ I- 80                         Ramp |        7
+ I- 80                         Ramp |        7
+ I- 880                             |        2
+ I- 880                             |        2
+ I- 880                             |        2
+ I- 880                             |        2
+ I- 880                             |        2
+ I- 880                             |        5
+ I- 880                             |        5
+ I- 880                             |        5
+ I- 880                             |        5
+ I- 880                             |        5
+ I- 880                             |        5
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        6
+ I- 880                             |        7
+ I- 880                             |        7
+ I- 880                             |        7
+ I- 880                             |        7
+ I- 880                             |        7
+ I- 880                             |        7
+ I- 880                             |        7
+ I- 880                             |        9
+ I- 880                             |        9
+ I- 880                             |        9
+ I- 880                             |        9
+ I- 880                             |        9
+ I- 880                             |        9
+ I- 880                             |        9
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       10
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       12
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       13
+ I- 880                             |       14
+ I- 880                             |       14
+ I- 880                             |       14
+ I- 880                             |       14
+ I- 880                             |       14
+ I- 880                             |       14
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       17
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                             |       19
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        2
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        3
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        4
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        5
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        6
+ I- 880                        Ramp |        8
+ I- 880                        Ramp |        8
+ I- 880                        Ramp |        8
+ I- 980                             |        2
+ I- 980                             |        2
+ I- 980                             |        2
+ I- 980                             |        2
+ I- 980                             |        2
+ I- 980                             |        2
+ I- 980                             |        2
+ I- 980                             |        2
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        3
+ I- 980                             |        4
+ I- 980                             |        4
+ I- 980                             |        5
+ I- 980                             |        5
+ I- 980                             |        7
+ I- 980                             |        7
+ I- 980                             |        7
+ I- 980                             |        7
+ I- 980                             |       12
+ I- 980                        Ramp |        3
+ I- 980                        Ramp |        3
+ I- 980                        Ramp |        3
+ I- 980                        Ramp |        7
+(896 rows)
 
 SELECT * FROM toyemp WHERE name = 'sharon';
   name  | age | location | annualsal 
@@ -426,11 +1326,12 @@ NOTICE:  f_leak => hamburger
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_normal WHERE f_leak(passwd);
-                          QUERY PLAN                          
---------------------------------------------------------------
- Seq Scan on customer
-   Filter: (f_leak(passwd) AND (name = (CURRENT_USER)::text))
-(2 rows)
+                             QUERY PLAN                             
+--------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Seq Scan on customer
+         Filter: (f_leak(passwd) AND (name = (CURRENT_USER)::text))
+(3 rows)
 
 SELECT * FROM my_property_secure WHERE f_leak(passwd);
 NOTICE:  f_leak => passwd123
@@ -440,13 +1341,14 @@ NOTICE:  f_leak => passwd123
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_secure WHERE f_leak(passwd);
-                  QUERY PLAN                   
------------------------------------------------
- Subquery Scan on my_property_secure
-   Filter: f_leak(my_property_secure.passwd)
-   ->  Seq Scan on customer
-         Filter: (name = (CURRENT_USER)::text)
-(4 rows)
+                     QUERY PLAN                      
+-----------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Subquery Scan on my_property_secure
+         Filter: f_leak(my_property_secure.passwd)
+         ->  Seq Scan on customer
+               Filter: (name = (CURRENT_USER)::text)
+(5 rows)
 
 --
 -- scenario: qualifiers can be pushed down if they contain leaky functions,
@@ -467,11 +1369,12 @@ NOTICE:  f_leak => hamburger
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_normal v
 		WHERE f_leak('passwd') AND f_leak(passwd);
-                                       QUERY PLAN                                        
------------------------------------------------------------------------------------------
- Seq Scan on customer
-   Filter: (f_leak('passwd'::text) AND f_leak(passwd) AND (name = (CURRENT_USER)::text))
-(2 rows)
+                                          QUERY PLAN                                           
+-----------------------------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Seq Scan on customer
+         Filter: (f_leak('passwd'::text) AND f_leak(passwd) AND (name = (CURRENT_USER)::text))
+(3 rows)
 
 SELECT * FROM my_property_secure v
 		WHERE f_leak('passwd') AND f_leak(passwd);
@@ -486,13 +1389,14 @@ NOTICE:  f_leak => passwd
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_property_secure v
 		WHERE f_leak('passwd') AND f_leak(passwd);
-                                 QUERY PLAN                                 
-----------------------------------------------------------------------------
- Subquery Scan on v
-   Filter: f_leak(v.passwd)
-   ->  Seq Scan on customer
-         Filter: (f_leak('passwd'::text) AND (name = (CURRENT_USER)::text))
-(4 rows)
+                                    QUERY PLAN                                    
+----------------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Subquery Scan on v
+         Filter: f_leak(v.passwd)
+         ->  Seq Scan on customer
+               Filter: (f_leak('passwd'::text) AND (name = (CURRENT_USER)::text))
+(5 rows)
 
 --
 -- scenario: if a qualifier references only one-side of a particular join-
@@ -509,16 +1413,17 @@ NOTICE:  f_leak => 9801-2345-6789-0123
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_normal WHERE f_leak(cnum);
-                     QUERY PLAN                      
------------------------------------------------------
- Hash Join
-   Hash Cond: (r.cid = l.cid)
-   ->  Seq Scan on credit_card r
-         Filter: f_leak(cnum)
-   ->  Hash
-         ->  Seq Scan on customer l
-               Filter: (name = (CURRENT_USER)::text)
-(7 rows)
+                        QUERY PLAN                         
+-----------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Hash Join
+         Hash Cond: (r.cid = l.cid)
+         ->  Seq Scan on credit_card r
+               Filter: f_leak(cnum)
+         ->  Hash
+               ->  Seq Scan on customer l
+                     Filter: (name = (CURRENT_USER)::text)
+(8 rows)
 
 SELECT * FROM my_credit_card_secure WHERE f_leak(cnum);
 NOTICE:  f_leak => 1111-2222-3333-4444
@@ -528,17 +1433,18 @@ NOTICE:  f_leak => 1111-2222-3333-4444
 (1 row)
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_secure WHERE f_leak(cnum);
-                        QUERY PLAN                         
------------------------------------------------------------
- Subquery Scan on my_credit_card_secure
-   Filter: f_leak(my_credit_card_secure.cnum)
-   ->  Hash Join
-         Hash Cond: (r.cid = l.cid)
-         ->  Seq Scan on credit_card r
-         ->  Hash
-               ->  Seq Scan on customer l
-                     Filter: (name = (CURRENT_USER)::text)
-(8 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Subquery Scan on my_credit_card_secure
+         Filter: f_leak(my_credit_card_secure.cnum)
+         ->  Hash Join
+               Hash Cond: (r.cid = l.cid)
+               ->  Seq Scan on credit_card r
+               ->  Hash
+                     ->  Seq Scan on customer l
+                           Filter: (name = (CURRENT_USER)::text)
+(9 rows)
 
 --
 -- scenario: an external qualifier can be pushed-down by in-front-of the
@@ -557,22 +1463,23 @@ NOTICE:  f_leak => 1111-2222-3333-4444
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_usage_normal
        WHERE f_leak(cnum) AND ymd >= '2011-10-01' AND ymd < '2011-11-01';
-                                  QUERY PLAN                                  
-------------------------------------------------------------------------------
- Nested Loop
-   Join Filter: (l.cid = r.cid)
-   ->  Seq Scan on credit_usage r
-         Filter: ((ymd >= '10-01-2011'::date) AND (ymd < '11-01-2011'::date))
-   ->  Materialize
-         ->  Subquery Scan on l
-               Filter: f_leak(l.cnum)
-               ->  Hash Join
-                     Hash Cond: (r_1.cid = l_1.cid)
-                     ->  Seq Scan on credit_card r_1
-                     ->  Hash
-                           ->  Seq Scan on customer l_1
-                                 Filter: (name = (CURRENT_USER)::text)
-(13 rows)
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         Join Filter: (l.cid = r.cid)
+         ->  Seq Scan on credit_usage r
+               Filter: ((ymd >= '10-01-2011'::date) AND (ymd < '11-01-2011'::date))
+         ->  Materialize
+               ->  Subquery Scan on l
+                     Filter: f_leak(l.cnum)
+                     ->  Hash Join
+                           Hash Cond: (r_1.cid = l_1.cid)
+                           ->  Seq Scan on credit_card r_1
+                           ->  Hash
+                                 ->  Seq Scan on customer l_1
+                                       Filter: (name = (CURRENT_USER)::text)
+(14 rows)
 
 SELECT * FROM my_credit_card_usage_secure
        WHERE f_leak(cnum) AND ymd >= '2011-10-01' AND ymd < '2011-11-01';
@@ -588,22 +1495,23 @@ NOTICE:  f_leak => 1111-2222-3333-4444
 
 EXPLAIN (COSTS OFF) SELECT * FROM my_credit_card_usage_secure
        WHERE f_leak(cnum) AND ymd >= '2011-10-01' AND ymd < '2011-11-01';
-                                     QUERY PLAN                                     
-------------------------------------------------------------------------------------
- Subquery Scan on my_credit_card_usage_secure
-   Filter: f_leak(my_credit_card_usage_secure.cnum)
-   ->  Nested Loop
-         Join Filter: (l.cid = r.cid)
-         ->  Seq Scan on credit_usage r
-               Filter: ((ymd >= '10-01-2011'::date) AND (ymd < '11-01-2011'::date))
-         ->  Materialize
-               ->  Hash Join
-                     Hash Cond: (r_1.cid = l.cid)
-                     ->  Seq Scan on credit_card r_1
-                     ->  Hash
-                           ->  Seq Scan on customer l
-                                 Filter: (name = (CURRENT_USER)::text)
-(13 rows)
+                                        QUERY PLAN                                        
+------------------------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Subquery Scan on my_credit_card_usage_secure
+         Filter: f_leak(my_credit_card_usage_secure.cnum)
+         ->  Nested Loop
+               Join Filter: (l.cid = r.cid)
+               ->  Seq Scan on credit_usage r
+                     Filter: ((ymd >= '10-01-2011'::date) AND (ymd < '11-01-2011'::date))
+               ->  Materialize
+                     ->  Hash Join
+                           Hash Cond: (r_1.cid = l.cid)
+                           ->  Seq Scan on credit_card r_1
+                           ->  Hash
+                                 ->  Seq Scan on customer l
+                                       Filter: (name = (CURRENT_USER)::text)
+(14 rows)
 
 --
 -- Test for the case when security_barrier gets changed between rewriter

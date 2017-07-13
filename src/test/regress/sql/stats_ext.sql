@@ -49,10 +49,22 @@ ALTER TABLE ab1 ALTER a SET STATISTICS 0;
 INSERT INTO ab1 SELECT a, a%23 FROM generate_series(1, 1000) a;
 CREATE STATISTICS ab1_a_b_stats ON a, b FROM ab1;
 ANALYZE ab1;
+SELECT
+  (stxndistinct IS NOT NULL) AS ndistinct,
+  (stxdependencies IS NOT NULL) AS dependencies
+FROM pg_statistic_ext WHERE stxname = 'ab1_a_b_stats';
 ALTER TABLE ab1 ALTER a SET STATISTICS -1;
 -- partial analyze doesn't build stats either
 ANALYZE ab1 (a);
+SELECT
+  (stxndistinct IS NOT NULL) AS ndistinct,
+  (stxdependencies IS NOT NULL) AS dependencies
+FROM pg_statistic_ext WHERE stxname = 'ab1_a_b_stats';
 ANALYZE ab1;
+SELECT
+  (stxndistinct IS NOT NULL) AS ndistinct,
+  (stxdependencies IS NOT NULL) AS dependencies
+FROM pg_statistic_ext WHERE stxname = 'ab1_a_b_stats';
 DROP TABLE ab1;
 
 -- Verify supported object types for extended statistics

@@ -155,8 +155,8 @@ SELECT * FROM pg_policies WHERE schemaname = 'regress_rls_schema' AND tablename 
 SET SESSION AUTHORIZATION regress_rls_bob;
 SET row_security TO ON;
 SELECT * FROM document WHERE f_leak(dtitle) ORDER BY did;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    4 |  44 |      1 | regress_rls_bob   | my first manga
    6 |  22 |      1 | regress_rls_carol | great science fiction
@@ -165,28 +165,31 @@ SELECT * FROM document WHERE f_leak(dtitle) ORDER BY did;
 (5 rows)
 
 SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
- cid | did | dlevel |      dauthor      |        dtitle         |      cname      
------+-----+--------+-------------------+-----------------------+-----------------
-  11 |   1 |      1 | regress_rls_bob   | my first novel        | novel
-  44 |   4 |      1 | regress_rls_bob   | my first manga        | manga
-  22 |   6 |      1 | regress_rls_carol | great science fiction | science fiction
-  44 |   8 |      1 | regress_rls_carol | great manga           | manga
-(4 rows)
+ cid | did | dlevel |      dauthor      |         dtitle          |      cname      
+-----+-----+--------+-------------------+-------------------------+-----------------
+  11 |   1 |      1 | regress_rls_bob   | my first novel          | novel
+  44 |   4 |      1 | regress_rls_bob   | my first manga          | manga
+  22 |   6 |      1 | regress_rls_carol | great science fiction   | science fiction
+  44 |   8 |      1 | regress_rls_carol | great manga             | manga
+  22 |   9 |      1 | regress_rls_dave  | awesome science fiction | science fiction
+(5 rows)
 
 -- try a sampled version
 SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0)
   WHERE f_leak(dtitle) ORDER BY did;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
+   4 |  44 |      1 | regress_rls_bob   | my first manga
    6 |  22 |      1 | regress_rls_carol | great science fiction
    8 |  44 |      1 | regress_rls_carol | great manga
-(2 rows)
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+(4 rows)
 
 -- viewpoint from regress_rls_carol
 SET SESSION AUTHORIZATION regress_rls_carol;
 SELECT * FROM document WHERE f_leak(dtitle) ORDER BY did;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
    3 |  22 |      2 | regress_rls_bob   | my science fiction
@@ -200,58 +203,126 @@ SELECT * FROM document WHERE f_leak(dtitle) ORDER BY did;
 (10 rows)
 
 SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
- cid | did | dlevel |      dauthor      |        dtitle         |      cname      
------+-----+--------+-------------------+-----------------------+-----------------
-  11 |   1 |      1 | regress_rls_bob   | my first novel        | novel
-  11 |   2 |      2 | regress_rls_bob   | my second novel       | novel
-  22 |   3 |      2 | regress_rls_bob   | my science fiction    | science fiction
-  44 |   4 |      1 | regress_rls_bob   | my first manga        | manga
-  44 |   5 |      2 | regress_rls_bob   | my second manga       | manga
-  22 |   6 |      1 | regress_rls_carol | great science fiction | science fiction
-  33 |   7 |      2 | regress_rls_carol | great technology book | technology
-  44 |   8 |      1 | regress_rls_carol | great manga           | manga
-(8 rows)
+ cid | did | dlevel |      dauthor      |         dtitle          |      cname      
+-----+-----+--------+-------------------+-------------------------+-----------------
+  11 |   1 |      1 | regress_rls_bob   | my first novel          | novel
+  11 |   2 |      2 | regress_rls_bob   | my second novel         | novel
+  22 |   3 |      2 | regress_rls_bob   | my science fiction      | science fiction
+  44 |   4 |      1 | regress_rls_bob   | my first manga          | manga
+  44 |   5 |      2 | regress_rls_bob   | my second manga         | manga
+  22 |   6 |      1 | regress_rls_carol | great science fiction   | science fiction
+  33 |   7 |      2 | regress_rls_carol | great technology book   | technology
+  44 |   8 |      1 | regress_rls_carol | great manga             | manga
+  22 |   9 |      1 | regress_rls_dave  | awesome science fiction | science fiction
+  33 |  10 |      2 | regress_rls_dave  | awesome technology book | technology
+(10 rows)
 
 -- try a sampled version
 SELECT * FROM document TABLESAMPLE BERNOULLI(50) REPEATABLE(0)
   WHERE f_leak(dtitle) ORDER BY did;
- did | cid | dlevel |      dauthor      |        dtitle         
------+-----+--------+-------------------+-----------------------
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
+   4 |  44 |      1 | regress_rls_bob   | my first manga
+   5 |  44 |      2 | regress_rls_bob   | my second manga
    6 |  22 |      1 | regress_rls_carol | great science fiction
    8 |  44 |      1 | regress_rls_carol | great manga
-(2 rows)
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+(5 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM document WHERE f_leak(dtitle);
-                               QUERY PLAN                                
--------------------------------------------------------------------------
+                            QUERY PLAN                             
+-------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on document
-         Filter: f_leak(document.dtitle)
-         ->  Seq Scan on document document_1
-               Filter: (dlevel <= $0)
-               InitPlan 1 (returns $0)
-                 ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-                       ->  Index Scan using uaccount_pkey on uaccount
-                             Index Cond: (pguser = "current_user"())
-(9 rows)
+   ->  Seq Scan on document
+         Filter: ((dlevel <= $0) AND f_leak(dtitle))
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+(7 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle);
-                                     QUERY PLAN                                      
--------------------------------------------------------------------------------------
+                            QUERY PLAN                             
+-------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
    ->  Hash Join
          Hash Cond: (category.cid = document.cid)
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
          ->  Seq Scan on category
          ->  Hash
-               ->  Subquery Scan on document
-                     Filter: f_leak(document.dtitle)
-                     ->  Seq Scan on document document_1
-                           Filter: (dlevel <= $0)
-                           InitPlan 1 (returns $0)
-                             ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-                                   ->  Index Scan using uaccount_pkey on uaccount
-                                         Index Cond: (pguser = "current_user"())
-(13 rows)
+               ->  Seq Scan on document
+                     Filter: ((dlevel <= $0) AND f_leak(dtitle))
+(11 rows)
+-- viewpoint from regress_rls_dave
+SET SESSION AUTHORIZATION regress_rls_dave;
+SELECT * FROM document WHERE f_leak(dtitle) ORDER BY did;
+NOTICE:  f_leak => my first novel
+NOTICE:  f_leak => my second novel
+NOTICE:  f_leak => my science fiction
+NOTICE:  f_leak => great science fiction
+NOTICE:  f_leak => great technology book
+NOTICE:  f_leak => awesome science fiction
+NOTICE:  f_leak => awesome technology book
+ did | cid | dlevel |      dauthor      |         dtitle          
+-----+-----+--------+-------------------+-------------------------
+   1 |  11 |      1 | regress_rls_bob   | my first novel
+   2 |  11 |      2 | regress_rls_bob   | my second novel
+   3 |  22 |      2 | regress_rls_bob   | my science fiction
+   6 |  22 |      1 | regress_rls_carol | great science fiction
+   7 |  33 |      2 | regress_rls_carol | great technology book
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+  10 |  33 |      2 | regress_rls_dave  | awesome technology book
+(7 rows)
+
+SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER BY did;
+NOTICE:  f_leak => my first novel
+NOTICE:  f_leak => my second novel
+NOTICE:  f_leak => my science fiction
+NOTICE:  f_leak => great science fiction
+NOTICE:  f_leak => great technology book
+NOTICE:  f_leak => awesome science fiction
+NOTICE:  f_leak => awesome technology book
+ cid | did | dlevel |      dauthor      |         dtitle          |      cname      
+-----+-----+--------+-------------------+-------------------------+-----------------
+  11 |   1 |      1 | regress_rls_bob   | my first novel          | novel
+  11 |   2 |      2 | regress_rls_bob   | my second novel         | novel
+  22 |   3 |      2 | regress_rls_bob   | my science fiction      | science fiction
+  22 |   6 |      1 | regress_rls_carol | great science fiction   | science fiction
+  33 |   7 |      2 | regress_rls_carol | great technology book   | technology
+  22 |   9 |      1 | regress_rls_dave  | awesome science fiction | science fiction
+  33 |  10 |      2 | regress_rls_dave  | awesome technology book | technology
+(7 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM document WHERE f_leak(dtitle);
+                                             QUERY PLAN                                             
+----------------------------------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Seq Scan on document
+         Filter: ((cid <> 44) AND (cid <> 44) AND (cid < 50) AND (dlevel <= $0) AND f_leak(dtitle))
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+(7 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle);
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Hash Join
+         Hash Cond: (category.cid = document.cid)
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+         ->  Seq Scan on category
+         ->  Hash
+               ->  Seq Scan on document
+                     Filter: ((cid <> 44) AND (cid <> 44) AND (cid < 50) AND (dlevel <= $0) AND f_leak(dtitle))
+(11 rows)
 
 -- 44 would technically fail for both p2r and p1r, but we should get an error
 -- back from p1r for this because it sorts first
@@ -308,27 +379,23 @@ SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle) ORDER by did;
 (3 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM document WHERE f_leak(dtitle);
-                     QUERY PLAN                      
------------------------------------------------------
+                          QUERY PLAN                           
+---------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on document
-         Filter: f_leak(document.dtitle)
-         ->  Seq Scan on document document_1
-               Filter: (dauthor = "current_user"())
-(5 rows)
+   ->  Seq Scan on document
+         Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
+(3 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM document NATURAL JOIN category WHERE f_leak(dtitle);
-                        QUERY PLAN                        
-----------------------------------------------------------
+                             QUERY PLAN                              
+---------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
    ->  Nested Loop
-         ->  Subquery Scan on document
-               Filter: f_leak(document.dtitle)
-               ->  Seq Scan on document document_1
-                     Filter: (dauthor = "current_user"())
+         ->  Seq Scan on document
+               Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
          ->  Index Scan using category_pkey on category
                Index Cond: (cid = document.cid)
-(8 rows)
+(6 rows)
 
 -- interaction of FK/PK constraints
 SET SESSION AUTHORIZATION regress_rls_alice;
@@ -342,11 +409,8 @@ SET SESSION AUTHORIZATION regress_rls_bob;
 SELECT * FROM document d FULL OUTER JOIN category c on d.cid = c.cid ORDER BY d.did, c.cid;
  did | cid | dlevel |     dauthor     |       dtitle       | cid |   cname    
 -----+-----+--------+-----------------+--------------------+-----+------------
-   4 |  44 |      1 | regress_rls_bob | my first manga     |     | 
-   5 |  44 |      2 | regress_rls_bob | my second manga    |     | 
-   2 |  11 |      2 | regress_rls_bob | my second novel    |  11 | novel
    1 |  11 |      1 | regress_rls_bob | my first novel     |  11 | novel
-     |     |        |                 |                    |  33 | technology
+   2 |  11 |      2 | regress_rls_bob | my second novel    |  11 | novel
    3 |  22 |      2 | regress_rls_bob | my science fiction |     | 
    4 |  44 |      1 | regress_rls_bob | my first manga     |     | 
    5 |  44 |      2 | regress_rls_bob | my second manga    |     | 
@@ -361,7 +425,6 @@ SET SESSION AUTHORIZATION regress_rls_carol;
 SELECT * FROM document d FULL OUTER JOIN category c on d.cid = c.cid ORDER BY d.did, c.cid;
  did | cid | dlevel |      dauthor      |        dtitle         | cid |      cname      
 -----+-----+--------+-------------------+-----------------------+-----+-----------------
-   8 |  44 |      1 | regress_rls_carol | great manga           |  44 | manga
    6 |  22 |      1 | regress_rls_carol | great science fiction |  22 | science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book |     | 
    8 |  44 |      1 | regress_rls_carol | great manga           |  44 | manga
@@ -386,21 +449,23 @@ DETAIL:  correlated UPDATE or updating distribution column currently not support
 -- database superuser does bypass RLS policy when enabled
 RESET SESSION AUTHORIZATION;
 SET row_security TO ON;
-SELECT * FROM document;
+SELECT * FROM document ORDER BY did;
  did | cid | dlevel |      dauthor      |         dtitle          
 -----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
-   5 |  44 |      2 | regress_rls_bob   | my second manga
-   6 |  22 |      1 | regress_rls_carol | great science fiction
-   8 |  44 |      1 | regress_rls_carol | great manga
    3 |  22 |      2 | regress_rls_bob   | my science fiction
    4 |  44 |      1 | regress_rls_bob   | my first manga
+   5 |  44 |      2 | regress_rls_bob   | my second manga
+   6 |  22 |      1 | regress_rls_carol | great science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book
-  10 |  33 |      1 | regress_rls_carol | hoge
-(9 rows)
+   8 |  44 |      1 | regress_rls_carol | great manga
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+  10 |  33 |      2 | regress_rls_dave  | awesome technology book
+  11 |  33 |      1 | regress_rls_carol | hoge
+(11 rows)
 
-SELECT * FROM category;
+SELECT * FROM category ORDER BY cid;
  cid |      cname      
 -----+-----------------
   11 | novel
@@ -412,21 +477,23 @@ SELECT * FROM category;
 -- database superuser does bypass RLS policy when disabled
 RESET SESSION AUTHORIZATION;
 SET row_security TO OFF;
-SELECT * FROM document;
+SELECT * FROM document ORDER BY did;
  did | cid | dlevel |      dauthor      |         dtitle          
 -----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
-   5 |  44 |      2 | regress_rls_bob   | my second manga
-   6 |  22 |      1 | regress_rls_carol | great science fiction
-   8 |  44 |      1 | regress_rls_carol | great manga
    3 |  22 |      2 | regress_rls_bob   | my science fiction
    4 |  44 |      1 | regress_rls_bob   | my first manga
+   5 |  44 |      2 | regress_rls_bob   | my second manga
+   6 |  22 |      1 | regress_rls_carol | great science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book
-  10 |  33 |      1 | regress_rls_carol | hoge
-(9 rows)
+   8 |  44 |      1 | regress_rls_carol | great manga
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+  10 |  33 |      2 | regress_rls_dave  | awesome technology book
+  11 |  33 |      1 | regress_rls_carol | hoge
+(11 rows)
 
-SELECT * FROM category;
+SELECT * FROM category ORDER BY cid;
  cid |      cname      
 -----+-----------------
   11 | novel
@@ -438,21 +505,23 @@ SELECT * FROM category;
 -- database non-superuser with bypass privilege can bypass RLS policy when disabled
 SET SESSION AUTHORIZATION regress_rls_exempt_user;
 SET row_security TO OFF;
-SELECT * FROM document;
+SELECT * FROM document ORDER BY did;
  did | cid | dlevel |      dauthor      |         dtitle          
 -----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
-   5 |  44 |      2 | regress_rls_bob   | my second manga
-   6 |  22 |      1 | regress_rls_carol | great science fiction
-   8 |  44 |      1 | regress_rls_carol | great manga
    3 |  22 |      2 | regress_rls_bob   | my science fiction
    4 |  44 |      1 | regress_rls_bob   | my first manga
+   5 |  44 |      2 | regress_rls_bob   | my second manga
+   6 |  22 |      1 | regress_rls_carol | great science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book
-  10 |  33 |      1 | regress_rls_carol | hoge
-(9 rows)
+   8 |  44 |      1 | regress_rls_carol | great manga
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+  10 |  33 |      2 | regress_rls_dave  | awesome technology book
+  11 |  33 |      1 | regress_rls_carol | hoge
+(11 rows)
 
-SELECT * FROM category;
+SELECT * FROM category ORDER BY cid;
  cid |      cname      
 -----+-----------------
   11 | novel
@@ -464,21 +533,23 @@ SELECT * FROM category;
 -- RLS policy does not apply to table owner when RLS enabled.
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security TO ON;
-SELECT * FROM document;
+SELECT * FROM document ORDER BY did;
  did | cid | dlevel |      dauthor      |         dtitle          
 -----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
-   5 |  44 |      2 | regress_rls_bob   | my second manga
-   6 |  22 |      1 | regress_rls_carol | great science fiction
-   8 |  44 |      1 | regress_rls_carol | great manga
    3 |  22 |      2 | regress_rls_bob   | my science fiction
    4 |  44 |      1 | regress_rls_bob   | my first manga
+   5 |  44 |      2 | regress_rls_bob   | my second manga
+   6 |  22 |      1 | regress_rls_carol | great science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book
-  10 |  33 |      1 | regress_rls_carol | hoge
-(9 rows)
+   8 |  44 |      1 | regress_rls_carol | great manga
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+  10 |  33 |      2 | regress_rls_dave  | awesome technology book
+  11 |  33 |      1 | regress_rls_carol | hoge
+(11 rows)
 
-SELECT * FROM category;
+SELECT * FROM category ORDER BY cid;
  cid |      cname      
 -----+-----------------
   11 | novel
@@ -490,21 +561,23 @@ SELECT * FROM category;
 -- RLS policy does not apply to table owner when RLS disabled.
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security TO OFF;
-SELECT * FROM document;
+SELECT * FROM document ORDER BY did;
  did | cid | dlevel |      dauthor      |         dtitle          
 -----+-----+--------+-------------------+-------------------------
    1 |  11 |      1 | regress_rls_bob   | my first novel
    2 |  11 |      2 | regress_rls_bob   | my second novel
-   5 |  44 |      2 | regress_rls_bob   | my second manga
-   6 |  22 |      1 | regress_rls_carol | great science fiction
-   8 |  44 |      1 | regress_rls_carol | great manga
    3 |  22 |      2 | regress_rls_bob   | my science fiction
    4 |  44 |      1 | regress_rls_bob   | my first manga
+   5 |  44 |      2 | regress_rls_bob   | my second manga
+   6 |  22 |      1 | regress_rls_carol | great science fiction
    7 |  33 |      2 | regress_rls_carol | great technology book
-  10 |  33 |      1 | regress_rls_carol | hoge
-(9 rows)
+   8 |  44 |      1 | regress_rls_carol | great manga
+   9 |  22 |      1 | regress_rls_dave  | awesome science fiction
+  10 |  33 |      2 | regress_rls_dave  | awesome technology book
+  11 |  33 |      1 | regress_rls_carol | hoge
+(11 rows)
 
-SELECT * FROM category;
+SELECT * FROM category ORDER BY cid;
  cid |      cname      
 -----+-----------------
   11 | novel
@@ -884,19 +957,21 @@ NOTICE:  f_leak => my first satire
 (4 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM part_document WHERE f_leak(dtitle);
-                     QUERY PLAN                      
------------------------------------------------------
- Append
-   InitPlan 1 (returns $0)
-     ->  Index Scan using uaccount_pkey on uaccount
-           Index Cond: (pguser = CURRENT_USER)
-   ->  Seq Scan on part_document_fiction
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_satire
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_nonfiction
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-(10 rows)
+                            QUERY PLAN                             
+-------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Append
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+         ->  Seq Scan on part_document_fiction
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_satire
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_nonfiction
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+(12 rows)
 
 -- viewpoint from regress_rls_carol
 SET SESSION AUTHORIZATION regress_rls_carol;
@@ -926,19 +1001,21 @@ NOTICE:  f_leak => awesome technology book
 (10 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM part_document WHERE f_leak(dtitle);
-                     QUERY PLAN                      
------------------------------------------------------
- Append
-   InitPlan 1 (returns $0)
-     ->  Index Scan using uaccount_pkey on uaccount
-           Index Cond: (pguser = CURRENT_USER)
-   ->  Seq Scan on part_document_fiction
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_satire
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_nonfiction
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-(10 rows)
+                            QUERY PLAN                             
+-------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Append
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+         ->  Seq Scan on part_document_fiction
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_satire
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_nonfiction
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+(12 rows)
 
 -- viewpoint from regress_rls_dave
 SET SESSION AUTHORIZATION regress_rls_dave;
@@ -956,15 +1033,17 @@ NOTICE:  f_leak => awesome science fiction
 (4 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM part_document WHERE f_leak(dtitle);
-                             QUERY PLAN                             
---------------------------------------------------------------------
- Append
-   InitPlan 1 (returns $0)
-     ->  Index Scan using uaccount_pkey on uaccount
-           Index Cond: (pguser = CURRENT_USER)
-   ->  Seq Scan on part_document_fiction
-         Filter: ((cid < 55) AND (dlevel <= $0) AND f_leak(dtitle))
-(6 rows)
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Append
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+         ->  Seq Scan on part_document_fiction
+               Filter: ((cid < 55) AND (dlevel <= $0) AND f_leak(dtitle))
+(8 rows)
 
 -- pp1 ERROR
 INSERT INTO part_document VALUES (100, 11, 5, 'regress_rls_dave', 'testing pp1'); -- fail
@@ -1035,15 +1114,17 @@ NOTICE:  f_leak => awesome science fiction
 (4 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM part_document WHERE f_leak(dtitle);
-                             QUERY PLAN                             
---------------------------------------------------------------------
- Append
-   InitPlan 1 (returns $0)
-     ->  Index Scan using uaccount_pkey on uaccount
-           Index Cond: (pguser = CURRENT_USER)
-   ->  Seq Scan on part_document_fiction
-         Filter: ((cid < 55) AND (dlevel <= $0) AND f_leak(dtitle))
-(6 rows)
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Append
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+         ->  Seq Scan on part_document_fiction
+               Filter: ((cid < 55) AND (dlevel <= $0) AND f_leak(dtitle))
+(8 rows)
 
 -- viewpoint from regress_rls_carol
 SET SESSION AUTHORIZATION regress_rls_carol;
@@ -1075,19 +1156,21 @@ NOTICE:  f_leak => awesome technology book
 (11 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM part_document WHERE f_leak(dtitle);
-                     QUERY PLAN                      
------------------------------------------------------
- Append
-   InitPlan 1 (returns $0)
-     ->  Index Scan using uaccount_pkey on uaccount
-           Index Cond: (pguser = CURRENT_USER)
-   ->  Seq Scan on part_document_fiction
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_satire
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_nonfiction
-         Filter: ((dlevel <= $0) AND f_leak(dtitle))
-(10 rows)
+                            QUERY PLAN                             
+-------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Append
+         InitPlan 1 (returns $0)
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Index Scan using uaccount_pkey on uaccount
+                       Index Cond: (pguser = CURRENT_USER)
+         ->  Seq Scan on part_document_fiction
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_satire
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_nonfiction
+               Filter: ((dlevel <= $0) AND f_leak(dtitle))
+(12 rows)
 
 -- only owner can change policies
 ALTER POLICY pp1 ON part_document USING (true);    --fail
@@ -1127,16 +1210,17 @@ NOTICE:  f_leak => great technology book
 (3 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM part_document WHERE f_leak(dtitle);
-                          QUERY PLAN                           
----------------------------------------------------------------
- Append
-   ->  Seq Scan on part_document_fiction
-         Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_satire
-         Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
-   ->  Seq Scan on part_document_nonfiction
-         Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
-(7 rows)
+                             QUERY PLAN                              
+---------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Append
+         ->  Seq Scan on part_document_fiction
+               Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_satire
+               Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
+         ->  Seq Scan on part_document_nonfiction
+               Filter: ((dauthor = CURRENT_USER) AND f_leak(dtitle))
+(8 rows)
 
 -- database superuser does bypass RLS policy when enabled
 RESET SESSION AUTHORIZATION;
@@ -1342,22 +1426,16 @@ SELECT * FROM s1 WHERE f_leak(b);	-- OK
 (2 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM only s1 WHERE f_leak(b);
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on s1
-         Filter: f_leak(s1.b)
-         ->  Hash Join
-               Hash Cond: (s1_1.a = s2.x)
-               ->  Seq Scan on s1 s1_1
-               ->  Hash
-                     ->  HashAggregate
-                           Group Key: s2.x
-                           ->  Subquery Scan on s2
-                                 Filter: (s2.y ~~ '%2f%'::text)
-                                 ->  Seq Scan on s2 s2_1
-                                       Filter: ((x % 2) = 0)
-(13 rows)
+   ->  Seq Scan on s1
+         Filter: ((hashed SubPlan 1) AND f_leak(b))
+         SubPlan 1
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Seq Scan on s2
+                       Filter: (((x % 2) = 0) AND (y ~~ '%2f%'::text))
+(7 rows)
 
 SET SESSION AUTHORIZATION regress_rls_alice;
 ALTER POLICY p1 ON s1 USING (a in (select x from v2)); -- using VIEW in RLS policy
@@ -1371,22 +1449,16 @@ SELECT * FROM s1 WHERE f_leak(b);	-- OK
 (2 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM s1 WHERE f_leak(b);
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on s1
-         Filter: f_leak(s1.b)
-         ->  Hash Join
-               Hash Cond: (s1_1.a = s2.x)
-               ->  Seq Scan on s1 s1_1
-               ->  Hash
-                     ->  HashAggregate
-                           Group Key: s2.x
-                           ->  Subquery Scan on s2
-                                 Filter: (s2.y ~~ '%2f%'::text)
-                                 ->  Seq Scan on s2 s2_1
-                                       Filter: ((x % 2) = 0)
-(13 rows)
+   ->  Seq Scan on s1
+         Filter: ((hashed SubPlan 1) AND f_leak(b))
+         SubPlan 1
+           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                 ->  Seq Scan on s2
+                       Filter: (((x % 2) = 0) AND (y ~~ '%2f%'::text))
+(7 rows)
 
 SELECT (SELECT x FROM s1 LIMIT 1) xx, * FROM s2 WHERE y like '%28%';
  xx | x  |                y                 
@@ -1397,27 +1469,22 @@ SELECT (SELECT x FROM s1 LIMIT 1) xx, * FROM s2 WHERE y like '%28%';
 (3 rows)
 
 EXPLAIN (COSTS OFF) SELECT (SELECT x FROM s1 LIMIT 1) xx, * FROM s2 WHERE y like '%28%';
-                                      QUERY PLAN                                      
---------------------------------------------------------------------------------------
+                                           QUERY PLAN                                            
+-------------------------------------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on s2
-         Filter: (s2.y ~~ '%28%'::text)
-         ->  Seq Scan on s2 s2_1
-               Filter: ((x % 2) = 0)
-         SubPlan 1
+   ->  Seq Scan on s2
+         Filter: (((x % 2) = 0) AND (y ~~ '%28%'::text))
+         SubPlan 2
            ->  Limit
                  ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                        ->  Limit
-                             ->  Subquery Scan on s1
-                                   ->  Nested Loop Semi Join
-                                         Join Filter: (s1_1.a = s2_2.x)
-                                         ->  Seq Scan on s1 s1_1
-                                         ->  Materialize
-                                               ->  Subquery Scan on s2_2
-                                                     Filter: (s2_2.y ~~ '%2f%'::text)
-                                                     ->  Seq Scan on s2 s2_3
-                                                           Filter: ((x % 2) = 0)
-(18 rows)
+                             ->  Seq Scan on s1
+                                   Filter: (hashed SubPlan 1)
+                                   SubPlan 1
+                                     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                                           ->  Seq Scan on s2 s2_1
+                                                 Filter: (((x % 2) = 0) AND (y ~~ '%2f%'::text))
+(13 rows)
 
 SET SESSION AUTHORIZATION regress_rls_alice;
 ALTER POLICY p2 ON s2 USING (x in (select a from s1 where b like '%d2%'));
@@ -2003,22 +2070,18 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 0) AND f_leak(b))
+(3 rows)
 
 PREPARE plancache_test AS SELECT * FROM z1 WHERE f_leak(b);
 EXPLAIN (COSTS OFF) EXECUTE plancache_test;
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 0) AND f_leak(b))
+(3 rows)
 
 PREPARE plancache_test2 AS WITH q AS (SELECT * FROM z1 WHERE f_leak(b)) SELECT * FROM q,z2;
 EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
@@ -2027,15 +2090,13 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
  Nested Loop
    CTE q
      ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 0)
+           ->  Seq Scan on z1
+                 Filter: (((a % 2) = 0) AND f_leak(b))
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                ->  Seq Scan on z2
-(11 rows)
+(9 rows)
 
 PREPARE plancache_test3 AS WITH q AS (SELECT * FROM z2) SELECT * FROM q,z1 WHERE f_leak(z1.b);
 EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
@@ -2048,11 +2109,9 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 0)
-(11 rows)
+               ->  Seq Scan on z1
+                     Filter: (((a % 2) = 0) AND f_leak(b))
+(9 rows)
 
 SET ROLE regress_rls_group1;
 SELECT * FROM z1 WHERE f_leak(b);
@@ -2066,21 +2125,17 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 0) AND f_leak(b))
+(3 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test;
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 0) AND f_leak(b))
+(3 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
                            QUERY PLAN                            
@@ -2088,15 +2143,13 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
  Nested Loop
    CTE q
      ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 0)
+           ->  Seq Scan on z1
+                 Filter: (((a % 2) = 0) AND f_leak(b))
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                ->  Seq Scan on z2
-(11 rows)
+(9 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
                            QUERY PLAN                            
@@ -2108,11 +2161,9 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 0)
-(11 rows)
+               ->  Seq Scan on z1
+                     Filter: (((a % 2) = 0) AND f_leak(b))
+(9 rows)
 
 SET SESSION AUTHORIZATION regress_rls_carol;
 SELECT * FROM z1 WHERE f_leak(b);
@@ -2126,21 +2177,17 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 1)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 1) AND f_leak(b))
+(3 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test;
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 1)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 1) AND f_leak(b))
+(3 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
                            QUERY PLAN                            
@@ -2148,15 +2195,13 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
  Nested Loop
    CTE q
      ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 1)
+           ->  Seq Scan on z1
+                 Filter: (((a % 2) = 1) AND f_leak(b))
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                ->  Seq Scan on z2
-(11 rows)
+(9 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
                            QUERY PLAN                            
@@ -2168,11 +2213,9 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 1)
-(11 rows)
+               ->  Seq Scan on z1
+                     Filter: (((a % 2) = 1) AND f_leak(b))
+(9 rows)
 
 SET ROLE regress_rls_group2;
 SELECT * FROM z1 WHERE f_leak(b);
@@ -2186,21 +2229,17 @@ EXPLAIN (COSTS OFF) SELECT * FROM z1 WHERE f_leak(b);
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 1)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 1) AND f_leak(b))
+(3 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test;
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 1)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 1) AND f_leak(b))
+(3 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
                            QUERY PLAN                            
@@ -2208,15 +2247,13 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test2;
  Nested Loop
    CTE q
      ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on z1
-                 Filter: f_leak(z1.b)
-                 ->  Seq Scan on z1 z1_1
-                       Filter: ((a % 2) = 1)
+           ->  Seq Scan on z1
+                 Filter: (((a % 2) = 1) AND f_leak(b))
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                ->  Seq Scan on z2
-(11 rows)
+(9 rows)
 
 EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
                            QUERY PLAN                            
@@ -2228,11 +2265,9 @@ EXPLAIN (COSTS OFF) EXECUTE plancache_test3;
    ->  CTE Scan on q
    ->  Materialize
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Subquery Scan on z1
-                     Filter: f_leak(z1.b)
-                     ->  Seq Scan on z1 z1_1
-                           Filter: ((a % 2) = 1)
-(11 rows)
+               ->  Seq Scan on z1
+                     Filter: (((a % 2) = 1) AND f_leak(b))
+(9 rows)
 
 --
 -- Views should follow policy for view owner.
@@ -2298,11 +2333,10 @@ EXPLAIN (COSTS OFF) SELECT * FROM rls_view;
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 0) AND f_leak(b))
+(3 rows)
+
 -- Query as role that is not owner of table but is owner of view.
 -- Should return records based on view owner policies.
 SET SESSION AUTHORIZATION regress_rls_bob;
@@ -2317,11 +2351,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM rls_view;
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 0) AND f_leak(b))
+(3 rows)
 
 -- Query as role that is not the owner of the table or view without permissions.
 SET SESSION AUTHORIZATION regress_rls_carol;
@@ -2343,11 +2375,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM rls_view;
                      QUERY PLAN                      
 -----------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on z1
-         Filter: f_leak(z1.b)
-         ->  Seq Scan on z1 z1_1
-               Filter: ((a % 2) = 0)
-(5 rows)
+   ->  Seq Scan on z1
+         Filter: (((a % 2) = 0) AND f_leak(b))
+(3 rows)
 
 SET SESSION AUTHORIZATION regress_rls_bob;
 DROP VIEW rls_view;
@@ -2464,14 +2494,12 @@ SET SESSION AUTHORIZATION regress_rls_bob;
 CREATE VIEW rls_sbv WITH (security_barrier) AS
     SELECT * FROM y1 WHERE f_leak(b);
 EXPLAIN (COSTS OFF) SELECT * FROM rls_sbv WHERE (a = 1);
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                               QUERY PLAN                               
+------------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1)
-   ->  Subquery Scan on y1
-         Filter: f_leak(y1.b)
-         ->  Seq Scan on y1 y1_1
-               Filter: ((a = 1) AND ((a > 2) OR ((a % 2) = 0)))
-(5 rows)
+   ->  Seq Scan on y1
+         Filter: ((a = 1) AND ((a > 2) OR ((a % 2) = 0)) AND f_leak(b))
+(3 rows)
 
 DROP VIEW rls_sbv;
 --
@@ -2502,14 +2530,12 @@ SELECT * FROM y2 WHERE f_leak(b);
 (14 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM y2 WHERE f_leak(b);
-                               QUERY PLAN                                
--------------------------------------------------------------------------
+                                    QUERY PLAN                                     
+-----------------------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Subquery Scan on y2
-         Filter: f_leak(y2.b)
-         ->  Seq Scan on y2 y2_1
-               Filter: (((a % 4) = 0) OR ((a % 3) = 0) OR ((a % 2) = 0))
-(5 rows)
+   ->  Seq Scan on y2
+         Filter: ((((a % 4) = 0) OR ((a % 3) = 0) OR ((a % 2) = 0)) AND f_leak(b))
+(3 rows)
 
 --
 -- Qual push-down of leaky functions, when not referring to table
@@ -2555,7 +2581,7 @@ EXPLAIN (COSTS OFF) SELECT * FROM y2 JOIN test_qual_pushdown ON (b = abc) WHERE 
 -------------------------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
    ->  Hash Join
-         Hash Cond: (test_qual_pushdown.abc = b)
+         Hash Cond: (test_qual_pushdown.abc = y2.b)
          ->  Seq Scan on test_qual_pushdown
                Filter: f_leak(abc)
          ->  Hash
@@ -2571,8 +2597,8 @@ SELECT * FROM y2 JOIN test_qual_pushdown ON (b = abc) WHERE f_leak(b);
 (0 rows)
 
 EXPLAIN (COSTS OFF) SELECT * FROM y2 JOIN test_qual_pushdown ON (b = abc) WHERE f_leak(b);
-                                        QUERY PLAN                                         
--------------------------------------------------------------------------------------------
+                                             QUERY PLAN                                              
+-----------------------------------------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
    ->  Hash Join
          Hash Cond: (test_qual_pushdown.abc = y2.b)
@@ -2580,11 +2606,9 @@ EXPLAIN (COSTS OFF) SELECT * FROM y2 JOIN test_qual_pushdown ON (b = abc) WHERE 
          ->  Hash
                ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                      Distribute results by H: b
-                     ->  Subquery Scan on y2
-                           Filter: f_leak(y2.b)
-                           ->  Seq Scan on y2 y2_1
-                                 Filter: (((a % 4) = 0) OR ((a % 3) = 0) OR ((a % 2) = 0))
-(11 rows)
+                     ->  Seq Scan on y2
+                           Filter: ((((a % 4) = 0) OR ((a % 3) = 0) OR ((a % 2) = 0)) AND f_leak(b))
+(9 rows)
 
 DROP TABLE test_qual_pushdown;
 --
@@ -2670,11 +2694,9 @@ EXPLAIN (COSTS OFF) WITH cte1 AS (SELECT * FROM t1 WHERE f_leak(b)) SELECT * FRO
  CTE Scan on cte1
    CTE cte1
      ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-           ->  Subquery Scan on t1
-                 Filter: f_leak(t1.b)
-                 ->  Seq Scan on t1 t1_1
-                       Filter: ((a % 2) = 0)
-(7 rows)
+           ->  Seq Scan on t1
+                 Filter: (((a % 2) = 0) AND f_leak(b))
+(5 rows)
 
 WITH cte1 AS (UPDATE t1 SET a = a + 1 RETURNING *) SELECT * FROM cte1; --fail
 ERROR:  INSERT/UPDATE/DELETE is not supported in subquery

@@ -202,32 +202,32 @@ UPDATE document SET did = 8, dauthor = 'regress_rls_carol' WHERE did = 5; -- Sho
 -- database superuser does bypass RLS policy when enabled
 RESET SESSION AUTHORIZATION;
 SET row_security TO ON;
-SELECT * FROM document;
+SELECT * FROM document ORDER BY did;
 SELECT * FROM category;
 
 -- database superuser does bypass RLS policy when disabled
 RESET SESSION AUTHORIZATION;
 SET row_security TO OFF;
-SELECT * FROM document;
-SELECT * FROM category;
+SELECT * FROM document ORDER BY did;
+SELECT * FROM category ORDER BY cid;
 
 -- database non-superuser with bypass privilege can bypass RLS policy when disabled
 SET SESSION AUTHORIZATION regress_rls_exempt_user;
 SET row_security TO OFF;
-SELECT * FROM document;
-SELECT * FROM category;
+SELECT * FROM document ORDER BY did;
+SELECT * FROM category ORDER BY cid;
 
 -- RLS policy does not apply to table owner when RLS enabled.
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security TO ON;
-SELECT * FROM document;
-SELECT * FROM category;
+SELECT * FROM document ORDER BY did;
+SELECT * FROM category ORDER BY cid;
 
 -- RLS policy does not apply to table owner when RLS disabled.
 SET SESSION AUTHORIZATION regress_rls_alice;
 SET row_security TO OFF;
-SELECT * FROM document;
-SELECT * FROM category;
+SELECT * FROM document ORDER BY did;
+SELECT * FROM category ORDER BY cid;
 
 --
 -- Table inheritance and RLS policy

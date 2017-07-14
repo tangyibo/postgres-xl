@@ -59,12 +59,31 @@ explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(
                      Output: val, val2
 (11 rows)
 
-select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2;
+select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2 order by 1;
  count | sum |        avg         |     ?column?     | val2 
 -------+-----+--------------------+------------------+------
-     3 |  11 | 3.6666666666666667 | 3.66666666666667 |    3
      2 |   8 | 4.0000000000000000 |                4 |    2
+     3 |  11 | 3.6666666666666667 | 3.66666666666667 |    3
 (2 rows)
+
+explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2 order by 1;
+                                                     QUERY PLAN                                                      
+---------------------------------------------------------------------------------------------------------------------
+ Sort
+   Output: (count(*)), (sum(val)), (avg(val)), (((sum(val))::double precision / (count(*))::double precision)), val2
+   Sort Key: (count(*))
+   ->  Finalize HashAggregate
+         Output: count(*), sum(val), avg(val), ((sum(val))::double precision / (count(*))::double precision), val2
+         Group Key: xc_having_tab1.val2
+         Filter: ((avg(xc_having_tab1.val) > 3.75) OR (xc_having_tab1.val2 > 2))
+         ->  Remote Subquery Scan on all
+               Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+               ->  Partial HashAggregate
+                     Output: val2, PARTIAL count(*), PARTIAL sum(val), PARTIAL avg(val)
+                     Group Key: xc_having_tab1.val2
+                     ->  Seq Scan on public.xc_having_tab1
+                           Output: val, val2
+(14 rows)
 
 explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2;
                                                  QUERY PLAN                                                  
@@ -269,12 +288,28 @@ explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(
                Output: val, val2
 (8 rows)
 
-select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2;
+select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2 order by 1;
  count | sum |        avg         |     ?column?     | val2 
 -------+-----+--------------------+------------------+------
-     3 |  11 | 3.6666666666666667 | 3.66666666666667 |    3
      2 |   8 | 4.0000000000000000 |                4 |    2
+     3 |  11 | 3.6666666666666667 | 3.66666666666667 |    3
 (2 rows)
+
+explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2 order by 1;
+                                                        QUERY PLAN                                                         
+---------------------------------------------------------------------------------------------------------------------------
+ Remote Subquery Scan on all
+   Output: count(*), sum(val), avg(val), ((sum(val))::double precision / (count(*))::double precision), val2
+   ->  Sort
+         Output: (count(*)), (sum(val)), (avg(val)), (((sum(val))::double precision / (count(*))::double precision)), val2
+         Sort Key: (count(*))
+         ->  HashAggregate
+               Output: count(*), sum(val), avg(val), ((sum(val))::double precision / (count(*))::double precision), val2
+               Group Key: xc_having_tab1.val2
+               Filter: ((avg(xc_having_tab1.val) > 3.75) OR (xc_having_tab1.val2 > 2))
+               ->  Seq Scan on public.xc_having_tab1
+                     Output: val, val2
+(11 rows)
 
 explain (verbose true, costs false, nodes false) select count(*), sum(val), avg(val), sum(val)::float8/count(*), val2 from xc_having_tab1 group by val2 having avg(val) > 3.75 or val2 > 2;
                                                     QUERY PLAN                                                     

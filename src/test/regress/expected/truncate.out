@@ -281,3 +281,203 @@ NOTICE:  drop cascades to 3 other objects
 DETAIL:  drop cascades to table trunc_fa
 drop cascades to table trunc_faa
 drop cascades to table trunc_fb
+-- Test ON TRUNCATE triggers
+CREATE TABLE trunc_trigger_test (f1 int, f2 text, f3 text);
+CREATE TABLE trunc_trigger_log (tgop text, tglevel text, tgwhen text,
+        tgargv text, tgtable name, rowcount bigint);
+CREATE FUNCTION trunctrigger() RETURNS trigger as $$
+declare c bigint;
+begin
+    execute 'select count(*) from ' || quote_ident(tg_table_name) into c;
+    insert into trunc_trigger_log values
+      (TG_OP, TG_LEVEL, TG_WHEN, TG_ARGV[0], tg_table_name, c);
+    return null;
+end;
+$$ LANGUAGE plpgsql;
+-- basic before trigger
+INSERT INTO trunc_trigger_test VALUES(1, 'foo', 'bar'), (2, 'baz', 'quux');
+CREATE TRIGGER t
+BEFORE TRUNCATE ON trunc_trigger_test
+FOR EACH STATEMENT
+EXECUTE PROCEDURE trunctrigger('before trigger truncate');
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
+SELECT count(*) as "Row count in test table" FROM trunc_trigger_test;
+ Row count in test table 
+-------------------------
+                       2
+(1 row)
+
+SELECT * FROM trunc_trigger_log;
+ tgop | tglevel | tgwhen | tgargv | tgtable | rowcount 
+------+---------+--------+--------+---------+----------
+(0 rows)
+
+TRUNCATE trunc_trigger_test;
+SELECT count(*) as "Row count in test table" FROM trunc_trigger_test;
+ Row count in test table 
+-------------------------
+                       0
+(1 row)
+
+SELECT * FROM trunc_trigger_log;
+ tgop | tglevel | tgwhen | tgargv | tgtable | rowcount 
+------+---------+--------+--------+---------+----------
+(0 rows)
+
+DROP TRIGGER t ON trunc_trigger_test;
+ERROR:  trigger "t" for table "trunc_trigger_test" does not exist
+truncate trunc_trigger_log;
+-- same test with an after trigger
+INSERT INTO trunc_trigger_test VALUES(1, 'foo', 'bar'), (2, 'baz', 'quux');
+CREATE TRIGGER tt
+AFTER TRUNCATE ON trunc_trigger_test
+FOR EACH STATEMENT
+EXECUTE PROCEDURE trunctrigger('after trigger truncate');
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
+SELECT count(*) as "Row count in test table" FROM trunc_trigger_test;
+ Row count in test table 
+-------------------------
+                       2
+(1 row)
+
+SELECT * FROM trunc_trigger_log;
+ tgop | tglevel | tgwhen | tgargv | tgtable | rowcount 
+------+---------+--------+--------+---------+----------
+(0 rows)
+
+TRUNCATE trunc_trigger_test;
+SELECT count(*) as "Row count in test table" FROM trunc_trigger_test;
+ Row count in test table 
+-------------------------
+                       0
+(1 row)
+
+SELECT * FROM trunc_trigger_log;
+ tgop | tglevel | tgwhen | tgargv | tgtable | rowcount 
+------+---------+--------+--------+---------+----------
+(0 rows)
+
+DROP TABLE trunc_trigger_test;
+DROP TABLE trunc_trigger_log;
+DROP FUNCTION trunctrigger();
+-- test TRUNCATE ... RESTART IDENTITY
+CREATE SEQUENCE truncate_a_id1 START WITH 33;
+CREATE TABLE truncate_a (id serial,
+                         id1 integer default nextval('truncate_a_id1'));
+ALTER SEQUENCE truncate_a_id1 OWNED BY truncate_a.id1;
+INSERT INTO truncate_a DEFAULT VALUES;
+INSERT INTO truncate_a DEFAULT VALUES;
+SELECT * FROM truncate_a;
+ id | id1 
+----+-----
+  1 |  33
+  2 |  34
+(2 rows)
+
+TRUNCATE truncate_a;
+INSERT INTO truncate_a DEFAULT VALUES;
+INSERT INTO truncate_a DEFAULT VALUES;
+SELECT * FROM truncate_a;
+ id | id1 
+----+-----
+  3 |  35
+  4 |  36
+(2 rows)
+
+TRUNCATE truncate_a RESTART IDENTITY;
+ERROR:  PGXC does not support RESTART IDENTITY yet
+DETAIL:  The feature is not supported currently
+INSERT INTO truncate_a DEFAULT VALUES;
+INSERT INTO truncate_a DEFAULT VALUES;
+SELECT * FROM truncate_a ORDER BY 1, 2;
+ id | id1 
+----+-----
+  3 |  35
+  4 |  36
+  5 |  37
+  6 |  38
+(4 rows)
+
+CREATE TABLE truncate_b (id int GENERATED ALWAYS AS IDENTITY (START WITH 44));
+INSERT INTO truncate_b DEFAULT VALUES;
+INSERT INTO truncate_b DEFAULT VALUES;
+SELECT * FROM truncate_b ORDER BY 1;
+ id 
+----
+ 44
+ 45
+(2 rows)
+
+TRUNCATE truncate_b;
+INSERT INTO truncate_b DEFAULT VALUES;
+INSERT INTO truncate_b DEFAULT VALUES;
+SELECT * FROM truncate_b ORDER BY 1;
+ id 
+----
+ 46
+ 47
+(2 rows)
+
+TRUNCATE truncate_b RESTART IDENTITY;
+ERROR:  PGXC does not support RESTART IDENTITY yet
+DETAIL:  The feature is not supported currently
+INSERT INTO truncate_b DEFAULT VALUES;
+INSERT INTO truncate_b DEFAULT VALUES;
+SELECT * FROM truncate_b ORDER BY 1;
+ id 
+----
+ 46
+ 47
+ 48
+ 49
+(4 rows)
+
+-- check rollback of a RESTART IDENTITY operation
+BEGIN;
+-- TRUNCATE truncate_a RESTART IDENTITY;
+INSERT INTO truncate_a DEFAULT VALUES;
+SELECT * FROM truncate_a ORDER BY 1, 2;
+ id | id1 
+----+-----
+  3 |  35
+  4 |  36
+  5 |  37
+  6 |  38
+  7 |  39
+(5 rows)
+
+ROLLBACK;
+INSERT INTO truncate_a DEFAULT VALUES;
+INSERT INTO truncate_a DEFAULT VALUES;
+SELECT * FROM truncate_a ORDER BY 1, 2;
+ id | id1 
+----+-----
+  3 |  35
+  4 |  36
+  5 |  37
+  6 |  38
+  8 |  40
+  9 |  41
+(6 rows)
+
+DROP TABLE truncate_a;
+SELECT nextval('truncate_a_id1'); -- fail, seq should have been dropped
+ERROR:  relation "truncate_a_id1" does not exist
+LINE 1: SELECT nextval('truncate_a_id1');
+                       ^
+-- partitioned table
+CREATE TABLE truncparted (a int, b char) PARTITION BY LIST (a);
+-- error, can't truncate a partitioned table
+TRUNCATE ONLY truncparted;
+ERROR:  cannot truncate only a partitioned table
+HINT:  Do not specify the ONLY keyword, or use truncate only on the partitions directly.
+CREATE TABLE truncparted1 PARTITION OF truncparted FOR VALUES IN (1);
+INSERT INTO truncparted VALUES (1, 'a');
+-- error, must truncate partitions
+TRUNCATE ONLY truncparted;
+ERROR:  cannot truncate only a partitioned table
+HINT:  Do not specify the ONLY keyword, or use truncate only on the partitions directly.
+TRUNCATE truncparted;
+DROP TABLE truncparted;

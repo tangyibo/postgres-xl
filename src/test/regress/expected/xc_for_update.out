@@ -299,6 +299,7 @@ explain (costs off, num_nodes off, nodes off, verbose on)  select * from t1 wher
    Output: t1.val, t1.val2
    ->  Hash Join
          Output: t1.val, t1.val2
+         Inner Unique: true
          Hash Cond: (t1.val = "ANY_subquery".val)
          ->  Seq Scan on public.t1
                Output: t1.val, t1.val2
@@ -313,7 +314,7 @@ explain (costs off, num_nodes off, nodes off, verbose on)  select * from t1 wher
                                  Output: t2.val, t2.ctid
                                  ->  Seq Scan on public.t2
                                        Output: t2.val, t2.ctid
-(18 rows)
+(19 rows)
 
 -- test multiple row marks
 explain (costs off, num_nodes off, nodes off, verbose on)  select * from t1, t2 for share of t2 for update of t1;

@@ -34,14 +34,6 @@ CREATE TABLE xl_dc4 (
     name text,
     price numeric
 ) DISTRIBUTE BY HASH (is_available);
---INT2VECTOR, 
-CREATE TABLE xl_dc5 (
-    product_no integer,
-    product_id integer,
-    sub_product_ids INT2VECTOR PRIMARY KEY, 
-    name text,
-    price numeric
-) DISTRIBUTE BY HASH (sub_product_ids);
 --OIDVECTOR, 
 CREATE TABLE xl_dc6 (
     product_no integer,
@@ -199,7 +191,6 @@ DROP TABLE xl_dc1;
 DROP TABLE xl_dc2;
 DROP TABLE xl_dc3;
 DROP TABLE xl_dc4;
-DROP TABLE xl_dc5;
 DROP TABLE xl_dc6;
 DROP TABLE xl_dc7;
 DROP TABLE xl_dc8;

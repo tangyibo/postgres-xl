@@ -258,11 +258,14 @@ select * from tab1_replicated where val2 = 4 offset 1;
 explain (num_nodes on, verbose on, nodes off, costs off) select * from tab1_replicated where val2 = 4 offset 1;
 select * from tab1_replicated order by val;
 explain (num_nodes on, verbose on, nodes off, costs off) select * from tab1_replicated order by val;
-select distinct val, val2 from tab1_replicated;
+select distinct val, val2 from tab1_replicated order by 1, 2;
+explain (num_nodes on, verbose on, nodes off, costs off) select distinct val, val2 from tab1_replicated order by 1, 2;
 explain (num_nodes on, verbose on, nodes off, costs off) select distinct val, val2 from tab1_replicated;
-select val, val2 from tab1_replicated group by val, val2;
+select val, val2 from tab1_replicated group by val, val2 order by 1, 2;
+explain (num_nodes on, verbose on, nodes off, costs off) select val, val2 from tab1_replicated group by val, val2 order by 1, 2;
 explain (num_nodes on, verbose on, nodes off, costs off) select val, val2 from tab1_replicated group by val, val2;
-select sum(val) from tab1_replicated group by val2 having sum(val) > 1;
+select sum(val) from tab1_replicated group by val2 having sum(val) > 1 order by 1;
+explain (num_nodes on, verbose on, nodes off, costs off) select sum(val) from tab1_replicated group by val2 having sum(val) > 1 order by 1;
 explain (num_nodes on, verbose on, nodes off, costs off) select sum(val) from tab1_replicated group by val2 having sum(val) > 1;
 -- DMLs
 update tab1_replicated set val2 = 1000 where val = 7; 

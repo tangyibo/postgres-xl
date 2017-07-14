@@ -1434,15 +1434,31 @@ explain (num_nodes on, verbose on, nodes off, costs off) select * from tab1_repl
                Output: val, val2
 (8 rows)
 
-select distinct val, val2 from tab1_replicated;
+select distinct val, val2 from tab1_replicated order by 1, 2;
  val | val2 
 -----+------
-   9 |    2
-   5 |    3
    1 |    2
    2 |    4
+   5 |    3
    7 |    8
+   9 |    2
 (5 rows)
+
+explain (num_nodes on, verbose on, nodes off, costs off) select distinct val, val2 from tab1_replicated order by 1, 2;
+                                    QUERY PLAN                                     
+-----------------------------------------------------------------------------------
+ Remote Fast Query Execution (primary node count=0, node count=1)
+   Output: tab1_replicated.val, tab1_replicated.val2
+   Remote query: SELECT DISTINCT val, val2 FROM tab1_replicated ORDER BY val, val2
+   ->  Sort
+         Output: val, val2
+         Sort Key: tab1_replicated.val, tab1_replicated.val2
+         ->  HashAggregate
+               Output: val, val2
+               Group Key: tab1_replicated.val, tab1_replicated.val2
+               ->  Seq Scan on public.tab1_replicated
+                     Output: val, val2
+(11 rows)
 
 explain (num_nodes on, verbose on, nodes off, costs off) select distinct val, val2 from tab1_replicated;
                             QUERY PLAN                            
@@ -1457,15 +1473,31 @@ explain (num_nodes on, verbose on, nodes off, costs off) select distinct val, va
                Output: val, val2
 (8 rows)
 
-select val, val2 from tab1_replicated group by val, val2;
+select val, val2 from tab1_replicated group by val, val2 order by 1, 2;
  val | val2 
 -----+------
-   9 |    2
-   5 |    3
    1 |    2
    2 |    4
+   5 |    3
    7 |    8
+   9 |    2
 (5 rows)
+
+explain (num_nodes on, verbose on, nodes off, costs off) select val, val2 from tab1_replicated group by val, val2 order by 1, 2;
+                                         QUERY PLAN                                          
+---------------------------------------------------------------------------------------------
+ Remote Fast Query Execution (primary node count=0, node count=1)
+   Output: tab1_replicated.val, tab1_replicated.val2
+   Remote query: SELECT val, val2 FROM tab1_replicated GROUP BY val, val2 ORDER BY val, val2
+   ->  Sort
+         Output: val, val2
+         Sort Key: tab1_replicated.val, tab1_replicated.val2
+         ->  HashAggregate
+               Output: val, val2
+               Group Key: tab1_replicated.val, tab1_replicated.val2
+               ->  Seq Scan on public.tab1_replicated
+                     Output: val, val2
+(11 rows)
 
 explain (num_nodes on, verbose on, nodes off, costs off) select val, val2 from tab1_replicated group by val, val2;
                                 QUERY PLAN                                
@@ -1480,14 +1512,31 @@ explain (num_nodes on, verbose on, nodes off, costs off) select val, val2 from t
                Output: val, val2
 (8 rows)
 
-select sum(val) from tab1_replicated group by val2 having sum(val) > 1;
+select sum(val) from tab1_replicated group by val2 having sum(val) > 1 order by 1;
  sum 
 -----
-   7
    2
    5
+   7
   10
 (4 rows)
+
+explain (num_nodes on, verbose on, nodes off, costs off) select sum(val) from tab1_replicated group by val2 having sum(val) > 1 order by 1;
+                                                     QUERY PLAN                                                      
+---------------------------------------------------------------------------------------------------------------------
+ Remote Fast Query Execution (primary node count=0, node count=1)
+   Output: sum(tab1_replicated.val), tab1_replicated.val2
+   Remote query: SELECT sum(val) AS sum FROM tab1_replicated GROUP BY val2 HAVING (sum(val) > 1) ORDER BY (sum(val))
+   ->  Sort
+         Output: (sum(val)), val2
+         Sort Key: (sum(tab1_replicated.val))
+         ->  HashAggregate
+               Output: sum(val), val2
+               Group Key: tab1_replicated.val2
+               Filter: (sum(tab1_replicated.val) > 1)
+               ->  Seq Scan on public.tab1_replicated
+                     Output: val, val2
+(12 rows)
 
 explain (num_nodes on, verbose on, nodes off, costs off) select sum(val) from tab1_replicated group by val2 having sum(val) > 1;
                                            QUERY PLAN                                            

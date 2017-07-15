@@ -317,6 +317,8 @@ explain (costs off)
 -- let's try that as a mergejoin
 set enable_mergejoin = on;
 set enable_nestloop = off;
+-- excluding as XL does not support complex queries
+-- with 'union all'
 -- check partially indexed scan
 set enable_nestloop = on;
 set enable_mergejoin = off;
@@ -358,22 +360,23 @@ explain (costs off)
      union all
      select ff + 4 as x from ec1) as ss1
   where ss1.x = ec1.f1 and ec1.ff = 42::int8;
-                     QUERY PLAN                      
------------------------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  Merge Join
-   Merge Cond: ((((ec1_1.ff + 2) + 1)) = ec1.f1)
-   ->  Merge Append
-         Sort Key: (((ec1_1.ff + 2) + 1))
-         ->  Index Scan using ec1_expr2 on ec1 ec1_1
+   Merge Cond: (x = ec1.f1)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          ->  Sort
-               Sort Key: (((ec1_2.ff + 3) + 1))
-               ->  Seq Scan on ec1 ec1_2
-         ->  Index Scan using ec1_expr4 on ec1 ec1_3
-   ->  Sort
-         Sort Key: ec1.f1 USING <
-         ->  Index Scan using ec1_pkey on ec1
-               Index Cond: (ff = '42'::bigint)
-(13 rows)
+               Sort Key: (((ec1_1.ff + 2) + 1))
+               ->  Append
+                     ->  Seq Scan on ec1 ec1_1
+                     ->  Seq Scan on ec1 ec1_2
+                     ->  Seq Scan on ec1 ec1_3
+   ->  Remote Subquery Scan on all (datanode_1)
+         ->  Sort
+               Sort Key: ec1.f1 USING <
+               ->  Index Scan using ec1_pkey on ec1
+                     Index Cond: (ff = '42'::bigint)
+(14 rows)
 
 -- check effects of row-level security
 set enable_nestloop = on;
@@ -387,14 +390,16 @@ grant select on ec1 to regress_user_ectest;
 explain (costs off)
   select * from ec0 a, ec1 b
   where a.ff = b.ff and a.ff = 43::bigint::int8alias1;
-                 QUERY PLAN                  
----------------------------------------------
- Nested Loop
-   ->  Index Scan using ec0_pkey on ec0 a
-         Index Cond: (ff = '43'::int8alias1)
-   ->  Index Scan using ec1_pkey on ec1 b
-         Index Cond: (ff = '43'::int8alias1)
-(5 rows)
+                    QUERY PLAN                     
+---------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Nested Loop
+         ->  Index Scan using ec0_pkey on ec0 a
+               Index Cond: (ff = '43'::int8alias1)
+         ->  Index Scan using ec1_pkey on ec1 b
+               Index Cond: (ff = '43'::int8alias1)
+(7 rows)
 
 set session authorization regress_user_ectest;
 -- with RLS active, the non-leakproof a.ff = 43 clause is not treated
@@ -403,15 +408,17 @@ set session authorization regress_user_ectest;
 explain (costs off)
   select * from ec0 a, ec1 b
   where a.ff = b.ff and a.ff = 43::bigint::int8alias1;
-                 QUERY PLAN                  
----------------------------------------------
- Nested Loop
-   ->  Index Scan using ec0_pkey on ec0 a
-         Index Cond: (ff = '43'::int8alias1)
-   ->  Index Scan using ec1_pkey on ec1 b
-         Index Cond: (ff = a.ff)
-         Filter: (f1 < '5'::int8alias1)
-(6 rows)
+                    QUERY PLAN                     
+---------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Nested Loop
+         ->  Index Scan using ec0_pkey on ec0 a
+               Index Cond: (ff = '43'::int8alias1)
+         ->  Index Scan using ec1_pkey on ec1 b
+               Index Cond: (ff = a.ff)
+               Filter: (f1 < '5'::int8alias1)
+(8 rows)
 
 reset session authorization;
 revoke select on ec0 from regress_user_ectest;

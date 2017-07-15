@@ -977,10 +977,11 @@ explain (costs off)
    ->  MixedAggregate
          Hash Key: unsortable_col
          Group Key: unhashable_col
-         ->  Sort
-               Sort Key: unhashable_col
-               ->  Seq Scan on gstest4
-(8 rows)
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               ->  Sort
+                     Sort Key: unhashable_col
+                     ->  Seq Scan on gstest4
+(9 rows)
 
 select unhashable_col, unsortable_col,
        grouping(unhashable_col, unsortable_col),
@@ -1020,10 +1021,11 @@ explain (costs off)
    ->  MixedAggregate
          Hash Key: v, unsortable_col
          Group Key: v, unhashable_col
-         ->  Sort
-               Sort Key: v, unhashable_col
-               ->  Seq Scan on gstest4
-(8 rows)
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               ->  Sort
+                     Sort Key: v, unhashable_col
+                     ->  Seq Scan on gstest4
+(9 rows)
 
 -- empty input: first is 0 rows, second 1, third 3 etc.
 select a, b, sum(v), count(*) from gstest_empty group by grouping sets ((a,b),a);
@@ -1033,13 +1035,14 @@ select a, b, sum(v), count(*) from gstest_empty group by grouping sets ((a,b),a)
 
 explain (costs off)
   select a, b, sum(v), count(*) from gstest_empty group by grouping sets ((a,b),a);
-           QUERY PLAN           
---------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  HashAggregate
    Hash Key: a, b
    Hash Key: a
-   ->  Seq Scan on gstest_empty
-(4 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on gstest_empty
+(5 rows)
 
 select a, b, sum(v), count(*) from gstest_empty group by grouping sets ((a,b),());
  a | b | sum | count 
@@ -1057,15 +1060,16 @@ select a, b, sum(v), count(*) from gstest_empty group by grouping sets ((a,b),()
 
 explain (costs off)
   select a, b, sum(v), count(*) from gstest_empty group by grouping sets ((a,b),(),(),());
-           QUERY PLAN           
---------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  MixedAggregate
    Hash Key: a, b
    Group Key: ()
    Group Key: ()
    Group Key: ()
-   ->  Seq Scan on gstest_empty
-(6 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on gstest_empty
+(7 rows)
 
 select sum(v), count(*) from gstest_empty group by grouping sets ((),(),());
  sum | count 
@@ -1077,14 +1081,15 @@ select sum(v), count(*) from gstest_empty group by grouping sets ((),(),());
 
 explain (costs off)
   select sum(v), count(*) from gstest_empty group by grouping sets ((),(),());
-           QUERY PLAN           
---------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  Aggregate
    Group Key: ()
    Group Key: ()
    Group Key: ()
-   ->  Seq Scan on gstest_empty
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on gstest_empty
+(6 rows)
 
 -- check that functionally dependent cols are not nulled
 select a, d, grouping(a,b,c)
@@ -1102,13 +1107,15 @@ explain (costs off)
   select a, d, grouping(a,b,c)
     from gstest3
    group by grouping sets ((a,b), (a,c));
-        QUERY PLAN         
----------------------------
- HashAggregate
-   Hash Key: a, b
-   Hash Key: a, c
-   ->  Seq Scan on gstest3
-(4 rows)
+            QUERY PLAN            
+----------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  HashAggregate
+         Hash Key: a, b
+         Hash Key: a, c
+         ->  Seq Scan on gstest3
+(6 rows)
 
 -- simple rescan tests
 select a, b, sum(v.x)
@@ -1209,8 +1216,8 @@ select a, b, sum(c), sum(sum(c)) over (order by a,b) as rsum
 explain (costs off)
   select a, b, sum(c), sum(sum(c)) over (order by a,b) as rsum
     from gstest2 group by cube (a,b) order by rsum, a, b;
-                 QUERY PLAN                  
----------------------------------------------
+                                 QUERY PLAN                                  
+-----------------------------------------------------------------------------
  Sort
    Sort Key: (sum((sum(c))) OVER (?)), a, b
    ->  WindowAgg
@@ -1221,8 +1228,9 @@ explain (costs off)
                      Hash Key: a
                      Hash Key: b
                      Group Key: ()
-                     ->  Seq Scan on gstest2
-(11 rows)
+                     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                           ->  Seq Scan on gstest2
+(12 rows)
 
 select a, b, sum(v.x)
   from (values (1),(2)) v(x), gstest_data(v.x)
@@ -1395,8 +1403,8 @@ explain (costs off)
          count(hundred), count(thousand), count(twothousand),
          count(*)
     from tenk1 group by grouping sets (unique1,twothousand,thousand,hundred,ten,four,two);
-          QUERY PLAN           
--------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  MixedAggregate
    Hash Key: two
    Hash Key: four
@@ -1407,10 +1415,11 @@ explain (costs off)
      Group Key: twothousand
    Sort Key: thousand
      Group Key: thousand
-   ->  Sort
-         Sort Key: unique1
-         ->  Seq Scan on tenk1
-(13 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: unique1
+               ->  Seq Scan on tenk1
+(14 rows)
 
 explain (costs off)
   select unique1,
@@ -1418,18 +1427,19 @@ explain (costs off)
          count(hundred), count(thousand), count(twothousand),
          count(*)
     from tenk1 group by grouping sets (unique1,hundred,ten,four,two);
-          QUERY PLAN           
--------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  MixedAggregate
    Hash Key: two
    Hash Key: four
    Hash Key: ten
    Hash Key: hundred
    Group Key: unique1
-   ->  Sort
-         Sort Key: unique1
-         ->  Seq Scan on tenk1
-(9 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: unique1
+               ->  Seq Scan on tenk1
+(10 rows)
 
 set work_mem = '384kB';
 explain (costs off)
@@ -1438,8 +1448,8 @@ explain (costs off)
          count(hundred), count(thousand), count(twothousand),
          count(*)
     from tenk1 group by grouping sets (unique1,twothousand,thousand,hundred,ten,four,two);
-          QUERY PLAN           
--------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  MixedAggregate
    Hash Key: two
    Hash Key: four
@@ -1449,9 +1459,10 @@ explain (costs off)
    Group Key: unique1
    Sort Key: twothousand
      Group Key: twothousand
-   ->  Sort
-         Sort Key: unique1
-         ->  Seq Scan on tenk1
-(12 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Sort
+               Sort Key: unique1
+               ->  Seq Scan on tenk1
+(13 rows)
 
 -- end

@@ -4917,6 +4917,14 @@ consider_groupingsets_paths(PlannerInfo *root,
 			strat = AGG_MIXED;
 		}
 
+		/*
+		 * If the grouping can't be fully pushed down, redistribute the
+		 * path on top of the (sorted) path. If if can be pushed down,
+		 * disable construction of complex distributed paths.
+		 */
+		if (! can_push_down_grouping(root, parse, path))
+			path = create_remotesubplan_path(root, path, NULL);
+
 		add_path(grouped_rel, (Path *)
 				 create_groupingsets_path(root,
 										  grouped_rel,
@@ -5075,6 +5083,14 @@ consider_groupingsets_paths(PlannerInfo *root,
 
 		if (rollups)
 		{
+			/*
+			 * If the grouping can't be fully pushed down, redistribute the
+			 * path on top of the (sorted) path. If if can be pushed down,
+			 * disable construction of complex distributed paths.
+			 */
+			if (! can_push_down_grouping(root, parse, path))
+				path = create_remotesubplan_path(root, path, NULL);
+
 			add_path(grouped_rel, (Path *)
 					 create_groupingsets_path(root,
 											  grouped_rel,
@@ -5092,6 +5108,15 @@ consider_groupingsets_paths(PlannerInfo *root,
 	 * Now try the simple sorted case.
 	 */
 	if (!gd->unsortable_sets)
+	{
+		/*
+		 * If the grouping can't be fully pushed down, redistribute the
+		 * path on top of the (sorted) path. If if can be pushed down,
+		 * disable construction of complex distributed paths.
+		 */
+		if (! can_push_down_grouping(root, parse, path))
+			path = create_remotesubplan_path(root, path, NULL);
+
 		add_path(grouped_rel, (Path *)
 				 create_groupingsets_path(root,
 										  grouped_rel,
@@ -5102,6 +5127,7 @@ consider_groupingsets_paths(PlannerInfo *root,
 										  gd->rollups,
 										  agg_costs,
 										  dNumGroups));
+	}
 }
 
 /*

@@ -203,27 +203,33 @@ CREATE VIEW atest12v AS
 GRANT SELECT ON atest12v TO PUBLIC;
 -- This plan should use nestloop, knowing that few rows will be selected.
 EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
-                   QUERY PLAN                    
--------------------------------------------------
- Nested Loop
-   ->  Seq Scan on atest12 atest12_1
-         Filter: (b <<< 5)
-   ->  Index Scan using atest12_a_idx on atest12
-         Index Cond: (a = atest12_1.b)
-         Filter: (b <<< 5)
-(6 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: (b <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
 
 -- And this one.
 EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
   WHERE x.a = y.b and abs(y.a) <<< 5;
-                    QUERY PLAN                     
----------------------------------------------------
- Nested Loop
-   ->  Seq Scan on atest12 y
-         Filter: (abs(a) <<< 5)
-   ->  Index Scan using atest12_a_idx on atest12 x
-         Index Cond: (a = y.b)
-(5 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 y
+                     Filter: (abs(a) <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12 x
+               Index Cond: (a = y.b)
+(8 rows)
 
 -- Check if regress_user2 can break security.
 SET SESSION AUTHORIZATION regress_user2;
@@ -237,16 +243,19 @@ EXPLAIN (COSTS OFF) SELECT * FROM atest12 WHERE a >>> 0;
 ERROR:  permission denied for relation atest12
 -- This plan should use hashjoin, as it will expect many rows to be selected.
 EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
-                QUERY PLAN                 
--------------------------------------------
- Hash Join
-   Hash Cond: (atest12.a = atest12_1.b)
-   ->  Seq Scan on atest12
-         Filter: (b <<< 5)
-   ->  Hash
-         ->  Seq Scan on atest12 atest12_1
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Hash Join
+         Hash Cond: (atest12.a = atest12_1.b)
+         ->  Seq Scan on atest12
                Filter: (b <<< 5)
-(7 rows)
+         ->  Hash
+               ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                     Distribute results by H: b
+                     ->  Seq Scan on atest12 atest12_1
+                           Filter: (b <<< 5)
+(10 rows)
 
 -- Now regress_user1 grants sufficient access to regress_user2.
 SET SESSION AUTHORIZATION regress_user1;
@@ -254,29 +263,35 @@ GRANT SELECT (a, b) ON atest12 TO PUBLIC;
 SET SESSION AUTHORIZATION regress_user2;
 -- Now regress_user2 will also get a good row estimate.
 EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
-                   QUERY PLAN                    
--------------------------------------------------
- Nested Loop
-   ->  Seq Scan on atest12 atest12_1
-         Filter: (b <<< 5)
-   ->  Index Scan using atest12_a_idx on atest12
-         Index Cond: (a = atest12_1.b)
-         Filter: (b <<< 5)
-(6 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: (b <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
 
 -- But not for this, due to lack of table-wide permissions needed
 -- to make use of the expression index's statistics.
 EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
   WHERE x.a = y.b and abs(y.a) <<< 5;
-              QUERY PLAN              
---------------------------------------
- Hash Join
-   Hash Cond: (x.a = y.b)
-   ->  Seq Scan on atest12 x
-   ->  Hash
-         ->  Seq Scan on atest12 y
-               Filter: (abs(a) <<< 5)
-(6 rows)
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Hash Join
+         Hash Cond: (x.a = y.b)
+         ->  Seq Scan on atest12 x
+         ->  Hash
+               ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                     Distribute results by H: b
+                     ->  Seq Scan on atest12 y
+                           Filter: (abs(a) <<< 5)
+(9 rows)
 
 -- clean up (regress_user1's objects are all dropped later)
 DROP FUNCTION leak2(integer, integer) CASCADE;
@@ -1263,7 +1278,7 @@ ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 \c -
 -- confirm ACL setting
-SELECT oid, pg_get_userbyid(lomowner) ownername, lomacl FROM pg_largeobject_metadata;
+SELECT oid, pg_get_userbyid(lomowner) ownername, lomacl FROM pg_largeobject_metadata WHERE oid >= 1000 AND oid < 3000 ORDER BY oid;
  oid | ownername | lomacl 
 -----+-----------+--------
 (0 rows)

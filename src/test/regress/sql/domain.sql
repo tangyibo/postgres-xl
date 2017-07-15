@@ -106,7 +106,7 @@ update domarrtest set
   testint4arr[3] = testint4arr[3] - 1
 where testchar4arr is null;
 
-select * from domarrtest where testchar4arr is null;
+select * from domarrtest where testchar4arr is null order by 1;
 
 drop table domarrtest;
 drop domain domainint4arr restrict;

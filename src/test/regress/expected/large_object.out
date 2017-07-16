@@ -7,9 +7,7 @@ WITH unlink AS (SELECT lo_unlink(loid) FROM pg_largeobject WHERE loid = 3001) SE
 
 -- Test creation of a large object and leave it for testing pg_upgrade
 SELECT lo_create(3001);
- lo_create 
------------
-      3001
-(1 row)
-
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 COMMENT ON LARGE OBJECT 3001 IS 'testing comments';
+ERROR:  large object 3001 does not exist

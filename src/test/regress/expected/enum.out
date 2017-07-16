@@ -585,13 +585,14 @@ CREATE TYPE bogus AS ENUM('good');
 -- but we can't use them
 BEGIN;
 ALTER TYPE bogus ADD VALUE 'new';
-SAVEPOINT x;
 SELECT 'new'::bogus;  -- unsafe
 ERROR:  unsafe use of new value "new" of enum type bogus
 LINE 1: SELECT 'new'::bogus;
                ^
 HINT:  New enum values must be committed before they can be used.
-ROLLBACK TO x;
+ROLLBACK;
+BEGIN;
+ALTER TYPE bogus ADD VALUE 'new';
 SELECT enum_first(null::bogus);  -- safe
  enum_first 
 ------------
@@ -601,18 +602,17 @@ SELECT enum_first(null::bogus);  -- safe
 SELECT enum_last(null::bogus);  -- unsafe
 ERROR:  unsafe use of new value "new" of enum type bogus
 HINT:  New enum values must be committed before they can be used.
-ROLLBACK TO x;
+ROLLBACK;
+BEGIN;
+ALTER TYPE bogus ADD VALUE 'new';
 SELECT enum_range(null::bogus);  -- unsafe
 ERROR:  unsafe use of new value "new" of enum type bogus
 HINT:  New enum values must be committed before they can be used.
-ROLLBACK TO x;
 COMMIT;
 SELECT 'new'::bogus;  -- now safe
- bogus 
--------
- new
-(1 row)
-
+ERROR:  invalid input value for enum bogus: "new"
+LINE 1: SELECT 'new'::bogus;
+               ^
 SELECT enumlabel, enumsortorder
 FROM pg_enum
 WHERE enumtypid = 'bogus'::regtype
@@ -620,8 +620,7 @@ ORDER BY 2;
  enumlabel | enumsortorder 
 -----------+---------------
  good      |             1
- new       |             2
-(2 rows)
+(1 row)
 
 -- check that we recognize the case where the enum already existed but was
 -- modified in the current txn; this should not be considered safe

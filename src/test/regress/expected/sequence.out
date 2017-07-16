@@ -65,14 +65,14 @@ ALTER SEQUENCE sequence_test14 AS int;  -- min and max will be adjusted
 --- test creation of SERIAL column
 ---
 SET sequence_range = 1;
-CREATE TABLE serialTest (f1 text, f2 serial);
-INSERT INTO serialTest VALUES ('foo');
-INSERT INTO serialTest VALUES ('bar');
-INSERT INTO serialTest VALUES ('force', 100);
-INSERT INTO serialTest VALUES ('wrong', NULL);
+CREATE TABLE serialTest1 (f1 text, f2 serial);
+INSERT INTO serialTest1 VALUES ('foo');
+INSERT INTO serialTest1 VALUES ('bar');
+INSERT INTO serialTest1 VALUES ('force', 100);
+INSERT INTO serialTest1 VALUES ('wrong', NULL);
 ERROR:  null value in column "f2" violates not-null constraint
 DETAIL:  Failing row contains (wrong, null).
-SELECT * FROM serialTest ORDER BY f1, f2;
+SELECT * FROM serialTest1 ORDER BY f1, f2;
   f1   | f2  
 -------+-----
  bar   |   2
@@ -264,9 +264,9 @@ SELECT last_value, log_cnt IN (31, 32) AS log_cnt_ok, is_called FROM foo_seq_new
 
 DROP SEQUENCE foo_seq_new;
 -- renaming serial sequences
-ALTER TABLE serialtest_f2_seq RENAME TO serialtest_f2_foo;
-INSERT INTO serialTest VALUES ('more');
-SELECT * FROM serialTest ORDER BY f1, f2;
+ALTER TABLE serialtest1_f2_seq RENAME TO serialtest1_f2_foo;
+INSERT INTO serialTest1 VALUES ('more');
+SELECT * FROM serialTest1 ORDER BY f1, f2;
   f1   | f2  
 -------+-----
  bar   |   2

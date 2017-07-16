@@ -1,21 +1,3 @@
-SELECT name, setting FROM pg_settings WHERE name LIKE 'enable%' ORDER BY name;
-             name             | setting 
-------------------------------+---------
- enable_bitmapscan            | on
- enable_datanode_row_triggers | off
- enable_fast_query_shipping   | on
- enable_hashagg               | on
- enable_hashjoin              | on
- enable_indexonlyscan         | on
- enable_indexscan             | on
- enable_material              | on
- enable_mergejoin             | on
- enable_nestloop              | on
- enable_seqscan               | on
- enable_sort                  | on
- enable_tidscan               | on
-(13 rows)
-
 CREATE TABLE foo2(fooid int, f2 int);
 INSERT INTO foo2 VALUES(1, 11);
 INSERT INTO foo2 VALUES(2, 22);
@@ -1706,10 +1688,10 @@ create trigger tnoticetrigger after insert on tt for each row
 execute procedure noticetrigger();
 ERROR:  Postgres-XL does not support TRIGGER yet
 DETAIL:  The feature is not currently supported
-select insert_tt2('foolme','barme') limit 1;
+select insert_tt2('foolme','barme') order by 1 limit 1;
  insert_tt2 
 ------------
-         12
+         11
 (1 row)
 
 select * from tt order by 1, 2;
@@ -1730,10 +1712,9 @@ select * from tt order by 1, 2;
 (12 rows)
 
 -- and rules work
-create temp table tt_log(f1 int, data text);
+create table tt_log(f1 int, data text);
 create rule insert_tt_rule as on insert to tt do also
   insert into tt_log values(new.*);
-ERROR:  relation "tt_log" does not exist
 select insert_tt2('foollog','barlog') limit 1;
  insert_tt2 
 ------------
@@ -1762,10 +1743,14 @@ select * from tt order by 1, 2;
 -- note that nextval() gets executed a second time in the rule expansion,
 -- which is expected.
 select * from tt_log order by 1, 2;
- f1 | data 
-----+------
-(0 rows)
+ f1 |  data   
+----+---------
+ 15 | foollog
+ 16 | barlog
+(2 rows)
 
+drop table tt_log cascade;
+NOTICE:  drop cascades to rule insert_tt_rule on table tt
 -- test case for a whole-row-variable bug
 create function foo1(n integer, out a text, out b text)
   returns setof record
@@ -1810,132 +1795,140 @@ select * from array_to_set(array['one', 'two']); -- fail
 ERROR:  a column definition list is required for functions returning "record"
 LINE 1: select * from array_to_set(array['one', 'two']);
                       ^
-create temp table foo(f1 int8, f2 int8);
+create table foo(f1 int8, f2 int8);
 create function testfoo() returns record as $$
   insert into foo values (1,2) returning *;
 $$ language sql;
-ERROR:  relation "foo" does not exist
 select testfoo();
-ERROR:  function testfoo() does not exist
-LINE 1: select testfoo();
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ testfoo 
+---------
+ (1,2)
+(1 row)
+
 select * from testfoo() as t(f1 int8,f2 int8);
-ERROR:  function testfoo() does not exist
-LINE 1: select * from testfoo() as t(f1 int8,f2 int8);
-                      ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ f1 | f2 
+----+----
+  1 |  2
+(1 row)
+
 select * from testfoo(); -- fail
-ERROR:  function testfoo() does not exist
+ERROR:  a column definition list is required for functions returning "record"
 LINE 1: select * from testfoo();
                       ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function testfoo();
-ERROR:  function testfoo() does not exist
 create function testfoo() returns setof record as $$
   insert into foo values (1,2), (3,4) returning *;
 $$ language sql;
-ERROR:  relation "foo" does not exist
 select testfoo();
-ERROR:  function testfoo() does not exist
-LINE 1: select testfoo();
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ testfoo 
+---------
+ (1,2)
+ (3,4)
+(2 rows)
+
 select * from testfoo() as t(f1 int8,f2 int8) order by 1, 2;
-ERROR:  function testfoo() does not exist
-LINE 1: select * from testfoo() as t(f1 int8,f2 int8) order by 1, 2;
-                      ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ f1 | f2 
+----+----
+  1 |  2
+  3 |  4
+(2 rows)
+
 select * from testfoo(); -- fail
-ERROR:  function testfoo() does not exist
+ERROR:  a column definition list is required for functions returning "record"
 LINE 1: select * from testfoo();
                       ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 drop function testfoo();
-ERROR:  function testfoo() does not exist
 --
 -- Check some cases involving added/dropped columns in a rowtype result
 --
-create temp table users (userid text, seq int, email text, todrop bool, moredrop int, enabled bool);
+create table users (userid text, seq int, email text, todrop bool, moredrop int, enabled bool);
 insert into users values ('id',1,'email',true,11,true);
 insert into users values ('id2',2,'email2',true,12,true);
 alter table users drop column todrop;
 create or replace function get_first_user() returns users as
 $$ SELECT * FROM users ORDER BY userid LIMIT 1; $$
 language sql stable;
-ERROR:  type "users" does not exist
 SELECT get_first_user();
-ERROR:  function get_first_user() does not exist
-LINE 1: SELECT get_first_user();
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+  get_first_user   
+-------------------
+ (id,1,email,11,t)
+(1 row)
+
 SELECT * FROM get_first_user();
-ERROR:  function get_first_user() does not exist
-LINE 1: SELECT * FROM get_first_user();
-                      ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ userid | seq | email | moredrop | enabled 
+--------+-----+-------+----------+---------
+ id     |   1 | email |       11 | t
+(1 row)
+
 create or replace function get_users() returns setof users as
 $$ SELECT * FROM users ORDER BY userid; $$
 language sql stable;
-ERROR:  type "users" does not exist
 SELECT get_users();
-ERROR:  function get_users() does not exist
-LINE 1: SELECT get_users();
-               ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+      get_users      
+---------------------
+ (id,1,email,11,t)
+ (id2,2,email2,12,t)
+(2 rows)
+
 SELECT * FROM get_users();
-ERROR:  function get_users() does not exist
-LINE 1: SELECT * FROM get_users();
-                      ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ userid | seq | email  | moredrop | enabled 
+--------+-----+--------+----------+---------
+ id     |   1 | email  |       11 | t
+ id2    |   2 | email2 |       12 | t
+(2 rows)
+
 SELECT * FROM get_users() WITH ORDINALITY;   -- make sure ordinality copes
-ERROR:  function get_users() does not exist
-LINE 1: SELECT * FROM get_users() WITH ORDINALITY;
-                      ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ userid | seq | email  | moredrop | enabled | ordinality 
+--------+-----+--------+----------+---------+------------
+ id     |   1 | email  |       11 | t       |          1
+ id2    |   2 | email2 |       12 | t       |          2
+(2 rows)
+
 -- multiple functions vs. dropped columns
 SELECT * FROM ROWS FROM(generate_series(10,11), get_users()) WITH ORDINALITY;
-ERROR:  function get_users() does not exist
-LINE 1: SELECT * FROM ROWS FROM(generate_series(10,11), get_users())...
-                                                        ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ generate_series | userid | seq | email  | moredrop | enabled | ordinality 
+-----------------+--------+-----+--------+----------+---------+------------
+              10 | id     |   1 | email  |       11 | t       |          1
+              11 | id2    |   2 | email2 |       12 | t       |          2
+(2 rows)
+
 SELECT * FROM ROWS FROM(get_users(), generate_series(10,11)) WITH ORDINALITY;
-ERROR:  function get_users() does not exist
-LINE 1: SELECT * FROM ROWS FROM(get_users(), generate_series(10,11))...
-                                ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ userid | seq | email  | moredrop | enabled | generate_series | ordinality 
+--------+-----+--------+----------+---------+-----------------+------------
+ id     |   1 | email  |       11 | t       |              10 |          1
+ id2    |   2 | email2 |       12 | t       |              11 |          2
+(2 rows)
+
 -- check that we can cope with post-parsing changes in rowtypes
 create temp view usersview as
 SELECT * FROM ROWS FROM(get_users(), generate_series(10,11)) WITH ORDINALITY;
-ERROR:  function get_users() does not exist
-LINE 2: SELECT * FROM ROWS FROM(get_users(), generate_series(10,11))...
-                                ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
 select * from usersview;
-ERROR:  relation "usersview" does not exist
-LINE 1: select * from usersview;
-                      ^
-alter table users drop column moredrop;
-select * from usersview;
-ERROR:  relation "usersview" does not exist
-LINE 1: select * from usersview;
-                      ^
+ userid | seq | email  | moredrop | enabled | generate_series | ordinality 
+--------+-----+--------+----------+---------+-----------------+------------
+ id     |   1 | email  |       11 | t       |              10 |          1
+ id2    |   2 | email2 |       12 | t       |              11 |          2
+(2 rows)
+
 alter table users add column junk text;
 select * from usersview;
-ERROR:  relation "usersview" does not exist
-LINE 1: select * from usersview;
-                      ^
+ userid | seq | email  | moredrop | enabled | generate_series | ordinality 
+--------+-----+--------+----------+---------+-----------------+------------
+ id     |   1 | email  |       11 | t       |              10 |          1
+ id2    |   2 | email2 |       12 | t       |              11 |          2
+(2 rows)
+
+begin;
+alter table users drop column moredrop;
+select * from usersview;  -- expect clean failure
+ERROR:  attribute 5 of type record has been dropped
+rollback;
 alter table users alter column seq type numeric;
 select * from usersview;  -- expect clean failure
-ERROR:  relation "usersview" does not exist
-LINE 1: select * from usersview;
-                      ^
+ERROR:  attribute 2 of type record has wrong type
+DETAIL:  Table has type numeric, but query expects integer.
 drop view usersview;
-ERROR:  view "usersview" does not exist
 drop function get_first_user();
-ERROR:  function get_first_user() does not exist
 drop function get_users();
-ERROR:  function get_users() does not exist
 drop table users;
 -- this won't get inlined because of type coercion, but it shouldn't fail
 create or replace function foobar() returns setof text as

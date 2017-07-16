@@ -461,11 +461,11 @@ end $$ language plpgsql;
 create trigger tnoticetrigger after insert on tt for each row
 execute procedure noticetrigger();
 
-select insert_tt2('foolme','barme') limit 1;
+select insert_tt2('foolme','barme') order by 1 limit 1;
 select * from tt order by 1, 2;
 
 -- and rules work
-create temp table tt_log(f1 int, data text);
+create table tt_log(f1 int, data text);
 
 create rule insert_tt_rule as on insert to tt do also
   insert into tt_log values(new.*);
@@ -475,6 +475,8 @@ select * from tt order by 1, 2;
 -- note that nextval() gets executed a second time in the rule expansion,
 -- which is expected.
 select * from tt_log order by 1, 2;
+
+drop table tt_log cascade;
 
 -- test case for a whole-row-variable bug
 create function foo1(n integer, out a text, out b text)
@@ -501,7 +503,7 @@ select array_to_set(array['one', 'two']);
 select * from array_to_set(array['one', 'two']) as t(f1 int,f2 text) order by 1, 2;
 select * from array_to_set(array['one', 'two']); -- fail
 
-create temp table foo(f1 int8, f2 int8);
+create table foo(f1 int8, f2 int8);
 
 create function testfoo() returns record as $$
   insert into foo values (1,2) returning *;
@@ -527,7 +529,7 @@ drop function testfoo();
 -- Check some cases involving added/dropped columns in a rowtype result
 --
 
-create temp table users (userid text, seq int, email text, todrop bool, moredrop int, enabled bool);
+create table users (userid text, seq int, email text, todrop bool, moredrop int, enabled bool);
 insert into users values ('id',1,'email',true,11,true);
 insert into users values ('id2',2,'email2',true,12,true);
 alter table users drop column todrop;

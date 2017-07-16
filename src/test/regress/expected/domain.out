@@ -207,7 +207,7 @@ insert into dcomptable values (array[row(3,4), row(5,6)]::comptype[]);
 insert into dcomptable values (array[row(7,8)::comptype, row(9,10)::comptype]);
 insert into dcomptable values (array[row(1,2)]::dcomptypea);  -- fail on uniqueness
 ERROR:  duplicate key value violates unique constraint "dcomptable_d1_key"
-DETAIL:  Key (d1)=({"(1,2)"}) already exists.
+DETAIL:  Key (d1)=((public.comptype){"(1,2)"}) already exists.
 insert into dcomptable (d1[1]) values(row(9,10));
 insert into dcomptable (d1[1].r) values(11);
 select * from dcomptable;

@@ -1838,6 +1838,7 @@ ERROR:  a column definition list is required for functions returning "record"
 LINE 1: select * from testfoo();
                       ^
 drop function testfoo();
+drop table foo;
 --
 -- Check some cases involving added/dropped columns in a rowtype result
 --

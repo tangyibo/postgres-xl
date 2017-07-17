@@ -524,6 +524,7 @@ select * from testfoo() as t(f1 int8,f2 int8) order by 1, 2;
 select * from testfoo(); -- fail
 
 drop function testfoo();
+drop table foo;
 
 --
 -- Check some cases involving added/dropped columns in a rowtype result

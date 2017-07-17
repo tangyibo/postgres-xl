@@ -5720,18 +5720,22 @@ select * from j1 inner join j2 on j1.id = j2.id;
 -- ensure join is not unique when not an equi-join
 explain (verbose, costs off)
 select * from j1 inner join j2 on j1.id > j2.id;
-            QUERY PLAN             
------------------------------------
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  Nested Loop
    Output: j1.id, j2.id
    Join Filter: (j1.id > j2.id)
-   ->  Seq Scan on public.j1
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: j1.id
+         ->  Seq Scan on public.j1
+               Output: j1.id
    ->  Materialize
          Output: j2.id
-         ->  Seq Scan on public.j2
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                Output: j2.id
-(9 rows)
+               ->  Seq Scan on public.j2
+                     Output: j2.id
+(13 rows)
 
 -- ensure non-unique rel is not chosen as inner
 explain (verbose, costs off)
@@ -5787,34 +5791,42 @@ select * from j1 right join j2 on j1.id = j2.id;
 -- ensure full join is marked as unique
 explain (verbose, costs off)
 select * from j1 full join j2 on j1.id = j2.id;
-            QUERY PLAN             
------------------------------------
- Hash Full Join
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ Remote Fast Query Execution
    Output: j1.id, j2.id
-   Inner Unique: true
-   Hash Cond: (j1.id = j2.id)
-   ->  Seq Scan on public.j1
-         Output: j1.id
-   ->  Hash
-         Output: j2.id
-         ->  Seq Scan on public.j2
+   Node/s: datanode_1, datanode_2
+   Remote query: SELECT j1.id, j2.id FROM (j1 FULL JOIN j2 ON ((j1.id = j2.id)))
+   ->  Hash Full Join
+         Output: j1.id, j2.id
+         Inner Unique: true
+         Hash Cond: (j1.id = j2.id)
+         ->  Seq Scan on public.j1
+               Output: j1.id
+         ->  Hash
                Output: j2.id
-(10 rows)
+               ->  Seq Scan on public.j2
+                     Output: j2.id
+(14 rows)
 
 -- a clauseless (cross) join can't be unique
 explain (verbose, costs off)
 select * from j1 cross join j2;
-            QUERY PLAN             
------------------------------------
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  Nested Loop
    Output: j1.id, j2.id
-   ->  Seq Scan on public.j1
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
          Output: j1.id
+         ->  Seq Scan on public.j1
+               Output: j1.id
    ->  Materialize
          Output: j2.id
-         ->  Seq Scan on public.j2
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                Output: j2.id
-(8 rows)
+               ->  Seq Scan on public.j2
+                     Output: j2.id
+(12 rows)
 
 -- ensure a natural join is marked as unique
 explain (verbose, costs off)

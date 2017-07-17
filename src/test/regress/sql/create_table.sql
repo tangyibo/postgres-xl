@@ -268,9 +268,9 @@ CREATE TEMP TABLE pg_temp.doubly_temp (a int primary key);		-- also OK
 CREATE TEMP TABLE public.temp_to_perm (a int primary key);		-- not OK
 DROP TABLE unlogged1, public.unlogged2;
 
-CREATE TABLE as_select1 AS SELECT * FROM pg_class WHERE relkind = 'r';
-CREATE TABLE as_select1 AS SELECT * FROM pg_class WHERE relkind = 'r';
-CREATE TABLE IF NOT EXISTS as_select1 AS SELECT * FROM pg_class WHERE relkind = 'r';
+CREATE TABLE as_select1 AS SELECT * FROM pg_attribute WHERE attstorage = 'p';
+CREATE TABLE as_select1 AS SELECT * FROM pg_attribute WHERE attstorage = 'p';
+CREATE TABLE IF NOT EXISTS as_select1 AS SELECT * FROM pg_attribute WHERE attstorage = 'p';
 DROP TABLE as_select1;
 
 -- check that the oid column is added before the primary key is checked

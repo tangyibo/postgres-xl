@@ -27,7 +27,7 @@ GRANT ALL ON SCHEMA selinto_schema TO public;
 
 SET SESSION AUTHORIZATION regress_selinto_user;
 SELECT * INTO TABLE selinto_schema.tmp1
-	  FROM pg_class WHERE relname like '%a%';	-- Error
+	  FROM pg_attribute WHERE attname like '%a%';	-- Error
 SELECT oid AS clsoid, relname, relnatts + 10 AS x
 	  INTO selinto_schema.tmp2
 	  FROM pg_class WHERE relname like '%b%';	-- Error
@@ -41,7 +41,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE regress_selinto_user
 
 SET SESSION AUTHORIZATION regress_selinto_user;
 SELECT * INTO TABLE selinto_schema.tmp1
-	  FROM pg_class WHERE relname like '%a%';	-- OK
+	  FROM pg_attribute WHERE attname like '%a%';	-- OK
 SELECT oid AS clsoid, relname, relnatts + 10 AS x
 	  INTO selinto_schema.tmp2
 	  FROM pg_class WHERE relname like '%b%';	-- OK

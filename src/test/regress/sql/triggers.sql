@@ -1419,12 +1419,14 @@ create table parent (a text, b int) partition by list (a);
 create table child1 partition of parent for values in ('AAA');
 
 -- a child with a dropped column
-create table child2 (x int, a text, b int);
+create table child2 (a text, b int, x int);
 alter table child2 drop column x;
 alter table parent attach partition child2 for values in ('BBB');
 
 -- a child with a different column order
-create table child3 (b int, a text);
+-- XXX XL does not support child with different column order, so change that,
+-- though it probably defeats the purpose of the test
+create table child3 (a text, b int);
 alter table parent attach partition child3 for values in ('CCC');
 
 create trigger parent_insert_trig
@@ -1470,7 +1472,7 @@ create trigger child3_delete_trig
 -- insert directly into children sees respective child-format tuples
 insert into child1 values ('AAA', 42);
 insert into child2 values ('BBB', 42);
-insert into child3 values (42, 'CCC');
+insert into child3 (b, a) values (42, 'CCC');
 
 -- update via parent sees parent-format tuples
 update parent set b = b + 1;
@@ -1564,10 +1566,13 @@ create trigger child_row_trig
   for each row execute procedure dump_insert();
 
 -- but now we're not allowed to reattach it
+-- XXX This does not fail in XL because trigger creation itself fails
 alter table parent attach partition child for values in ('AAA');
 
 -- drop the trigger, and now we're allowed to attach it again
 drop trigger child_row_trig on child;
+
+-- XXX and this fails because the previous attach worked ok
 alter table parent attach partition child for values in ('AAA');
 
 drop table child, parent;
@@ -1586,6 +1591,7 @@ create table parent (a text, b int);
 create table child1 () inherits (parent);
 
 -- a child with a different column order
+-- XXX this fails in XL because we don't allow different column ordering
 create table child2 (b int, a text);
 alter table child2 inherit parent;
 

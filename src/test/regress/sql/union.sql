@@ -212,10 +212,10 @@ explain (num_nodes off, nodes off, costs off)
 -- children.
 --
 
-CREATE TEMP TABLE t1c (b text, a text);
+CREATE TEMP TABLE t1c (a text, b text);
 ALTER TABLE t1c INHERIT t1;
 CREATE TEMP TABLE t2c (primary key (ab)) INHERITS (t2);
-INSERT INTO t1c VALUES ('v', 'w'), ('c', 'd'), ('m', 'n'), ('e', 'f');
+INSERT INTO t1c (b, a)  VALUES ('v', 'w'), ('c', 'd'), ('m', 'n'), ('e', 'f');
 INSERT INTO t2c VALUES ('vw'), ('cd'), ('mn'), ('ef');
 CREATE INDEX t1c_ab_idx on t1c ((a || b));
 

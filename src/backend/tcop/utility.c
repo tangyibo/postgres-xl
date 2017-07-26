@@ -1257,58 +1257,58 @@ standard_ProcessUtility(Node *parsetree,
 		case T_RenameStmt:
 			{
 				RenameStmt *stmt = (RenameStmt *) parsetree;
+				RemoteQueryExecType exec_type;
+				bool is_temp = false;
+
+				if (IS_PGXC_LOCAL_COORDINATOR)
+				{
+					/*
+					 * Get the necessary details about the relation before we
+					 * run ExecRenameStmt locally. Otherwise we may not be able
+					 * to look-up using the old relation name.
+					 */
+					if (stmt->relation)
+					{
+						/*
+						 * If the table does not exist, don't send the query to
+						 * the remote nodes. The local node will eventually
+						 * report an error, which is then sent back to the
+						 * client.
+						 */
+						Oid relid = RangeVarGetRelid(stmt->relation, NoLock, true);
+
+						if (OidIsValid(relid))
+							exec_type = ExecUtilityFindNodes(stmt->renameType,
+									relid,
+									&is_temp);
+						else
+							exec_type = EXEC_ON_NONE;
+					}
+					else
+						exec_type = ExecUtilityFindNodes(stmt->renameType,
+								InvalidOid,
+								&is_temp);
+				}
 
 				if (EventTriggerSupportsObjectType(stmt->renameType))
 					ProcessUtilitySlow(parsetree, queryString,
 									   context, params,
 									   dest,
-#ifdef PGXC
 									   sentToRemote,
-#endif				
 									   completionTag);
 				else
 					ExecRenameStmt(stmt);
-			}
-#ifdef PGXC
-			if (IS_PGXC_LOCAL_COORDINATOR)
-			{
-				RenameStmt *stmt = (RenameStmt *) parsetree;
-				RemoteQueryExecType exec_type;
-				bool is_temp = false;
 
-				/* Try to use the object relation if possible */
-				if (stmt->relation)
+				if (IS_PGXC_LOCAL_COORDINATOR)
 				{
-					/*
-					 * When a relation is defined, it is possible that this object does
-					 * not exist but an IF EXISTS clause might be used. So we do not do
-					 * any error check here but block the access to remote nodes to
-					 * this object as it does not exisy
-					 */
-					Oid relid = RangeVarGetRelid(stmt->relation, NoLock, true);
-
-					if (OidIsValid(relid))
-						exec_type = ExecUtilityFindNodes(stmt->renameType,
-								relid,
-								&is_temp);
-					else
-						exec_type = EXEC_ON_NONE;
+					ExecUtilityStmtOnNodes(queryString,
+							NULL,
+							sentToRemote,
+							false,
+							exec_type,
+							is_temp);
 				}
-				else
-				{
-					exec_type = ExecUtilityFindNodes(stmt->renameType,
-							InvalidOid,
-							&is_temp);
-				}
-
-				ExecUtilityStmtOnNodes(queryString,
-						NULL,
-						sentToRemote,
-						false,
-						exec_type,
-						is_temp);
 			}
-#endif
 			break;
 
 		case T_AlterObjectSchemaStmt:

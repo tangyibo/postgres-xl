@@ -414,8 +414,6 @@ ALTER TABLE tmp7 ADD CONSTRAINT identity CHECK (b = boo(b));
 ALTER TABLE tmp3 ADD CONSTRAINT IDENTITY check (b = boo(b)) NOT VALID;
 NOTICE:  merging constraint "identity" with inherited definition
 ALTER TABLE tmp3 VALIDATE CONSTRAINT identity;
-NOTICE:  boo: 16
-NOTICE:  boo: 20
 -- A NO INHERIT constraint should not be looked for in children during VALIDATE CONSTRAINT
 create table parent_noinh_convalid (a int);
 create table child_noinh_convalid () inherits (parent_noinh_convalid);

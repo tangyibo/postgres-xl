@@ -6,6 +6,8 @@ CREATE TABLE tidscan(id integer);
 INSERT INTO tidscan VALUES (1), (2), (3);
 
 -- show ctids
+-- XXX since rows come from different datanodes, some TIDs can be duplicated in
+-- XL
 SELECT ctid, * FROM tidscan;
 
 -- ctid equality - implemented as tidscan

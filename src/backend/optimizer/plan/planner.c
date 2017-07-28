@@ -4511,220 +4511,220 @@ create_grouping_paths(PlannerInfo *root,
 								 AGGSPLIT_FINAL_DESERIAL,
 								 &agg_final_costs);
 		}
-	}
 
-	/* Build final XL grouping paths */
-	if (can_sort && try_distributed_aggregation)
-	{
-		/*
-		 * Use any available suitably-sorted path as input, and also consider
-		 * sorting the cheapest-total path.
-		 */
-		foreach(lc, input_rel->pathlist)
+		/* Build final XL grouping paths */
+		if (can_sort)
 		{
-			Path	   *path = (Path *) lfirst(lc);
-			bool		is_sorted;
-
-			is_sorted = pathkeys_contained_in(root->group_pathkeys,
-					path->pathkeys);
-
 			/*
-			 * XL: Can it happen that the cheapest path can't be pushed down,
-			 * while some other path could be? Perhaps we should move the check
-			 * if a path can be pushed down up, and add another OR condition
-			 * to consider all paths that can be pushed down?
-			 *
-			 * if (path == cheapest_path || is_sorted || can_push_down)
+			 * Use any available suitably-sorted path as input, and also consider
+			 * sorting the cheapest-total path.
 			 */
-			if (path == cheapest_path || is_sorted)
+			foreach(lc, input_rel->pathlist)
 			{
+				Path	   *path = (Path *) lfirst(lc);
+				bool		is_sorted;
+
+				is_sorted = pathkeys_contained_in(root->group_pathkeys,
+						path->pathkeys);
+
 				/*
-				 * We can't really beat paths that we managed to fully push
-				 * down above, so we can skip them entirely.
+				 * XL: Can it happen that the cheapest path can't be pushed down,
+				 * while some other path could be? Perhaps we should move the check
+				 * if a path can be pushed down up, and add another OR condition
+				 * to consider all paths that can be pushed down?
 				 *
-				 * XXX Not constructing any paths, so we can do this before
-				 * adding the Sort path.
+				 * if (path == cheapest_path || is_sorted || can_push_down)
 				 */
-				if (can_push_down_grouping(root, parse, path))
-					continue;
-
-				/* Sort the cheapest-total path if it isn't already sorted */
-				if (!is_sorted)
-					path = (Path *) create_sort_path(root,
-													 grouped_rel,
-													 path,
-													 root->group_pathkeys,
-													 -1.0);
-
-				/* Now decide what to stick atop it */
-				if (parse->groupingSets)
+				if (path == cheapest_path || is_sorted)
 				{
 					/*
-					 * TODO 2-phase aggregation for grouping sets paths not
-					 * supported yet, but this the place where such paths
-					 * should be constructed.
+					 * We can't really beat paths that we managed to fully push
+					 * down above, so we can skip them entirely.
+					 *
+					 * XXX Not constructing any paths, so we can do this before
+					 * adding the Sort path.
 					 */
-				}
-				else if (parse->hasAggs)
-				{
-					/*
-					 * We have aggregation, possibly with plain GROUP BY. Make
-					 * an AggPath.
-					 */
+					if (can_push_down_grouping(root, parse, path))
+						continue;
 
-					path = (Path *) create_agg_path(root,
-													grouped_rel,
-													path,
-													partial_grouping_target,
-									parse->groupClause ? AGG_SORTED : AGG_PLAIN,
-													AGGSPLIT_INITIAL_SERIAL,
-													parse->groupClause,
-													NIL,
-													&agg_partial_costs,
-													dNumPartialGroups);
+					/* Sort the cheapest-total path if it isn't already sorted */
+					if (!is_sorted)
+						path = (Path *) create_sort_path(root,
+														 grouped_rel,
+														 path,
+														 root->group_pathkeys,
+														 -1.0);
 
-					path = create_remotesubplan_path(root, path, NULL);
+					/* Now decide what to stick atop it */
+					if (parse->groupingSets)
+					{
+						/*
+						 * TODO 2-phase aggregation for grouping sets paths not
+						 * supported yet, but this the place where such paths
+						 * should be constructed.
+						 */
+					}
+					else if (parse->hasAggs)
+					{
+						/*
+						 * We have aggregation, possibly with plain GROUP BY. Make
+						 * an AggPath.
+						 */
 
-					/*
-					 * We generate two paths, differing in the second phase
-					 * implementation (sort and hash).
-					 */
+						path = (Path *) create_agg_path(root,
+														grouped_rel,
+														path,
+														partial_grouping_target,
+										parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+														AGGSPLIT_INITIAL_SERIAL,
+														parse->groupClause,
+														NIL,
+														&agg_partial_costs,
+														dNumPartialGroups);
 
-					add_path(grouped_rel, (Path *)
-							 create_agg_path(root,
-											 grouped_rel,
-											 path,
-											 target,
-									 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
-											 AGGSPLIT_FINAL_DESERIAL,
-											 parse->groupClause,
-											 (List *) parse->havingQual,
-											 &agg_final_costs,
-											 dNumGroups));
+						path = create_remotesubplan_path(root, path, NULL);
 
-					if (can_hash)
+						/*
+						 * We generate two paths, differing in the second phase
+						 * implementation (sort and hash).
+						 */
+
 						add_path(grouped_rel, (Path *)
 								 create_agg_path(root,
 												 grouped_rel,
 												 path,
 												 target,
-												 AGG_HASHED,
+										 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
 												 AGGSPLIT_FINAL_DESERIAL,
 												 parse->groupClause,
 												 (List *) parse->havingQual,
 												 &agg_final_costs,
 												 dNumGroups));
-				}
-				else if (parse->groupClause)
-				{
-					/*
-					 * We have GROUP BY without aggregation or grouping sets.
-					 * Make a GroupPath.
-					 */
-					path = (Path *) create_group_path(root,
-													  grouped_rel,
-													  path,
-													  partial_grouping_target,
-													  parse->groupClause,
-													  NIL,
-													  dNumPartialGroups);
 
-					path = create_remotesubplan_path(root, path, NULL);
+						if (can_hash)
+							add_path(grouped_rel, (Path *)
+									 create_agg_path(root,
+													 grouped_rel,
+													 path,
+													 target,
+													 AGG_HASHED,
+													 AGGSPLIT_FINAL_DESERIAL,
+													 parse->groupClause,
+													 (List *) parse->havingQual,
+													 &agg_final_costs,
+													 dNumGroups));
+					}
+					else if (parse->groupClause)
+					{
+						/*
+						 * We have GROUP BY without aggregation or grouping sets.
+						 * Make a GroupPath.
+						 */
+						path = (Path *) create_group_path(root,
+														  grouped_rel,
+														  path,
+														  partial_grouping_target,
+														  parse->groupClause,
+														  NIL,
+														  dNumPartialGroups);
 
-					add_path(grouped_rel, (Path *)
-							 create_group_path(root,
-											   grouped_rel,
-											   path,
-											   target,
-											   parse->groupClause,
-											   (List *) parse->havingQual,
-											   dNumGroups));
+						path = create_remotesubplan_path(root, path, NULL);
 
-				}
-				else
-				{
-					/* Other cases should have been handled above */
-					Assert(false);
+						add_path(grouped_rel, (Path *)
+								 create_group_path(root,
+												   grouped_rel,
+												   path,
+												   target,
+												   parse->groupClause,
+												   (List *) parse->havingQual,
+												   dNumGroups));
+
+					}
+					else
+					{
+						/* Other cases should have been handled above */
+						Assert(false);
+					}
 				}
 			}
 		}
-	}
 
-	if (can_hash && try_distributed_aggregation)
-	{
-		hashaggtablesize = estimate_hashagg_tablesize(cheapest_path,
-													  agg_costs,
-													  dNumGroups);
-
-		/*
-		 * Provided that the estimated size of the hashtable does not exceed
-		 * work_mem, we'll generate a HashAgg Path, although if we were unable
-		 * to sort above, then we'd better generate a Path, so that we at
-		 * least have one.
-		 */
-		if (hashaggtablesize < work_mem * 1024L ||
-			grouped_rel->pathlist == NIL)
+		if (can_hash)
 		{
-			/* If the whole aggregate was pushed down, we're done. */
-			if (! can_push_down_grouping(root, parse, cheapest_path))
+			hashaggtablesize = estimate_hashagg_tablesize(cheapest_path,
+														  agg_costs,
+														  dNumGroups);
+
+			/*
+			 * Provided that the estimated size of the hashtable does not exceed
+			 * work_mem, we'll generate a HashAgg Path, although if we were unable
+			 * to sort above, then we'd better generate a Path, so that we at
+			 * least have one.
+			 */
+			if (hashaggtablesize < work_mem * 1024L ||
+				grouped_rel->pathlist == NIL)
 			{
-				Path *path, *agg_path;
-
-				path = (Path *) create_agg_path(root,
-									   grouped_rel,
-									   cheapest_path,
-									   partial_grouping_target,
-									   AGG_HASHED,
-									   AGGSPLIT_INITIAL_SERIAL,
-									   parse->groupClause,
-									   NIL,
-									   &agg_partial_costs,
-									   dNumPartialGroups);
-
-				/* keep partially aggregated path for the can_sort branch */
-				agg_path = path;
-
-				path = create_remotesubplan_path(root, path, NULL);
-
-				/* Generate paths with both hash and sort second phase. */
-
-				add_path(grouped_rel, (Path *)
-						 create_agg_path(root,
-										 grouped_rel,
-										 path,
-										 target,
-										 AGG_HASHED,
-										 AGGSPLIT_FINAL_DESERIAL,
-										 parse->groupClause,
-										 (List *) parse->havingQual,
-										 &agg_final_costs,
-										 dNumGroups));
-
-				if (can_sort)
+				/* If the whole aggregate was pushed down, we're done. */
+				if (! can_push_down_grouping(root, parse, cheapest_path))
 				{
-					/*
-					 * AGG_HASHED aggregate paths are always unsorted, so add
-					 * a Sorted node for the final AGG_SORTED step.
-					 */
-					path = (Path *) create_sort_path(root,
-													 grouped_rel,
-													 agg_path,
-													 root->group_pathkeys,
-													 -1.0);
+					Path *path, *agg_path;
+
+					path = (Path *) create_agg_path(root,
+										   grouped_rel,
+										   cheapest_path,
+										   partial_grouping_target,
+										   AGG_HASHED,
+										   AGGSPLIT_INITIAL_SERIAL,
+										   parse->groupClause,
+										   NIL,
+										   &agg_partial_costs,
+										   dNumPartialGroups);
+
+					/* keep partially aggregated path for the can_sort branch */
+					agg_path = path;
 
 					path = create_remotesubplan_path(root, path, NULL);
+
+					/* Generate paths with both hash and sort second phase. */
 
 					add_path(grouped_rel, (Path *)
 							 create_agg_path(root,
 											 grouped_rel,
 											 path,
 											 target,
-									 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+											 AGG_HASHED,
 											 AGGSPLIT_FINAL_DESERIAL,
 											 parse->groupClause,
 											 (List *) parse->havingQual,
 											 &agg_final_costs,
 											 dNumGroups));
+
+					if (can_sort)
+					{
+						/*
+						 * AGG_HASHED aggregate paths are always unsorted, so add
+						 * a Sorted node for the final AGG_SORTED step.
+						 */
+						path = (Path *) create_sort_path(root,
+														 grouped_rel,
+														 agg_path,
+														 root->group_pathkeys,
+														 -1.0);
+
+						path = create_remotesubplan_path(root, path, NULL);
+
+						add_path(grouped_rel, (Path *)
+								 create_agg_path(root,
+												 grouped_rel,
+												 path,
+												 target,
+										 parse->groupClause ? AGG_SORTED : AGG_PLAIN,
+												 AGGSPLIT_FINAL_DESERIAL,
+												 parse->groupClause,
+												 (List *) parse->havingQual,
+												 &agg_final_costs,
+												 dNumGroups));
+					}
 				}
 			}
 		}

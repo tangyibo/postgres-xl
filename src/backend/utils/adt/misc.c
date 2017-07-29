@@ -401,8 +401,6 @@ pg_tablespace_databases(PG_FUNCTION_ARGS)
 			else
 #ifdef PGXC
 				/* Postgres-XC tablespaces also include node name in path */
-				sprintf(fctx->location, "pg_tblspc/%u/%s_%s", tablespaceOid,
-						TABLESPACE_VERSION_DIRECTORY, PGXCNodeName);
 				fctx->location = psprintf("pg_tblspc/%u/%s_%s", tablespaceOid,
 										  TABLESPACE_VERSION_DIRECTORY,
 										  PGXCNodeName);

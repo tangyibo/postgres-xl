@@ -2402,7 +2402,8 @@ gtm_sync_standby(GTM_Conn *conn)
 	if (gtmpqFlush(conn))
 		goto send_failed;
 
-		finish_time = time(NULL) + CLIENT_GTM_TIMEOUT;
+	finish_time = time(NULL) + CLIENT_GTM_TIMEOUT;
+
 	if (gtmpqWaitTimed(true, false, conn, finish_time) ||
 		gtmpqReadData(conn) < 0)
 		goto receive_failed;

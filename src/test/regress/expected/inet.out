@@ -65,6 +65,7 @@ SELECT '' AS ten, c AS cidr, i AS inet FROM INET_TBL ORDER BY cidr, inet;
      | 10:23::8000/113    | 10:23::ffff
 (17 rows)
 
+VACUUM INET_TBL;
 -- now test some support functions
 SELECT '' AS ten, i AS inet, host(i), text(i), family(i) FROM INET_TBL ORDER BY i;
  ten |       inet       |     host      |       text       | family 
@@ -241,6 +242,7 @@ SELECT '' AS ten, set_masklen(inet(text(i)), 24) FROM INET_TBL ORDER BY 1, 2;
 
 -- check that btree index works correctly
 CREATE INDEX inet_idx1 ON inet_tbl(i);
+VACUUM INET_TBL;
 SET enable_seqscan TO off;
 SELECT * FROM inet_tbl WHERE i<<'192.168.1.0/24'::cidr ORDER BY i, c;
        c        |        i         
@@ -265,6 +267,7 @@ SET enable_seqscan TO on;
 DROP INDEX inet_idx1;
 -- check that gist index works correctly
 CREATE INDEX inet_idx2 ON inet_tbl using gist (i inet_ops);
+VACUUM INET_TBL;
 SET enable_seqscan TO off;
 SELECT * FROM inet_tbl WHERE i << '192.168.1.0/24'::cidr ORDER BY i;
        c        |        i         
@@ -393,16 +396,14 @@ SELECT * FROM inet_tbl WHERE i <> '192.168.1.0/24'::cidr ORDER BY i, c;
 -- test index-only scans
 EXPLAIN (COSTS OFF)
 SELECT i FROM inet_tbl WHERE i << '192.168.1.0/24'::cidr ORDER BY i;
-                          QUERY PLAN                           
----------------------------------------------------------------
+                       QUERY PLAN                        
+---------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
    ->  Sort
          Sort Key: i
-         ->  Bitmap Heap Scan on inet_tbl
-               Recheck Cond: (i << '192.168.1.0/24'::inet)
-               ->  Bitmap Index Scan on inet_idx2
-                     Index Cond: (i << '192.168.1.0/24'::inet)
-(7 rows)
+         ->  Index Only Scan using inet_idx2 on inet_tbl
+               Index Cond: (i << '192.168.1.0/24'::inet)
+(5 rows)
 
 SELECT i FROM inet_tbl WHERE i << '192.168.1.0/24'::cidr ORDER BY i;
         i         
@@ -416,6 +417,7 @@ SET enable_seqscan TO on;
 DROP INDEX inet_idx2;
 -- check that spgist index works correctly
 CREATE INDEX inet_idx3 ON inet_tbl using spgist (i);
+VACUUM INET_TBL;
 SET enable_seqscan TO off;
 SELECT * FROM inet_tbl WHERE i << '192.168.1.0/24'::cidr ORDER BY i;
        c        |        i         
@@ -544,13 +546,14 @@ SELECT * FROM inet_tbl WHERE i <> '192.168.1.0/24'::cidr ORDER BY i, c;
 -- test index-only scans
 EXPLAIN (COSTS OFF)
 SELECT i FROM inet_tbl WHERE i << '192.168.1.0/24'::cidr ORDER BY i;
-                    QUERY PLAN                     
----------------------------------------------------
- Sort
-   Sort Key: i
-   ->  Index Only Scan using inet_idx3 on inet_tbl
-         Index Cond: (i << '192.168.1.0/24'::inet)
-(4 rows)
+                       QUERY PLAN                        
+---------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Sort
+         Sort Key: i
+         ->  Index Only Scan using inet_idx3 on inet_tbl
+               Index Cond: (i << '192.168.1.0/24'::inet)
+(5 rows)
 
 SELECT i FROM inet_tbl WHERE i << '192.168.1.0/24'::cidr ORDER BY i;
         i         

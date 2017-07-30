@@ -1567,9 +1567,9 @@ BeginCopy(ParseState *pstate,
 		 * will ultimately lead to an error, but doing it here allows us to
 		 * throw a more friendly and PG-compatible error.
 		 */
-		if (IsA(raw_query, SelectStmt))
+		if (IsA(raw_query->stmt, SelectStmt))
 		{
-			SelectStmt *stmt = (SelectStmt *) raw_query;
+			SelectStmt *stmt = (SelectStmt *) raw_query->stmt;
 
 			/*
 			 * If it's a set-operation tree, drilldown to leftmost SelectStmt

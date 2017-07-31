@@ -2160,7 +2160,7 @@ ProcessUtilitySlow(ParseState *pstate,
 				 */
 				if (IS_PGXC_LOCAL_COORDINATOR)
 					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
-							true, EXEC_ON_ALL_NODES, false);
+							false , EXEC_ON_ALL_NODES, false);
 #endif
 				break;
 

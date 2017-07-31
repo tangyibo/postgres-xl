@@ -3936,6 +3936,9 @@ create_set_projection_path(PlannerInfo *root,
 	/* Projection does not change the sort order XXX? */
 	pathnode->path.pathkeys = subpath->pathkeys;
 
+	/* distribution is the same as in the subpath */
+	pathnode->path.distribution = copyObject(subpath->distribution);
+
 	pathnode->subpath = subpath;
 
 	/*

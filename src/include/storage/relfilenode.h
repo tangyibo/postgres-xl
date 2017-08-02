@@ -15,6 +15,7 @@
 #define RELFILENODE_H
 
 #include "common/relpath.h"
+#include "pgxc/pgxc.h"
 #include "storage/backendid.h"
 
 /*
@@ -77,7 +78,7 @@ typedef struct RelFileNodeBackend
 
 #ifdef XCP
 #define RelFileNodeBackendIsTemp(rnode) \
-	(!OidIsValid(MyCoordId) && ((rnode).backend != InvalidBackendId))
+	(!IS_PGXC_DATANODE && ((rnode).backend != InvalidBackendId))
 #else
 #define RelFileNodeBackendIsTemp(rnode) \
 	((rnode).backend != InvalidBackendId)

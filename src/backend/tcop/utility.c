@@ -4573,6 +4573,7 @@ ExecUtilityFindNodesRelkind(Oid relid, bool *is_temp)
 	{
 		case RELKIND_SEQUENCE:
 		case RELKIND_RELATION:
+		case RELKIND_PARTITIONED_TABLE:
 			if ((*is_temp = IsTempTable(relid)))
 			{
 				if (IsLocalTempTable(relid))

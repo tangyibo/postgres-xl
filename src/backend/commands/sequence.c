@@ -945,13 +945,6 @@ nextval_internal(Oid relid, bool check_permissions)
 	log -= fetch;				/* adjust for any unfetched numbers */
 	Assert(log >= 0);
 
-	/* save info in local cache */
-	elm->last = result;			/* last returned number */
-	elm->cached = last;			/* last fetched number */
-	elm->last_valid = true;
-
-	last_used_seq = elm;
-
 	/*
 	 * If something needs to be WAL logged, acquire an xid, so this
 	 * transaction's commit will trigger a WAL flush and wait for syncrep.

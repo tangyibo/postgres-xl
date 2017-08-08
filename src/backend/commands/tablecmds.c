@@ -781,7 +781,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 */
 	CommandCounterIncrement();
 
-#ifdef PGXC
 	/*
 	 * Add to pgxc_class.
 	 * we need to do this after CommandCounterIncrement
@@ -807,7 +806,7 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 		/* Make sure locator info gets rebuilt */
 		RelationCacheInvalidateEntry(relationId);
 	}
-#endif
+
 	/*
 	 * Open the new relation and acquire exclusive lock on it.  This isn't
 	 * really necessary for locking out other backends (since they can't see
@@ -815,6 +814,26 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	 * complaining about deadlock risks.
 	 */
 	rel = relation_open(relationId, AccessExclusiveLock);
+
+	/*
+	 * If we are inheriting from more than one parent, ensure that the
+	 * distribution strategy of the child table and each of the parent table
+	 * satisfies various limitations imposed by XL. Any violation will be
+	 * reported as ERROR by MergeDistributionIntoExisting.
+	 */
+	if (IS_PGXC_COORDINATOR && list_length(inheritOids) > 1)
+	{
+		ListCell   *entry;
+		foreach(entry, inheritOids)
+		{
+			Oid			parentOid = lfirst_oid(entry);
+			Relation	parent_rel = heap_open(parentOid, ShareUpdateExclusiveLock);
+
+			MergeDistributionIntoExisting(rel, parent_rel);
+			heap_close(parent_rel, NoLock);
+		}
+	}
+
 
 	/* Process and store partition bound, if any. */
 	if (stmt->partbound)
@@ -11747,7 +11766,20 @@ MergeDistributionIntoExisting(Relation child_rel, Relation parent_rel)
 				errdetail("Distribution type for the child must be same as the parent")));
 
 
-	/* Same attribute number? */
+	/*
+	 * Same attribute number?
+	 *
+	 * For table distributed by roundrobin or replication, the partAttrNum will
+	 * be -1 and inheritance is allowed for tables distributed by roundrobin or
+	 * replication, as long as the distribution type matches (i.e. all tables
+	 * are either roundrobin or all tables are replicated).
+	 *
+	 * Tables distributed by roundrobin or replication do not have partAttrName
+	 * set. We should have checked for distribution type above. So if the
+	 * partAttrNum does not match below, we must be dealing with either modulo
+	 * or hash distributed tables and partAttrName must be set in both the
+	 * cases.
+	 */
 	if (parent_locinfo->partAttrNum != child_locinfo->partAttrNum)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -11758,6 +11790,24 @@ MergeDistributionIntoExisting(Relation child_rel, Relation parent_rel)
 					RelationGetRelationName(parent_rel),
 					parent_locinfo->partAttrName),
 				errdetail("Distribution column for the child must be same as the parent")));
+
+	/*
+	 * Same attribute name? partAttrName could be NULL if we are dealing with
+	 * roundrobin or replicated tables. So check for that.
+	 */
+	if (parent_locinfo->partAttrName &&
+		child_locinfo->partAttrName &&
+		strcmp(parent_locinfo->partAttrName, child_locinfo->partAttrName) != 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				errmsg("table \"%s\" is distributed on column \"%s\", but the "
+					"parent table \"%s\" is distributed on column \"%s\"",
+					RelationGetRelationName(child_rel),
+					child_locinfo->partAttrName,
+					RelationGetRelationName(parent_rel),
+					parent_locinfo->partAttrName),
+				errdetail("Distribution column for the child must be same as the parent")));
+
 
 	/* Same node list? */
 	if (list_difference_int(nodeList1, nodeList2) != NIL ||

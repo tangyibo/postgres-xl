@@ -393,8 +393,8 @@ DELETE FROM atest5 WHERE two = 2; -- ok
 
 -- check inheritance cases
 SET SESSION AUTHORIZATION regress_user1;
-CREATE TABLE atestp1 (f1 int, f2 int) WITH OIDS;
-CREATE TABLE atestp2 (fx int, fy int) WITH OIDS;
+CREATE TABLE atestp1 (f1 int, f2 int) WITH OIDS DISTRIBUTE BY ROUNDROBIN;
+CREATE TABLE atestp2 (fx int, fy int) WITH OIDS DISTRIBUTE BY ROUNDROBIN;
 CREATE TABLE atestc (fz int) INHERITS (atestp1, atestp2);
 GRANT SELECT(fx,fy,oid) ON atestp2 TO regress_user2;
 GRANT SELECT(fx) ON atestc TO regress_user2;

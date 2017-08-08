@@ -522,8 +522,8 @@ insert into atacc1 (test2, test) values (3, 4);
 drop table atacc1;
 
 -- inheritance related tests
-create table atacc1 (test int);
-create table atacc2 (test2 int);
+create table atacc1 (test int) distribute by roundrobin;
+create table atacc2 (test2 int) distribute by roundrobin;
 create table atacc3 (test3 int) inherits (atacc1, atacc2);
 alter table atacc2 add constraint foo check (test2>0);
 -- fail and then succeed on atacc2
@@ -536,9 +536,23 @@ drop table atacc3;
 drop table atacc2;
 drop table atacc1;
 
--- same things with one created with INHERIT
 create table atacc1 (test int);
-create table atacc2 (test2 int);
+create table atacc2 (test int);
+-- fail due to missing constraint
+alter table atacc1 add constraint foo check (test>0);
+alter table atacc2 inherit atacc1;
+-- fail due to not-matching constraint
+alter table atacc2 add constraint foo check (test>10);
+alter table atacc2 inherit atacc1;
+-- succeed
+alter table atacc2 drop constraint foo;
+alter table atacc2 add constraint foo check (test>0);
+alter table atacc2 inherit atacc1;
+drop table atacc1 cascade;
+
+-- same things with one created with INHERIT
+create table atacc1 (test int) distribute by roundrobin;
+create table atacc2 (test2 int) distribute by roundrobin;
 create table atacc3 (test3 int) inherits (atacc1, atacc2);
 alter table atacc3 no inherit atacc2;
 -- fail
@@ -546,9 +560,6 @@ alter table atacc3 no inherit atacc2;
 -- make sure it really isn't a child
 insert into atacc3 (test2) values (3);
 select test2 from atacc2;
--- fail due to missing constraint
-alter table atacc2 add constraint foo check (test2>0);
-alter table atacc3 inherit atacc2;
 -- fail due to missing column
 alter table atacc3 rename test2 to testx;
 alter table atacc3 inherit atacc2;
@@ -560,15 +571,18 @@ alter table atacc3 drop test2;
 alter table atacc3 add test2 int;
 update atacc3 set test2 = 4 where test2 is null;
 alter table atacc3 add constraint foo check (test2>0);
+-- XXX fails in XL because of column position mismatch
 alter table atacc3 inherit atacc2;
 -- fail due to duplicates and circular inheritance
 alter table atacc3 inherit atacc2;
 alter table atacc2 inherit atacc3;
 alter table atacc2 inherit atacc2;
 -- test that we really are a child now (should see 4 not 3 and cascade should go through)
+-- XXX fails in XL because the previous alter table failed
 select test2 from atacc2;
 drop table atacc2 cascade;
-drop table atacc1;
+-- XXX needs a cascade drop in XL because atacc3 is still a child of atacc1
+drop table atacc1 cascade;
 
 -- adding only to a parent is allowed as of 9.2
 
@@ -1098,8 +1112,8 @@ alter table c1 drop column f1;
 
 drop table p1 cascade;
 
-create table p1(id int, name text);
-create table p2(id2 int, name text, height int);
+create table p1(id int, name text) distribute by roundrobin;
+create table p2(id2 int, name text, height int) distribute by roundrobin;
 create table c1(age int) inherits(p1,p2);
 create table gc1() inherits (c1);
 
@@ -2031,7 +2045,10 @@ DROP TABLE parent CASCADE;
 CREATE TEMP TABLE temp_parted (a int) PARTITION BY LIST (a);
 CREATE TABLE perm_part (a int);
 ALTER TABLE temp_parted ATTACH PARTITION perm_part FOR VALUES IN (1);
+-- XXX fail in XL because temp and regular tables can't be dropped together
 DROP TABLE temp_parted, perm_part;
+DROP TABLE temp_parted;
+DROP TABLE perm_part;
 
 -- check that the table being attached is not a typed table
 CREATE TYPE mytype AS (a int);

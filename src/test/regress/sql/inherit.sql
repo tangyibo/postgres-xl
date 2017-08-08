@@ -295,8 +295,8 @@ select NULL::derived::base;
 drop table derived;
 drop table base;
 
-create table p1(ff1 int);
-create table p2(f1 text);
+create table p1(ff1 int) distribute by roundrobin;
+create table p2(f1 text) distribute by roundrobin;
 create function p2text(p2) returns text as 'select $1.f1' language sql;
 create table c1(f3 int) inherits(p1,p2);
 insert into c1 values(123456789, 'hi', 42);
@@ -347,8 +347,8 @@ select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pg
 drop table bc;
 drop table ac;
 
-create table ac (a int constraint check_a check (a <> 0));
-create table bc (b int constraint check_b check (b <> 0));
+create table ac (a int constraint check_a check (a <> 0)) distribute by roundrobin;
+create table bc (b int constraint check_b check (b <> 0)) distribute by roundrobin;
 create table cc (c int constraint check_c check (c <> 0)) inherits (ac, bc);
 select pc.relname, pgc.conname, pgc.contype, pgc.conislocal, pgc.coninhcount, pgc.consrc from pg_class as pc inner join pg_constraint as pgc on (pgc.conrelid = pc.oid) where pc.relname in ('ac', 'bc', 'cc') order by 1,2;
 
@@ -359,8 +359,8 @@ drop table cc;
 drop table bc;
 drop table ac;
 
-create table p1(f1 int);
-create table p2(f2 int);
+create table p1(f1 int) distribute by roundrobin;
+create table p2(f2 int) distribute by roundrobin;
 create table c1(f3 int) inherits(p1,p2);
 insert into c1 values(1,-1,2);
 alter table p2 add constraint cc check (f2>0);  -- fail
@@ -387,8 +387,8 @@ alter table pp1 add column a2 int check (a2 > 0);
 drop table pp1 cascade;
 
 -- Test for renaming in simple multiple inheritance
-CREATE TABLE inht1 (a int, b int);
-CREATE TABLE inhs1 (b int, c int);
+CREATE TABLE inht1 (a int, b int) distribute by roundrobin;
+CREATE TABLE inhs1 (b int, c int) distribute by roundrobin;
 CREATE TABLE inhts (d int) INHERITS (inht1, inhs1);
 
 ALTER TABLE inht1 RENAME a TO aa;

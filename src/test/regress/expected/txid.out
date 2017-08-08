@@ -293,10 +293,14 @@ SELECT txid_status(2); -- FrozenTransactionId is always committed
  committed
 (1 row)
 
-SELECT txid_status(3); -- in regress testing FirstNormalTransactionId will always be behind oldestXmin
+-- in regress testing FirstNormalTransactionId will always be behind oldestXmin
+-- XXX in XL, the oldestXmin is advanced lazily and depends on the global
+-- state. So the clog for FirstNormalTransactionId may very well exist and
+-- txid_status gives us a correct answer
+SELECT txid_status(3);
  txid_status 
 -------------
- 
+ committed
 (1 row)
 
 COMMIT;
@@ -315,10 +319,10 @@ EXCEPTION
 END;
 $$;
 SELECT test_future_xid_status(:inprogress + 10000);
-NOTICE:  Got expected error for xid in the future
- test_future_xid_status 
-------------------------
- 
-(1 row)
-
+ERROR:  Internal subtransactions not supported in Postgres-XL
+CONTEXT:  PL/pgSQL function test_future_xid_status(bigint) line 2 during statement block entry
 ROLLBACK;
+-- add a new test case for coverage in XL. Use some very large value for
+-- consistent output
+SELECT txid_status(10000000);
+ERROR:  transaction ID 10000000 is in the future

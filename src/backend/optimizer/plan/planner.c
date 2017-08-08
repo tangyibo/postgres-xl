@@ -379,7 +379,7 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 		 */
 		top_plan = (Plan *) make_remotesubplan(root, top_plan, NULL,
 											   root->distribution,
-											   root->query_pathkeys);
+											   root->sort_pathkeys);
 	}
 #endif
 

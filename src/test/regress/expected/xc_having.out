@@ -135,7 +135,6 @@ explain (verbose true, costs false, nodes false) select count(*), sum(xc_having_
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Remote Subquery Scan on all
    Output: count(*), sum((xc_having_tab1.val * xc_having_tab2.val)), avg((xc_having_tab1.val * xc_having_tab2.val)), ((sum((xc_having_tab1.val * xc_having_tab2.val)))::double precision / (count(*))::double precision), xc_having_tab1.val2, xc_having_tab2.val2
-   Sort Key: xc_having_tab1.val2
    ->  GroupAggregate
          Output: count(*), sum((xc_having_tab1.val * xc_having_tab2.val)), avg((xc_having_tab1.val * xc_having_tab2.val)), ((sum((xc_having_tab1.val * xc_having_tab2.val)))::double precision / (count(*))::double precision), xc_having_tab1.val2, xc_having_tab2.val2
          Group Key: xc_having_tab1.val2, xc_having_tab2.val2
@@ -163,7 +162,7 @@ explain (verbose true, costs false, nodes false) select count(*), sum(xc_having_
                                  Sort Key: xc_having_tab2.val2
                                  ->  Seq Scan on public.xc_having_tab2
                                        Output: xc_having_tab2.val, xc_having_tab2.val2
-(30 rows)
+(29 rows)
 
 -- group by and having, without aggregate in the target list
 select val2 from xc_having_tab1 group by val2 having sum(val) > 8;
@@ -566,7 +565,6 @@ explain (verbose true, costs false, nodes false) select count(*), sum(xc_having_
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Remote Subquery Scan on all
    Output: count(*), sum((xc_having_tab1.val * xc_having_tab2.val)), avg((xc_having_tab1.val * xc_having_tab2.val)), ((sum((xc_having_tab1.val * xc_having_tab2.val)))::double precision / (count(*))::double precision), xc_having_tab1.val2, xc_having_tab2.val2
-   Sort Key: xc_having_tab1.val2
    ->  GroupAggregate
          Output: count(*), sum((xc_having_tab1.val * xc_having_tab2.val)), avg((xc_having_tab1.val * xc_having_tab2.val)), ((sum((xc_having_tab1.val * xc_having_tab2.val)))::double precision / (count(*))::double precision), xc_having_tab1.val2, xc_having_tab2.val2
          Group Key: xc_having_tab1.val2, xc_having_tab2.val2
@@ -594,7 +592,7 @@ explain (verbose true, costs false, nodes false) select count(*), sum(xc_having_
                                  Sort Key: xc_having_tab2.val2
                                  ->  Seq Scan on public.xc_having_tab2
                                        Output: xc_having_tab2.val, xc_having_tab2.val2
-(30 rows)
+(29 rows)
 
 -- group by and having, without aggregate in the target list
 select val2 from xc_having_tab1 group by val2 having sum(val) > 8;

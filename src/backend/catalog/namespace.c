@@ -3756,7 +3756,7 @@ InitTempTableNamespace(void)
 	if (IsParallelWorker())
 		ereport(ERROR,
 				(errcode(ERRCODE_READ_ONLY_SQL_TRANSACTION),
-				 errmsg("cannot create temporary tables in parallel mode")));
+				 errmsg("cannot create temporary tables during a parallel operation")));
 
 #ifdef XCP
 	/*

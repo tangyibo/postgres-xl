@@ -10244,14 +10244,37 @@ SELECT * FROM pg_locks pl LEFT JOIN pg_prepared_xacts ppx
       <entry><type>text[]</type></entry>
       <entry></entry>
       <entry>
-       User mapping specific options, as <quote>keyword=value</>
-       strings, if the current user is the owner of the foreign
-       server, else null
+       User mapping specific options, as <quote>keyword=value</> strings
       </entry>
      </row>
     </tbody>
    </tgroup>
   </table>
+
+  <para>
+   To protect password information stored as a user mapping option,
+   the <structfield>umoptions</structfield> column will read as null
+   unless one of the following applies:
+   <itemizedlist>
+    <listitem>
+     <para>
+      current user is the user being mapped, and owns the server or
+      holds <literal>USAGE</> privilege on it
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+      current user is the server owner and mapping is for <literal>PUBLIC</>
+     </para>
+    </listitem>
+    <listitem>
+     <para>
+      current user is a superuser
+     </para>
+    </listitem>
+   </itemizedlist>
+  </para>
+
  </sect1>
 
 

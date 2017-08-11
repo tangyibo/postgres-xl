@@ -12,7 +12,7 @@ DROP ROLE IF EXISTS regressuser3;
 DROP ROLE IF EXISTS regressuser4;
 DROP ROLE IF EXISTS regressuser5;
 DROP ROLE IF EXISTS regressuser6;
-SELECT lo_unlink(oid) FROM pg_largeobject_metadata;
+SELECT lo_unlink(oid) FROM pg_largeobject_metadata WHERE oid >= 1000 AND oid < 3000 ORDER BY oid;
  lo_unlink 
 -----------
 (0 rows)
@@ -191,6 +191,118 @@ SELECT * FROM atest1 ORDER BY 1; -- ok
  2 | two
 (2 rows)
 
+-- test leaky-function protections in selfuncs
+-- regressuser1 will own a table and provide a view for it.
+SET SESSION AUTHORIZATION regressuser1;
+CREATE TABLE atest12 as
+  SELECT x AS a, 10001 - x AS b FROM generate_series(1,10000) x;
+CREATE INDEX ON atest12 (a);
+CREATE INDEX ON atest12 (abs(a));
+VACUUM ANALYZE atest12;
+CREATE FUNCTION leak(integer,integer) RETURNS boolean
+  AS $$begin return $1 < $2; end$$
+  LANGUAGE plpgsql immutable;
+CREATE OPERATOR <<< (procedure = leak, leftarg = integer, rightarg = integer,
+                     restrict = scalarltsel);
+-- view with leaky operator
+CREATE VIEW atest12v AS
+  SELECT * FROM atest12 WHERE b <<< 5;
+GRANT SELECT ON atest12v TO PUBLIC;
+-- This plan should use nestloop, knowing that few rows will be selected.
+EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: (b <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
+
+-- And this one.
+EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
+  WHERE x.a = y.b and abs(y.a) <<< 5;
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Hash Join
+         Hash Cond: (x.a = y.b)
+         ->  Seq Scan on atest12 x
+         ->  Hash
+               ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                     Distribute results by H: b
+                     ->  Seq Scan on atest12 y
+                           Filter: (abs(a) <<< 5)
+(9 rows)
+
+-- Check if regressuser2 can break security.
+SET SESSION AUTHORIZATION regressuser2;
+CREATE FUNCTION leak2(integer,integer) RETURNS boolean
+  AS $$begin raise notice 'leak % %', $1, $2; return $1 > $2; end$$
+  LANGUAGE plpgsql immutable;
+CREATE OPERATOR >>> (procedure = leak2, leftarg = integer, rightarg = integer,
+                     restrict = scalargtsel);
+-- This should not show any "leak" notices before failing.
+EXPLAIN (COSTS OFF) SELECT * FROM atest12 WHERE a >>> 0;
+ERROR:  permission denied for relation atest12
+-- This plan should use hashjoin, as it will expect many rows to be selected.
+EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: (b <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
+
+-- Now regressuser1 grants sufficient access to regressuser2.
+SET SESSION AUTHORIZATION regressuser1;
+GRANT SELECT (a, b) ON atest12 TO PUBLIC;
+SET SESSION AUTHORIZATION regressuser2;
+-- Now regressuser2 will also get a good row estimate.
+EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: (b <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
+
+-- But not for this, due to lack of table-wide permissions needed
+-- to make use of the expression index's statistics.
+EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
+  WHERE x.a = y.b and abs(y.a) <<< 5;
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Hash Join
+         Hash Cond: (x.a = y.b)
+         ->  Seq Scan on atest12 x
+         ->  Hash
+               ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                     Distribute results by H: b
+                     ->  Seq Scan on atest12 y
+                           Filter: (abs(a) <<< 5)
+(9 rows)
+
+-- clean up (regressuser1's objects are all dropped later)
+DROP FUNCTION leak2(integer, integer) CASCADE;
+NOTICE:  drop cascades to operator >>>(integer,integer)
 -- groups
 SET SESSION AUTHORIZATION regressuser3;
 CREATE TABLE atest3 (one int, two int, three int);
@@ -1108,6 +1220,12 @@ DETAIL:  The feature is not currently supported
 SELECT lo_create(2002);
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
+SELECT loread(lo_open(1001, x'20000'::int), 32);	-- allowed, for now
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
+SELECT lowrite(lo_open(1001, x'40000'::int), 'abcd');	-- fail, wrong mode
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1001, x'40000'::int), 32);
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
@@ -1148,7 +1266,7 @@ ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 \c -
 -- confirm ACL setting
-SELECT oid, pg_get_userbyid(lomowner) ownername, lomacl FROM pg_largeobject_metadata;
+SELECT oid, pg_get_userbyid(lomowner) ownername, lomacl FROM pg_largeobject_metadata WHERE oid >= 1000 AND oid < 3000 ORDER BY oid;
  oid | ownername | lomacl 
 -----+-----------+--------
 (0 rows)
@@ -1180,6 +1298,9 @@ SELECT lowrite(lo_open(1002, x'20000'::int), 'abcd');	-- to be denied
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 SELECT lo_truncate(lo_open(1002, x'20000'::int), 10);	-- to be denied
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
+SELECT lo_put(1002, 1, 'abcd');				-- to be denied
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 SELECT lo_unlink(1002);					-- to be denied
@@ -1500,7 +1621,7 @@ DROP TABLE atest6;
 DROP TABLE atestc;
 DROP TABLE atestp1;
 DROP TABLE atestp2;
-SELECT lo_unlink(oid) FROM pg_largeobject_metadata;
+SELECT lo_unlink(oid) FROM pg_largeobject_metadata WHERE oid >= 1000 AND oid < 3000 ORDER BY oid;
  lo_unlink 
 -----------
 (0 rows)

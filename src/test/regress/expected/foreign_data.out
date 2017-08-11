@@ -1112,10 +1112,11 @@ ERROR:  server "s9" does not exist
 CREATE USER MAPPING FOR current_user SERVER s9;
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
+-- We use terse mode to avoid ordering issues in cascade detail output.
+\set VERBOSITY terse
 DROP SERVER s9 CASCADE;
 NOTICE:  drop cascades to 2 other objects
-DETAIL:  drop cascades to user mapping for public on server s9
-drop cascades to user mapping for unprivileged_role on server s9
+\set VERBOSITY default
 RESET ROLE;
 CREATE SERVER s9 FOREIGN DATA WRAPPER foo;
 ERROR:  Postgres-XL does not support SERVER yet
@@ -1132,7 +1133,67 @@ ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
 DROP SERVER s9 CASCADE;                                         -- ERROR
 ERROR:  server "s9" does not exist
+ERROR:  must be owner of foreign server s9
+-- Check visibility of user mapping data
+SET ROLE regress_test_role;
+CREATE SERVER s10 FOREIGN DATA WRAPPER foo;
+CREATE USER MAPPING FOR public SERVER s10 OPTIONS (user 'secret');
+CREATE USER MAPPING FOR unprivileged_role SERVER s10 OPTIONS (user 'secret');
+-- owner of server can see some option fields
+\deu+
+             List of user mappings
+ Server |     User name     |    FDW Options    
+--------+-------------------+-------------------
+ s10    | public            | ("user" 'secret')
+ s10    | unprivileged_role | 
+ s4     | foreign_data_user | 
+ s5     | regress_test_role | (modified '1')
+ s6     | regress_test_role | 
+ s8     | foreign_data_user | 
+ s8     | public            | 
+ s9     | unprivileged_role | 
+ t1     | public            | (modified '1')
+(9 rows)
+
 RESET ROLE;
+-- superuser can see all option fields
+\deu+
+              List of user mappings
+ Server |     User name     |     FDW Options     
+--------+-------------------+---------------------
+ s10    | public            | ("user" 'secret')
+ s10    | unprivileged_role | ("user" 'secret')
+ s4     | foreign_data_user | 
+ s5     | regress_test_role | (modified '1')
+ s6     | regress_test_role | 
+ s8     | foreign_data_user | (password 'public')
+ s8     | public            | 
+ s9     | unprivileged_role | 
+ t1     | public            | (modified '1')
+(9 rows)
+
+-- unprivileged user cannot see any option field
+SET ROLE unprivileged_role;
+\deu+
+          List of user mappings
+ Server |     User name     | FDW Options 
+--------+-------------------+-------------
+ s10    | public            | 
+ s10    | unprivileged_role | 
+ s4     | foreign_data_user | 
+ s5     | regress_test_role | 
+ s6     | regress_test_role | 
+ s8     | foreign_data_user | 
+ s8     | public            | 
+ s9     | unprivileged_role | 
+ t1     | public            | 
+(9 rows)
+
+RESET ROLE;
+\set VERBOSITY terse
+DROP SERVER s10 CASCADE;
+NOTICE:  drop cascades to 2 other objects
+\set VERBOSITY default
 -- Triggers
 CREATE FUNCTION dummy_trigger() RETURNS TRIGGER AS $$
   BEGIN
@@ -1467,15 +1528,12 @@ Inherits: pt1
 Child tables: ct3,
               ft3
 
+\set VERBOSITY terse
 DROP FOREIGN TABLE ft2; -- ERROR
 ERROR:  cannot drop foreign table ft2 because other objects depend on it
-DETAIL:  table ct3 depends on foreign table ft2
-foreign table ft3 depends on foreign table ft2
-HINT:  Use DROP ... CASCADE to drop the dependent objects too.
 DROP FOREIGN TABLE ft2 CASCADE;
 NOTICE:  drop cascades to 2 other objects
-DETAIL:  drop cascades to table ct3
-drop cascades to foreign table ft3
+\set VERBOSITY default
 CREATE FOREIGN TABLE ft2 (
 	c1 integer NOT NULL,
 	c2 text,
@@ -1711,8 +1769,7 @@ ERROR:  foreign-data wrapper "foo" does not exist
 \set VERBOSITY default
 DROP SERVER s8 CASCADE;
 NOTICE:  drop cascades to 2 other objects
-DETAIL:  drop cascades to user mapping for foreign_data_user on server s8
-drop cascades to user mapping for public on server s8
+\set VERBOSITY default
 DROP ROLE regress_test_indirect;
 ERROR:  role "regress_test_indirect" does not exist
 DROP ROLE regress_test_role;

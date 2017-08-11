@@ -849,7 +849,7 @@ static const pgsql_thing_t words_after_create[] = {
 	{"UNIQUE", NULL, NULL, THING_NO_DROP},		/* for CREATE UNIQUE INDEX ... */
 	{"UNLOGGED", NULL, NULL, THING_NO_DROP},	/* for CREATE UNLOGGED TABLE
 												 * ... */
-	{"USER", Query_for_list_of_roles},
+	{"USER", Query_for_list_of_roles " UNION SELECT 'MAPPING FOR'"},
 #ifndef PGXC
 	/* PGXCTODO: This should be re-enabled once USER MAPPING is supported */
 	{"USER MAPPING FOR", NULL, NULL},
@@ -4102,13 +4102,9 @@ psql_completion(const char *text, int start, int end)
 		}
 	}
 	else if (strcmp(prev_wd, "\\unset") == 0)
-	{
 		matches = complete_from_variables(text, "", "", true);
-	}
 	else if (strcmp(prev_wd, "\\set") == 0)
-	{
 		matches = complete_from_variables(text, "", "", false);
-	}
 	else if (strcmp(prev2_wd, "\\set") == 0)
 	{
 		static const char *const boolean_value_list[] =

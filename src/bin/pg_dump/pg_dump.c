@@ -755,7 +755,15 @@ main(int argc, char **argv)
 			getTableDataFKConstraints();
 	}
 
-	if (dopt.outputBlobs)
+	/*
+	 * In binary-upgrade mode, we do not have to worry about the actual blob
+	 * data or the associated metadata that resides in the pg_largeobject and
+	 * pg_largeobject_metadata tables, respectivly.
+	 *
+	 * However, we do need to collect blob information as there may be
+	 * comments or other information on blobs that we do need to dump out.
+	 */
+	if (dopt.outputBlobs || dopt.binary_upgrade)
 		getBlobs(fout);
 
 	/*
@@ -838,6 +846,7 @@ main(int argc, char **argv)
 	ropt->lockWaitTimeout = dopt.lockWaitTimeout;
 	ropt->include_everything = dopt.include_everything;
 	ropt->enable_row_security = dopt.enable_row_security;
+	ropt->binary_upgrade = dopt.binary_upgrade;
 
 	if (compressLevel == -1)
 		ropt->compression = 0;
@@ -2847,8 +2856,14 @@ dumpBlob(Archive *fout, BlobInfo *binfo)
 				 NULL, binfo->rolname,
 				 binfo->dobj.catId, 0, binfo->dobj.dumpId);
 
-	/* Dump ACL if any */
-	if (binfo->blobacl)
+	/*
+	 * Dump ACL if any
+	 *
+	 * Do not dump the ACL in binary-upgrade mode, however, as the ACL will be
+	 * copied over by pg_upgrade as it is part of the pg_largeobject_metadata
+	 * table.
+	 */
+	if (binfo->blobacl && !fout->dopt->binary_upgrade)
 		dumpACL(fout, binfo->dobj.catId, binfo->dobj.dumpId, "LARGE OBJECT",
 				binfo->dobj.name, NULL, cquery->data,
 				NULL, binfo->rolname, binfo->blobacl);
@@ -2872,6 +2887,13 @@ dumpBlobs(Archive *fout, void *arg)
 	int			ntups;
 	int			i;
 	int			cnt;
+
+	/*
+	 * Do not dump out blob data in binary-upgrade mode, pg_upgrade will copy
+	 * the pg_largeobject table over entirely from the old cluster.
+	 */
+	if (fout->dopt->binary_upgrade)
+		return 1;
 
 	if (g_verbose)
 		write_msg(NULL, "saving large objects\n");
@@ -8197,7 +8219,8 @@ dumpComment(Archive *fout, const char *target,
 	}
 	else
 	{
-		if (dopt->schemaOnly)
+		/* We do dump blob comments in binary-upgrade mode */
+		if (dopt->schemaOnly && !dopt->binary_upgrade)
 			return;
 	}
 
@@ -10250,10 +10273,10 @@ dumpProcLang(Archive *fout, ProcLangInfo *plang)
 
 	/* Dump Proc Lang Comments and Security Labels */
 	dumpComment(fout, labelq->data,
-				NULL, "",
+				lanschema, plang->lanowner,
 				plang->dobj.catId, 0, plang->dobj.dumpId);
 	dumpSecLabel(fout, labelq->data,
-				 NULL, "",
+				 lanschema, plang->lanowner,
 				 plang->dobj.catId, 0, plang->dobj.dumpId);
 
 	if (plang->lanpltrusted)
@@ -11008,7 +11031,7 @@ dumpCast(Archive *fout, CastInfo *cast)
 
 	/* Dump Cast Comments */
 	dumpComment(fout, labelq->data,
-				NULL, "",
+				"pg_catalog", "",
 				cast->dobj.catId, 0, cast->dobj.dumpId);
 
 	destroyPQExpBuffer(defqry);
@@ -11128,7 +11151,7 @@ dumpTransform(Archive *fout, TransformInfo *transform)
 
 	/* Dump Transform Comments */
 	dumpComment(fout, labelq->data,
-				NULL, "",
+				"pg_catalog", "",
 				transform->dobj.catId, 0, transform->dobj.dumpId);
 
 	free(lanname);
@@ -11634,7 +11657,8 @@ dumpOpclass(Archive *fout, OpclassInfo *opcinfo)
 	i_opcfamilynsp = PQfnumber(res, "opcfamilynsp");
 	i_amname = PQfnumber(res, "amname");
 
-	opcintype = PQgetvalue(res, 0, i_opcintype);
+	/* opcintype may still be needed after we PQclear res */
+	opcintype = pg_strdup(PQgetvalue(res, 0, i_opcintype));
 	opckeytype = PQgetvalue(res, 0, i_opckeytype);
 	opcdefault = PQgetvalue(res, 0, i_opcdefault);
 	/* opcfamily will still be needed after we PQclear res */
@@ -11868,6 +11892,15 @@ dumpOpclass(Archive *fout, OpclassInfo *opcinfo)
 
 	PQclear(res);
 
+	/*
+	 * If needComma is still false it means we haven't added anything after
+	 * the AS keyword.  To avoid printing broken SQL, append a dummy STORAGE
+	 * clause with the same datatype.  This isn't sanctioned by the
+	 * documentation, but actually DefineOpClass will treat it as a no-op.
+	 */
+	if (!needComma)
+		appendPQExpBuffer(q, "STORAGE %s", opcintype);
+
 	appendPQExpBufferStr(q, ";\n");
 
 	appendPQExpBuffer(labelq, "OPERATOR CLASS %s",
@@ -11890,9 +11923,11 @@ dumpOpclass(Archive *fout, OpclassInfo *opcinfo)
 
 	/* Dump Operator Class Comments */
 	dumpComment(fout, labelq->data,
-				NULL, opcinfo->rolname,
+				opcinfo->dobj.namespace->dobj.name, opcinfo->rolname,
 				opcinfo->dobj.catId, 0, opcinfo->dobj.dumpId);
 
+	free(opcintype);
+	free(opcfamily);
 	free(amname);
 	destroyPQExpBuffer(query);
 	destroyPQExpBuffer(q);
@@ -12161,7 +12196,7 @@ dumpOpfamily(Archive *fout, OpfamilyInfo *opfinfo)
 
 	/* Dump Operator Family Comments */
 	dumpComment(fout, labelq->data,
-				NULL, opfinfo->rolname,
+				opfinfo->dobj.namespace->dobj.name, opfinfo->rolname,
 				opfinfo->dobj.catId, 0, opfinfo->dobj.dumpId);
 
 	free(amname);
@@ -12849,7 +12884,7 @@ dumpTSParser(Archive *fout, TSParserInfo *prsinfo)
 
 	/* Dump Parser Comments */
 	dumpComment(fout, labelq->data,
-				NULL, "",
+				prsinfo->dobj.namespace->dobj.name, "",
 				prsinfo->dobj.catId, 0, prsinfo->dobj.dumpId);
 
 	destroyPQExpBuffer(q);
@@ -12937,7 +12972,7 @@ dumpTSDictionary(Archive *fout, TSDictInfo *dictinfo)
 
 	/* Dump Dictionary Comments */
 	dumpComment(fout, labelq->data,
-				NULL, dictinfo->rolname,
+				dictinfo->dobj.namespace->dobj.name, dictinfo->rolname,
 				dictinfo->dobj.catId, 0, dictinfo->dobj.dumpId);
 
 	destroyPQExpBuffer(q);
@@ -13004,7 +13039,7 @@ dumpTSTemplate(Archive *fout, TSTemplateInfo *tmplinfo)
 
 	/* Dump Template Comments */
 	dumpComment(fout, labelq->data,
-				NULL, "",
+				tmplinfo->dobj.namespace->dobj.name, "",
 				tmplinfo->dobj.catId, 0, tmplinfo->dobj.dumpId);
 
 	destroyPQExpBuffer(q);
@@ -13133,7 +13168,7 @@ dumpTSConfig(Archive *fout, TSConfigInfo *cfginfo)
 
 	/* Dump Configuration Comments */
 	dumpComment(fout, labelq->data,
-				NULL, cfginfo->rolname,
+				cfginfo->dobj.namespace->dobj.name, cfginfo->rolname,
 				cfginfo->dobj.catId, 0, cfginfo->dobj.dumpId);
 
 	destroyPQExpBuffer(q);
@@ -13580,7 +13615,8 @@ dumpSecLabel(Archive *fout, const char *target,
 	}
 	else
 	{
-		if (dopt->schemaOnly)
+		/* We do dump blob security labels in binary-upgrade mode */
+		if (dopt->schemaOnly && !dopt->binary_upgrade)
 			return;
 	}
 
@@ -15657,6 +15693,7 @@ dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 {
 	DumpOptions *dopt = fout->dopt;
 	PQExpBuffer query;
+	PQExpBuffer delqry;
 	PQExpBuffer labelq;
 
 	/* Skip if not to be dumped */
@@ -15664,6 +15701,7 @@ dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 		return;
 
 	query = createPQExpBuffer();
+	delqry = createPQExpBuffer();
 	labelq = createPQExpBuffer();
 
 	appendPQExpBufferStr(query, "CREATE EVENT TRIGGER ");
@@ -15703,19 +15741,27 @@ dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 		}
 		appendPQExpBufferStr(query, ";\n");
 	}
+
+	appendPQExpBuffer(delqry, "DROP EVENT TRIGGER %s;\n",
+					  fmtId(evtinfo->dobj.name));
+
 	appendPQExpBuffer(labelq, "EVENT TRIGGER %s",
 					  fmtId(evtinfo->dobj.name));
 
 	ArchiveEntry(fout, evtinfo->dobj.catId, evtinfo->dobj.dumpId,
-				 evtinfo->dobj.name, NULL, NULL, evtinfo->evtowner, false,
+				 evtinfo->dobj.name, NULL, NULL,
+				 evtinfo->evtowner, false,
 				 "EVENT TRIGGER", SECTION_POST_DATA,
-				 query->data, "", NULL, NULL, 0, NULL, NULL);
+				 query->data, delqry->data, NULL,
+				 NULL, 0,
+				 NULL, NULL);
 
 	dumpComment(fout, labelq->data,
 				NULL, evtinfo->evtowner,
 				evtinfo->dobj.catId, 0, evtinfo->dobj.dumpId);
 
 	destroyPQExpBuffer(query);
+	destroyPQExpBuffer(delqry);
 	destroyPQExpBuffer(labelq);
 }
 

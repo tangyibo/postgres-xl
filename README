@@ -12,7 +12,7 @@ distribution also contains C language bindings.
 Postgres-XL has many language interfaces similar to PostgreSQL, many of
 which are listed here:
 
-	http://www.postgresql.org/download
+	https://www.postgresql.org/download
 
 See the file INSTALL for instructions on how to build and install
 Postgres-XL.  That file also lists supported operating systems and

@@ -1,5 +1,137 @@
 <!-- doc/src/sgml/release-9.5.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
+
+ <sect1 id="release-xl-9-5r1.6">
+  <title>Postgres-XL Release 9.5r1.6</title>
+
+  <note>
+  <title>Release Date</title>
+  <simpara>2017-08-??</simpara>
+  </note>
+  <para>
+   This release includes all the bug fixes and security fixes from PostgreSQL
+   9.5.8. In addition, there are a few Postgres-XL specific bug fixes in this
+   release. For information about new features in the Postgres-XL 9.5r1 major release, see
+   <xref linkend="release-xl-9-5r1">.
+  </para>
+  <sect2>
+   <title>Migration to Version Postgres-XL 9.5r1.6</title>
+   <para>
+    A dump/restore is not required for those running Postgres-XL 9.5r1.2 and
+    above.
+   </para>
+  </sect2>
+  <sect2>
+   <title>Changes</title>
+   <itemizedlist>
+    <listitem>
+     <para>
+      Fix a bug in the handling renaming of a table using <command>ALTER
+      TABLE</command>.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a bug in the handling of shared storage for temporary tables.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a bug in the GTM where concurrent threads could overwrite snapshot
+      information, thus causing infinite wait on the client side.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Significantly improve performance for Fast-Query-Shipping when large
+      number of rows are fetched from the datanodes. We now switch between datanode
+      connections while consuming the rows, thus creating more parallelism.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix <command>EXPLAIN ANALYZE .. SELECT INTO</command> and give it the
+      same treatment as we provide to <command>CREATE TABLE AS </command>.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Add support for <command>COPY (INSERT RETURNING)</command>.
+     </para>
+    
+     <para>
+      Use properly qualified names while transforming <command>CREATE TABLE
+      AS</command> into a separate <command>CREATE TABLE</command> and
+      <command>INSERT</command> statements. This ensures that the resulting table is
+      created in the correct schema.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Add a new configuration parameter
+      <varname>pgxl_remote_fetch_size</varname> to control the number of rows
+      fetched during a single remote request.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Ensure that we don't try to allocate connection in/out buffers over
+      MaxAllocSize.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a server crash with unsortable data in grouping sets.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Randomize the choice of the initial ROUNDROBIN node, so that with single-row
+      inserts the ROUNDROBIN behaves a bit like RANDOM distribution.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Prevent dropping distribution keys for MODULO, just like we do for HASH
+      distribution.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix buffer overflow in gtm_serialize_pgxcnodeinfo().
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Improve grouping_distribution() to consider all grouping keys.
+      The original implementation required the distribution expression
+      to match the first grouping key, which resulted in suprising
+      inconsistencies when pushing down aggregation.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      make pgxc_ctl connect to 'postgres' database when pinging a node.
+     </para>
+    </listitem>
+
+   </itemizedlist>
+  </sect2>
+ </sect1>
+
  <sect1 id="release-xl-9-5r1.5">
   <title>Postgres-XL Release 9.5r1.5</title>
 

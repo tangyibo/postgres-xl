@@ -27,20 +27,20 @@
     <listitem>
      <para>
       Fix a bug in the handling renaming of a table using <command>ALTER
-      TABLE</command>.
+      TABLE</command> (Pavan Deolasee)
      </para>
     </listitem>
 
     <listitem>
      <para>
-      Fix a bug in the handling of shared storage for temporary tables.
+      Fix a bug in the handling of shared storage for temporary tables (Pavan Deolasee)
      </para>
     </listitem>
 
     <listitem>
      <para>
       Fix a bug in the GTM where concurrent threads could overwrite snapshot
-      information, thus causing infinite wait on the client side.
+      information, thus causing infinite wait on the client side (Chi Gao)
      </para>
     </listitem>
 
@@ -48,27 +48,27 @@
      <para>
       Significantly improve performance for Fast-Query-Shipping when large
       number of rows are fetched from the datanodes. We now switch between datanode
-      connections while consuming the rows, thus creating more parallelism.
+      connections while consuming the rows, thus creating more parallelism (Pavan Deolasee)
      </para>
     </listitem>
 
     <listitem>
      <para>
       Fix <command>EXPLAIN ANALYZE .. SELECT INTO</command> and give it the
-      same treatment as we provide to <command>CREATE TABLE AS </command>.
+      same treatment as we provide to <command>CREATE TABLE AS </command> (Pavan Deolasee)
      </para>
     </listitem>
 
     <listitem>
      <para>
-      Add support for <command>COPY (INSERT RETURNING)</command>.
+      Add support for <command>COPY (INSERT RETURNING)</command> (Pavan Deolasee)
      </para>
     
      <para>
       Use properly qualified names while transforming <command>CREATE TABLE
       AS</command> into a separate <command>CREATE TABLE</command> and
       <command>INSERT</command> statements. This ensures that the resulting table is
-      created in the correct schema.
+      created in the correct schema (Tomas Vondra, Pavan Deolasee)
      </para>
     </listitem>
 
@@ -76,40 +76,40 @@
      <para>
       Add a new configuration parameter
       <varname>pgxl_remote_fetch_size</varname> to control the number of rows
-      fetched during a single remote request.
+      fetched during a single remote request (Pavan Deolasee)
      </para>
     </listitem>
 
     <listitem>
      <para>
       Ensure that we don't try to allocate connection in/out buffers over
-      MaxAllocSize.
+      MaxAllocSize (Krzysztof Nienartowicz)
      </para>
     </listitem>
 
     <listitem>
      <para>
-      Fix a server crash with unsortable data in grouping sets.
+      Fix a server crash with unsortable data in grouping sets (Pavan Deolasee, Tomas Vondra)
      </para>
     </listitem>
 
     <listitem>
      <para>
       Randomize the choice of the initial ROUNDROBIN node, so that with single-row
-      inserts the ROUNDROBIN behaves a bit like RANDOM distribution.
+      inserts the ROUNDROBIN behaves a bit like RANDOM distribution (Tomas Vondra)
      </para>
     </listitem>
 
     <listitem>
      <para>
       Prevent dropping distribution keys for MODULO, just like we do for HASH
-      distribution.
+      distribution (Tomas Vondra)
      </para>
     </listitem>
 
     <listitem>
      <para>
-      Fix buffer overflow in gtm_serialize_pgxcnodeinfo().
+      Fix buffer overflow in gtm_serialize_pgxcnodeinfo() (Tomas Vondra, Rami Sergey)
      </para>
     </listitem>
 
@@ -118,13 +118,13 @@
       Improve grouping_distribution() to consider all grouping keys.
       The original implementation required the distribution expression
       to match the first grouping key, which resulted in suprising
-      inconsistencies when pushing down aggregation.
+      inconsistencies when pushing down aggregation (Tomas Vondra)
      </para>
     </listitem>
 
     <listitem>
      <para>
-      make pgxc_ctl connect to 'postgres' database when pinging a node.
+      make pgxc_ctl connect to 'postgres' database when pinging a node (Pavan Deolasee, Tomas Vondra)
      </para>
     </listitem>
 

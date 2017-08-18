@@ -1078,9 +1078,10 @@ DETAIL:  The feature is not currently supported
 CREATE USER MAPPING FOR public SERVER s10 OPTIONS (user 'secret');
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
-GRANT USAGE ON FOREIGN SERVER s10 TO regress_unprivileged_role;
-ERROR:  server "s10" does not exist
--- owner of server can see option fields
+CREATE USER MAPPING FOR regress_unprivileged_role SERVER s10 OPTIONS (user 'secret');
+ERROR:  Postgres-XL does not support USER MAPPING yet
+DETAIL:  The feature is not currently supported
+-- owner of server can see some option fields
 \deu+
       List of user mappings
  Server | User name | FDW options 
@@ -1107,6 +1108,7 @@ RESET ROLE;
 \set VERBOSITY terse
 DROP SERVER s10 CASCADE;
 ERROR:  server "s10" does not exist
+\set VERBOSITY default
 -- Triggers
 CREATE FUNCTION dummy_trigger() RETURNS TRIGGER AS $$
   BEGIN
@@ -1327,10 +1329,12 @@ Distribute By: HASH(c1)
 Location Nodes: ALL DATANODES
 
 \d+ ft2
+\set VERBOSITY terse
 DROP FOREIGN TABLE ft2; -- ERROR
 ERROR:  foreign table "ft2" does not exist
 DROP FOREIGN TABLE ft2 CASCADE;
 ERROR:  foreign table "ft2" does not exist
+\set VERBOSITY default
 CREATE FOREIGN TABLE ft2 (
 	c1 integer NOT NULL,
 	c2 text,
@@ -1621,14 +1625,12 @@ DROP SERVER t1 CASCADE;
 ERROR:  server "t1" does not exist
 DROP USER MAPPING FOR regress_test_role SERVER s6;
 ERROR:  role "regress_test_role" does not exist
--- This test causes some order dependent cascade detail output,
--- so switch to terse mode for it.
 \set VERBOSITY terse
 DROP FOREIGN DATA WRAPPER foo CASCADE;
 ERROR:  foreign-data wrapper "foo" does not exist
-\set VERBOSITY default
 DROP SERVER s8 CASCADE;
 ERROR:  server "s8" does not exist
+\set VERBOSITY default
 DROP ROLE regress_test_indirect;
 ERROR:  role "regress_test_indirect" does not exist
 DROP ROLE regress_test_role;

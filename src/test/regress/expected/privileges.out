@@ -1238,6 +1238,12 @@ DETAIL:  The feature is not currently supported
 SELECT lo_create(2002);
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
+SELECT loread(lo_open(1001, x'20000'::int), 32);	-- allowed, for now
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
+SELECT lowrite(lo_open(1001, x'40000'::int), 'abcd');	-- fail, wrong mode
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
 SELECT loread(lo_open(1001, x'40000'::int), 32);
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
@@ -1310,6 +1316,9 @@ SELECT lowrite(lo_open(1002, x'20000'::int), 'abcd');	-- to be denied
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 SELECT lo_truncate(lo_open(1002, x'20000'::int), 10);	-- to be denied
+ERROR:  Postgres-XL does not yet support large objects
+DETAIL:  The feature is not currently supported
+SELECT lo_put(1002, 1, 'abcd');				-- to be denied
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 SELECT lo_unlink(1002);					-- to be denied

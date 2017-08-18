@@ -1049,8 +1049,11 @@ ERROR:  server "s9" does not exist
 CREATE USER MAPPING FOR current_user SERVER s9;
 ERROR:  Postgres-XL does not support USER MAPPING yet
 DETAIL:  The feature is not currently supported
+-- We use terse mode to avoid ordering issues in cascade detail output.
+\set VERBOSITY terse
 DROP SERVER s9 CASCADE;
 ERROR:  server "s9" does not exist
+\set VERBOSITY default
 RESET ROLE;
 CREATE SERVER s9 FOREIGN DATA WRAPPER foo;
 ERROR:  Postgres-XL does not support SERVER yet
@@ -1085,14 +1088,14 @@ ERROR:  server "s10" does not exist
 (0 rows)
 
 RESET ROLE;
--- superuser can see option fields
+-- superuser can see all option fields
 \deu+
       List of user mappings
  Server | User name | FDW options 
 --------+-----------+-------------
 (0 rows)
 
--- unprivileged user cannot see option fields
+-- unprivileged user cannot see any option field
 SET ROLE regress_unprivileged_role;
 \deu+
       List of user mappings
@@ -1101,6 +1104,7 @@ SET ROLE regress_unprivileged_role;
 (0 rows)
 
 RESET ROLE;
+\set VERBOSITY terse
 DROP SERVER s10 CASCADE;
 ERROR:  server "s10" does not exist
 -- Triggers

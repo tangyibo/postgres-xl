@@ -1470,7 +1470,7 @@ static void
 ExecSetupTransitionCaptureState(ModifyTableState *mtstate, EState *estate)
 {
 	ResultRelInfo *targetRelInfo = getASTriggerResultRelInfo(mtstate);
-	int		i;
+	int			i;
 
 	/* Check for transition tables on the directly targeted relation. */
 	mtstate->mt_transition_capture =
@@ -1484,7 +1484,7 @@ ExecSetupTransitionCaptureState(ModifyTableState *mtstate, EState *estate)
 	if (mtstate->mt_transition_capture != NULL)
 	{
 		ResultRelInfo *resultRelInfos;
-		int		numResultRelInfos;
+		int			numResultRelInfos;
 
 		/* Find the set of partitions so that we can find their TupleDescs. */
 		if (mtstate->mt_partition_dispatch_info != NULL)
@@ -1536,9 +1536,10 @@ ExecSetupTransitionCaptureState(ModifyTableState *mtstate, EState *estate)
  *		if needed.
  * ----------------------------------------------------------------
  */
-TupleTableSlot *
-ExecModifyTable(ModifyTableState *node)
+static TupleTableSlot *
+ExecModifyTable(PlanState *pstate)
 {
+	ModifyTableState *node = castNode(ModifyTableState, pstate);
 	EState	   *estate = node->ps.state;
 	CmdType		operation = node->operation;
 	ResultRelInfo *saved_resultRelInfo;
@@ -1551,6 +1552,8 @@ ExecModifyTable(ModifyTableState *node)
 	ItemPointerData tuple_ctid;
 	HeapTupleData oldtupdata;
 	HeapTuple	oldtuple;
+
+	CHECK_FOR_INTERRUPTS();
 
 	/*
 	 * This should NOT get called during EvalPlanQual; we should have passed a
@@ -1694,7 +1697,7 @@ ExecModifyTable(ModifyTableState *node)
 				 * the old relation tuple.
 				 *
 				 * Foreign table updates have a wholerow attribute when the
-				 * relation has an AFTER ROW trigger.  Note that the wholerow
+				 * relation has a row-level trigger.  Note that the wholerow
 				 * attribute does not carry system columns.  Foreign table
 				 * triggers miss seeing those, except that we know enough here
 				 * to set t_tableOid.  Quite separately from this, the FDW may
@@ -1805,6 +1808,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	mtstate = makeNode(ModifyTableState);
 	mtstate->ps.plan = (Plan *) node;
 	mtstate->ps.state = estate;
+	mtstate->ps.ExecProcNode = ExecModifyTable;
 
 	mtstate->operation = operation;
 	mtstate->canSetTag = node->canSetTag;
@@ -1916,6 +1920,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 					num_partitions;
 
 		ExecSetupPartitionTupleRouting(rel,
+									   node->nominalRelation,
 									   &partition_dispatch_info,
 									   &partitions,
 									   &partition_tupconv_maps,
@@ -1993,7 +1998,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 			/* varno = node->nominalRelation */
 			mapped_wcoList = map_partition_varattnos(wcoList,
 													 node->nominalRelation,
-													 partrel, rel);
+													 partrel, rel, NULL);
 			foreach(ll, mapped_wcoList)
 			{
 				WithCheckOption *wco = castNode(WithCheckOption, lfirst(ll));
@@ -2066,7 +2071,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 			/* varno = node->nominalRelation */
 			rlist = map_partition_varattnos(returningList,
 											node->nominalRelation,
-											partrel, rel);
+											partrel, rel, NULL);
 			resultRelInfo->ri_projectReturning =
 				ExecBuildProjectionInfo(rlist, econtext, slot, &mtstate->ps,
 										resultRelInfo->ri_RelationDesc->rd_att);
@@ -2179,8 +2184,11 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 	/*
 	 * Initialize the junk filter(s) if needed.  INSERT queries need a filter
 	 * if there are any junk attrs in the tlist.  UPDATE and DELETE always
-	 * need a filter, since there's always a junk 'ctid' or 'wholerow'
-	 * attribute present --- no need to look first.
+	 * need a filter, since there's always at least one junk attribute present
+	 * --- no need to look first.  Typically, this will be a 'ctid' or
+	 * 'wholerow' attribute, but in the case of a foreign data wrapper it
+	 * might be a set of junk attributes sufficient to identify the remote
+	 * row.
 	 *
 	 * If there are multiple result relations, each one needs its own junk
 	 * filter.  Note multiple rels are only possible for UPDATE/DELETE, so we
@@ -2248,8 +2256,8 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 					else if (relkind == RELKIND_FOREIGN_TABLE)
 					{
 						/*
-						 * When there is an AFTER trigger, there should be a
-						 * wholerow attribute.
+						 * When there is a row-level trigger, there should be
+						 * a wholerow attribute.
 						 */
 						j->jf_junkAttNo = ExecFindJunkAttribute(j, "wholerow");
 					}

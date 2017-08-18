@@ -1553,8 +1553,8 @@ GetOldestXminInternal(Relation rel, int flags, bool computeLocal,
 		 * being careful not to generate a "permanent" XID.
 		 *
 		 * vacuum_defer_cleanup_age provides some additional "slop" for the
-		 * benefit of hot standby queries on slave servers.  This is quick and
-		 * dirty, and perhaps not all that useful unless the master has a
+		 * benefit of hot standby queries on standby servers.  This is quick
+		 * and dirty, and perhaps not all that useful unless the master has a
 		 * predictable transaction rate, but it offers some protection when
 		 * there's no walsender connection.  Note that we are assuming
 		 * vacuum_defer_cleanup_age isn't large enough to cause wraparound ---
@@ -2293,20 +2293,21 @@ GetOldestActiveTransactionId(void)
 
 	Assert(!RecoveryInProgress());
 
-	LWLockAcquire(ProcArrayLock, LW_SHARED);
-
 	/*
-	 * It's okay to read nextXid without acquiring XidGenLock because (1) we
-	 * assume TransactionIds can be read atomically and (2) we don't care if
-	 * we get a slightly stale value.  It can't be very stale anyway, because
-	 * the LWLockAcquire above will have done any necessary memory
-	 * interlocking.
+	 * Read nextXid, as the upper bound of what's still active.
+	 *
+	 * Reading a TransactionId is atomic, but we must grab the lock to make
+	 * sure that all XIDs < nextXid are already present in the proc array (or
+	 * have already completed), when we spin over it.
 	 */
+	LWLockAcquire(XidGenLock, LW_SHARED);
 	oldestRunningXid = ShmemVariableCache->nextXid;
+	LWLockRelease(XidGenLock);
 
 	/*
 	 * Spin over procArray collecting all xids and subxids.
 	 */
+	LWLockAcquire(ProcArrayLock, LW_SHARED);
 	for (index = 0; index < arrayP->numProcs; index++)
 	{
 		int			pgprocno = arrayP->pgprocnos[index];
@@ -2328,7 +2329,6 @@ GetOldestActiveTransactionId(void)
 		 * smaller than oldestRunningXid
 		 */
 	}
-
 	LWLockRelease(ProcArrayLock);
 
 	return oldestRunningXid;

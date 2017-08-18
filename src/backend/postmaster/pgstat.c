@@ -3548,6 +3548,12 @@ pgstat_get_wait_activity(WaitEventActivity w)
 		case WAIT_EVENT_CHECKPOINTER_MAIN:
 			event_name = "CheckpointerMain";
 			break;
+		case WAIT_EVENT_LOGICAL_LAUNCHER_MAIN:
+			event_name = "LogicalLauncherMain";
+			break;
+		case WAIT_EVENT_LOGICAL_APPLY_MAIN:
+			event_name = "LogicalApplyMain";
+			break;
 		case WAIT_EVENT_PGSTAT_MAIN:
 			event_name = "PgStatMain";
 			break;
@@ -3568,12 +3574,6 @@ pgstat_get_wait_activity(WaitEventActivity w)
 			break;
 		case WAIT_EVENT_WAL_WRITER_MAIN:
 			event_name = "WalWriterMain";
-			break;
-		case WAIT_EVENT_LOGICAL_LAUNCHER_MAIN:
-			event_name = "LogicalLauncherMain";
-			break;
-		case WAIT_EVENT_LOGICAL_APPLY_MAIN:
-			event_name = "LogicalApplyMain";
 			break;
 		case WAIT_EVENT_CLUSTER_MONITOR_MAIN:
 			event_name = "ClusterMonitorMain";
@@ -3603,14 +3603,17 @@ pgstat_get_wait_client(WaitEventClient w)
 		case WAIT_EVENT_CLIENT_WRITE:
 			event_name = "ClientWrite";
 			break;
+		case WAIT_EVENT_LIBPQWALRECEIVER_CONNECT:
+			event_name = "LibPQWalReceiverConnect";
+			break;
+		case WAIT_EVENT_LIBPQWALRECEIVER_RECEIVE:
+			event_name = "LibPQWalReceiverReceive";
+			break;
 		case WAIT_EVENT_SSL_OPEN_SERVER:
 			event_name = "SSLOpenServer";
 			break;
 		case WAIT_EVENT_WAL_RECEIVER_WAIT_START:
 			event_name = "WalReceiverWaitStart";
-			break;
-		case WAIT_EVENT_LIBPQWALRECEIVER:
-			event_name = "LibPQWalReceiver";
 			break;
 		case WAIT_EVENT_WAL_SENDER_WAIT_WAL:
 			event_name = "WalSenderWaitForWAL";
@@ -3649,6 +3652,12 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_EXECUTE_GATHER:
 			event_name = "ExecuteGather";
 			break;
+		case WAIT_EVENT_LOGICAL_SYNC_DATA:
+			event_name = "LogicalSyncData";
+			break;
+		case WAIT_EVENT_LOGICAL_SYNC_STATE_CHANGE:
+			event_name = "LogicalSyncStateChange";
+			break;
 		case WAIT_EVENT_MQ_INTERNAL:
 			event_name = "MessageQueueInternal";
 			break;
@@ -3670,17 +3679,17 @@ pgstat_get_wait_ipc(WaitEventIPC w)
 		case WAIT_EVENT_PROCARRAY_GROUP_UPDATE:
 			event_name = "ProcArrayGroupUpdate";
 			break;
+		case WAIT_EVENT_REPLICATION_ORIGIN_DROP:
+			event_name = "ReplicationOriginDrop";
+			break;
+		case WAIT_EVENT_REPLICATION_SLOT_DROP:
+			event_name = "ReplicationSlotDrop";
+			break;
 		case WAIT_EVENT_SAFE_SNAPSHOT:
 			event_name = "SafeSnapshot";
 			break;
 		case WAIT_EVENT_SYNC_REP:
 			event_name = "SyncRep";
-			break;
-		case WAIT_EVENT_LOGICAL_SYNC_DATA:
-			event_name = "LogicalSyncData";
-			break;
-		case WAIT_EVENT_LOGICAL_SYNC_STATE_CHANGE:
-			event_name = "LogicalSyncStateChange";
 			break;
 			/* no default case, so that compiler will warn */
 	}

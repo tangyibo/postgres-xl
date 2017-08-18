@@ -276,7 +276,7 @@ SELECT (pg_identify_object(addr1.classid, addr1.objid, addr1.objsubid)).*,
 ---
 --- Cleanup resources
 ---
-SET client_min_messages TO 'warning';
+\set VERBOSITY terse \\ -- suppress cascade details
 DROP FOREIGN DATA WRAPPER addr_fdw CASCADE;
 ERROR:  foreign-data wrapper "addr_fdw" does not exist
 DROP PUBLICATION addr_pub;
@@ -284,5 +284,6 @@ ERROR:  publication "addr_pub" does not exist
 DROP SUBSCRIPTION addr_sub;
 ERROR:  subscription "addr_sub" does not exist
 DROP SCHEMA addr_nsp CASCADE;
+NOTICE:  drop cascades to 12 other objects
 DROP OWNED BY regress_addr_user;
 DROP USER regress_addr_user;

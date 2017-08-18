@@ -212,6 +212,7 @@ typedef enum NodeTag
 	T_CoerceToDomainValue,
 	T_SetToDefault,
 	T_CurrentOfExpr,
+	T_NextValueExpr,
 	T_InferenceElem,
 	T_TargetEntry,
 	T_RangeTblRef,
@@ -223,7 +224,6 @@ typedef enum NodeTag
 	T_DistributeBy,
 	T_PGXCSubCluster,
 #endif
-	T_NextValueExpr,
 
 	/*
 	 * TAGS FOR EXPRESSION STATE NODES (execnodes.h)

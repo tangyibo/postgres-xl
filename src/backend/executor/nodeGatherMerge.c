@@ -44,6 +44,7 @@ typedef struct GMReaderTupleBuffer
  */
 #define MAX_TUPLE_STORE 10
 
+static TupleTableSlot *ExecGatherMerge(PlanState *pstate);
 static int32 heap_compare_slots(Datum a, Datum b, void *arg);
 static TupleTableSlot *gather_merge_getnext(GatherMergeState *gm_state);
 static HeapTuple gm_readnext_tuple(GatherMergeState *gm_state, int nreader,
@@ -75,6 +76,7 @@ ExecInitGatherMerge(GatherMerge *node, EState *estate, int eflags)
 	gm_state = makeNode(GatherMergeState);
 	gm_state->ps.plan = (Plan *) node;
 	gm_state->ps.state = estate;
+	gm_state->ps.ExecProcNode = ExecGatherMerge;
 
 	/*
 	 * Miscellaneous initialization
@@ -157,12 +159,15 @@ ExecInitGatherMerge(GatherMerge *node, EState *estate, int eflags)
  *		the next qualifying tuple.
  * ----------------------------------------------------------------
  */
-TupleTableSlot *
-ExecGatherMerge(GatherMergeState *node)
+static TupleTableSlot *
+ExecGatherMerge(PlanState *pstate)
 {
+	GatherMergeState *node = castNode(GatherMergeState, pstate);
 	TupleTableSlot *slot;
 	ExprContext *econtext;
 	int			i;
+
+	CHECK_FOR_INTERRUPTS();
 
 	/*
 	 * As with Gather, we don't launch workers until this node is actually
@@ -393,6 +398,8 @@ gather_merge_init(GatherMergeState *gm_state)
 reread:
 	for (i = 0; i < nreaders + 1; i++)
 	{
+		CHECK_FOR_INTERRUPTS();
+
 		if (!gm_state->gm_tuple_buffers[i].done &&
 			(TupIsNull(gm_state->gm_slots[i]) ||
 			 gm_state->gm_slots[i]->tts_isempty))

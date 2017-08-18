@@ -56,8 +56,8 @@ static void *dense_alloc(HashJoinTable hashtable, Size size);
  *		stub for pro forma compliance
  * ----------------------------------------------------------------
  */
-TupleTableSlot *
-ExecHash(HashState *node)
+static TupleTableSlot *
+ExecHash(PlanState *pstate)
 {
 	elog(ERROR, "Hash node does not support ExecProcNode call convention");
 	return NULL;
@@ -172,6 +172,7 @@ ExecInitHash(Hash *node, EState *estate, int eflags)
 	hashstate = makeNode(HashState);
 	hashstate->ps.plan = (Plan *) node;
 	hashstate->ps.state = estate;
+	hashstate->ps.ExecProcNode = ExecHash;
 	hashstate->hashtable = NULL;
 	hashstate->hashkeys = NIL;	/* will be set by parent HashJoin */
 
@@ -810,6 +811,9 @@ ExecHashIncreaseNumBuckets(HashJoinTable hashtable)
 			idx += MAXALIGN(HJTUPLE_OVERHEAD +
 							HJTUPLE_MINTUPLE(hashTuple)->t_len);
 		}
+
+		/* allow this loop to be cancellable */
+		CHECK_FOR_INTERRUPTS();
 	}
 }
 
@@ -1192,6 +1196,9 @@ ExecScanHashTableForUnmatched(HashJoinState *hjstate, ExprContext *econtext)
 
 			hashTuple = hashTuple->next;
 		}
+
+		/* allow this loop to be cancellable */
+		CHECK_FOR_INTERRUPTS();
 	}
 
 	/*

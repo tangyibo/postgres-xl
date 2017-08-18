@@ -24,6 +24,7 @@
 
 #include "executor/executor.h"
 #include "executor/nodeGroup.h"
+#include "miscadmin.h"
 
 
 /*
@@ -31,14 +32,17 @@
  *
  *		Return one tuple for each group of matching input tuples.
  */
-TupleTableSlot *
-ExecGroup(GroupState *node)
+static TupleTableSlot *
+ExecGroup(PlanState *pstate)
 {
+	GroupState *node = castNode(GroupState, pstate);
 	ExprContext *econtext;
 	int			numCols;
 	AttrNumber *grpColIdx;
 	TupleTableSlot *firsttupleslot;
 	TupleTableSlot *outerslot;
+
+	CHECK_FOR_INTERRUPTS();
 
 	/*
 	 * get state info from node
@@ -172,6 +176,7 @@ ExecInitGroup(Group *node, EState *estate, int eflags)
 	grpstate = makeNode(GroupState);
 	grpstate->ss.ps.plan = (Plan *) node;
 	grpstate->ss.ps.state = estate;
+	grpstate->ss.ps.ExecProcNode = ExecGroup;
 	grpstate->grp_done = FALSE;
 
 	/*

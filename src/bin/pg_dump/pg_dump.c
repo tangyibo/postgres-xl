@@ -681,8 +681,8 @@ main(int argc, char **argv)
 		dopt.no_security_labels = 1;
 
 	/*
-	 * On hot standby slaves, never try to dump unlogged table data, since it
-	 * will just throw an error.
+	 * On hot standbys, never try to dump unlogged table data, since it will
+	 * just throw an error.
 	 */
 	if (fout->isStandby)
 		dopt.no_unlogged_table_data = true;
@@ -4160,8 +4160,8 @@ getNamespaces(Archive *fout, int *numNamespaces)
 		 */
 		if (dopt->outputClean)
 			appendPQExpBuffer(query, " AND pip.objoid <> "
-									 "coalesce((select oid from pg_namespace "
-									 "where nspname = 'public'),0)");
+							  "coalesce((select oid from pg_namespace "
+							  "where nspname = 'public'),0)");
 
 		appendPQExpBuffer(query, ") ");
 
@@ -14521,10 +14521,20 @@ dumpDefaultACL(Archive *fout, DefaultACLInfo *daclinfo)
  * 'tag' is the tag for the archive entry (typ. unquoted name of object).
  * 'nspname' is the namespace the object is in (NULL if none).
  * 'owner' is the owner, NULL if there is no owner (for languages).
- * 'acls' is the string read out of the fooacl system catalog field;
- *		it will be parsed here.
- * 'racls' contains any initial ACLs that the object had which have now been
- *		revoked by the user, it will also be parsed here.
+ * 'acls' contains the ACL string of the object from the appropriate system
+ * 		catalog field; it will be passed to buildACLCommands for building the
+ * 		appropriate GRANT commands.
+ * 'racls' contains the ACL string of any initial-but-now-revoked ACLs of the
+ * 		object; it will be passed to buildACLCommands for building the
+ * 		appropriate REVOKE commands.
+ * 'initacls' In binary-upgrade mode, ACL string of the object's initial
+ * 		privileges, to be recorded into pg_init_privs
+ * 'initracls' In binary-upgrade mode, ACL string of the object's
+ * 		revoked-from-default privileges, to be recorded into pg_init_privs
+ *
+ * NB: initacls/initracls are needed because extensions can set privileges on
+ * an object during the extension's script file and we record those into
+ * pg_init_privs as that object's initial privileges.
  *----------
  */
 static void
@@ -17003,6 +17013,7 @@ dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 {
 	DumpOptions *dopt = fout->dopt;
 	PQExpBuffer query;
+	PQExpBuffer delqry;
 	PQExpBuffer labelq;
 
 	/* Skip if not to be dumped */
@@ -17010,6 +17021,7 @@ dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 		return;
 
 	query = createPQExpBuffer();
+	delqry = createPQExpBuffer();
 	labelq = createPQExpBuffer();
 
 	appendPQExpBufferStr(query, "CREATE EVENT TRIGGER ");
@@ -17049,14 +17061,21 @@ dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 		}
 		appendPQExpBufferStr(query, ";\n");
 	}
+
+	appendPQExpBuffer(delqry, "DROP EVENT TRIGGER %s;\n",
+					  fmtId(evtinfo->dobj.name));
+
 	appendPQExpBuffer(labelq, "EVENT TRIGGER %s",
 					  fmtId(evtinfo->dobj.name));
 
 	if (evtinfo->dobj.dump & DUMP_COMPONENT_DEFINITION)
 		ArchiveEntry(fout, evtinfo->dobj.catId, evtinfo->dobj.dumpId,
-					 evtinfo->dobj.name, NULL, NULL, evtinfo->evtowner, false,
+					 evtinfo->dobj.name, NULL, NULL,
+					 evtinfo->evtowner, false,
 					 "EVENT TRIGGER", SECTION_POST_DATA,
-					 query->data, "", NULL, NULL, 0, NULL, NULL);
+					 query->data, delqry->data, NULL,
+					 NULL, 0,
+					 NULL, NULL);
 
 	if (evtinfo->dobj.dump & DUMP_COMPONENT_COMMENT)
 		dumpComment(fout, labelq->data,
@@ -17064,6 +17083,7 @@ dumpEventTrigger(Archive *fout, EventTriggerInfo *evtinfo)
 					evtinfo->dobj.catId, 0, evtinfo->dobj.dumpId);
 
 	destroyPQExpBuffer(query);
+	destroyPQExpBuffer(delqry);
 	destroyPQExpBuffer(labelq);
 }
 

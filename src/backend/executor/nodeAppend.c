@@ -59,7 +59,9 @@
 
 #include "executor/execdebug.h"
 #include "executor/nodeAppend.h"
+#include "miscadmin.h"
 
+static TupleTableSlot *ExecAppend(PlanState *pstate);
 static bool exec_append_initialize_next(AppendState *appendstate);
 
 
@@ -146,6 +148,7 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
 	 */
 	appendstate->ps.plan = (Plan *) node;
 	appendstate->ps.state = estate;
+	appendstate->ps.ExecProcNode = ExecAppend;
 	appendstate->appendplans = appendplanstates;
 	appendstate->as_nplans = nplans;
 
@@ -196,13 +199,17 @@ ExecInitAppend(Append *node, EState *estate, int eflags)
  *		Handles iteration over multiple subplans.
  * ----------------------------------------------------------------
  */
-TupleTableSlot *
-ExecAppend(AppendState *node)
+static TupleTableSlot *
+ExecAppend(PlanState *pstate)
 {
+	AppendState *node = castNode(AppendState, pstate);
+
 	for (;;)
 	{
 		PlanState  *subnode;
 		TupleTableSlot *result;
+
+		CHECK_FOR_INTERRUPTS();
 
 		/*
 		 * figure out which subplan we are currently processing

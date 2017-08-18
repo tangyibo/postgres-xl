@@ -2070,7 +2070,7 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 				expr = map_variable_attnos(stringToNode(check[i].ccbin),
 										   1, 0,
 										   newattno, tupleDesc->natts,
-										   &found_whole_row);
+										   InvalidOid, &found_whole_row);
 
 				/*
 				 * For the moment we have to reject whole-row variables. We
@@ -5094,13 +5094,18 @@ ATTypedTableRecursion(List **wqueue, Relation rel, AlterTableCmd *cmd,
 /*
  * find_composite_type_dependencies
  *
- * Check to see if a composite type is being used as a column in some
- * other table (possibly nested several levels deep in composite types!).
+ * Check to see if the type "typeOid" is being used as a column in some table
+ * (possibly nested several levels deep in composite types, arrays, etc!).
  * Eventually, we'd like to propagate the check or rewrite operation
- * into other such tables, but for now, just error out if we find any.
+ * into such tables, but for now, just error out if we find any.
  *
- * Caller should provide either a table name or a type name (not both) to
- * report in the error message, if any.
+ * Caller should provide either the associated relation of a rowtype,
+ * or a type name (not both) for use in the error message, if any.
+ *
+ * Note that "typeOid" is not necessarily a composite type; it could also be
+ * another container type such as an array or range, or a domain over one of
+ * these things.  The name of this function is therefore somewhat historical,
+ * but it's not worth changing.
  *
  * We assume that functions and views depending on the type are not reasons
  * to reject the ALTER.  (How safe is this really?)
@@ -5113,11 +5118,13 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 	ScanKeyData key[2];
 	SysScanDesc depScan;
 	HeapTuple	depTup;
-	Oid			arrayOid;
+
+	/* since this function recurses, it could be driven to stack overflow */
+	check_stack_depth();
 
 	/*
-	 * We scan pg_depend to find those things that depend on the rowtype. (We
-	 * assume we can ignore refobjsubid for a rowtype.)
+	 * We scan pg_depend to find those things that depend on the given type.
+	 * (We assume we can ignore refobjsubid for a type.)
 	 */
 	depRel = heap_open(DependRelationId, AccessShareLock);
 
@@ -5139,8 +5146,22 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 		Relation	rel;
 		Form_pg_attribute att;
 
-		/* Ignore dependees that aren't user columns of relations */
-		/* (we assume system columns are never of rowtypes) */
+		/* Check for directly dependent types */
+		if (pg_depend->classid == TypeRelationId)
+		{
+			/*
+			 * This must be an array, domain, or range containing the given
+			 * type, so recursively check for uses of this type.  Note that
+			 * any error message will mention the original type not the
+			 * container; this is intentional.
+			 */
+			find_composite_type_dependencies(pg_depend->objid,
+											 origRelation, origTypeName);
+			continue;
+		}
+
+		/* Else, ignore dependees that aren't user columns of relations */
+		/* (we assume system columns are never of interesting types) */
 		if (pg_depend->classid != RelationRelationId ||
 			pg_depend->objsubid <= 0)
 			continue;
@@ -5197,14 +5218,6 @@ find_composite_type_dependencies(Oid typeOid, Relation origRelation,
 	systable_endscan(depScan);
 
 	relation_close(depRel, AccessShareLock);
-
-	/*
-	 * If there's an array type for the rowtype, must check for uses of it,
-	 * too.
-	 */
-	arrayOid = get_array_type(typeOid);
-	if (OidIsValid(arrayOid))
-		find_composite_type_dependencies(arrayOid, origRelation, origTypeName);
 }
 
 
@@ -9129,7 +9142,7 @@ ATPrepAlterColumnType(List **wqueue,
 					map_variable_attnos(def->cooked_default,
 										1, 0,
 										attmap, RelationGetDescr(rel)->natts,
-										&found_whole_row);
+										InvalidOid, &found_whole_row);
 				if (found_whole_row)
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -14386,10 +14399,10 @@ ComputePartitionAttrs(Relation rel, List *partParams, AttrNumber *partattrs,
 static ObjectAddress
 ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 {
-	Relation	attachRel,
+	Relation	attachrel,
 				catalog;
-	List	   *childrels;
-	TupleConstr *attachRel_constr;
+	List	   *attachrel_children;
+	TupleConstr *attachrel_constr;
 	List	   *partConstraint,
 			   *existConstraint;
 	SysScanDesc scan;
@@ -14400,23 +14413,24 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	bool		skip_validate = false;
 	ObjectAddress address;
 	const char *trigger_name;
+	bool		found_whole_row;
 
-	attachRel = heap_openrv(cmd->name, AccessExclusiveLock);
+	attachrel = heap_openrv(cmd->name, AccessExclusiveLock);
 
 	/*
 	 * Must be owner of both parent and source table -- parent was checked by
 	 * ATSimplePermissions call in ATPrepCmd
 	 */
-	ATSimplePermissions(attachRel, ATT_TABLE | ATT_FOREIGN_TABLE);
+	ATSimplePermissions(attachrel, ATT_TABLE | ATT_FOREIGN_TABLE);
 
 	/* A partition can only have one parent */
-	if (attachRel->rd_rel->relispartition)
+	if (attachrel->rd_rel->relispartition)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is already a partition",
-						RelationGetRelationName(attachRel))));
+						RelationGetRelationName(attachrel))));
 
-	if (OidIsValid(attachRel->rd_rel->reloftype))
+	if (OidIsValid(attachrel->rd_rel->reloftype))
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot attach a typed table as partition")));
@@ -14429,7 +14443,7 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	ScanKeyInit(&skey,
 				Anum_pg_inherits_inhrelid,
 				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(attachRel)));
+				ObjectIdGetDatum(RelationGetRelid(attachrel)));
 	scan = systable_beginscan(catalog, InheritsRelidSeqnoIndexId, true,
 							  NULL, 1, &skey);
 	if (HeapTupleIsValid(systable_getnext(scan)))
@@ -14442,11 +14456,11 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	ScanKeyInit(&skey,
 				Anum_pg_inherits_inhparent,
 				BTEqualStrategyNumber, F_OIDEQ,
-				ObjectIdGetDatum(RelationGetRelid(attachRel)));
+				ObjectIdGetDatum(RelationGetRelid(attachrel)));
 	scan = systable_beginscan(catalog, InheritsParentIndexId, true, NULL,
 							  1, &skey);
 	if (HeapTupleIsValid(systable_getnext(scan)) &&
-		attachRel->rd_rel->relkind == RELKIND_RELATION)
+		attachrel->rd_rel->relkind == RELKIND_RELATION)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot attach inheritance parent as partition")));
@@ -14454,22 +14468,33 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	heap_close(catalog, AccessShareLock);
 
 	/*
-	 * Prevent circularity by seeing if rel is a partition of attachRel. (In
+	 * Prevent circularity by seeing if rel is a partition of attachrel. (In
 	 * particular, this disallows making a rel a partition of itself.)
+	 *
+	 * We do that by checking if rel is a member of the list of attachRel's
+	 * partitions provided the latter is partitioned at all.  We want to avoid
+	 * having to construct this list again, so we request the strongest lock
+	 * on all partitions.  We need the strongest lock, because we may decide
+	 * to scan them if we find out that the table being attached (or its leaf
+	 * partitions) may contain rows that violate the partition constraint. If
+	 * the table has a constraint that would prevent such rows, which by
+	 * definition is present in all the partitions, we need not scan the
+	 * table, nor its partitions.  But we cannot risk a deadlock by taking a
+	 * weaker lock now and the stronger one only when needed.
 	 */
-	childrels = find_all_inheritors(RelationGetRelid(attachRel),
-									AccessShareLock, NULL);
-	if (list_member_oid(childrels, RelationGetRelid(rel)))
+	attachrel_children = find_all_inheritors(RelationGetRelid(attachrel),
+											 AccessExclusiveLock, NULL);
+	if (list_member_oid(attachrel_children, RelationGetRelid(rel)))
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_TABLE),
 				 errmsg("circular inheritance not allowed"),
 				 errdetail("\"%s\" is already a child of \"%s\".",
 						   RelationGetRelationName(rel),
-						   RelationGetRelationName(attachRel))));
+						   RelationGetRelationName(attachrel))));
 
 	/* Temp parent cannot have a partition that is itself not a temp */
 	if (rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
-		attachRel->rd_rel->relpersistence != RELPERSISTENCE_TEMP)
+		attachrel->rd_rel->relpersistence != RELPERSISTENCE_TEMP)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot attach a permanent relation as partition of temporary relation \"%s\"",
@@ -14483,30 +14508,30 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 				 errmsg("cannot attach as partition of temporary relation of another session")));
 
 	/* Ditto for the partition */
-	if (attachRel->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
-		!attachRel->rd_islocaltemp)
+	if (attachrel->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
+		!attachrel->rd_islocaltemp)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot attach temporary relation of another session as partition")));
 
 	/* If parent has OIDs then child must have OIDs */
-	if (rel->rd_rel->relhasoids && !attachRel->rd_rel->relhasoids)
+	if (rel->rd_rel->relhasoids && !attachrel->rd_rel->relhasoids)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot attach table \"%s\" without OIDs as partition of"
-						" table \"%s\" with OIDs", RelationGetRelationName(attachRel),
+						" table \"%s\" with OIDs", RelationGetRelationName(attachrel),
 						RelationGetRelationName(rel))));
 
-	/* OTOH, if parent doesn't have them, do not allow in attachRel either */
-	if (attachRel->rd_rel->relhasoids && !rel->rd_rel->relhasoids)
+	/* OTOH, if parent doesn't have them, do not allow in attachrel either */
+	if (attachrel->rd_rel->relhasoids && !rel->rd_rel->relhasoids)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot attach table \"%s\" with OIDs as partition of table"
-						" \"%s\" without OIDs", RelationGetRelationName(attachRel),
+						" \"%s\" without OIDs", RelationGetRelationName(attachrel),
 						RelationGetRelationName(rel))));
 
-	/* Check if there are any columns in attachRel that aren't in the parent */
-	tupleDesc = RelationGetDescr(attachRel);
+	/* Check if there are any columns in attachrel that aren't in the parent */
+	tupleDesc = RelationGetDescr(attachrel);
 	natts = tupleDesc->natts;
 	for (attno = 1; attno <= natts; attno++)
 	{
@@ -14524,7 +14549,7 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("table \"%s\" contains column \"%s\" not found in parent \"%s\"",
-							RelationGetRelationName(attachRel), attributeName,
+							RelationGetRelationName(attachrel), attributeName,
 							RelationGetRelationName(rel)),
 					 errdetail("New partition should contain only the columns present in parent.")));
 	}
@@ -14534,40 +14559,50 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	 * currently don't allow it to become a partition.  See also prohibitions
 	 * in ATExecAddInherit() and CreateTrigger().
 	 */
-	trigger_name = FindTriggerIncompatibleWithInheritance(attachRel->trigdesc);
+	trigger_name = FindTriggerIncompatibleWithInheritance(attachrel->trigdesc);
 	if (trigger_name != NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("trigger \"%s\" prevents table \"%s\" from becoming a partition",
-						trigger_name, RelationGetRelationName(attachRel)),
+						trigger_name, RelationGetRelationName(attachrel)),
 				 errdetail("ROW triggers with transition tables are not supported on partitions")));
 
 	/* OK to create inheritance.  Rest of the checks performed there */
-	CreateInheritance(attachRel, rel);
+	CreateInheritance(attachrel, rel);
 
 	/*
 	 * Check that the new partition's bound is valid and does not overlap any
 	 * of existing partitions of the parent - note that it does not return on
 	 * error.
 	 */
-	check_new_partition_bound(RelationGetRelationName(attachRel), rel,
+	check_new_partition_bound(RelationGetRelationName(attachrel), rel,
 							  cmd->bound);
 
 	/* Update the pg_class entry. */
-	StorePartitionBound(attachRel, rel, cmd->bound);
+	StorePartitionBound(attachrel, rel, cmd->bound);
 
 	/*
 	 * Generate partition constraint from the partition bound specification.
 	 * If the parent itself is a partition, make sure to include its
 	 * constraint as well.
 	 */
-	partConstraint = list_concat(get_qual_from_partbound(attachRel, rel,
+	partConstraint = list_concat(get_qual_from_partbound(attachrel, rel,
 														 cmd->bound),
 								 RelationGetPartitionQual(rel));
 	partConstraint = (List *) eval_const_expressions(NULL,
 													 (Node *) partConstraint);
 	partConstraint = (List *) canonicalize_qual((Expr *) partConstraint);
 	partConstraint = list_make1(make_ands_explicit(partConstraint));
+
+	/*
+	 * Adjust the generated constraint to match this partition's attribute
+	 * numbers.
+	 */
+	partConstraint = map_partition_varattnos(partConstraint, 1, attachrel,
+											 rel, &found_whole_row);
+	/* There can never be a whole-row reference here */
+	if (found_whole_row)
+		elog(ERROR, "unexpected whole-row reference found in partition key");
 
 	/*
 	 * Check if we can do away with having to scan the table being attached to
@@ -14579,20 +14614,20 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	 * There is a case in which we cannot rely on just the result of the
 	 * proof.
 	 */
-	attachRel_constr = tupleDesc->constr;
+	attachrel_constr = tupleDesc->constr;
 	existConstraint = NIL;
-	if (attachRel_constr != NULL)
+	if (attachrel_constr != NULL)
 	{
-		int			num_check = attachRel_constr->num_check;
+		int			num_check = attachrel_constr->num_check;
 		int			i;
 
-		if (attachRel_constr->has_not_null)
+		if (attachrel_constr->has_not_null)
 		{
-			int			natts = attachRel->rd_att->natts;
+			int			natts = attachrel->rd_att->natts;
 
 			for (i = 1; i <= natts; i++)
 			{
-				Form_pg_attribute att = attachRel->rd_att->attrs[i - 1];
+				Form_pg_attribute att = attachrel->rd_att->attrs[i - 1];
 
 				if (att->attnotnull && !att->attisdropped)
 				{
@@ -14626,10 +14661,10 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 			 * If this constraint hasn't been fully validated yet, we must
 			 * ignore it here.
 			 */
-			if (!attachRel_constr->check[i].ccvalid)
+			if (!attachrel_constr->check[i].ccvalid)
 				continue;
 
-			cexpr = stringToNode(attachRel_constr->check[i].ccbin);
+			cexpr = stringToNode(attachrel_constr->check[i].ccbin);
 
 			/*
 			 * Run each expression through const-simplification and
@@ -14651,71 +14686,71 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 			skip_validate = true;
 	}
 
-	/* It's safe to skip the validation scan after all */
 	if (skip_validate)
+	{
+		/* No need to scan the table after all. */
 		ereport(INFO,
 				(errmsg("partition constraint for table \"%s\" is implied by existing constraints",
-						RelationGetRelationName(attachRel))));
-
-	/*
-	 * Set up to have the table be scanned to validate the partition
-	 * constraint (see partConstraint above).  If it's a partitioned table, we
-	 * instead schedule its leaf partitions to be scanned.
-	 */
-	if (!skip_validate)
+						RelationGetRelationName(attachrel))));
+	}
+	else
 	{
-		List	   *all_parts;
+		/* Constraints proved insufficient, so we need to scan the table. */
 		ListCell   *lc;
 
-		/* Take an exclusive lock on the partitions to be checked */
-		if (attachRel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
-			all_parts = find_all_inheritors(RelationGetRelid(attachRel),
-											AccessExclusiveLock, NULL);
-		else
-			all_parts = list_make1_oid(RelationGetRelid(attachRel));
-
-		foreach(lc, all_parts)
+		foreach(lc, attachrel_children)
 		{
 			AlteredTableInfo *tab;
 			Oid			part_relid = lfirst_oid(lc);
 			Relation	part_rel;
-			Expr	   *constr;
+			List	   *my_partconstr = partConstraint;
 
 			/* Lock already taken */
-			if (part_relid != RelationGetRelid(attachRel))
+			if (part_relid != RelationGetRelid(attachrel))
 				part_rel = heap_open(part_relid, NoLock);
 			else
-				part_rel = attachRel;
+				part_rel = attachrel;
 
 			/*
-			 * Skip if it's a partitioned table.  Only RELKIND_RELATION
-			 * relations (ie, leaf partitions) need to be scanned.
+			 * Skip if the partition is itself a partitioned table.  We can
+			 * only ever scan RELKIND_RELATION relations.
 			 */
-			if (part_rel != attachRel &&
-				part_rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
+			if (part_rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE)
 			{
-				heap_close(part_rel, NoLock);
+				if (part_rel != attachrel)
+					heap_close(part_rel, NoLock);
 				continue;
 			}
 
-			/* Grab a work queue entry */
-			tab = ATGetQueueEntry(wqueue, part_rel);
+			if (part_rel != attachrel)
+			{
+				/*
+				 * Adjust the constraint that we constructed above for
+				 * attachRel so that it matches this partition's attribute
+				 * numbers.
+				 */
+				my_partconstr = map_partition_varattnos(my_partconstr, 1,
+														part_rel, attachrel,
+														&found_whole_row);
+				/* There can never be a whole-row reference here */
+				if (found_whole_row)
+					elog(ERROR, "unexpected whole-row reference found in partition key");
+			}
 
-			/* Adjust constraint to match this partition */
-			constr = linitial(partConstraint);
-			tab->partition_constraint = (Expr *)
-				map_partition_varattnos((List *) constr, 1,
-										part_rel, rel);
+			/* Grab a work queue entry. */
+			tab = ATGetQueueEntry(wqueue, part_rel);
+			tab->partition_constraint = (Expr *) linitial(my_partconstr);
+
 			/* keep our lock until commit */
-			if (part_rel != attachRel)
+			if (part_rel != attachrel)
 				heap_close(part_rel, NoLock);
 		}
 	}
 
-	ObjectAddressSet(address, RelationRelationId, RelationGetRelid(attachRel));
+	ObjectAddressSet(address, RelationRelationId, RelationGetRelid(attachrel));
 
 	/* keep our lock until commit */
-	heap_close(attachRel, NoLock);
+	heap_close(attachrel, NoLock);
 
 	return address;
 }

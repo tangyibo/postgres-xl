@@ -105,10 +105,10 @@ CREATE STATISTICS tststats.s9 ON a, b FROM tststats.pt1;
 -- END;
 -- $$;
 
-SET client_min_messages TO warning;
+\set VERBOSITY terse \\ -- suppress cascade details
 DROP SCHEMA tststats CASCADE;
 -- DROP FOREIGN DATA WRAPPER extstats_dummy_fdw CASCADE;
-RESET client_min_messages;
+\set VERBOSITY default
 
 -- n-distinct tests
 CREATE TABLE ndistinct (

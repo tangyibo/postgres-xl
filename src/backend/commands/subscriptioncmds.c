@@ -572,10 +572,9 @@ AlterSubscription_refresh(Subscription *sub, bool copy_data)
 			SetSubscriptionRelState(sub->oid, relid,
 									copy_data ? SUBREL_STATE_INIT : SUBREL_STATE_READY,
 									InvalidXLogRecPtr, false);
-			ereport(NOTICE,
-					(errmsg("added subscription for table %s.%s",
-							quote_identifier(rv->schemaname),
-							quote_identifier(rv->relname))));
+			ereport(DEBUG1,
+					(errmsg("table \"%s.%s\" added to subscription \"%s\"",
+							rv->schemaname, rv->relname, sub->name)));
 		}
 	}
 
@@ -593,17 +592,15 @@ AlterSubscription_refresh(Subscription *sub, bool copy_data)
 		if (!bsearch(&relid, pubrel_local_oids,
 					 list_length(pubrel_names), sizeof(Oid), oid_cmp))
 		{
-			char	   *namespace;
-
 			RemoveSubscriptionRel(sub->oid, relid);
 
-			logicalrep_worker_stop(sub->oid, relid);
+			logicalrep_worker_stop_at_commit(sub->oid, relid);
 
-			namespace = get_namespace_name(get_rel_namespace(relid));
-			ereport(NOTICE,
-					(errmsg("removed subscription for table %s.%s",
-							quote_identifier(namespace),
-							quote_identifier(get_rel_name(relid)))));
+			ereport(DEBUG1,
+					(errmsg("table \"%s.%s\" removed from subscription \"%s\"",
+							get_namespace_name(get_rel_namespace(relid)),
+							get_rel_name(relid),
+							sub->name)));
 		}
 	}
 }
@@ -819,6 +816,8 @@ DropSubscription(DropSubscriptionStmt *stmt, bool isTopLevel)
 	char	   *subname;
 	char	   *conninfo;
 	char	   *slotname;
+	List	   *subworkers;
+	ListCell   *lc;
 	char		originname[NAMEDATALEN];
 	char	   *err = NULL;
 	RepOriginId originid;
@@ -909,20 +908,39 @@ DropSubscription(DropSubscriptionStmt *stmt, bool isTopLevel)
 
 	ReleaseSysCache(tup);
 
+	/*
+	 * If we are dropping the replication slot, stop all the subscription
+	 * workers immediately, so that the slot becomes accessible.  Otherwise
+	 * just schedule the stopping for the end of the transaction.
+	 *
+	 * New workers won't be started because we hold an exclusive lock on the
+	 * subscription till the end of the transaction.
+	 */
+	LWLockAcquire(LogicalRepWorkerLock, LW_SHARED);
+	subworkers = logicalrep_workers_find(subid, false);
+	LWLockRelease(LogicalRepWorkerLock);
+	foreach(lc, subworkers)
+	{
+		LogicalRepWorker *w = (LogicalRepWorker *) lfirst(lc);
+
+		if (slotname)
+			logicalrep_worker_stop(w->subid, w->relid);
+		else
+			logicalrep_worker_stop_at_commit(w->subid, w->relid);
+	}
+	list_free(subworkers);
+
 	/* Clean up dependencies */
 	deleteSharedDependencyRecordsFor(SubscriptionRelationId, subid, 0);
 
 	/* Remove any associated relation synchronization states. */
 	RemoveSubscriptionRel(subid, InvalidOid);
 
-	/* Kill the apply worker so that the slot becomes accessible. */
-	logicalrep_worker_stop(subid, InvalidOid);
-
 	/* Remove the origin tracking if exists. */
 	snprintf(originname, sizeof(originname), "pg_%u", subid);
 	originid = replorigin_by_name(originname, true);
 	if (originid != InvalidRepOriginId)
-		replorigin_drop(originid);
+		replorigin_drop(originid, false);
 
 	/*
 	 * If there is no slot associated with the subscription, we can finish

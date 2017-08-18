@@ -2914,7 +2914,8 @@ create_indexscan_plan(PlannerInfo *root,
 										 exprtype,
 										 pathkey->pk_strategy);
 			if (!OidIsValid(sortop))
-				elog(ERROR, "failed to find sort operator for ORDER BY expression");
+				elog(ERROR, "missing operator %d(%u,%u) in opfamily %u",
+					 pathkey->pk_strategy, exprtype, exprtype, pathkey->pk_opfamily);
 			indexorderbyops = lappend_oid(indexorderbyops, sortop);
 		}
 	}
@@ -6454,7 +6455,7 @@ prepare_sort_from_pathkeys(Plan *lefttree, List *pathkeys,
 									 pk_datatype,
 									 pathkey->pk_strategy);
 		if (!OidIsValid(sortop))	/* should not happen */
-			elog(ERROR, "could not find member %d(%u,%u) of opfamily %u",
+			elog(ERROR, "missing operator %d(%u,%u) in opfamily %u",
 				 pathkey->pk_strategy, pk_datatype, pk_datatype,
 				 pathkey->pk_opfamily);
 
@@ -6959,7 +6960,7 @@ make_unique_from_pathkeys(Plan *lefttree, List *pathkeys, int numCols)
 								   pk_datatype,
 								   BTEqualStrategyNumber);
 		if (!OidIsValid(eqop))	/* should not happen */
-			elog(ERROR, "could not find member %d(%u,%u) of opfamily %u",
+			elog(ERROR, "missing operator %d(%u,%u) in opfamily %u",
 				 BTEqualStrategyNumber, pk_datatype, pk_datatype,
 				 pathkey->pk_opfamily);
 
@@ -7310,8 +7311,10 @@ make_modifytable(PlannerInfo *root,
 		}
 
 		/*
-		 * If the target foreign table has any row-level triggers, we can't
-		 * modify the foreign table directly.
+		 * Try to modify the foreign table directly if (1) the FDW provides
+		 * callback functions needed for that, (2) there are no row-level
+		 * triggers on the foreign table, and (3) there are no WITH CHECK
+		 * OPTIONs from parent views.
 		 */
 		direct_modify = false;
 		if (fdwroutine != NULL &&
@@ -7319,6 +7322,7 @@ make_modifytable(PlannerInfo *root,
 			fdwroutine->BeginDirectModify != NULL &&
 			fdwroutine->IterateDirectModify != NULL &&
 			fdwroutine->EndDirectModify != NULL &&
+			withCheckOptionLists == NIL &&
 			!has_row_triggers(root, rti, operation))
 			direct_modify = fdwroutine->PlanDirectModify(root, node, rti, i);
 		if (direct_modify)

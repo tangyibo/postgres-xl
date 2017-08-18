@@ -845,7 +845,7 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
 
       <tbody>
        <row>
-        <entry morerows="59"><literal>LWLock</></entry>
+        <entry morerows="60"><literal>LWLock</></entry>
         <entry><literal>ShmemIndexLock</></entry>
         <entry>Waiting to find or allocate space in shared memory.</entry>
        </row>
@@ -1155,7 +1155,7 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
          <entry>Waiting to acquire a pin on a buffer.</entry>
         </row>
         <row>
-         <entry morerows="11"><literal>Activity</></entry>
+         <entry morerows="13"><literal>Activity</></entry>
          <entry><literal>ArchiverMain</></entry>
          <entry>Waiting in main loop of the archiver process.</entry>
         </row>
@@ -1174,6 +1174,14 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
         <row>
          <entry><literal>CheckpointerMain</></entry>
          <entry>Waiting in main loop of checkpointer process.</entry>
+        </row>
+        <row>
+         <entry><literal>LogicalLauncherMain</></entry>
+         <entry>Waiting in main loop of logical launcher process.</entry>
+        </row>
+        <row>
+         <entry><literal>LogicalApplyMain</></entry>
+         <entry>Waiting in main loop of logical apply process.</entry>
         </row>
         <row>
          <entry><literal>PgStatMain</></entry>
@@ -1204,13 +1212,21 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
          <entry>Waiting in main loop of WAL writer process.</entry>
         </row>
         <row>
-         <entry morerows="5"><literal>Client</></entry>
+         <entry morerows="7"><literal>Client</></entry>
          <entry><literal>ClientRead</></entry>
          <entry>Waiting to read data from the client.</entry>
         </row>
         <row>
          <entry><literal>ClientWrite</></entry>
          <entry>Waiting to write data from the client.</entry>
+        </row>
+        <row>
+         <entry><literal>LibPQWalReceiverConnect</></entry>
+         <entry>Waiting in WAL receiver to establish connection to remote server.</entry>
+        </row>
+        <row>
+         <entry><literal>LibPQWalReceiverReceive</></entry>
+         <entry>Waiting in WAL receiver to receive data from remote server.</entry>
         </row>
         <row>
          <entry><literal>SSLOpenServer</></entry>
@@ -1234,7 +1250,7 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
          <entry>Waiting in an extension.</entry>
         </row>
         <row>
-         <entry morerows="12"><literal>IPC</></entry>
+         <entry morerows="16"><literal>IPC</></entry>
          <entry><literal>BgWorkerShutdown</></entry>
          <entry>Waiting for background worker to shut down.</entry>
         </row>
@@ -1249,6 +1265,14 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
         <row>
          <entry><literal>ExecuteGather</></entry>
          <entry>Waiting for activity from child process when executing <literal>Gather</> node.</entry>
+        </row>
+        <row>
+         <entry><literal>LogicalSyncData</></entry>
+         <entry>Waiting for logical replication remote server to send data for initial table synchronization.</entry>
+        </row>
+        <row>
+         <entry><literal>LogicalSyncStateChange</></entry>
+         <entry>Waiting for logical replication remote server to change state.</entry>
         </row>
         <row>
          <entry><literal>MessageQueueInternal</></entry>
@@ -1271,12 +1295,20 @@ postgres   27093  0.0  0.0  30096  2752 ?        Ss   11:34   0:00 postgres: ser
          <entry>Waiting for parallel workers to finish computing.</entry>
         </row>
         <row>
-         <entry><literal>ParallelBitmapPopulate</></entry>
-         <entry>Waiting for the leader to populate the TidBitmap.</entry>
+         <entry><literal>ParallelBitmapScan</></entry>
+         <entry>Waiting for parallel bitmap scan to become initialized.</entry>
         </row>
         <row>
          <entry><literal>ProcArrayGroupUpdate</></entry>
          <entry>Waiting for group leader to clear transaction id at transaction end.</entry>
+        </row>
+        <row>
+         <entry><literal>ReplicationOriginDrop</></entry>
+         <entry>Waiting for a replication origin to become inactive to be dropped.</entry>
+        </row>
+        <row>
+         <entry><literal>ReplicationSlotDrop</></entry>
+         <entry>Waiting for a replication slot to become inactive to be dropped.</entry>
         </row>
         <row>
          <entry><literal>SafeSnapshot</></entry>

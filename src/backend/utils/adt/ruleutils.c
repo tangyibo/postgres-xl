@@ -444,6 +444,9 @@ static void get_rule_expr(Node *node, deparse_context *context,
 			  bool showimplicit);
 static void get_rule_expr_toplevel(Node *node, deparse_context *context,
 					   bool showimplicit);
+static void get_rule_expr_funccall(Node *node, deparse_context *context,
+					   bool showimplicit);
+static bool looks_like_function(Node *node);
 static void get_oper_expr(OpExpr *expr, deparse_context *context);
 static void get_func_expr(FuncExpr *expr, deparse_context *context,
 			  bool showimplicit);
@@ -1336,8 +1339,7 @@ pg_get_indexdef_worker(Oid indexrelid, int colno,
 			if (!colno || colno == keyno + 1)
 			{
 				/* Need parens if it's not a bare function call */
-				if (indexkey && IsA(indexkey, FuncExpr) &&
-					((FuncExpr *) indexkey)->funcformat == COERCE_EXPLICIT_CALL)
+				if (looks_like_function(indexkey))
 					appendStringInfoString(&buf, str);
 				else
 					appendStringInfo(&buf, "(%s)", str);
@@ -1726,11 +1728,16 @@ pg_get_partkeydef_worker(Oid relid, int prettyFlags,
 				elog(ERROR, "too few entries in partexprs list");
 			partkey = (Node *) lfirst(partexpr_item);
 			partexpr_item = lnext(partexpr_item);
+
 			/* Deparse */
 			str = deparse_expression_pretty(partkey, context, false, false,
-											0, 0);
+											prettyFlags, 0);
+			/* Need parens if it's not a bare function call */
+			if (looks_like_function(partkey))
+				appendStringInfoString(&buf, str);
+			else
+				appendStringInfo(&buf, "(%s)", str);
 
-			appendStringInfoString(&buf, str);
 			keycoltype = exprType(partkey);
 			keycolcollation = exprCollation(partkey);
 		}
@@ -4707,6 +4714,8 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	char	   *ev_qual;
 	char	   *ev_action;
 	List	   *actions = NIL;
+	Relation	ev_relation;
+	TupleDesc	viewResultDesc = NULL;
 	int			fno;
 	Datum		dat;
 	bool		isnull;
@@ -4743,6 +4752,8 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	if (ev_action != NULL)
 		actions = (List *) stringToNode(ev_action);
 
+	ev_relation = heap_open(ev_class, AccessShareLock);
+
 	/*
 	 * Build the rules definition text
 	 */
@@ -4759,6 +4770,7 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	{
 		case '1':
 			appendStringInfoString(buf, "SELECT");
+			viewResultDesc = RelationGetDescr(ev_relation);
 			break;
 
 		case '2':
@@ -4848,7 +4860,7 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		foreach(action, actions)
 		{
 			query = (Query *) lfirst(action);
-			get_query_def(query, buf, NIL, NULL,
+			get_query_def(query, buf, NIL, viewResultDesc,
 						  prettyFlags, WRAP_COLUMN_DEFAULT, 0
 #ifdef PGXC
 						  , false, false
@@ -4870,7 +4882,7 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		Query	   *query;
 
 		query = (Query *) linitial(actions);
-		get_query_def(query, buf, NIL, NULL,
+		get_query_def(query, buf, NIL, viewResultDesc,
 					  prettyFlags, WRAP_COLUMN_DEFAULT, 0
 #ifdef PGXC
 						, false, false
@@ -4878,6 +4890,8 @@ make_ruledef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 		);
 		appendStringInfo(buf, ";");
 	}
+
+	heap_close(ev_relation, AccessShareLock);
 }
 
 
@@ -4899,20 +4913,28 @@ make_viewdef(StringInfo buf, HeapTuple ruletup, TupleDesc rulettc,
 	List	   *actions = NIL;
 	Relation	ev_relation;
 	int			fno;
+	Datum		dat;
 	bool		isnull;
 
 	/*
 	 * Get the attribute values from the rules tuple
 	 */
 	fno = SPI_fnumber(rulettc, "ev_type");
-	ev_type = (char) SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	Assert(!isnull);
+	ev_type = DatumGetChar(dat);
 
 	fno = SPI_fnumber(rulettc, "ev_class");
-	ev_class = (Oid) SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	Assert(!isnull);
+	ev_class = DatumGetObjectId(dat);
 
 	fno = SPI_fnumber(rulettc, "is_instead");
-	is_instead = (bool) SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	dat = SPI_getbinval(ruletup, rulettc, fno, &isnull);
+	Assert(!isnull);
+	is_instead = DatumGetBool(dat);
 
+	/* these could be nulls */
 	fno = SPI_fnumber(rulettc, "ev_qual");
 	ev_qual = SPI_getvalue(ruletup, rulettc, fno);
 
@@ -7824,6 +7846,7 @@ isSimpleNode(Node *node, Node *parentNode, int prettyFlags)
 		case T_MinMaxExpr:
 		case T_SQLValueFunction:
 		case T_XmlExpr:
+		case T_NextValueExpr:
 		case T_NullIfExpr:
 		case T_Aggref:
 		case T_WindowFunc:
@@ -8870,22 +8893,6 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
-		case T_NextValueExpr:
-			{
-				/*
-				 * This gets invoked by Fast Query Shipping code to deparse a
-				 * query. It seems enough to just generate a "DEFAULT" clause
-				 * and let the remote datanode handle finding the correct
-				 * sequence for replica identity.
-				 *
-				 * XXX PG10MERGE: If we do see issues with this, it might be
-				 * worthwhile to consider generating an expression such as,
-				 * nextval('sequence_name'::regclass)
-				 */
-				appendStringInfoString(buf, "DEFAULT");
-			}
-			break;
-
 		case T_XmlExpr:
 			{
 				XmlExpr    *xexpr = (XmlExpr *) node;
@@ -9169,6 +9176,22 @@ get_rule_expr(Node *node, deparse_context *context,
 			}
 			break;
 
+		case T_NextValueExpr:
+			{
+				NextValueExpr *nvexpr = (NextValueExpr *) node;
+
+				/*
+				 * This isn't exactly nextval(), but that seems close enough
+				 * for EXPLAIN's purposes.
+				 */
+				appendStringInfoString(buf, "nextval(");
+				simple_quote_literal(buf,
+									 generate_relation_name(nvexpr->seqid,
+															NIL));
+				appendStringInfoChar(buf, ')');
+			}
+			break;
+
 		case T_InferenceElem:
 			{
 				InferenceElem *iexpr = (InferenceElem *) node;
@@ -9247,43 +9270,9 @@ get_rule_expr(Node *node, deparse_context *context,
 							   list_length(spec->lowerdatums) ==
 							   list_length(spec->upperdatums));
 
-						appendStringInfoString(buf, "FOR VALUES FROM (");
-						sep = "";
-						foreach(cell, spec->lowerdatums)
-						{
-							PartitionRangeDatum *datum =
-							castNode(PartitionRangeDatum, lfirst(cell));
-
-							appendStringInfoString(buf, sep);
-							if (datum->infinite)
-								appendStringInfoString(buf, "UNBOUNDED");
-							else
-							{
-								Const	   *val = castNode(Const, datum->value);
-
-								get_const_expr(val, context, -1);
-							}
-							sep = ", ";
-						}
-						appendStringInfoString(buf, ") TO (");
-						sep = "";
-						foreach(cell, spec->upperdatums)
-						{
-							PartitionRangeDatum *datum =
-							castNode(PartitionRangeDatum, lfirst(cell));
-
-							appendStringInfoString(buf, sep);
-							if (datum->infinite)
-								appendStringInfoString(buf, "UNBOUNDED");
-							else
-							{
-								Const	   *val = castNode(Const, datum->value);
-
-								get_const_expr(val, context, -1);
-							}
-							sep = ", ";
-						}
-						appendStringInfoString(buf, ")");
+						appendStringInfo(buf, "FOR VALUES FROM %s TO %s",
+										 get_range_partbound_string(spec->lowerdatums),
+										 get_range_partbound_string(spec->upperdatums));
 						break;
 
 					default:
@@ -9338,6 +9327,64 @@ get_rule_expr_toplevel(Node *node, deparse_context *context,
 		(void) get_variable((Var *) node, 0, true, context);
 	else
 		get_rule_expr(node, context, showimplicit);
+}
+
+/*
+ * get_rule_expr_funccall		- Parse back a function-call expression
+ *
+ * Same as get_rule_expr(), except that we guarantee that the output will
+ * look like a function call, or like one of the things the grammar treats as
+ * equivalent to a function call (see the func_expr_windowless production).
+ * This is needed in places where the grammar uses func_expr_windowless and
+ * you can't substitute a parenthesized a_expr.  If what we have isn't going
+ * to look like a function call, wrap it in a dummy CAST() expression, which
+ * will satisfy the grammar --- and, indeed, is likely what the user wrote to
+ * produce such a thing.
+ */
+static void
+get_rule_expr_funccall(Node *node, deparse_context *context,
+					   bool showimplicit)
+{
+	if (looks_like_function(node))
+		get_rule_expr(node, context, showimplicit);
+	else
+	{
+		StringInfo	buf = context->buf;
+
+		appendStringInfoString(buf, "CAST(");
+		/* no point in showing any top-level implicit cast */
+		get_rule_expr(node, context, false);
+		appendStringInfo(buf, " AS %s)",
+						 format_type_with_typemod(exprType(node),
+												  exprTypmod(node)));
+	}
+}
+
+/*
+ * Helper function to identify node types that satisfy func_expr_windowless.
+ * If in doubt, "false" is always a safe answer.
+ */
+static bool
+looks_like_function(Node *node)
+{
+	if (node == NULL)
+		return false;			/* probably shouldn't happen */
+	switch (nodeTag(node))
+	{
+		case T_FuncExpr:
+			/* OK, unless it's going to deparse as a cast */
+			return (((FuncExpr *) node)->funcformat == COERCE_EXPLICIT_CALL);
+		case T_NullIfExpr:
+		case T_CoalesceExpr:
+		case T_MinMaxExpr:
+		case T_SQLValueFunction:
+		case T_XmlExpr:
+			/* these are all accepted by func_expr_common_subexpr */
+			return true;
+		default:
+			break;
+	}
+	return false;
 }
 
 
@@ -10326,7 +10373,7 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 				if (list_length(rte->functions) == 1 &&
 					(rtfunc1->funccolnames == NIL || !rte->funcordinality))
 				{
-					get_rule_expr(rtfunc1->funcexpr, context, true);
+					get_rule_expr_funccall(rtfunc1->funcexpr, context, true);
 					/* we'll print the coldeflist below, if it has one */
 				}
 				else
@@ -10389,7 +10436,7 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 
 							if (funcno > 0)
 								appendStringInfoString(buf, ", ");
-							get_rule_expr(rtfunc->funcexpr, context, true);
+							get_rule_expr_funccall(rtfunc->funcexpr, context, true);
 							if (rtfunc->funccolnames != NIL)
 							{
 								/* Reconstruct the column definition list */
@@ -10592,6 +10639,11 @@ get_from_clause_item(Node *jtnode, Query *query, deparse_context *context)
 			get_rule_expr(j->quals, context, false);
 			if (!PRETTY_PAREN(context))
 				appendStringInfoChar(buf, ')');
+		}
+		else if (j->jointype != JOIN_INNER)
+		{
+			/* If we didn't say CROSS JOIN above, we must provide an ON */
+			appendStringInfoString(buf, " ON TRUE");
 		}
 
 		if (!PRETTY_PAREN(context) || j->alias != NULL)
@@ -11429,4 +11481,44 @@ flatten_reloptions(Oid relid)
 	ReleaseSysCache(tuple);
 
 	return result;
+}
+
+/*
+ * get_one_range_partition_bound_string
+ *		A C string representation of one range partition bound
+ */
+char *
+get_range_partbound_string(List *bound_datums)
+{
+	deparse_context context;
+	StringInfo	buf = makeStringInfo();
+	ListCell   *cell;
+	char	   *sep;
+
+	memset(&context, 0, sizeof(deparse_context));
+	context.buf = buf;
+
+	appendStringInfoString(buf, "(");
+	sep = "";
+	foreach(cell, bound_datums)
+	{
+		PartitionRangeDatum *datum =
+		castNode(PartitionRangeDatum, lfirst(cell));
+
+		appendStringInfoString(buf, sep);
+		if (datum->kind == PARTITION_RANGE_DATUM_MINVALUE)
+			appendStringInfoString(buf, "MINVALUE");
+		else if (datum->kind == PARTITION_RANGE_DATUM_MAXVALUE)
+			appendStringInfoString(buf, "MAXVALUE");
+		else
+		{
+			Const	   *val = castNode(Const, datum->value);
+
+			get_const_expr(val, &context, -1);
+		}
+		sep = ", ";
+	}
+	appendStringInfoString(buf, ")");
+
+	return buf->data;
 }

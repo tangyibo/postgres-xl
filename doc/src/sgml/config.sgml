@@ -1216,6 +1216,30 @@ include_dir 'conf.d'
       </listitem>
      </varlistentry>
 
+     <varlistentry id="guc-ssl-dh-params-file" xreflabel="ssl_dh_params_file">
+      <term><varname>ssl_dh_params_file</varname> (<type>string</type>)
+      <indexterm>
+       <primary><varname>ssl_dh_params_file</> configuration parameter</primary>
+      </indexterm>
+      </term>
+      <listitem>
+       <para>
+        Specifies the name of the file containing Diffie-Hellman parameters
+        used for so-called ephemeral DH family of SSL ciphers. The default is
+        empty, in which case compiled-in default DH parameters used. Using
+        custom DH parameters reduces the exposure if an attacker manages to
+        crack the well-known compiled-in DH parameters. You can create your own
+        DH parameters file with the command
+        <command>openssl dhparam -out dhparams.pem 2048</command>.
+       </para>
+
+       <para>
+        This parameter can only be set in the <filename>postgresql.conf</>
+        file or on the server command line.
+       </para>
+      </listitem>
+     </varlistentry>
+
      <varlistentry id="guc-krb-server-keyfile" xreflabel="krb_server_keyfile">
       <term><varname>krb_server_keyfile</varname> (<type>string</type>)
       <indexterm>
@@ -2047,8 +2071,8 @@ include_dir 'conf.d'
        <listitem>
         <para>
          Sets the maximum number of workers that can be started by a single
-         <literal>Gather</literal> node.  Parallel workers are taken from the
-         pool of processes established by
+         <literal>Gather</literal> or <literal>Gather Merge</literal> node.
+         Parallel workers are taken from the pool of processes established by
          <xref linkend="guc-max-worker-processes">, limited by
          <xref linkend="guc-max-parallel-workers">.  Note that the requested
          number of workers may not actually be available at run time.  If this
@@ -5402,6 +5426,7 @@ log_line_prefix = '%m [%p] %q%u@%d/%a '
         longer than <xref linkend="guc-deadlock-timeout"> to acquire a
         lock.  This is useful in determining if lock waits are causing
         poor performance.  The default is <literal>off</>.
+        Only superusers can change this setting.
        </para>
       </listitem>
      </varlistentry>

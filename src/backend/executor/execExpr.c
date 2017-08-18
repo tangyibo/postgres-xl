@@ -1116,6 +1116,18 @@ ExecInitExprRec(Expr *node, PlanState *parent, ExprState *state,
 					 * field assignment can't be within a CASE either.  (So
 					 * saving and restoring innermost_caseval is just
 					 * paranoia, but let's do it anyway.)
+					 *
+					 * Another non-obvious point is that it's safe to use the
+					 * field's values[]/nulls[] entries as both the caseval
+					 * source and the result address for this subexpression.
+					 * That's okay only because (1) both FieldStore and
+					 * ArrayRef evaluate their arg or refexpr inputs first,
+					 * and (2) any such CaseTestExpr is directly the arg or
+					 * refexpr input.  So any read of the caseval will occur
+					 * before there's a chance to overwrite it.  Also, if
+					 * multiple entries in the newvals/fieldnums lists target
+					 * the same field, they'll effectively be applied
+					 * left-to-right which is what we want.
 					 */
 					save_innermost_caseval = state->innermost_caseval;
 					save_innermost_casenull = state->innermost_casenull;
@@ -1628,6 +1640,9 @@ ExecInitExprRec(Expr *node, PlanState *parent, ExprState *state,
 											 lefttype,
 											 righttype,
 											 BTORDER_PROC);
+					if (!OidIsValid(proc))
+						elog(ERROR, "missing support function %d(%u,%u) in opfamily %u",
+							 BTORDER_PROC, lefttype, righttype, opfamily);
 
 					/* Set up the primary fmgr lookup information */
 					finfo = palloc0(sizeof(FmgrInfo));
@@ -2443,14 +2458,14 @@ ExecInitArrayRef(ExprEvalStep *scratch, ArrayRef *aref, PlanState *parent,
 		 * refassgnexpr is itself a FieldStore or ArrayRef that needs to
 		 * obtain and modify the previous value of the array element or slice
 		 * being replaced.  If so, we have to extract that value from the
-		 * array and pass it down via the CaseTextExpr mechanism.  It's safe
+		 * array and pass it down via the CaseTestExpr mechanism.  It's safe
 		 * to reuse the CASE mechanism because there cannot be a CASE between
 		 * here and where the value would be needed, and an array assignment
 		 * can't be within a CASE either.  (So saving and restoring
 		 * innermost_caseval is just paranoia, but let's do it anyway.)
 		 *
 		 * Since fetching the old element might be a nontrivial expense, do it
-		 * only if the argument appears to actually need it.
+		 * only if the argument actually needs it.
 		 */
 		if (isAssignmentIndirectionExpr(aref->refassgnexpr))
 		{
@@ -2506,10 +2521,16 @@ ExecInitArrayRef(ExprEvalStep *scratch, ArrayRef *aref, PlanState *parent,
 
 /*
  * Helper for preparing ArrayRef expressions for evaluation: is expr a nested
- * FieldStore or ArrayRef that might need the old element value passed down?
+ * FieldStore or ArrayRef that needs the old element value passed down?
  *
  * (We could use this in FieldStore too, but in that case passing the old
  * value is so cheap there's no need.)
+ *
+ * Note: it might seem that this needs to recurse, but it does not; the
+ * CaseTestExpr, if any, will be directly the arg or refexpr of the top-level
+ * node.  Nested-assignment situations give rise to expression trees in which
+ * each level of assignment has its own CaseTestExpr, and the recursive
+ * structure appears within the newvals or refassgnexpr field.
  */
 static bool
 isAssignmentIndirectionExpr(Expr *expr)

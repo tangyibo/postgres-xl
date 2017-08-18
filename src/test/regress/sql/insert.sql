@@ -169,7 +169,7 @@ select tableoid::regclass, * from list_parted;
 
 -- some more tests to exercise tuple-routing with multi-level partitioning
 create table part_gg partition of list_parted for values in ('gg') partition by range (b);
-create table part_gg1 partition of part_gg for values from (unbounded) to (1);
+create table part_gg1 partition of part_gg for values from (minvalue) to (1);
 create table part_gg2 partition of part_gg for values from (1) to (10) partition by range (b);
 create table part_gg2_1 partition of part_gg2 for values from (1) to (5);
 create table part_gg2_2 partition of part_gg2 for values from (5) to (10);
@@ -263,6 +263,18 @@ with ins (a, b, c) as
   (insert into mlparted (b, a) select s.a, 1 from generate_series(2, 39) s(a) returning tableoid::regclass, *)
   select a, b, min(c), max(c) from ins group by a, b order by 1;
 
+alter table mlparted add c text;
+create table mlparted5 (c text, a int not null, b int not null) partition by list (c);
+create table mlparted5a (a int not null, c text, b int not null);
+alter table mlparted5 attach partition mlparted5a for values in ('a');
+alter table mlparted attach partition mlparted5 for values from (1, 40) to (1, 50);
+alter table mlparted add constraint check_b check (a = 1 and b < 45);
+insert into mlparted values (1, 45, 'a');
+create function mlparted5abrtrig_func() returns trigger as $$ begin new.c = 'b'; return new; end; $$ language plpgsql;
+create trigger mlparted5abrtrig before insert on mlparted5a for each row execute procedure mlparted5abrtrig_func();
+insert into mlparted5 (a, b, c) values (1, 40, 'a');
+drop table mlparted5;
+
 -- check that message shown after failure to find a partition shows the
 -- appropriate key description (or none) in various situations
 create table key_desc (a int, b int) partition by list ((a+0));
@@ -293,12 +305,12 @@ drop table key_desc, key_desc_1;
 -- check multi-column range partitioning expression enforces the same
 -- constraint as what tuple-routing would determine it to be
 create table mcrparted (a int, b int, c int) partition by range (a, abs(b), c);
-create table mcrparted0 partition of mcrparted for values from (unbounded, unbounded, unbounded) to (1, unbounded, unbounded);
-create table mcrparted1 partition of mcrparted for values from (2, 1, unbounded) to (10, 5, 10);
-create table mcrparted2 partition of mcrparted for values from (10, 6, unbounded) to (10, unbounded, unbounded);
+create table mcrparted0 partition of mcrparted for values from (minvalue, 0, 0) to (1, maxvalue, 0);
+create table mcrparted1 partition of mcrparted for values from (2, 1, minvalue) to (10, 5, 10);
+create table mcrparted2 partition of mcrparted for values from (10, 6, minvalue) to (10, maxvalue, 0);
 create table mcrparted3 partition of mcrparted for values from (11, 1, 1) to (20, 10, 10);
-create table mcrparted4 partition of mcrparted for values from (21, unbounded, unbounded) to (30, 20, unbounded);
-create table mcrparted5 partition of mcrparted for values from (30, 21, 20) to (unbounded, unbounded, unbounded);
+create table mcrparted4 partition of mcrparted for values from (21, minvalue, 0) to (30, 20, maxvalue);
+create table mcrparted5 partition of mcrparted for values from (30, 21, 20) to (maxvalue, 0, 0);
 
 -- routed to mcrparted0
 insert into mcrparted values (0, 1, 1);
@@ -340,5 +352,63 @@ create or replace function brtrigpartcon1trigf() returns trigger as $$begin new.
 create trigger brtrigpartcon1trig before insert on brtrigpartcon1 for each row execute procedure brtrigpartcon1trigf();
 insert into brtrigpartcon values (1, 'hi there');
 insert into brtrigpartcon1 values (1, 'hi there');
+
+-- check that the message shows the appropriate column description in a
+-- situation where the partitioned table is not the primary ModifyTable node
+create table inserttest3 (f1 text default 'foo', f2 text default 'bar', f3 int);
+create role regress_coldesc_role;
+grant insert on inserttest3 to regress_coldesc_role;
+grant insert on brtrigpartcon to regress_coldesc_role;
+revoke select on brtrigpartcon from regress_coldesc_role;
+set role regress_coldesc_role;
+with result as (insert into brtrigpartcon values (1, 'hi there') returning 1)
+  insert into inserttest3 (f3) select * from result;
+reset role;
+
+-- cleanup
+revoke all on inserttest3 from regress_coldesc_role;
+revoke all on brtrigpartcon from regress_coldesc_role;
+drop role regress_coldesc_role;
+drop table inserttest3;
 drop table brtrigpartcon;
 drop function brtrigpartcon1trigf();
+
+-- check multi-column range partitioning with minvalue/maxvalue constraints
+create table mcrparted (a text, b int) partition by range(a, b);
+create table mcrparted1_lt_b partition of mcrparted for values from (minvalue, 0) to ('b', minvalue);
+create table mcrparted2_b partition of mcrparted for values from ('b', minvalue) to ('c', minvalue);
+create table mcrparted3_c_to_common partition of mcrparted for values from ('c', minvalue) to ('common', minvalue);
+create table mcrparted4_common_lt_0 partition of mcrparted for values from ('common', minvalue) to ('common', 0);
+create table mcrparted5_common_0_to_10 partition of mcrparted for values from ('common', 0) to ('common', 10);
+create table mcrparted6_common_ge_10 partition of mcrparted for values from ('common', 10) to ('common', maxvalue);
+create table mcrparted7_gt_common_lt_d partition of mcrparted for values from ('common', maxvalue) to ('d', minvalue);
+create table mcrparted8_ge_d partition of mcrparted for values from ('d', minvalue) to (maxvalue, 0);
+
+\d+ mcrparted
+\d+ mcrparted1_lt_b
+\d+ mcrparted2_b
+\d+ mcrparted3_c_to_common
+\d+ mcrparted4_common_lt_0
+\d+ mcrparted5_common_0_to_10
+\d+ mcrparted6_common_ge_10
+\d+ mcrparted7_gt_common_lt_d
+\d+ mcrparted8_ge_d
+
+insert into mcrparted values ('aaa', 0), ('b', 0), ('bz', 10), ('c', -10),
+    ('comm', -10), ('common', -10), ('common', 0), ('common', 10),
+    ('commons', 0), ('d', -10), ('e', 0);
+select tableoid::regclass, * from mcrparted order by a, b;
+drop table mcrparted;
+
+-- check that wholerow vars in the RETURNING list work with partitioned tables
+create table returningwrtest (a int) partition by list (a);
+create table returningwrtest1 partition of returningwrtest for values in (1);
+insert into returningwrtest values (1) returning returningwrtest;
+
+-- check also that the wholerow vars in RETURNING list are converted as needed
+alter table returningwrtest add b text;
+create table returningwrtest2 (b text, c int, a int);
+alter table returningwrtest2 drop c;
+alter table returningwrtest attach partition returningwrtest2 for values in (2);
+insert into returningwrtest values (2, 'foo') returning returningwrtest;
+drop table returningwrtest;

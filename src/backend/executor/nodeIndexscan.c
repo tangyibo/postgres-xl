@@ -34,6 +34,7 @@
 #include "executor/execdebug.h"
 #include "executor/nodeIndexscan.h"
 #include "lib/pairingheap.h"
+#include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 #include "optimizer/clauses.h"
 #include "utils/array.h"
@@ -131,6 +132,8 @@ IndexNext(IndexScanState *node)
 	 */
 	while ((tuple = index_getnext(scandesc, direction)) != NULL)
 	{
+		CHECK_FOR_INTERRUPTS();
+
 		/*
 		 * Store the scanned tuple in the scan tuple slot of the scan state.
 		 * Note: we pass 'false' because tuples returned by amgetnext are
@@ -233,6 +236,8 @@ IndexNextWithReorder(IndexScanState *node)
 
 	for (;;)
 	{
+		CHECK_FOR_INTERRUPTS();
+
 		/*
 		 * Check the reorder queue first.  If the topmost tuple in the queue
 		 * has an ORDER BY value smaller than (or equal to) the value last
@@ -299,6 +304,8 @@ next_indextuple:
 			{
 				/* Fails recheck, so drop it and loop back for another */
 				InstrCountFiltered2(node, 1);
+				/* allow this loop to be cancellable */
+				CHECK_FOR_INTERRUPTS();
 				goto next_indextuple;
 			}
 		}
@@ -535,9 +542,11 @@ reorderqueue_pop(IndexScanState *node)
  *		ExecIndexScan(node)
  * ----------------------------------------------------------------
  */
-TupleTableSlot *
-ExecIndexScan(IndexScanState *node)
+static TupleTableSlot *
+ExecIndexScan(PlanState *pstate)
 {
+	IndexScanState *node = castNode(IndexScanState, pstate);
+
 	/*
 	 * If we have runtime keys and they've not already been set up, do it now.
 	 */
@@ -903,6 +912,7 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
 	indexstate = makeNode(IndexScanState);
 	indexstate->ss.ps.plan = (Plan *) node;
 	indexstate->ss.ps.state = estate;
+	indexstate->ss.ps.ExecProcNode = ExecIndexScan;
 
 	/*
 	 * Miscellaneous initialization
@@ -1367,6 +1377,9 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 											 op_lefttype,
 											 op_righttype,
 											 BTORDER_PROC);
+				if (!RegProcedureIsValid(opfuncid))
+					elog(ERROR, "missing support function %d(%u,%u) in opfamily %u",
+						 BTORDER_PROC, op_lefttype, op_righttype, opfamily);
 
 				inputcollation = lfirst_oid(collids_cell);
 				collids_cell = lnext(collids_cell);

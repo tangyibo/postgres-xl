@@ -3796,7 +3796,7 @@ _readPartitionRangeDatum(void)
 {
 	READ_LOCALS(PartitionRangeDatum);
 
-	READ_BOOL_FIELD(infinite);
+	READ_ENUM_FIELD(kind, PartitionRangeDatumKind);
 	READ_NODE_FIELD(value);
 	READ_LOCATION_FIELD(location);
 
@@ -3925,6 +3925,8 @@ parseNodeString(void)
 		return_value = _readSetToDefault();
 	else if (MATCH("CURRENTOFEXPR", 13))
 		return_value = _readCurrentOfExpr();
+	else if (MATCH("NEXTVALUEEXPR", 13))
+		return_value = _readNextValueExpr();
 	else if (MATCH("INFERENCEELEM", 13))
 		return_value = _readInferenceElem();
 	else if (MATCH("TARGETENTRY", 11))

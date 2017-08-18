@@ -457,9 +457,6 @@
 /* Define to 1 if you have the external array `tzname'. */
 /* #undef HAVE_TZNAME */
 
-/* Define to 1 if you have the `ucol_strcollUTF8' function. */
-#define HAVE_UCOL_STRCOLLUTF8 1
-
 /* Define to 1 if the system has the type `uint64'. */
 /* #undef HAVE_UINT64 */
 
@@ -557,7 +554,7 @@
 #define PACKAGE_STRING "Postgres-XL 10alpha1"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "10beta2"
+#define PACKAGE_VERSION "10beta3"
 
 /* Define to the name of a signed 128-bit integer type. */
 #undef PG_INT128_TYPE
@@ -566,7 +563,7 @@
 #define PG_INT64_TYPE long long int
 
 /* PostgreSQL version as a string */
-#define PG_VERSION "10beta2"
+#define PG_VERSION "10beta3"
 
 /* PostgreSQL version as a number */
 #define PG_VERSION_NUM 100000

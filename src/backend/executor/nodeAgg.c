@@ -678,6 +678,8 @@ fetch_input_tuple(AggState *aggstate)
 
 	if (aggstate->sort_in)
 	{
+		/* make sure we check for interrupts in either path through here */
+		CHECK_FOR_INTERRUPTS();
 		if (!tuplesort_gettupleslot(aggstate->sort_in, true, false,
 									aggstate->sort_slot, NULL))
 			return NULL;
@@ -1415,6 +1417,8 @@ process_ordered_aggregate_multi(AggState *aggstate,
 	while (tuplesort_gettupleslot(pertrans->sortstates[aggstate->current_set],
 								  true, true, slot1, &newAbbrevVal))
 	{
+		CHECK_FOR_INTERRUPTS();
+
 		/*
 		 * Extract the first numTransInputs columns as datums to pass to the
 		 * transfn.  (This will help execTuplesMatch too, so we do it
@@ -2096,10 +2100,13 @@ lookup_hash_entries(AggState *aggstate)
  *	  stored in the expression context to be used when ExecProject evaluates
  *	  the result tuple.
  */
-TupleTableSlot *
-ExecAgg(AggState *node)
+static TupleTableSlot *
+ExecAgg(PlanState *pstate)
 {
+	AggState   *node = castNode(AggState, pstate);
 	TupleTableSlot *result = NULL;
+
+	CHECK_FOR_INTERRUPTS();
 
 	if (!node->agg_done)
 	{
@@ -2564,6 +2571,8 @@ agg_retrieve_hash_table(AggState *aggstate)
 		TupleTableSlot *hashslot = perhash->hashslot;
 		int			i;
 
+		CHECK_FOR_INTERRUPTS();
+
 		/*
 		 * Find the next entry in the hash table
 		 */
@@ -2688,6 +2697,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	aggstate = makeNode(AggState);
 	aggstate->ss.ps.plan = (Plan *) node;
 	aggstate->ss.ps.state = estate;
+	aggstate->ss.ps.ExecProcNode = ExecAgg;
 
 	aggstate->aggs = NIL;
 	aggstate->numaggs = 0;

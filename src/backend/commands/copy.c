@@ -1482,6 +1482,7 @@ BeginCopy(ParseState *pstate,
 						num_partitions;
 
 			ExecSetupPartitionTupleRouting(rel,
+										   1,
 										   &partition_dispatch_info,
 										   &partitions,
 										   &partition_tupconv_maps,
@@ -1502,7 +1503,7 @@ BeginCopy(ParseState *pstate,
 			 */
 			if (cstate->transition_capture != NULL)
 			{
-				int		i;
+				int			i;
 
 				cstate->transition_tupconv_maps = (TupleConversionMap **)
 					palloc0(sizeof(TupleConversionMap *) *
@@ -2837,6 +2838,7 @@ CopyFrom(CopyState cstate)
 					cstate->transition_capture->tcs_map = NULL;
 				}
 			}
+
 			/*
 			 * We might need to convert from the parent rowtype to the
 			 * partition rowtype.

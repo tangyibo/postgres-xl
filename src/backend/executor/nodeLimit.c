@@ -23,6 +23,7 @@
 
 #include "executor/executor.h"
 #include "executor/nodeLimit.h"
+#include "miscadmin.h"
 #include "nodes/nodeFuncs.h"
 
 static void recompute_limits(LimitState *node);
@@ -36,12 +37,15 @@ static void pass_down_bound(LimitState *node, PlanState *child_node);
  *		filtering on the stream of tuples returned by a subplan.
  * ----------------------------------------------------------------
  */
-TupleTableSlot *				/* return: a tuple or NULL */
-ExecLimit(LimitState *node)
+static TupleTableSlot *			/* return: a tuple or NULL */
+ExecLimit(PlanState *pstate)
 {
+	LimitState *node = castNode(LimitState, pstate);
 	ScanDirection direction;
 	TupleTableSlot *slot;
 	PlanState  *outerPlan;
+
+	CHECK_FOR_INTERRUPTS();
 
 	/*
 	 * get information from the node
@@ -375,6 +379,7 @@ ExecInitLimit(Limit *node, EState *estate, int eflags)
 	limitstate = makeNode(LimitState);
 	limitstate->ps.plan = (Plan *) node;
 	limitstate->ps.state = estate;
+	limitstate->ps.ExecProcNode = ExecLimit;
 
 	limitstate->lstate = LIMIT_INITIAL;
 

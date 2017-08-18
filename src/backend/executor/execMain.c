@@ -806,8 +806,8 @@ ExecCheckRTEPermsModified(Oid relOid, Oid userid, Bitmapset *modifiedCols,
  * unless we're in parallel mode, in which case don't even allow writes
  * to temp tables.
  *
- * Note: in a Hot Standby slave this would need to reject writes to temp
- * tables just as we do in parallel mode; but an HS slave can't have created
+ * Note: in a Hot Standby this would need to reject writes to temp
+ * tables just as we do in parallel mode; but an HS standby can't have created
  * any temp tables in the first place, so no need to check that.
  */
 static void
@@ -1944,6 +1944,7 @@ ExecPartitionCheck(ResultRelInfo *resultRelInfo, TupleTableSlot *slot,
 			if (map != NULL)
 			{
 				tuple = do_convert_tuple(tuple, map);
+				ExecSetSlotDescriptor(slot, tupdesc);
 				ExecStoreTuple(tuple, slot, InvalidBuffer, false);
 			}
 		}
@@ -2021,6 +2022,7 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
 					if (map != NULL)
 					{
 						tuple = do_convert_tuple(tuple, map);
+						ExecSetSlotDescriptor(slot, tupdesc);
 						ExecStoreTuple(tuple, slot, InvalidBuffer, false);
 					}
 				}
@@ -2068,6 +2070,7 @@ ExecConstraints(ResultRelInfo *resultRelInfo,
 				if (map != NULL)
 				{
 					tuple = do_convert_tuple(tuple, map);
+					ExecSetSlotDescriptor(slot, tupdesc);
 					ExecStoreTuple(tuple, slot, InvalidBuffer, false);
 				}
 			}
@@ -2162,6 +2165,26 @@ ExecWithCheckOptions(WCOKind kind, ResultRelInfo *resultRelInfo,
 					 * USING policy.
 					 */
 				case WCO_VIEW_CHECK:
+					/* See the comment in ExecConstraints(). */
+					if (resultRelInfo->ri_PartitionRoot)
+					{
+						HeapTuple	tuple = ExecFetchSlotTuple(slot);
+						TupleDesc	old_tupdesc = RelationGetDescr(rel);
+						TupleConversionMap *map;
+
+						rel = resultRelInfo->ri_PartitionRoot;
+						tupdesc = RelationGetDescr(rel);
+						/* a reverse map */
+						map = convert_tuples_by_name(old_tupdesc, tupdesc,
+													 gettext_noop("could not convert row type"));
+						if (map != NULL)
+						{
+							tuple = do_convert_tuple(tuple, map);
+							ExecSetSlotDescriptor(slot, tupdesc);
+							ExecStoreTuple(tuple, slot, InvalidBuffer, false);
+						}
+					}
+
 					insertedCols = GetInsertedColumns(resultRelInfo, estate);
 					updatedCols = GetUpdatedColumns(resultRelInfo, estate);
 					modifiedCols = bms_union(insertedCols, updatedCols);
@@ -3283,6 +3306,7 @@ EvalPlanQualEnd(EPQState *epqstate)
  */
 void
 ExecSetupPartitionTupleRouting(Relation rel,
+							   Index resultRTindex,
 							   PartitionDispatch **pd,
 							   ResultRelInfo **partitions,
 							   TupleConversionMap ***tup_conv_maps,
@@ -3341,7 +3365,7 @@ ExecSetupPartitionTupleRouting(Relation rel,
 
 		InitResultRelInfo(leaf_part_rri,
 						  partrel,
-						  1,	/* dummy */
+						  resultRTindex,
 						  rel,
 						  0);
 
@@ -3380,7 +3404,7 @@ ExecFindPartition(ResultRelInfo *resultRelInfo, PartitionDispatch *pd,
 
 	/*
 	 * First check the root table's partition constraint, if any.  No point in
-	 * routing the tuple it if it doesn't belong in the root table itself.
+	 * routing the tuple if it doesn't belong in the root table itself.
 	 */
 	if (resultRelInfo->ri_PartitionCheck)
 		ExecPartitionCheck(resultRelInfo, slot, estate);

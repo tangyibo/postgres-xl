@@ -41,6 +41,7 @@
 #include "access/transam.h"
 #include "executor/execdebug.h"
 #include "executor/nodeBitmapHeapscan.h"
+#include "miscadmin.h"
 #include "pgstat.h"
 #include "storage/bufmgr.h"
 #include "storage/predicate.h"
@@ -191,6 +192,8 @@ BitmapHeapNext(BitmapHeapScanState *node)
 	{
 		Page		dp;
 		ItemId		lp;
+
+		CHECK_FOR_INTERRUPTS();
 
 		/*
 		 * Get next page of results if needed
@@ -662,9 +665,11 @@ BitmapHeapRecheck(BitmapHeapScanState *node, TupleTableSlot *slot)
  *		ExecBitmapHeapScan(node)
  * ----------------------------------------------------------------
  */
-TupleTableSlot *
-ExecBitmapHeapScan(BitmapHeapScanState *node)
+static TupleTableSlot *
+ExecBitmapHeapScan(PlanState *pstate)
 {
+	BitmapHeapScanState *node = castNode(BitmapHeapScanState, pstate);
+
 	return ExecScan(&node->ss,
 					(ExecScanAccessMtd) BitmapHeapNext,
 					(ExecScanRecheckMtd) BitmapHeapRecheck);
@@ -812,6 +817,7 @@ ExecInitBitmapHeapScan(BitmapHeapScan *node, EState *estate, int eflags)
 	scanstate = makeNode(BitmapHeapScanState);
 	scanstate->ss.ps.plan = (Plan *) node;
 	scanstate->ss.ps.state = estate;
+	scanstate->ss.ps.ExecProcNode = ExecBitmapHeapScan;
 
 	scanstate->tbm = NULL;
 	scanstate->tbmiterator = NULL;

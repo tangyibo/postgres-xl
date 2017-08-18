@@ -214,11 +214,15 @@ DefineCollation(ParseState *pstate, List *names, List *parameters, bool if_not_e
 	if (!OidIsValid(newoid))
 		return InvalidObjectAddress;
 
-	ObjectAddressSet(address, CollationRelationId, newoid);
-
-	/* check that the locales can be loaded */
+	/*
+	 * Check that the locales can be loaded.  NB: pg_newlocale_from_collation
+	 * is only supposed to be called on non-C-equivalent locales.
+	 */
 	CommandCounterIncrement();
-	(void) pg_newlocale_from_collation(newoid);
+	if (!lc_collate_is_c(newoid) || !lc_ctype_is_c(newoid))
+		(void) pg_newlocale_from_collation(newoid);
+
+	ObjectAddressSet(address, CollationRelationId, newoid);
 
 	return address;
 }
@@ -674,14 +678,30 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 		 */
 		for (i = -1; i < ucol_countAvailable(); i++)
 		{
+			/*
+			 * In ICU 4.2, ucol_getKeywordValuesForLocale() sometimes returns
+			 * values that will not be accepted by uloc_toLanguageTag().  Skip
+			 * loading keyword variants in that version.  (Both
+			 * ucol_getKeywordValuesForLocale() and uloc_toLanguageTag() are
+			 * new in ICU 4.2, so older versions are not supported at all.)
+			 *
+			 * XXX We have no information about ICU 4.3 through 4.7, but we
+			 * know the code below works with 4.8.
+			 */
+#if U_ICU_VERSION_MAJOR_NUM > 4 || (U_ICU_VERSION_MAJOR_NUM == 4 && U_ICU_VERSION_MINOR_NUM > 2)
+#define LOAD_ICU_KEYWORD_VARIANTS
+#endif
+
 			const char *name;
 			char	   *langtag;
 			char	   *icucomment;
 			const char *collcollate;
+			Oid			collid;
+#ifdef LOAD_ICU_KEYWORD_VARIANTS
 			UEnumeration *en;
 			UErrorCode	status;
 			const char *val;
-			Oid			collid;
+#endif
 
 			if (i == -1)
 				name = "";		/* ICU root locale */
@@ -717,8 +737,9 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 			}
 
 			/*
-			 * Add keyword variants
+			 * Add keyword variants, if enabled.
 			 */
+#ifdef LOAD_ICU_KEYWORD_VARIANTS
 			status = U_ZERO_ERROR;
 			en = ucol_getKeywordValuesForLocale("collation", name, TRUE, &status);
 			if (U_FAILURE(status))
@@ -765,6 +786,7 @@ pg_import_system_collations(PG_FUNCTION_ARGS)
 						(errmsg("could not get keyword values for locale \"%s\": %s",
 								name, u_errorName(status))));
 			uenum_close(en);
+#endif							/* LOAD_ICU_KEYWORD_VARIANTS */
 		}
 	}
 #endif							/* USE_ICU */

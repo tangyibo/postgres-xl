@@ -4512,6 +4512,7 @@ ExecInitRemoteQuery(RemoteQuery *node, EState *estate, int eflags)
 	InitResponseCombiner(combiner, 0, node->combine_type);
 	combiner->ss.ps.plan = (Plan *) node;
 	combiner->ss.ps.state = estate;
+	combiner->ss.ps.ExecProcNode = ExecRemoteQuery;
 
 	combiner->ss.ps.qual = NULL;
 
@@ -4557,8 +4558,9 @@ ExecInitRemoteQuery(RemoteQuery *node, EState *estate, int eflags)
  * The function returns at most one tuple per invocation.
  */
 TupleTableSlot *
-ExecRemoteQuery(RemoteQueryState *node)
+ExecRemoteQuery(PlanState *pstate)
 {
+	RemoteQueryState *node = castNode(RemoteQueryState, pstate);
 	ResponseCombiner *combiner = (ResponseCombiner *) node;
 	RemoteQuery    *step = (RemoteQuery *) combiner->ss.ps.plan;
 	TupleTableSlot *resultslot = combiner->ss.ps.ps_ResultTupleSlot;
@@ -5264,6 +5266,7 @@ ExecInitRemoteSubplan(RemoteSubplan *node, EState *estate, int eflags)
 	InitResponseCombiner(combiner, 0, combineType);
 	combiner->ss.ps.plan = (Plan *) node;
 	combiner->ss.ps.state = estate;
+	combiner->ss.ps.ExecProcNode = ExecRemoteSubplan;
 
 	combiner->ss.ps.qual = NULL;
 
@@ -5799,8 +5802,9 @@ static int encode_parameters(int nparams, RemoteParam *remoteparams,
 
 
 TupleTableSlot *
-ExecRemoteSubplan(RemoteSubplanState *node)
+ExecRemoteSubplan(PlanState *pstate)
 {
+	RemoteSubplanState *node = castNode(RemoteSubplanState, pstate);
 	ResponseCombiner *combiner = (ResponseCombiner *) node;
 	RemoteSubplan  *plan = (RemoteSubplan *) combiner->ss.ps.plan;
 	EState		   *estate = combiner->ss.ps.state;

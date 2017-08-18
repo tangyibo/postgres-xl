@@ -186,6 +186,9 @@ relationHasPrimaryKey(Relation rel)
  * created NOT NULL during CREATE TABLE), do an ALTER SET NOT NULL to mark
  * them so --- or fail if they are not in fact nonnull.
  *
+ * As of PG v10, the SET NOT NULL is applied to child tables as well, so
+ * that the behavior is like a manual SET NOT NULL.
+ *
  * Caller had better have at least ShareLock on the table, else the not-null
  * checking isn't trustworthy.
  */
@@ -254,17 +257,13 @@ index_check_primary_key(Relation heapRel,
 	}
 
 	/*
-	 * XXX: Shouldn't the ALTER TABLE .. SET NOT NULL cascade to child tables?
-	 * Currently, since the PRIMARY KEY itself doesn't cascade, we don't
-	 * cascade the notnull constraint(s) either; but this is pretty debatable.
-	 *
 	 * XXX: possible future improvement: when being called from ALTER TABLE,
 	 * it would be more efficient to merge this with the outer ALTER TABLE, so
 	 * as to avoid two scans.  But that seems to complicate DefineIndex's API
 	 * unduly.
 	 */
 	if (cmds)
-		AlterTableInternal(RelationGetRelid(heapRel), cmds, false);
+		AlterTableInternal(RelationGetRelid(heapRel), cmds, true);
 }
 
 /*
@@ -1739,6 +1738,10 @@ BuildSpeculativeIndexInfo(Relation index, IndexInfo *ii)
 								index->rd_opcintype[i],
 								index->rd_opcintype[i],
 								ii->ii_UniqueStrats[i]);
+		if (!OidIsValid(ii->ii_UniqueOps[i]))
+			elog(ERROR, "missing operator %d(%u,%u) in opfamily %u",
+				 ii->ii_UniqueStrats[i], index->rd_opcintype[i],
+				 index->rd_opcintype[i], index->rd_opfamily[i]);
 		ii->ii_UniqueProcs[i] = get_opcode(ii->ii_UniqueOps[i]);
 	}
 }

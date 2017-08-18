@@ -2957,15 +2957,18 @@ init(bool is_no_vacuum)
 }
 
 /*
- * Parse the raw sql and replace :param to $n.
+ * Replace :param with $n throughout the command's SQL text, which
+ * is a modifiable string in cmd->argv[0].
  */
 static bool
-parseQuery(Command *cmd, const char *raw_sql)
+parseQuery(Command *cmd)
 {
 	char	   *sql,
 			   *p;
 
-	sql = pg_strdup(raw_sql);
+	/* We don't want to scribble on cmd->argv[0] until done */
+	sql = pg_strdup(cmd->argv[0]);
+
 	cmd->argc = 1;
 
 	p = sql;
@@ -2987,7 +2990,8 @@ parseQuery(Command *cmd, const char *raw_sql)
 
 		if (cmd->argc >= MAX_ARGS)
 		{
-			fprintf(stderr, "statement has too many arguments (maximum is %d): %s\n", MAX_ARGS - 1, raw_sql);
+			fprintf(stderr, "statement has too many arguments (maximum is %d): %s\n",
+					MAX_ARGS - 1, cmd->argv[0]);
 			pg_free(name);
 			return false;
 		}
@@ -2999,6 +3003,7 @@ parseQuery(Command *cmd, const char *raw_sql)
 		cmd->argc++;
 	}
 
+	pg_free(cmd->argv[0]);
 	cmd->argv[0] = sql;
 	return true;
 }
@@ -3096,8 +3101,14 @@ process_sql_command(PQExpBuffer buf, const char *source)
 	my_command = (Command *) pg_malloc0(sizeof(Command));
 	my_command->command_num = num_commands++;
 	my_command->type = SQL_COMMAND;
-	my_command->argc = 0;
 	initSimpleStats(&my_command->stats);
+
+	/*
+	 * Install query text as the sole argv string.  If we are using a
+	 * non-simple query mode, we'll extract parameters from it later.
+	 */
+	my_command->argv[0] = pg_strdup(p);
+	my_command->argc = 1;
 
 	/*
 	 * If SQL command is multi-line, we only want to save the first line as
@@ -3112,21 +3123,6 @@ process_sql_command(PQExpBuffer buf, const char *source)
 	}
 	else
 		my_command->line = pg_strdup(p);
-
-	switch (querymode)
-	{
-		case QUERY_SIMPLE:
-			my_command->argv[0] = pg_strdup(p);
-			my_command->argc++;
-			break;
-		case QUERY_EXTENDED:
-		case QUERY_PREPARED:
-			if (!parseQuery(my_command, p))
-				exit(1);
-			break;
-		default:
-			exit(1);
-	}
 
 	return my_command;
 }
@@ -4034,11 +4030,6 @@ main(int argc, char **argv)
 				break;
 			case 'M':
 				benchmarking_option_set = true;
-				if (num_scripts > 0)
-				{
-					fprintf(stderr, "query mode (-M) should be specified before any transaction scripts (-f or -b)\n");
-					exit(1);
-				}
 				for (querymode = 0; querymode < NUM_QUERYMODE; querymode++)
 					if (strcmp(optarg, QUERYMODE[querymode]) == 0)
 						break;
@@ -4153,6 +4144,24 @@ main(int argc, char **argv)
 		process_builtin(findBuiltin("tpcb-like", use_branch), 1);
 		benchmarking_option_set = true;
 		internal_script_used = true;
+	}
+
+	/* if not simple query mode, parse the script(s) to find parameters */
+	if (querymode != QUERY_SIMPLE)
+	{
+		for (i = 0; i < num_scripts; i++)
+		{
+			Command   **commands = sql_script[i].commands;
+			int			j;
+
+			for (j = 0; commands[j] != NULL; j++)
+			{
+				if (commands[j]->type != SQL_COMMAND)
+					continue;
+				if (!parseQuery(commands[j]))
+					exit(1);
+			}
+		}
 	}
 
 	/* compute total_weight */

@@ -79,6 +79,12 @@ Distribute By: HASH(id)
 Location Nodes: ALL DATANODES
 
 \dRp+ testpub_foralltables
+                  Publication testpub_foralltables
+          Owner           | All tables | Inserts | Updates | Deletes 
+--------------------------+------------+---------+---------+---------
+ regress_publication_user | t          | t       | t       | f
+(1 row)
+
 DROP TABLE testpub_tbl2;
 DROP PUBLICATION testpub_foralltables;
 ERROR:  publication "testpub_foralltables" does not exist
@@ -145,6 +151,14 @@ Distribute By: HASH(id)
 Location Nodes: ALL DATANODES
 
 \dRp+ testpub_default
+                     Publication testpub_default
+          Owner           | All tables | Inserts | Updates | Deletes 
+--------------------------+------------+---------+---------+---------
+ regress_publication_user | f          | t       | t       | t
+Tables:
+    "pub_test.testpub_nopk"
+    "public.testpub_tbl1"
+
 ALTER PUBLICATION testpub_default DROP TABLE testpub_tbl1, pub_test.testpub_nopk;
 ERROR:  publication "testpub_default" does not exist
 -- fail - nonexistent
@@ -187,6 +201,12 @@ DROP TABLE testpub_parted;
 DROP VIEW testpub_view;
 DROP TABLE testpub_tbl1;
 \dRp+ testpub_default
+                     Publication testpub_default
+          Owner           | All tables | Inserts | Updates | Deletes 
+--------------------------+------------+---------+---------+---------
+ regress_publication_user | f          | t       | t       | t
+(1 row)
+
 -- fail - must be owner of publication
 SET ROLE regress_publication_user_dummy;
 ALTER PUBLICATION testpub_default RENAME TO testpub_dummy;

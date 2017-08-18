@@ -780,6 +780,9 @@ SET SESSION AUTHORIZATION regress_user2;
 SELECT lo_create(2001);
 SELECT lo_create(2002);
 
+SELECT loread(lo_open(1001, x'20000'::int), 32);	-- allowed, for now
+SELECT lowrite(lo_open(1001, x'40000'::int), 'abcd');	-- fail, wrong mode
+
 SELECT loread(lo_open(1001, x'40000'::int), 32);
 SELECT loread(lo_open(1002, x'40000'::int), 32);	-- to be denied
 SELECT loread(lo_open(1003, x'40000'::int), 32);
@@ -819,6 +822,7 @@ SET SESSION AUTHORIZATION regress_user4;
 SELECT loread(lo_open(1002, x'40000'::int), 32);	-- to be denied
 SELECT lowrite(lo_open(1002, x'20000'::int), 'abcd');	-- to be denied
 SELECT lo_truncate(lo_open(1002, x'20000'::int), 10);	-- to be denied
+SELECT lo_put(1002, 1, 'abcd');				-- to be denied
 SELECT lo_unlink(1002);					-- to be denied
 SELECT lo_export(1001, '/dev/null');			-- to be denied
 
@@ -982,9 +986,9 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA testns FROM PUBLIC;
 
 SELECT has_function_privilege('regress_user1', 'testns.testfunc(int)', 'EXECUTE'); -- false
 
-SET client_min_messages TO 'warning';
+\set VERBOSITY terse \\ -- suppress cascade details
 DROP SCHEMA testns CASCADE;
-RESET client_min_messages;
+\set VERBOSITY default
 
 
 -- Change owner of the schema & and rename of new schema owner
@@ -1003,9 +1007,9 @@ ALTER ROLE regress_schemauser2 RENAME TO regress_schemauser_renamed;
 SELECT nspname, rolname FROM pg_namespace, pg_roles WHERE pg_namespace.nspname = 'testns' AND pg_namespace.nspowner = pg_roles.oid;
 
 set session role regress_schemauser_renamed;
-SET client_min_messages TO 'warning';
+\set VERBOSITY terse \\ -- suppress cascade details
 DROP SCHEMA testns CASCADE;
-RESET client_min_messages;
+\set VERBOSITY default
 
 -- clean up
 \c -

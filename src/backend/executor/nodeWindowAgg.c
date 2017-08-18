@@ -1588,12 +1588,15 @@ update_frametailpos(WindowObject winobj, TupleTableSlot *slot)
  *	returned rows is exactly the same as its outer subplan's result.
  * -----------------
  */
-TupleTableSlot *
-ExecWindowAgg(WindowAggState *winstate)
+static TupleTableSlot *
+ExecWindowAgg(PlanState *pstate)
 {
+	WindowAggState *winstate = castNode(WindowAggState, pstate);
 	ExprContext *econtext;
 	int			i;
 	int			numfuncs;
+
+	CHECK_FOR_INTERRUPTS();
 
 	if (winstate->all_done)
 		return NULL;
@@ -1789,6 +1792,7 @@ ExecInitWindowAgg(WindowAgg *node, EState *estate, int eflags)
 	winstate = makeNode(WindowAggState);
 	winstate->ss.ps.plan = (Plan *) node;
 	winstate->ss.ps.state = estate;
+	winstate->ss.ps.ExecProcNode = ExecWindowAgg;
 
 	/*
 	 * Create expression contexts.  We need two, one for per-input-tuple
@@ -2371,6 +2375,9 @@ window_gettupleslot(WindowObject winobj, int64 pos, TupleTableSlot *slot)
 {
 	WindowAggState *winstate = winobj->winstate;
 	MemoryContext oldcontext;
+
+	/* often called repeatedly in a row */
+	CHECK_FOR_INTERRUPTS();
 
 	/* Don't allow passing -1 to spool_tuples here */
 	if (pos < 0)

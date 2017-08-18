@@ -80,6 +80,7 @@
 #ssl_ciphers = 'HIGH:MEDIUM:+3DES:!aNULL' # allowed SSL ciphers
 #ssl_prefer_server_ciphers = on
 #ssl_ecdh_curve = 'prime256v1'
+#ssl_dh_params_file = ''
 #ssl_cert_file = 'server.crt'
 #ssl_key_file = 'server.key'
 #ssl_ca_file = ''
@@ -130,6 +131,7 @@
 					#   windows
 					#   mmap
 					# use none to disable dynamic shared memory
+					# (change requires restart)
 
 # - Disk -
 
@@ -281,6 +283,7 @@
 # These settings are ignored on a publisher.
 
 #max_logical_replication_workers = 4	# taken from max_worker_processes
+					# (change requires restart)
 #max_sync_workers_per_subscription = 2	# taken from max_logical_replication_workers
 
 
@@ -383,6 +386,7 @@
 #syslog_split_messages = on
 
 # This is only relevant when logging to eventlog (win32):
+# (change requires restart)
 #event_source = 'PostgreSQL'
 
 # - When to Log -

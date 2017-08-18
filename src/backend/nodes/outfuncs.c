@@ -4699,7 +4699,7 @@ _outPartitionRangeDatum(StringInfo str, const PartitionRangeDatum *node)
 {
 	WRITE_NODE_TYPE("PARTITIONRANGEDATUM");
 
-	WRITE_BOOL_FIELD(infinite);
+	WRITE_ENUM_FIELD(kind, PartitionRangeDatumKind);
 	WRITE_NODE_FIELD(value);
 	WRITE_LOCATION_FIELD(location);
 }

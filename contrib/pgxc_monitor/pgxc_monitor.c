@@ -49,6 +49,7 @@
 
 #include <stdlib.h>
 #include <getopt.h>
+#include <sys/wait.h>
 
 /* Define all the node types */
 typedef enum

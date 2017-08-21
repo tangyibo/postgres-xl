@@ -686,7 +686,7 @@ storm_gather_remote_coord_info(Oid funcid)
 	node = ExecInitRemoteQuery(step, estate, 0);
 	MemoryContextSwitchTo(oldcontext);
 	/* get ready to combine results */
-	result = ExecRemoteQuery(node);
+	result = ExecRemoteQuery((PlanState *) node);
 	while (result != NULL && !TupIsNull(result))
 	{
 		Datum 	value;
@@ -743,7 +743,7 @@ storm_gather_remote_coord_info(Oid funcid)
 			entry->counters.ddl_cnt += DatumGetInt64(value);
 
 		/* fetch next */
-		result = ExecRemoteQuery(node);
+		result = ExecRemoteQuery((PlanState *) node);
 	}
 	ExecEndRemoteQuery(node);
 

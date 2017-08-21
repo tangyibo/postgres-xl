@@ -3767,7 +3767,7 @@ ExplainRemoteQuery(RemoteQuery *plan, PlanState *planstate, List *ancestors, Exp
 
 		node = ExecInitRemoteQuery(step, estate, 0);
 		MemoryContextSwitchTo(oldcontext);
-		result = ExecRemoteQuery(node);
+		result = ExecRemoteQuery((PlanState *) node);
 		while (result != NULL && !TupIsNull(result))
 		{
 			Datum 	value;
@@ -3782,7 +3782,7 @@ ExplainRemoteQuery(RemoteQuery *plan, PlanState *planstate, List *ancestors, Exp
 			}
 
 			/* fetch next */
-			result = ExecRemoteQuery(node);
+			result = ExecRemoteQuery((PlanState *) node);
 		}
 		ExecEndRemoteQuery(node);
 

@@ -3114,7 +3114,7 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 	for (i = 0; i < attr_cnt; i++)
 		numnodes[i] = 0;
 
-	result = ExecRemoteQuery(node);
+	result = ExecRemoteQuery((PlanState *) node);
 	PopActiveSnapshot();
 	while (result != NULL && !TupIsNull(result))
 	{
@@ -3351,7 +3351,7 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 		}
 
 		/* fetch next */
-		result = ExecRemoteQuery(node);
+		result = ExecRemoteQuery((PlanState *) node);
 	}
 	ExecEndRemoteQuery(node);
 
@@ -3447,7 +3447,7 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 	for (i = 0; i < attr_cnt; i++)
 		numnodes[i] = 0;
 
-	result = ExecRemoteQuery(node);
+	result = ExecRemoteQuery((PlanState *) node);
 	PopActiveSnapshot();
 
 	/*
@@ -3517,7 +3517,7 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 		}
 
 		/* fetch stats from next node */
-		result = ExecRemoteQuery(node);
+		result = ExecRemoteQuery((PlanState *) node);
 	}
 	ExecEndRemoteQuery(node);
 }

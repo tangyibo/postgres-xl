@@ -1250,11 +1250,11 @@ pgxc_execute_on_nodes(int numnodes, Oid *nodelist, char *query)
 	pstate = ExecInitRemoteQuery(plan, estate, 0);
 	MemoryContextSwitchTo(oldcontext);
 
-	result = ExecRemoteQuery(pstate);
+	result = ExecRemoteQuery((PlanState *) pstate);
 	while (result != NULL && !TupIsNull(result))
 	{
 		datum = slot_getattr(result, 1, &isnull);
-		result = ExecRemoteQuery(pstate);
+		result = ExecRemoteQuery((PlanState *) pstate);
 
 		/* For single node, don't assume the type of datum. It can be bool also. */
 		if (numnodes == 1)

@@ -77,6 +77,13 @@ typedef struct
 	void *fparams;
 } abort_callback_type;
 
+struct find_params_context
+{
+	RemoteParam *rparams;
+	Bitmapset *defineParams;
+	List *subplans;
+};
+
 /*
  * Buffer size does not affect performance significantly, just do not allow
  * connection buffer grows infinitely
@@ -114,6 +121,8 @@ static void pgxc_node_remote_abort(void);
 static void pgxc_connections_cleanup(ResponseCombiner *combiner);
 
 static void pgxc_node_report_error(ResponseCombiner *combiner);
+
+static bool determine_param_types(Plan *plan,  struct find_params_context *context);
 
 #define REMOVE_CURR_CONN(combiner) \
 	if ((combiner)->current_conn < --((combiner)->conn_count)) \
@@ -4952,12 +4961,6 @@ RemoteSubplanMakeUnique(Node *plan, int unique)
 	}
 }
 
-struct find_params_context
-{
-	RemoteParam *rparams;
-	Bitmapset *defineParams;
-};
-
 static bool
 determine_param_types_walker(Node *node, struct find_params_context *context)
 {
@@ -4981,6 +4984,17 @@ determine_param_types_walker(Node *node, struct find_params_context *context)
 			return bms_is_empty(context->defineParams);
 		}
 	}
+
+	if (IsA(node, SubPlan) && context->subplans)
+	{
+		Plan *plan;
+		SubPlan *subplan = (SubPlan *) node;
+
+		plan = (Plan *) list_nth(context->subplans, subplan->plan_id - 1);
+		if (determine_param_types(plan, context))
+			return true;
+	}
+
 	return expression_tree_walker(node, determine_param_types_walker,
 								  (void *) context);
 
@@ -5219,6 +5233,18 @@ determine_param_types(Plan *plan,  struct find_params_context *context)
 				 (int) nodeTag(plan));
 	}
 
+	/* check initplan if exists */
+	if (plan->initPlan)
+	{
+		ListCell *l;
+
+		foreach(l, plan->initPlan)
+		{
+			SubPlan  *subplan = (SubPlan *) lfirst(l);
+			if (determine_param_types_walker((Node *) subplan, context))
+				return true;
+		}
+	}
 
 	/* recurse into subplans */
 	return determine_param_types(plan->lefttree, context) ||
@@ -5496,6 +5522,7 @@ ExecInitRemoteSubplan(RemoteSubplan *node, EState *estate, int eflags)
 
 					context.rparams = rstmt.remoteparams;
 					context.defineParams = defineParams;
+					context.subplans = estate->es_plannedstmt->subplans;
 
 					all_found = determine_param_types(node->scan.plan.lefttree,
 													  &context);

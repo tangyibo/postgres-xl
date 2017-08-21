@@ -190,12 +190,8 @@ drop table range_parted, list_parted;
 
 -- more tests for certain multi-level partitioning scenarios
 create table mlparted (a int, b int) partition by range (a, b);
-create table mlparted1 (b int not null, a int not null) partition by range ((b+0));
+create table mlparted1 (a int not null, b int not null) partition by range ((b+0));
 create table mlparted11 (like mlparted1);
-alter table mlparted11 drop a;
-alter table mlparted11 add a int;
-alter table mlparted11 drop a;
-alter table mlparted11 add a int not null;
 -- attnum for key attribute 'a' is different in mlparted, mlparted1, and mlparted11
 select attrelid::regclass, attname, attnum
 from pg_attribute
@@ -234,6 +230,7 @@ create trigger mlparted11_trig before insert ON mlparted11
 -- check that the correct row is shown when constraint check_b fails after
 -- "(1, 2)" is routed to mlparted11 (actually "(1, 4)" would be shown due
 -- to the BR trigger mlparted11_trig_fn)
+-- XXX since trigger are not supported in XL, "(1, 2)" would be shown
 insert into mlparted values (1, 2);
 drop trigger mlparted11_trig on mlparted11;
 drop function mlparted11_trig_fn();
@@ -252,20 +249,18 @@ drop table lparted_nonullpart;
 -- check that RETURNING works correctly with tuple-routing
 alter table mlparted drop constraint check_b;
 create table mlparted12 partition of mlparted1 for values from (5) to (10);
-create table mlparted2 (b int not null, a int not null);
+create table mlparted2 (a int not null, b int not null);
 alter table mlparted attach partition mlparted2 for values from (1, 10) to (1, 20);
 create table mlparted3 partition of mlparted for values from (1, 20) to (1, 30);
 create table mlparted4 (like mlparted);
-alter table mlparted4 drop a;
-alter table mlparted4 add a int not null;
+-- alter table mlparted4 drop a;
+-- alter table mlparted4 add a int not null;
 alter table mlparted attach partition mlparted4 for values from (1, 30) to (1, 40);
-with ins (a, b, c) as
-  (insert into mlparted (b, a) select s.a, 1 from generate_series(2, 39) s(a) returning tableoid::regclass, *)
-  select a, b, min(c), max(c) from ins group by a, b order by 1;
+insert into mlparted (b, a) select s.a, 1 from generate_series(2, 39) s(a) returning tableoid::regclass, *;
 
 alter table mlparted add c text;
-create table mlparted5 (c text, a int not null, b int not null) partition by list (c);
-create table mlparted5a (a int not null, c text, b int not null);
+create table mlparted5 (a int not null, b int not null, c text) partition by list (c);
+create table mlparted5a (a int not null, b int not null, c text);
 alter table mlparted5 attach partition mlparted5a for values in ('a');
 alter table mlparted attach partition mlparted5 for values from (1, 40) to (1, 50);
 alter table mlparted add constraint check_b check (a = 1 and b < 45);
@@ -407,7 +402,7 @@ insert into returningwrtest values (1) returning returningwrtest;
 
 -- check also that the wholerow vars in RETURNING list are converted as needed
 alter table returningwrtest add b text;
-create table returningwrtest2 (b text, c int, a int);
+create table returningwrtest2 (a int, b text, c int);
 alter table returningwrtest2 drop c;
 alter table returningwrtest attach partition returningwrtest2 for values in (2);
 insert into returningwrtest values (2, 'foo') returning returningwrtest;

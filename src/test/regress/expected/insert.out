@@ -320,12 +320,8 @@ select tableoid::regclass::text, a, min(b) as min_b, max(b) as max_b from list_p
 drop table range_parted, list_parted;
 -- more tests for certain multi-level partitioning scenarios
 create table mlparted (a int, b int) partition by range (a, b);
-create table mlparted1 (b int not null, a int not null) partition by range ((b+0));
+create table mlparted1 (a int not null, b int not null) partition by range ((b+0));
 create table mlparted11 (like mlparted1);
-alter table mlparted11 drop a;
-alter table mlparted11 add a int;
-alter table mlparted11 drop a;
-alter table mlparted11 add a int not null;
 -- attnum for key attribute 'a' is different in mlparted, mlparted1, and mlparted11
 select attrelid::regclass, attname, attnum
 from pg_attribute
@@ -337,8 +333,8 @@ order by attrelid::regclass::text;
   attrelid  | attname | attnum 
 ------------+---------+--------
  mlparted   | a       |      1
- mlparted1  | a       |      2
- mlparted11 | a       |      4
+ mlparted1  | a       |      1
+ mlparted11 | a       |      1
 (3 rows)
 
 alter table mlparted1 attach partition mlparted11 for values from (2) to (5);
@@ -369,20 +365,24 @@ $$
 language plpgsql;
 create trigger mlparted11_trig before insert ON mlparted11
   for each row execute procedure mlparted11_trig_fn();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 -- check that the correct row is shown when constraint check_b fails after
 -- "(1, 2)" is routed to mlparted11 (actually "(1, 4)" would be shown due
 -- to the BR trigger mlparted11_trig_fn)
+-- XXX since trigger are not supported in XL, "(1, 2)" would be shown
 insert into mlparted values (1, 2);
 ERROR:  new row for relation "mlparted11" violates check constraint "check_b"
-DETAIL:  Failing row contains (1, 4).
+DETAIL:  Failing row contains (1, 2).
 drop trigger mlparted11_trig on mlparted11;
+ERROR:  trigger "mlparted11_trig" for table "mlparted11" does not exist
 drop function mlparted11_trig_fn();
 -- check that inserting into an internal partition successfully results in
 -- checking its partition constraint before inserting into the leaf partition
 -- selected by tuple-routing
 insert into mlparted1 (a, b) values (2, 3);
 ERROR:  new row for relation "mlparted1" violates partition constraint
-DETAIL:  Failing row contains (3, 2).
+DETAIL:  Failing row contains (2, 3).
 -- check routing error through a list partitioned table when the key is null
 create table lparted_nonullpart (a int, b char) partition by list (b);
 create table lparted_nonullpart_a partition of lparted_nonullpart for values in ('a');
@@ -393,28 +393,59 @@ drop table lparted_nonullpart;
 -- check that RETURNING works correctly with tuple-routing
 alter table mlparted drop constraint check_b;
 create table mlparted12 partition of mlparted1 for values from (5) to (10);
-create table mlparted2 (b int not null, a int not null);
+create table mlparted2 (a int not null, b int not null);
 alter table mlparted attach partition mlparted2 for values from (1, 10) to (1, 20);
 create table mlparted3 partition of mlparted for values from (1, 20) to (1, 30);
 create table mlparted4 (like mlparted);
-alter table mlparted4 drop a;
-alter table mlparted4 add a int not null;
+-- alter table mlparted4 drop a;
+-- alter table mlparted4 add a int not null;
 alter table mlparted attach partition mlparted4 for values from (1, 30) to (1, 40);
-with ins (a, b, c) as
-  (insert into mlparted (b, a) select s.a, 1 from generate_series(2, 39) s(a) returning tableoid::regclass, *)
-  select a, b, min(c), max(c) from ins group by a, b order by 1;
-     a      | b | min | max 
-------------+---+-----+-----
- mlparted11 | 1 |   2 |   4
- mlparted12 | 1 |   5 |   9
- mlparted2  | 1 |  10 |  19
- mlparted3  | 1 |  20 |  29
- mlparted4  | 1 |  30 |  39
-(5 rows)
+insert into mlparted (b, a) select s.a, 1 from generate_series(2, 39) s(a) returning tableoid::regclass, *;
+  tableoid  | a | b  
+------------+---+----
+ mlparted11 | 1 |  2
+ mlparted11 | 1 |  3
+ mlparted11 | 1 |  4
+ mlparted12 | 1 |  5
+ mlparted12 | 1 |  6
+ mlparted12 | 1 |  7
+ mlparted12 | 1 |  8
+ mlparted12 | 1 |  9
+ mlparted2  | 1 | 10
+ mlparted2  | 1 | 11
+ mlparted2  | 1 | 12
+ mlparted2  | 1 | 13
+ mlparted2  | 1 | 14
+ mlparted2  | 1 | 15
+ mlparted2  | 1 | 16
+ mlparted2  | 1 | 17
+ mlparted2  | 1 | 18
+ mlparted2  | 1 | 19
+ mlparted3  | 1 | 20
+ mlparted3  | 1 | 21
+ mlparted3  | 1 | 22
+ mlparted3  | 1 | 23
+ mlparted3  | 1 | 24
+ mlparted3  | 1 | 25
+ mlparted3  | 1 | 26
+ mlparted3  | 1 | 27
+ mlparted3  | 1 | 28
+ mlparted3  | 1 | 29
+ mlparted4  | 1 | 30
+ mlparted4  | 1 | 31
+ mlparted4  | 1 | 32
+ mlparted4  | 1 | 33
+ mlparted4  | 1 | 34
+ mlparted4  | 1 | 35
+ mlparted4  | 1 | 36
+ mlparted4  | 1 | 37
+ mlparted4  | 1 | 38
+ mlparted4  | 1 | 39
+(38 rows)
 
 alter table mlparted add c text;
-create table mlparted5 (c text, a int not null, b int not null) partition by list (c);
-create table mlparted5a (a int not null, c text, b int not null);
+create table mlparted5 (a int not null, b int not null, c text) partition by list (c);
+create table mlparted5a (a int not null, b int not null, c text);
 alter table mlparted5 attach partition mlparted5a for values in ('a');
 alter table mlparted attach partition mlparted5 for values from (1, 40) to (1, 50);
 alter table mlparted add constraint check_b check (a = 1 and b < 45);
@@ -423,9 +454,9 @@ ERROR:  new row for relation "mlparted5a" violates check constraint "check_b"
 DETAIL:  Failing row contains (1, 45, a).
 create function mlparted5abrtrig_func() returns trigger as $$ begin new.c = 'b'; return new; end; $$ language plpgsql;
 create trigger mlparted5abrtrig before insert on mlparted5a for each row execute procedure mlparted5abrtrig_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 insert into mlparted5 (a, b, c) values (1, 40, 'a');
-ERROR:  new row for relation "mlparted5a" violates partition constraint
-DETAIL:  Failing row contains (b, 1, 40).
 drop table mlparted5;
 -- check that message shown after failure to find a partition shows the
 -- appropriate key description (or none) in various situations
@@ -517,12 +548,10 @@ create table brtrigpartcon (a int, b text) partition by list (a);
 create table brtrigpartcon1 partition of brtrigpartcon for values in (1);
 create or replace function brtrigpartcon1trigf() returns trigger as $$begin new.a := 2; return new; end$$ language plpgsql;
 create trigger brtrigpartcon1trig before insert on brtrigpartcon1 for each row execute procedure brtrigpartcon1trigf();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 insert into brtrigpartcon values (1, 'hi there');
-ERROR:  new row for relation "brtrigpartcon1" violates partition constraint
-DETAIL:  Failing row contains (2, hi there).
 insert into brtrigpartcon1 values (1, 'hi there');
-ERROR:  new row for relation "brtrigpartcon1" violates partition constraint
-DETAIL:  Failing row contains (2, hi there).
 -- check that the message shows the appropriate column description in a
 -- situation where the partitioned table is not the primary ModifyTable node
 create table inserttest3 (f1 text default 'foo', f2 text default 'bar', f3 int);
@@ -533,8 +562,7 @@ revoke select on brtrigpartcon from regress_coldesc_role;
 set role regress_coldesc_role;
 with result as (insert into brtrigpartcon values (1, 'hi there') returning 1)
   insert into inserttest3 (f3) select * from result;
-ERROR:  new row for relation "brtrigpartcon1" violates partition constraint
-DETAIL:  Failing row contains (a, b) = (2, hi there).
+ERROR:  INSERT/UPDATE/DELETE is not supported in subquery
 reset role;
 -- cleanup
 revoke all on inserttest3 from regress_coldesc_role;
@@ -568,6 +596,8 @@ Partitions: mcrparted1_lt_b FOR VALUES FROM (MINVALUE, 0) TO ('b', MINVALUE),
             mcrparted6_common_ge_10 FOR VALUES FROM ('common', 10) TO ('common', MAXVALUE),
             mcrparted7_gt_common_lt_d FOR VALUES FROM ('common', MAXVALUE) TO ('d', MINVALUE),
             mcrparted8_ge_d FOR VALUES FROM ('d', MINVALUE) TO (MAXVALUE, 0)
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted1_lt_b
                               Table "public.mcrparted1_lt_b"
@@ -577,6 +607,8 @@ Partitions: mcrparted1_lt_b FOR VALUES FROM (MINVALUE, 0) TO ('b', MINVALUE),
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM (MINVALUE, 0) TO ('b', MINVALUE)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a < 'b'::text))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted2_b
                                 Table "public.mcrparted2_b"
@@ -586,6 +618,8 @@ Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a < 'b'::text))
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM ('b', MINVALUE) TO ('c', MINVALUE)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a >= 'b'::text) AND (a < 'c'::text))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted3_c_to_common
                            Table "public.mcrparted3_c_to_common"
@@ -595,6 +629,8 @@ Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a >= 'b'::text) 
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM ('c', MINVALUE) TO ('common', MINVALUE)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a >= 'c'::text) AND (a < 'common'::text))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted4_common_lt_0
                            Table "public.mcrparted4_common_lt_0"
@@ -604,6 +640,8 @@ Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a >= 'c'::text) 
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM ('common', MINVALUE) TO ('common', 0)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a = 'common'::text) AND (b < 0))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted5_common_0_to_10
                          Table "public.mcrparted5_common_0_to_10"
@@ -613,6 +651,8 @@ Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a = 'common'::te
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM ('common', 0) TO ('common', 10)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a = 'common'::text) AND (b >= 0) AND (b < 10))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted6_common_ge_10
                           Table "public.mcrparted6_common_ge_10"
@@ -622,6 +662,8 @@ Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a = 'common'::te
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM ('common', 10) TO ('common', MAXVALUE)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a = 'common'::text) AND (b >= 10))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted7_gt_common_lt_d
                          Table "public.mcrparted7_gt_common_lt_d"
@@ -631,6 +673,8 @@ Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a = 'common'::te
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM ('common', MAXVALUE) TO ('d', MINVALUE)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a > 'common'::text) AND (a < 'd'::text))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 \d+ mcrparted8_ge_d
                               Table "public.mcrparted8_ge_d"
@@ -640,6 +684,8 @@ Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a > 'common'::te
  b      | integer |           |          |         | plain    |              | 
 Partition of: mcrparted FOR VALUES FROM ('d', MINVALUE) TO (MAXVALUE, 0)
 Partition constraint: ((a IS NOT NULL) AND (b IS NOT NULL) AND (a >= 'd'::text))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 insert into mcrparted values ('aaa', 0), ('b', 0), ('bz', 10), ('c', -10),
     ('comm', -10), ('common', -10), ('common', 0), ('common', 10),
@@ -672,7 +718,7 @@ insert into returningwrtest values (1) returning returningwrtest;
 
 -- check also that the wholerow vars in RETURNING list are converted as needed
 alter table returningwrtest add b text;
-create table returningwrtest2 (b text, c int, a int);
+create table returningwrtest2 (a int, b text, c int);
 alter table returningwrtest2 drop c;
 alter table returningwrtest attach partition returningwrtest2 for values in (2);
 insert into returningwrtest values (2, 'foo') returning returningwrtest;

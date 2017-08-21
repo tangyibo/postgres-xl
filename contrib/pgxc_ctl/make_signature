@@ -52,15 +52,7 @@ EOF
 
 
 
-cp pgxc_ctl_bash_2  pgxc_ctl_bash.c.wk
-ex pgxc_ctl_bash.c.wk <<EOF
-%s/"/\\\"/ge
-w
-%s/^\(.*\)$/"\1",/e
-%s/^"#ifdef XCP",$/#ifdef XCP/e
-%s/^"#endif",$/#endif/e
-wq
-EOF
+sed -e 's/"/\\\"/g; s/^/"/; s/$/",/; s/^"#ifdef XCP",/#ifdef XCP/; s/^"#endif",/#endif/' pgxc_ctl_bash_2 > pgxc_ctl_bash.c.wk
 
 cat > pgxc_ctl_bash.c <<EOF 
 /*
@@ -108,16 +100,7 @@ EOF
 
 rm pgxc_ctl_bash.c.wk
 
-cp pgxc_ctl_conf_part_full pgxc_ctl_conf_part.wk
-
-ex pgxc_ctl_conf_part.wk <<EOF
-%s/"/\\\"/ge
-w
-%s/^\(.*\)$/"\1",/e
-%s/^"#ifdef XCP",$/#ifdef XCP/e
-%s/^"#endif",$/#endif/e
-wq
-EOF
+sed -e 's/"/\\\"/g; s/^/"/; s/$/",/; s/^"#ifdef XCP",/#ifdef XCP/; s/^"#endif",/#endif/' pgxc_ctl_conf_part_full > pgxc_ctl_conf_part.wk
 
 cat >> pgxc_ctl_bash.c <<EOF
 /*
@@ -139,16 +122,7 @@ EOF
 
 rm pgxc_ctl_conf_part.wk
 
-cp pgxc_ctl_conf_part_minimal pgxc_ctl_conf_part.wk
-
-ex pgxc_ctl_conf_part.wk <<EOF
-%s/"/\\\"/ge
-w
-%s/^\(.*\)$/"\1",/e
-%s/^"#ifdef XCP",$/#ifdef XCP/e
-%s/^"#endif",$/#endif/e
-wq
-EOF
+sed -e 's/"/\\\"/g; s/^/"/; s/$/",/; s/^"#ifdef XCP",/#ifdef XCP/; s/^"#endif",/#endif/' pgxc_ctl_conf_part_minimal > pgxc_ctl_conf_part.wk
 
 cat >> pgxc_ctl_bash.c <<EOF
 /*
@@ -170,16 +144,7 @@ EOF
 
 rm pgxc_ctl_conf_part.wk
 
-cp pgxc_ctl_conf_part_empty pgxc_ctl_conf_empty.wk
-
-ex pgxc_ctl_conf_empty.wk <<EOF
-%s/"/\\\"/ge
-w
-%s/^\(.*\)$/"\1",/e
-%s/^"#ifdef XCP",$/#ifdef XCP/e
-%s/^"#endif",$/#endif/e
-wq
-EOF
+sed -e 's/"/\\\"/g; s/^/"/; s/$/",/; s/^"#ifdef XCP",/#ifdef XCP/; s/^"#endif",/#endif/' pgxc_ctl_conf_part_empty > pgxc_ctl_conf_empty.wk
 
 cat >> pgxc_ctl_bash.c <<EOF
 /*

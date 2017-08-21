@@ -29,6 +29,9 @@
 # the integrity between the two.
 #------------------------------------------------------------------------
 
+# make sure we fail if any of the executed commands fails
+set -e
+
 sig=`date +%y%m%d_%H%M_%N`
 cat > signature.h <<EOF
 /*-------------------------------------------------------------------------

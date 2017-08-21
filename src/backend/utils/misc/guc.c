@@ -164,6 +164,8 @@ static bool call_bool_check_hook(struct config_bool *conf, bool *newval,
 					 void **extra, GucSource source, int elevel);
 static bool call_int_check_hook(struct config_int *conf, int *newval,
 					void **extra, GucSource source, int elevel);
+static bool call_uint_check_hook(struct config_uint *conf, uint *newval,
+					void **extra, GucSource source, int elevel);
 static bool call_real_check_hook(struct config_real *conf, double *newval,
 					 void **extra, GucSource source, int elevel);
 static bool call_string_check_hook(struct config_string *conf, char **newval,
@@ -749,6 +751,7 @@ const char *const config_type_names[] =
 {
 	 /* PGC_BOOL */ "bool",
 	 /* PGC_INT */ "integer",
+	 /* PGC_UINT */ "unsigned integer",
 	 /* PGC_REAL */ "real",
 	 /* PGC_STRING */ "string",
 	 /* PGC_ENUM */ "enum"
@@ -3151,17 +3154,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"coordinator_lxid", PGC_USERSET, UNGROUPED,
-			gettext_noop("Sets the coordinator local transaction identifier."),
-			NULL,
-			GUC_IS_NAME | GUC_REPORT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE | GUC_NOT_WHILE_SEC_REST
-		},
-		&MyCoordLxid,
-		0, 0, INT_MAX,
-		NULL, NULL, NULL
-	},
-
-	{
 		{"parentPGXCPid", PGC_USERSET, UNGROUPED,
 			gettext_noop("PID of the remote process attached to this session."),
 			gettext_noop("This GUC only makes sense when a coordinator or a "
@@ -3204,6 +3196,24 @@ static struct config_int ConfigureNamesInt[] =
 	}
 };
 
+static struct config_uint ConfigureNamesUInt[] =
+{
+	{
+		{"coordinator_lxid", PGC_USERSET, UNGROUPED,
+			gettext_noop("Sets the coordinator local transaction identifier."),
+			NULL,
+			GUC_IS_NAME | GUC_REPORT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_DISALLOW_IN_FILE | GUC_NOT_WHILE_SEC_REST
+		},
+		&MyCoordLxid,
+		0, 0, INT_MAX,
+		NULL, NULL, NULL
+	},
+
+	/* End-of-list marker */
+	{
+		{NULL, 0, 0, NULL, NULL}, NULL, 0, 0, 0, NULL, NULL, NULL
+	}
+};
 
 static struct config_real ConfigureNamesReal[] =
 {
@@ -4492,6 +4502,10 @@ extra_field_used(struct config_generic *gconf, void *extra)
 			if (extra == ((struct config_int *) gconf)->reset_extra)
 				return true;
 			break;
+		case PGC_UINT:
+			if (extra == ((struct config_uint *) gconf)->reset_extra)
+				return true;
+			break;
 		case PGC_REAL:
 			if (extra == ((struct config_real *) gconf)->reset_extra)
 				return true;
@@ -4553,6 +4567,10 @@ set_stack_value(struct config_generic *gconf, config_var_value *val)
 			val->val.intval =
 				*((struct config_int *) gconf)->variable;
 			break;
+		case PGC_UINT:
+			val->val.intval =
+				*((struct config_uint *) gconf)->variable;
+			break;
 		case PGC_REAL:
 			val->val.realval =
 				*((struct config_real *) gconf)->variable;
@@ -4581,6 +4599,7 @@ discard_stack_value(struct config_generic *gconf, config_var_value *val)
 	{
 		case PGC_BOOL:
 		case PGC_INT:
+		case PGC_UINT:
 		case PGC_REAL:
 		case PGC_ENUM:
 			/* no need to do anything */
@@ -4635,6 +4654,14 @@ build_guc_variables(void)
 		num_vars++;
 	}
 
+	for (i = 0; ConfigureNamesUInt[i].gen.name; i++)
+	{
+		struct config_uint *conf = &ConfigureNamesUInt[i];
+
+		conf->gen.vartype = PGC_UINT;
+		num_vars++;
+	}
+
 	for (i = 0; ConfigureNamesReal[i].gen.name; i++)
 	{
 		struct config_real *conf = &ConfigureNamesReal[i];
@@ -4674,6 +4701,9 @@ build_guc_variables(void)
 
 	for (i = 0; ConfigureNamesInt[i].gen.name; i++)
 		guc_vars[num_vars++] = &ConfigureNamesInt[i].gen;
+
+	for (i = 0; ConfigureNamesUInt[i].gen.name; i++)
+		guc_vars[num_vars++] = &ConfigureNamesUInt[i].gen;
 
 	for (i = 0; ConfigureNamesReal[i].gen.name; i++)
 		guc_vars[num_vars++] = &ConfigureNamesReal[i].gen;
@@ -5029,6 +5059,24 @@ InitializeOneGUCOption(struct config_generic *gconf)
 				conf->gen.extra = conf->reset_extra = extra;
 				break;
 			}
+		case PGC_UINT:
+			{
+				struct config_uint *conf = (struct config_uint *) gconf;
+				uint		newval = conf->boot_val;
+				void	   *extra = NULL;
+
+				Assert(newval >= conf->min);
+				Assert(newval <= conf->max);
+				if (!call_uint_check_hook(conf, &newval, &extra,
+										 PGC_S_DEFAULT, LOG))
+					elog(FATAL, "failed to initialize %s to %d",
+						 conf->gen.name, newval);
+				if (conf->assign_hook)
+					(*conf->assign_hook) (newval, extra);
+				*conf->variable = conf->reset_val = newval;
+				conf->gen.extra = conf->reset_extra = extra;
+				break;
+			}
 		case PGC_REAL:
 			{
 				struct config_real *conf = (struct config_real *) gconf;
@@ -5315,6 +5363,18 @@ ResetAllOptions(void)
 			case PGC_INT:
 				{
 					struct config_int *conf = (struct config_int *) gconf;
+
+					if (conf->assign_hook)
+						(*conf->assign_hook) (conf->reset_val,
+											  conf->reset_extra);
+					*conf->variable = conf->reset_val;
+					set_extra_field(&conf->gen, &conf->gen.extra,
+									conf->reset_extra);
+					break;
+				}
+			case PGC_UINT:
+				{
+					struct config_uint *conf = (struct config_uint *) gconf;
 
 					if (conf->assign_hook)
 						(*conf->assign_hook) (conf->reset_val,
@@ -5670,6 +5730,24 @@ AtEOXact_GUC(bool isCommit, int nestLevel)
 							}
 							break;
 						}
+					case PGC_UINT:
+						{
+							struct config_uint *conf = (struct config_uint *) gconf;
+							uint		newval = newvalue.val.intval;
+							void	   *newextra = newvalue.extra;
+
+							if (*conf->variable != newval ||
+								conf->gen.extra != newextra)
+							{
+								if (conf->assign_hook)
+									(*conf->assign_hook) (newval, newextra);
+								*conf->variable = newval;
+								set_extra_field(&conf->gen, &conf->gen.extra,
+												newextra);
+								changed = true;
+							}
+							break;
+						}
 					case PGC_REAL:
 						{
 							struct config_real *conf = (struct config_real *) gconf;
@@ -5863,6 +5941,40 @@ convert_to_base_unit(int64 value, const char *unit,
 }
 
 /*
+ * Convert a value from one of the human-friendly units ("kB", "min" etc.)
+ * to the given base unit.  'value' and 'unit' are the input value and unit
+ * to convert from.  The converted value is stored in *base_value.
+ *
+ * Returns true on success, false if the input unit is not recognized.
+ */
+static bool
+convert_to_base_unit_unsigned(uint64 value, const char *unit,
+							  int base_unit, uint64 *base_value)
+{
+	const unit_conversion *table;
+	int			i;
+
+	if (base_unit & GUC_UNIT_MEMORY)
+		table = memory_unit_conversion_table;
+	else
+		table = time_unit_conversion_table;
+
+	for (i = 0; *table[i].unit; i++)
+	{
+		if (base_unit == table[i].base_unit &&
+			strcmp(unit, table[i].unit) == 0)
+		{
+			if (table[i].multiplier < 0)
+				*base_value = value / (-table[i].multiplier);
+			else
+				*base_value = value * table[i].multiplier;
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
  * Convert a value in some base unit to a human-friendly unit.  The output
  * unit is chosen so that it's the greatest unit that can represent the value
  * without loss.  For example, if the base unit is GUC_UNIT_KB, 1024 is
@@ -5972,6 +6084,97 @@ parse_int(const char *value, int *result, int flags, const char **hintmsg)
 		if (*endptr == '\0')
 			converted = convert_to_base_unit(val, unit, (flags & GUC_UNIT),
 											 &val);
+		if (!converted)
+		{
+			/* invalid unit, or garbage after the unit; set hint and fail. */
+			if (hintmsg)
+			{
+				if (flags & GUC_UNIT_MEMORY)
+					*hintmsg = memory_units_hint;
+				else
+					*hintmsg = time_units_hint;
+			}
+			return false;
+		}
+
+		/* Check for overflow due to units conversion */
+		if (val != (int64) ((int32) val))
+		{
+			if (hintmsg)
+				*hintmsg = gettext_noop("Value exceeds integer range.");
+			return false;
+		}
+	}
+
+	if (result)
+		*result = (int) val;
+	return true;
+}
+
+
+/*
+ * Try to parse value as an unsigned integer.  The accepted formats are the
+ * usual decimal, octal, or hexadecimal formats, optionally followed by
+ * a unit name if "flags" indicates a unit is allowed.
+ *
+ * If the string parses okay, return true, else false.
+ * If okay and result is not NULL, return the value in *result.
+ * If not okay and hintmsg is not NULL, *hintmsg is set to a suitable
+ *	HINT message, or NULL if no hint provided.
+ */
+bool
+parse_uint(const char *value, uint *result, int flags, const char **hintmsg)
+{
+	uint64		val;
+	char	   *endptr;
+
+	/* To suppress compiler warnings, always set output params */
+	if (result)
+		*result = 0;
+	if (hintmsg)
+		*hintmsg = NULL;
+
+	/* We assume here that int64 is at least as wide as long */
+	errno = 0;
+	val = strtoul(value, &endptr, 0);
+
+	if (endptr == value)
+		return false;			/* no HINT for integer syntax error */
+
+	if (errno == ERANGE || val != (int64) ((int32) val))
+	{
+		if (hintmsg)
+			*hintmsg = gettext_noop("Value exceeds integer range.");
+		return false;
+	}
+
+	/* allow whitespace between integer and unit */
+	while (isspace((unsigned char) *endptr))
+		endptr++;
+
+	/* Handle possible unit */
+	if (*endptr != '\0')
+	{
+		char		unit[MAX_UNIT_LEN + 1];
+		int			unitlen;
+		bool		converted = false;
+
+		if ((flags & GUC_UNIT) == 0)
+			return false;		/* this setting does not accept a unit */
+
+		unitlen = 0;
+		while (*endptr != '\0' && !isspace((unsigned char) *endptr) &&
+			   unitlen < MAX_UNIT_LEN)
+			unit[unitlen++] = *(endptr++);
+		unit[unitlen] = '\0';
+		/* allow whitespace after unit */
+		while (isspace((unsigned char) *endptr))
+			endptr++;
+
+		if (*endptr == '\0')
+			converted = convert_to_base_unit_unsigned(val, unit,
+													  (flags & GUC_UNIT),
+													  &val);
 		if (!converted)
 		{
 			/* invalid unit, or garbage after the unit; set hint and fail. */
@@ -6200,6 +6403,37 @@ parse_and_validate_value(struct config_generic *record,
 				}
 
 				if (!call_int_check_hook(conf, &newval->intval, newextra,
+										 source, elevel))
+					return false;
+			}
+			break;
+		case PGC_UINT:
+			{
+				struct config_uint *conf = (struct config_uint *) record;
+				const char *hintmsg;
+
+				if (!parse_uint(value, &newval->uintval,
+							   conf->gen.flags, &hintmsg))
+				{
+					ereport(elevel,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("invalid value for parameter \"%s\": \"%s\"",
+									name, value),
+							 hintmsg ? errhint("%s", _(hintmsg)) : 0));
+					return false;
+				}
+
+				if (newval->intval < conf->min || newval->intval > conf->max)
+				{
+					ereport(elevel,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("%d is outside the valid range for parameter \"%s\" (%d .. %d)",
+									newval->intval, name,
+									conf->min, conf->max)));
+					return false;
+				}
+
+				if (!call_uint_check_hook(conf, &newval->uintval, newextra,
 										 source, elevel))
 					return false;
 			}
@@ -6774,6 +7008,96 @@ set_config_option(const char *name, const char *value,
 #undef newval
 			}
 
+		case PGC_UINT:
+			{
+				struct config_uint *conf = (struct config_uint *) record;
+
+#define newval (newval_union.uintval)
+
+				if (value)
+				{
+					if (!parse_and_validate_value(record, name, value,
+												  source, elevel,
+												  &newval_union, &newextra))
+						return 0;
+				}
+				else if (source == PGC_S_DEFAULT)
+				{
+					newval = conf->boot_val;
+					if (!call_uint_check_hook(conf, &newval, &newextra,
+											  source, elevel))
+						return 0;
+				}
+				else
+				{
+					newval = conf->reset_val;
+					newextra = conf->reset_extra;
+					source = conf->gen.reset_source;
+					context = conf->gen.reset_scontext;
+				}
+
+				if (prohibitValueChange)
+				{
+					if (*conf->variable != newval)
+					{
+						record->status |= GUC_PENDING_RESTART;
+						ereport(elevel,
+								(errcode(ERRCODE_CANT_CHANGE_RUNTIME_PARAM),
+								 errmsg("parameter \"%s\" cannot be changed without restarting the server",
+										name)));
+						return 0;
+					}
+					record->status &= ~GUC_PENDING_RESTART;
+					return -1;
+				}
+
+				if (changeVal)
+				{
+					/* Save old value to support transaction abort */
+					if (!makeDefault)
+						push_old_value(&conf->gen, action);
+
+					if (conf->assign_hook)
+						(*conf->assign_hook) (newval, newextra);
+					*conf->variable = newval;
+					set_extra_field(&conf->gen, &conf->gen.extra,
+									newextra);
+					conf->gen.source = source;
+					conf->gen.scontext = context;
+				}
+				if (makeDefault)
+				{
+					GucStack   *stack;
+
+					if (conf->gen.reset_source <= source)
+					{
+						conf->reset_val = newval;
+						set_extra_field(&conf->gen, &conf->reset_extra,
+										newextra);
+						conf->gen.reset_source = source;
+						conf->gen.reset_scontext = context;
+					}
+					for (stack = conf->gen.stack; stack; stack = stack->prev)
+					{
+						if (stack->source <= source)
+						{
+							stack->prior.val.uintval = newval;
+							set_extra_field(&conf->gen, &stack->prior.extra,
+											newextra);
+							stack->source = source;
+							stack->scontext = context;
+						}
+					}
+				}
+
+				/* Perhaps we didn't install newextra anywhere */
+				if (newextra && !extra_field_used(&conf->gen, newextra))
+					free(newextra);
+				break;
+
+#undef newval
+			}
+
 		case PGC_REAL:
 			{
 				struct config_real *conf = (struct config_real *) record;
@@ -7228,6 +7552,11 @@ GetConfigOption(const char *name, bool missing_ok, bool restrict_superuser)
 					 *((struct config_int *) record)->variable);
 			return buffer;
 
+		case PGC_UINT:
+			snprintf(buffer, sizeof(buffer), "%u",
+					 *((struct config_int *) record)->variable);
+			return buffer;
+
 		case PGC_REAL:
 			snprintf(buffer, sizeof(buffer), "%g",
 					 *((struct config_real *) record)->variable);
@@ -7275,6 +7604,11 @@ GetConfigOptionResetString(const char *name)
 
 		case PGC_INT:
 			snprintf(buffer, sizeof(buffer), "%d",
+					 ((struct config_int *) record)->reset_val);
+			return buffer;
+
+		case PGC_UINT:
+			snprintf(buffer, sizeof(buffer), "%u",
 					 ((struct config_int *) record)->reset_val);
 			return buffer;
 
@@ -8293,6 +8627,36 @@ DefineCustomIntVariable(const char *name,
 }
 
 void
+DefineCustomUintVariable(const char *name,
+						 const char *short_desc,
+						 const char *long_desc,
+						 uint *valueAddr,
+						 uint bootValue,
+						 uint minValue,
+						 uint maxValue,
+						 GucContext context,
+						 int flags,
+						 GucUintCheckHook check_hook,
+						 GucUintAssignHook assign_hook,
+						 GucShowHook show_hook)
+{
+	struct config_uint *var;
+
+	var = (struct config_uint *)
+		init_custom_variable(name, short_desc, long_desc, context, flags,
+							 PGC_UINT, sizeof(struct config_uint));
+	var->variable = valueAddr;
+	var->boot_val = bootValue;
+	var->reset_val = bootValue;
+	var->min = minValue;
+	var->max = maxValue;
+	var->check_hook = check_hook;
+	var->assign_hook = assign_hook;
+	var->show_hook = show_hook;
+	define_custom_variable(&var->gen);
+}
+
+void
 DefineCustomRealVariable(const char *name,
 						 const char *short_desc,
 						 const char *long_desc,
@@ -8712,6 +9076,31 @@ GetConfigOptionByNum(int varnum, const char **values, bool *noshow)
 
 				/* reset_val */
 				snprintf(buffer, sizeof(buffer), "%d", lconf->reset_val);
+				values[13] = pstrdup(buffer);
+			}
+			break;
+
+		case PGC_UINT:
+			{
+				struct config_uint *lconf = (struct config_uint *) conf;
+
+				/* min_val */
+				snprintf(buffer, sizeof(buffer), "%u", lconf->min);
+				values[9] = pstrdup(buffer);
+
+				/* max_val */
+				snprintf(buffer, sizeof(buffer), "%u", lconf->max);
+				values[10] = pstrdup(buffer);
+
+				/* enumvals */
+				values[11] = NULL;
+
+				/* boot_val */
+				snprintf(buffer, sizeof(buffer), "%u", lconf->boot_val);
+				values[12] = pstrdup(buffer);
+
+				/* reset_val */
+				snprintf(buffer, sizeof(buffer), "%u", lconf->reset_val);
 				values[13] = pstrdup(buffer);
 			}
 			break;
@@ -9189,6 +9578,36 @@ _ShowOption(struct config_generic *record, bool use_units)
 			}
 			break;
 
+		case PGC_UINT:
+			{
+				struct config_uint *conf = (struct config_uint *) record;
+
+				if (conf->show_hook)
+					val = (*conf->show_hook) ();
+				else
+				{
+					/*
+					 * Use int64 arithmetic to avoid overflows in units
+					 * conversion.
+					 */
+					int64		result = *conf->variable;
+					const char *unit;
+
+					if (use_units && result > 0 && (record->flags & GUC_UNIT))
+					{
+						convert_from_base_unit(result, record->flags & GUC_UNIT,
+											   &result, &unit);
+					}
+					else
+						unit = "";
+
+					snprintf(buffer, sizeof(buffer), UINT64_FORMAT "%s",
+							 result, unit);
+					val = buffer;
+				}
+			}
+			break;
+
 		case PGC_REAL:
 			{
 				struct config_real *conf = (struct config_real *) record;
@@ -9278,6 +9697,14 @@ write_one_nondefault_variable(FILE *fp, struct config_generic *gconf)
 				struct config_int *conf = (struct config_int *) gconf;
 
 				fprintf(fp, "%d", *conf->variable);
+			}
+			break;
+
+		case PGC_UINT:
+			{
+				struct config_uint *conf = (struct config_uint *) gconf;
+
+				fprintf(fp, "%u", *conf->variable);
 			}
 			break;
 
@@ -9538,6 +9965,23 @@ estimate_variable_size(struct config_generic *gconf)
 			}
 			break;
 
+		case PGC_UINT:
+			{
+				struct config_uint *conf = (struct config_uint *) gconf;
+
+				/*
+				 * Instead of getting the exact display length, use max
+				 * length.  Also reduce the max length for typical ranges of
+				 * small values.  Maximum value is 2147483647, i.e. 10 chars.
+				 * Do not include one byte for sign, as this is unsigned.
+				 */
+				if (Abs(*conf->variable) < 1000)
+					valsize = 3;
+				else
+					valsize = 10;
+			}
+			break;
+
 		case PGC_REAL:
 			{
 				/*
@@ -9696,6 +10140,14 @@ serialize_variable(char **destptr, Size *maxbytes,
 				struct config_int *conf = (struct config_int *) gconf;
 
 				do_serialize(destptr, maxbytes, "%d", *conf->variable);
+			}
+			break;
+
+		case PGC_UINT:
+			{
+				struct config_uint *conf = (struct config_uint *) gconf;
+
+				do_serialize(destptr, maxbytes, "%u", *conf->variable);
 			}
 			break;
 
@@ -10330,6 +10782,40 @@ call_bool_check_hook(struct config_bool *conf, bool *newval, void **extra,
 static bool
 call_int_check_hook(struct config_int *conf, int *newval, void **extra,
 					GucSource source, int elevel)
+{
+	/* Quick success if no hook */
+	if (!conf->check_hook)
+		return true;
+
+	/* Reset variables that might be set by hook */
+	GUC_check_errcode_value = ERRCODE_INVALID_PARAMETER_VALUE;
+	GUC_check_errmsg_string = NULL;
+	GUC_check_errdetail_string = NULL;
+	GUC_check_errhint_string = NULL;
+
+	if (!(*conf->check_hook) (newval, extra, source))
+	{
+		ereport(elevel,
+				(errcode(GUC_check_errcode_value),
+				 GUC_check_errmsg_string ?
+				 errmsg_internal("%s", GUC_check_errmsg_string) :
+				 errmsg("invalid value for parameter \"%s\": %d",
+						conf->gen.name, *newval),
+				 GUC_check_errdetail_string ?
+				 errdetail_internal("%s", GUC_check_errdetail_string) : 0,
+				 GUC_check_errhint_string ?
+				 errhint("%s", GUC_check_errhint_string) : 0));
+		/* Flush any strings created in ErrorContext */
+		FlushErrorState();
+		return false;
+	}
+
+	return true;
+}
+
+static bool
+call_uint_check_hook(struct config_uint *conf, uint *newval, void **extra,
+					 GucSource source, int elevel)
 {
 	/* Quick success if no hook */
 	if (!conf->check_hook)

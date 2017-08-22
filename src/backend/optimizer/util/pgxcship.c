@@ -817,10 +817,11 @@ pgxc_shippability_walker(Node *node, Shippability_context *sc_context)
 
 		case T_NextValueExpr:
 			/*
-			 * XXX PG10MERGE: Is it Ok to ship nextval when it's used for
-			 * replica identity?
+			 * We must not FQS NextValueExpr since it could be used for
+			 * distribution key and it should get mapped to the correct
+			 * datanode.
 			 */
-			pgxc_set_exprtype_shippability(exprType(node), sc_context);
+			pgxc_set_shippability_reason(sc_context, SS_UNSHIPPABLE_EXPR);
 			break;
 
 		case T_Aggref:

@@ -4763,6 +4763,44 @@ ExecRemoteQuery(PlanState *pstate)
 	return NULL;
 }
 
+/* ----------------------------------------------------------------
+ *		ExecReScanRemoteQuery
+ * ----------------------------------------------------------------
+ */
+void
+ExecReScanRemoteQuery(RemoteQueryState *node)
+{
+	ResponseCombiner *combiner = (ResponseCombiner *)node;
+
+	/*
+	 * If we haven't queried remote nodes yet, just return. If outerplan'
+	 * chgParam is not NULL then it will be re-scanned by ExecProcNode,
+	 * else - no reason to re-scan it at all.
+	 */
+	if (!node->query_Done)
+		return;
+
+	/*
+	 * If we execute locally rescan local copy of the plan
+	 */
+	if (outerPlanState(node))
+		ExecReScan(outerPlanState(node));
+
+	/*
+	 * Consume any possible pending input
+	 */
+	pgxc_connections_cleanup(combiner);
+
+	/* misc cleanup */
+	combiner->command_complete_count = 0;
+	combiner->description_count = 0;
+
+	/*
+	 * Force query is re-bound with new parameters
+	 */
+	node->query_Done = false;
+
+}
 
 /*
  * Clean up and discard any data on the data node connections that might not

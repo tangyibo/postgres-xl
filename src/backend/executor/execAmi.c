@@ -232,6 +232,9 @@ ExecReScan(PlanState *node)
 		case T_RemoteSubplanState:
 			ExecReScanRemoteSubplan((RemoteSubplanState *) node);
 			break;
+		case T_RemoteQueryState:
+			ExecReScanRemoteQuery((RemoteQueryState *) node);
+			break;
 #endif
 		case T_CustomScanState:
 			ExecReScanCustomScan((CustomScanState *) node);

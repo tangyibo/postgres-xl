@@ -244,6 +244,7 @@ extern bool DataNodeCopyEnd(PGXCNodeHandle *handle, bool is_error);
 
 extern RemoteQueryState *ExecInitRemoteQuery(RemoteQuery *node, EState *estate, int eflags);
 extern TupleTableSlot* ExecRemoteQuery(PlanState *pstate);
+extern void ExecReScanRemoteQuery(RemoteQueryState *node);
 extern void ExecEndRemoteQuery(RemoteQueryState *step);
 extern void RemoteSubplanMakeUnique(Node *plan, int unique);
 extern RemoteSubplanState *ExecInitRemoteSubplan(RemoteSubplan *node, EState *estate, int eflags);

@@ -1,7 +1,7 @@
 --
 -- Tests for some likely failure cases with combo cmin/cmax mechanism
 --
-CREATE TEMP TABLE combocidtest (foobar int);
+CREATE TEMP TABLE combocidtest (foobar int) DISTRIBUTE BY ROUNDROBIN;
 
 BEGIN;
 
@@ -22,16 +22,17 @@ INSERT INTO combocidtest VALUES (2);
 
 SELECT ctid,cmin,* FROM combocidtest ORDER BY ctid;
 
-SAVEPOINT s1;
+-- SAVEPOINT s1;
 
 UPDATE combocidtest SET foobar = foobar + 10;
 
 -- here we should see only updated tuples
 SELECT ctid,cmin,* FROM combocidtest ORDER BY ctid;
 
-ROLLBACK TO s1;
+-- ROLLBACK TO s1;
 
 -- now we should see old tuples, but with combo CIDs starting at 0
+-- ROLLBACK TO s1 is commented, so we will continue to see updated tuples
 SELECT ctid,cmin,* FROM combocidtest ORDER BY ctid;
 
 COMMIT;
@@ -73,7 +74,7 @@ INSERT INTO combocidtest VALUES (444);
 
 SELECT ctid,cmin,* FROM combocidtest ORDER BY ctid;
 
-SAVEPOINT s1;
+-- SAVEPOINT s1;
 
 -- this doesn't affect cmin
 SELECT ctid,cmin,* FROM combocidtest FOR UPDATE;
@@ -84,7 +85,7 @@ UPDATE combocidtest SET foobar = foobar + 10;
 
 SELECT ctid,cmin,* FROM combocidtest ORDER BY ctid;
 
-ROLLBACK TO s1;
+-- ROLLBACK TO s1;
 
 SELECT ctid,cmin,* FROM combocidtest ORDER BY ctid;
 
@@ -102,9 +103,9 @@ INSERT INTO testcase VALUES (1, 0);
 BEGIN;
 SELECT * FROM testcase WHERE testcase.id = 1 FOR UPDATE;
 UPDATE testcase SET balance = balance + 400 WHERE id=1;
-SAVEPOINT subxact;
+--SAVEPOINT subxact;
 UPDATE testcase SET balance = balance - 100 WHERE id=1;
-ROLLBACK TO SAVEPOINT subxact;
+--ROLLBACK TO SAVEPOINT subxact;
 -- should return one tuple
 SELECT * FROM testcase WHERE id = 1 FOR UPDATE;
 ROLLBACK;

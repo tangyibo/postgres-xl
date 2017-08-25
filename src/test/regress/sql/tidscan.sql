@@ -41,6 +41,8 @@ BEGIN;
 DECLARE c CURSOR FOR
 SELECT ctid, * FROM tidscan WHERE ctid = ANY(ARRAY['(0,1)', '(0,2)']::tid[]);
 FETCH ALL FROM c;
+-- XL does not support BACKWARD scan of RemoteSubplan/RemoteSubquery and
+-- hence the next statement fails
 FETCH BACKWARD 1 FROM c;
 FETCH FIRST FROM c;
 ROLLBACK;
@@ -52,6 +54,8 @@ FETCH NEXT FROM c; -- skip one row
 FETCH NEXT FROM c;
 -- perform update
 EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
+-- XL does not support WHERE CURRENT OF and hence the next
+-- statement fails
 UPDATE tidscan SET id = -id WHERE CURRENT OF c RETURNING *;
 FETCH NEXT FROM c;
 -- perform update

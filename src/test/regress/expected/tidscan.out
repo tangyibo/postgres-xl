@@ -118,18 +118,13 @@ FETCH ALL FROM c;
  (0,1) |  3
 (3 rows)
 
+-- XL does not support BACKWARD scan of RemoteSubplan/RemoteSubquery and
+-- hence the next statement fails
 FETCH BACKWARD 1 FROM c;
- ctid  | id 
--------+----
- (0,2) |  2
-(1 row)
-
+ERROR:  cursor can only scan forward
+HINT:  Declare it with SCROLL option to enable backward scan.
 FETCH FIRST FROM c;
- ctid  | id 
--------+----
- (0,1) |  1
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 -- tidscan via CURRENT OF
 BEGIN;
@@ -148,47 +143,24 @@ FETCH NEXT FROM c;
 
 -- perform update
 EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
+-- XL does not support WHERE CURRENT OF and hence the next
+-- statement fails
 UPDATE tidscan SET id = -id WHERE CURRENT OF c RETURNING *;
-                    QUERY PLAN                     
----------------------------------------------------
- Update on tidscan (actual rows=1 loops=1)
-   ->  Tid Scan on tidscan (actual rows=1 loops=1)
-         TID Cond: CURRENT OF c
-(3 rows)
-
+ERROR:  WHERE CURRENT OF clause not yet supported
 FETCH NEXT FROM c;
- ctid  | id 
--------+----
- (0,3) |  3
-(1 row)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 -- perform update
 EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
 UPDATE tidscan SET id = -id WHERE CURRENT OF c RETURNING *;
-                    QUERY PLAN                     
----------------------------------------------------
- Update on tidscan (actual rows=1 loops=1)
-   ->  Tid Scan on tidscan (actual rows=1 loops=1)
-         TID Cond: CURRENT OF c
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 SELECT * FROM tidscan;
- id 
-----
-  1
- -2
- -3
-(3 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 -- position cursor past any rows
 FETCH NEXT FROM c;
- ctid | id 
-------+----
-(0 rows)
-
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 -- should error out
 EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
 UPDATE tidscan SET id = -id WHERE CURRENT OF c RETURNING *;
-ERROR:  cursor "c" is not positioned on a row
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
 DROP TABLE tidscan;

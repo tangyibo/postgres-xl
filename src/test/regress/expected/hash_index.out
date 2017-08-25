@@ -209,9 +209,15 @@ SET enable_seqscan = OFF;
 SET enable_bitmapscan = OFF;
 DECLARE c CURSOR FOR SELECT * from hash_split_heap WHERE keycol = 1;
 MOVE FORWARD ALL FROM c;
+-- XL does not support backward scan of RemoteSubplan/RemoteSubquery and hence
+-- the next statement will fail
 MOVE BACKWARD 10000 FROM c;
+ERROR:  cursor can only scan forward
+HINT:  Declare it with SCROLL option to enable backward scan.
 MOVE BACKWARD ALL FROM c;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 CLOSE c;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
 END;
 -- DELETE, INSERT, VACUUM.
 DELETE FROM hash_split_heap WHERE keycol = 1;

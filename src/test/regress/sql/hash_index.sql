@@ -167,6 +167,8 @@ SET enable_bitmapscan = OFF;
 
 DECLARE c CURSOR FOR SELECT * from hash_split_heap WHERE keycol = 1;
 MOVE FORWARD ALL FROM c;
+-- XL does not support backward scan of RemoteSubplan/RemoteSubquery and hence
+-- the next statement will fail
 MOVE BACKWARD 10000 FROM c;
 MOVE BACKWARD ALL FROM c;
 CLOSE c;

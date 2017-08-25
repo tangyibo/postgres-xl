@@ -1030,19 +1030,21 @@ create table pktable2(f1 int primary key);
 create table fktable2(f1 int references pktable2 deferrable initially deferred);
 insert into pktable2 values(1);
 
-begin;
-insert into fktable2 values(1);
-savepoint x;
-delete from fktable2;
-rollback to x;
-commit;
+-- Since subtransactions are not supported in XL, these tests make no sense
 
-begin;
-insert into fktable2 values(2);
-savepoint x;
-delete from fktable2;
-rollback to x;
-commit; -- fail
+-- begin;
+-- insert into fktable2 values(1);
+-- savepoint x;
+-- delete from fktable2;
+-- rollback to x;
+-- commit;
+-- 
+-- begin;
+-- insert into fktable2 values(2);
+-- savepoint x;
+-- delete from fktable2;
+-- rollback to x;
+-- commit; -- fail
 
 --
 -- Test that we prevent dropping FK constraint with pending trigger events

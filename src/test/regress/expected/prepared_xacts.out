@@ -179,16 +179,11 @@ DROP TABLE pxtest1;
 BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
   CREATE TABLE pxtest2 (a int);
   INSERT INTO pxtest2 VALUES (1);
-  SAVEPOINT a;
-ERROR:  SAVEPOINT is not yet supported.
-    INSERT INTO pxtest2 VALUES (2);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
-  ROLLBACK TO a;
-ERROR:  no such savepoint
-  SAVEPOINT b;
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
+--  SAVEPOINT a;
+--    INSERT INTO pxtest2 VALUES (2);
+--  ROLLBACK TO a;
+--  SAVEPOINT b;
   INSERT INTO pxtest2 VALUES (3);
-ERROR:  current transaction is aborted, commands ignored until end of transaction block
 PREPARE TRANSACTION 'regress-one';
 CREATE TABLE pxtest3(fff int);
 -- Test shared invalidation
@@ -218,15 +213,17 @@ LINE 1: SELECT * FROM pxtest2;
 SELECT gid FROM pg_prepared_xacts ORDER BY gid;
      gid     
 -------------
+ regress-one
  regress-two
-(1 row)
+(2 rows)
 
 -- Check prepared transactions in the cluster
 SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
  pgxc_prepared_xact 
 --------------------
+ regress-one
  regress-two
-(1 row)
+(2 rows)
 
 -- pxtest3 should be locked because of the pending DROP
 begin;
@@ -239,15 +236,17 @@ rollback;
 SELECT gid FROM pg_prepared_xacts ORDER BY gid;
      gid     
 -------------
+ regress-one
  regress-two
-(1 row)
+(2 rows)
 
 -- Check prepared transactions in the cluster
 SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
  pgxc_prepared_xact 
 --------------------
+ regress-one
  regress-two
-(1 row)
+(2 rows)
 
 -- pxtest3 should still be locked because of the pending DROP
 begin;
@@ -256,7 +255,6 @@ ERROR:  could not obtain lock on relation "pxtest3"
 rollback;
 -- Commit table creation
 COMMIT PREPARED 'regress-one';
-ERROR:  prepared transaction with identifier "regress-one" does not exist
 \d pxtest2
               Table "public.pxtest2"
  Column |  Type   | Collation | Nullable | Default 
@@ -264,9 +262,12 @@ ERROR:  prepared transaction with identifier "regress-one" does not exist
  a      | integer |           |          | 
 
 SELECT * FROM pxtest2;
-ERROR:  relation "pxtest2" does not exist
-LINE 1: SELECT * FROM pxtest2;
-                      ^
+ a 
+---
+ 1
+ 3
+(2 rows)
+
 -- There should be one prepared transaction
 SELECT gid FROM pg_prepared_xacts ORDER BY 1;
      gid     
@@ -301,7 +302,6 @@ SELECT pgxc_prepared_xact FROM pgxc_prepared_xacts ORDER by 1;
 
 -- Clean up
 DROP TABLE pxtest2;
-ERROR:  table "pxtest2" does not exist
 DROP TABLE pxtest3;  -- will still be there if prepared xacts are disabled
 ERROR:  table "pxtest3" does not exist
 DROP TABLE pxtest4;

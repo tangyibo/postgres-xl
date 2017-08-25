@@ -201,10 +201,10 @@ set enable_hashjoin to off;
 set enable_mergejoin to off;
 set enable_material to off;
 -- test prefetching, if the platform allows it
-DO $$
-BEGIN
- SET effective_io_concurrency = 50;
-END $$;
+--DO $$
+--BEGIN
+-- SET effective_io_concurrency = 50;
+--END $$;
 set work_mem='64kB';  --set small work mem to force lossy pages
 explain (costs off)
 	select count(*) from tenk1, tenk2 where tenk1.hundred > 1 and tenk2.thousand=0;

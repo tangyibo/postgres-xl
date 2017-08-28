@@ -3344,13 +3344,12 @@ UPDATE r2 SET a = 2 RETURNING *; -- Updates nothing
 ---
 (0 rows)
 
-UPDATE 0
 DELETE FROM r2 RETURNING *; -- Deletes nothing
  a 
 ---
 (0 rows)
 
-DELETE 0
+-- r2 can be used as a non-target relation in DML
 INSERT INTO r1 SELECT a + 1 FROM r2 RETURNING *; -- OK
  a  
 ----
@@ -3410,8 +3409,6 @@ INSERT INTO r1 VALUES (1);
 ERROR:  new row violates row-level security policy for table "r1"
 -- No error (unable to see any rows to update)
 UPDATE r1 SET a = 1;
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
 TABLE r1;
  a 
 ---

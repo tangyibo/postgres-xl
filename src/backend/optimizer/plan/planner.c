@@ -6918,6 +6918,9 @@ adjust_path_distribution(PlannerInfo *root, Query *parse, Path *path)
 	if ((path->distribution == NULL) && (root->distribution == NULL))
 		return path;
 
+	if (IS_DUMMY_PATH(path))
+		return path;
+
 	if (equal_distributions(root, root->distribution, path->distribution))
 	{
 		if (IsLocatorReplicated(path->distribution->distributionType) &&

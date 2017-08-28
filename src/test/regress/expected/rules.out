@@ -2676,8 +2676,6 @@ create rule t1_upd_2 as on update to t1
 set constraint_exclusion = on;
 insert into t1 select * from generate_series(5,19,1) g;
 update t1 set a = 4 where a = 5;
-ERROR:  could not plan this distributed update
-DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
 select * from only t1 order by 1;
  a 
 ---
@@ -2686,7 +2684,7 @@ select * from only t1 order by 1;
 select * from only t1_1 order by 1;
  a 
 ---
- 5
+ 4
  6
  7
  8

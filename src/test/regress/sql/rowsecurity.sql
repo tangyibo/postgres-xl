@@ -203,7 +203,7 @@ UPDATE document SET did = 8, dauthor = 'regress_rls_carol' WHERE did = 5; -- Sho
 RESET SESSION AUTHORIZATION;
 SET row_security TO ON;
 SELECT * FROM document ORDER BY did;
-SELECT * FROM category;
+SELECT * FROM category ORDER BY cid;
 
 -- database superuser does bypass RLS policy when disabled
 RESET SESSION AUTHORIZATION;
@@ -236,8 +236,10 @@ SET SESSION AUTHORIZATION regress_rls_alice;
 
 SET row_security TO ON;
 
-CREATE TABLE t1 (a int, junk1 text, b text) WITH OIDS;
-ALTER TABLE t1 DROP COLUMN junk1;    -- just a disturbing factor
+-- CREATE TABLE t1 (a int, junk1 text, b text) WITH OIDS;
+-- XL requires columns to be in the same order
+CREATE TABLE t1 (a int, b text) WITH OIDS;
+-- ALTER TABLE t1 DROP COLUMN junk1;    -- just a disturbing factor
 GRANT ALL ON t1 TO public;
 
 COPY t1 FROM stdin WITH (oids);
@@ -257,14 +259,14 @@ COPY t2 FROM stdin WITH (oids);
 204	4	def	4.4
 \.
 
-CREATE TABLE t3 (c text, b text, a int) WITH OIDS;
+CREATE TABLE t3 (a int, b text) WITH OIDS;
 ALTER TABLE t3 INHERIT t1;
 GRANT ALL ON t3 TO public;
 
-COPY t3(a,b,c) FROM stdin WITH (oids);
-301	1	xxx	X
-302	2	yyy	Y
-303	3	zzz	Z
+COPY t3(a,b) FROM stdin WITH (oids);
+301	1	xxx
+302	2	yyy
+303	3	zzz
 \.
 
 CREATE POLICY p1 ON t1 FOR ALL TO PUBLIC USING (a % 2 = 0); -- be even number
@@ -275,25 +277,25 @@ ALTER TABLE t2 ENABLE ROW LEVEL SECURITY;
 
 SET SESSION AUTHORIZATION regress_rls_bob;
 
-SELECT * FROM t1;
+SELECT * FROM t1 ORDER BY a;
 EXPLAIN (COSTS OFF) SELECT * FROM t1;
 
-SELECT * FROM t1 WHERE f_leak(b);
+SELECT * FROM t1 WHERE f_leak(b) ORDER BY a;
 EXPLAIN (COSTS OFF) SELECT * FROM t1 WHERE f_leak(b);
 
 -- reference to system column
-SELECT oid, * FROM t1;
+SELECT oid, * FROM t1 ORDER BY a;
 EXPLAIN (COSTS OFF) SELECT *, t1 FROM t1;
 
 -- reference to whole-row reference
-SELECT *, t1 FROM t1;
+SELECT *, t1 FROM t1 ORDER BY a;
 EXPLAIN (COSTS OFF) SELECT *, t1 FROM t1;
 
 -- for share/update lock
-SELECT * FROM t1 FOR SHARE;
+SELECT * FROM t1 ORDER BY a FOR SHARE;
 EXPLAIN (COSTS OFF) SELECT * FROM t1 FOR SHARE;
 
-SELECT * FROM t1 WHERE f_leak(b) FOR SHARE;
+SELECT * FROM t1 WHERE f_leak(b) ORDER BY a FOR SHARE;
 EXPLAIN (COSTS OFF) SELECT * FROM t1 WHERE f_leak(b) FOR SHARE;
 
 -- union all query
@@ -303,13 +305,13 @@ EXPLAIN (COSTS OFF) SELECT a, b, oid FROM t2 UNION ALL SELECT a, b, oid FROM t3;
 -- superuser is allowed to bypass RLS checks
 RESET SESSION AUTHORIZATION;
 SET row_security TO OFF;
-SELECT * FROM t1 WHERE f_leak(b);
+SELECT * FROM t1 WHERE f_leak(b) ORDER BY a;
 EXPLAIN (COSTS OFF) SELECT * FROM t1 WHERE f_leak(b);
 
 -- non-superuser with bypass privilege can bypass RLS policy when disabled
 SET SESSION AUTHORIZATION regress_rls_exempt_user;
 SET row_security TO OFF;
-SELECT * FROM t1 WHERE f_leak(b);
+SELECT * FROM t1 WHERE f_leak(b) ORDER BY a;
 EXPLAIN (COSTS OFF) SELECT * FROM t1 WHERE f_leak(b);
 
 --
@@ -590,7 +592,7 @@ EXPLAIN (COSTS OFF) EXECUTE p1(2);
 -- superuser is allowed to bypass RLS checks
 RESET SESSION AUTHORIZATION;
 SET row_security TO OFF;
-SELECT * FROM t1 WHERE f_leak(b);
+SELECT * FROM t1 WHERE f_leak(b) ORDER BY a;
 EXPLAIN (COSTS OFF) SELECT * FROM t1 WHERE f_leak(b);
 
 -- plan cache should be invalidated
@@ -1417,29 +1419,87 @@ SELECT refclassid::regclass, deptype
   WHERE classid = 'pg_policy'::regclass
   AND refobjid IN ('regress_rls_eve'::regrole, 'regress_rls_frank'::regrole);
 
-SAVEPOINT q;
 DROP ROLE regress_rls_eve; --fails due to dependency on POLICY p
-ROLLBACK TO q;
+ROLLBACK;
+
+BEGIN;
+CREATE ROLE regress_rls_eve;
+CREATE ROLE regress_rls_frank;
+CREATE TABLE tbl1 (c) AS VALUES ('bar'::text);
+GRANT SELECT ON TABLE tbl1 TO regress_rls_eve;
+CREATE POLICY P ON tbl1 TO regress_rls_eve, regress_rls_frank USING (true);
+SELECT refclassid::regclass, deptype
+  FROM pg_depend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid = 'tbl1'::regclass;
+SELECT refclassid::regclass, deptype
+  FROM pg_shdepend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid IN ('regress_rls_eve'::regrole, 'regress_rls_frank'::regrole);
 
 ALTER POLICY p ON tbl1 TO regress_rls_frank USING (true);
-SAVEPOINT q;
 DROP ROLE regress_rls_eve; --fails due to dependency on GRANT SELECT
-ROLLBACK TO q;
+ROLLBACK;
 
+BEGIN;
+CREATE ROLE regress_rls_eve;
+CREATE ROLE regress_rls_frank;
+CREATE TABLE tbl1 (c) AS VALUES ('bar'::text);
+GRANT SELECT ON TABLE tbl1 TO regress_rls_eve;
+CREATE POLICY P ON tbl1 TO regress_rls_eve, regress_rls_frank USING (true);
+SELECT refclassid::regclass, deptype
+  FROM pg_depend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid = 'tbl1'::regclass;
+SELECT refclassid::regclass, deptype
+  FROM pg_shdepend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid IN ('regress_rls_eve'::regrole, 'regress_rls_frank'::regrole);
+
+ALTER POLICY p ON tbl1 TO regress_rls_frank USING (true);
 REVOKE ALL ON TABLE tbl1 FROM regress_rls_eve;
-SAVEPOINT q;
 DROP ROLE regress_rls_eve; --succeeds
-ROLLBACK TO q;
+ROLLBACK;
 
-SAVEPOINT q;
+BEGIN;
+CREATE ROLE regress_rls_eve;
+CREATE ROLE regress_rls_frank;
+CREATE TABLE tbl1 (c) AS VALUES ('bar'::text);
+GRANT SELECT ON TABLE tbl1 TO regress_rls_eve;
+CREATE POLICY P ON tbl1 TO regress_rls_eve, regress_rls_frank USING (true);
+SELECT refclassid::regclass, deptype
+  FROM pg_depend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid = 'tbl1'::regclass;
+SELECT refclassid::regclass, deptype
+  FROM pg_shdepend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid IN ('regress_rls_eve'::regrole, 'regress_rls_frank'::regrole);
+
+ALTER POLICY p ON tbl1 TO regress_rls_frank USING (true);
+REVOKE ALL ON TABLE tbl1 FROM regress_rls_eve;
 DROP ROLE regress_rls_frank; --fails due to dependency on POLICY p
-ROLLBACK TO q;
+ROLLBACK;
 
+BEGIN;
+CREATE ROLE regress_rls_eve;
+CREATE ROLE regress_rls_frank;
+CREATE TABLE tbl1 (c) AS VALUES ('bar'::text);
+GRANT SELECT ON TABLE tbl1 TO regress_rls_eve;
+CREATE POLICY P ON tbl1 TO regress_rls_eve, regress_rls_frank USING (true);
+SELECT refclassid::regclass, deptype
+  FROM pg_depend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid = 'tbl1'::regclass;
+SELECT refclassid::regclass, deptype
+  FROM pg_shdepend
+  WHERE classid = 'pg_policy'::regclass
+  AND refobjid IN ('regress_rls_eve'::regrole, 'regress_rls_frank'::regrole);
+
+ALTER POLICY p ON tbl1 TO regress_rls_frank USING (true);
+REVOKE ALL ON TABLE tbl1 FROM regress_rls_eve;
 DROP POLICY p ON tbl1;
-SAVEPOINT q;
 DROP ROLE regress_rls_frank; -- succeeds
-ROLLBACK TO q;
-
 ROLLBACK; -- cleanup
 
 --
@@ -1449,18 +1509,24 @@ BEGIN;
 CREATE TABLE t (c int);
 CREATE POLICY p ON t USING (c % 2 = 1);
 ALTER TABLE t ENABLE ROW LEVEL SECURITY;
-
-SAVEPOINT q;
 CREATE RULE "_RETURN" AS ON SELECT TO t DO INSTEAD
   SELECT * FROM generate_series(1,5) t0(c); -- fails due to row level security enabled
-ROLLBACK TO q;
+ROLLBACK;
 
+BEGIN;
+CREATE TABLE t (c int);
+CREATE POLICY p ON t USING (c % 2 = 1);
+ALTER TABLE t ENABLE ROW LEVEL SECURITY;
 ALTER TABLE t DISABLE ROW LEVEL SECURITY;
-SAVEPOINT q;
 CREATE RULE "_RETURN" AS ON SELECT TO t DO INSTEAD
   SELECT * FROM generate_series(1,5) t0(c); -- fails due to policy p on t
-ROLLBACK TO q;
+ROLLBACK;
 
+BEGIN;
+CREATE TABLE t (c int);
+CREATE POLICY p ON t USING (c % 2 = 1);
+ALTER TABLE t ENABLE ROW LEVEL SECURITY;
+ALTER TABLE t DISABLE ROW LEVEL SECURITY;
 DROP POLICY p ON t;
 CREATE RULE "_RETURN" AS ON SELECT TO t DO INSTEAD
   SELECT * FROM generate_series(1,5) t0(c); -- succeeds

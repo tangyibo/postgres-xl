@@ -3880,13 +3880,14 @@ select cast_invoker(20150718);  -- second call crashed in pre-release 9.5
 begin;
 select cast_invoker(20150717);
 select cast_invoker(20150718);
-savepoint s1;
+-- XL does not support savepoint
+-- savepoint s1;
 select cast_invoker(20150718);
-select cast_invoker(-1); -- fails
-rollback to savepoint s1;
+-- rollback to savepoint s1;
 select cast_invoker(20150719);
 select cast_invoker(20150720);
 commit;
+select cast_invoker(-1); -- fails
 
 drop function cast_invoker(integer);
 drop function sql_to_date(integer) cascade;

@@ -4720,18 +4720,15 @@ select cast_invoker(20150718);
  07-18-2015
 (1 row)
 
-savepoint s1;
+-- XL does not support savepoint
+-- savepoint s1;
 select cast_invoker(20150718);
  cast_invoker 
 --------------
  07-18-2015
 (1 row)
 
-select cast_invoker(-1); -- fails
-ERROR:  invalid input syntax for type date: "-1"
-CONTEXT:  SQL function "sql_to_date" statement 1
-PL/pgSQL function cast_invoker(integer) while casting return value to function's return type
-rollback to savepoint s1;
+-- rollback to savepoint s1;
 select cast_invoker(20150719);
  cast_invoker 
 --------------
@@ -4745,6 +4742,10 @@ select cast_invoker(20150720);
 (1 row)
 
 commit;
+select cast_invoker(-1); -- fails
+ERROR:  invalid input syntax for type date: "-1"
+CONTEXT:  SQL function "sql_to_date" statement 1
+PL/pgSQL function cast_invoker(integer) while casting return value to function's return type
 drop function cast_invoker(integer);
 drop function sql_to_date(integer) cascade;
 NOTICE:  drop cascades to cast from integer to date
@@ -5657,7 +5658,6 @@ END $$;
 INFO:  r.patient_id=1
 INFO:  condition true
 ROLLBACK;
->>>>>>> remotes/origin/master
 -- Test use of plpgsql in a domain check constraint (cf. bug #14414)
 create function plpgsql_domain_check(val int) returns boolean as $$
 begin return val > 0; end
@@ -5727,20 +5727,17 @@ CREATE TRIGGER transition_table_base_ins_trig
   REFERENCING OLD TABLE AS oldtable NEW TABLE AS newtable
   FOR EACH STATEMENT
   EXECUTE PROCEDURE transition_table_base_ins_func();
-ERROR:  OLD TABLE can only be specified for a DELETE or UPDATE trigger
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 CREATE TRIGGER transition_table_base_ins_trig
   AFTER INSERT ON transition_table_base
   REFERENCING NEW TABLE AS newtable
   FOR EACH STATEMENT
   EXECUTE PROCEDURE transition_table_base_ins_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 INSERT INTO transition_table_base VALUES (1, 'One'), (2, 'Two');
-INFO:  Named Tuplestore Scan
-  Output: id, val
-
 INSERT INTO transition_table_base VALUES (3, 'Three'), (4, 'Four');
-INFO:  Named Tuplestore Scan
-  Output: id, val
-
 CREATE OR REPLACE FUNCTION transition_table_base_upd_func()
   RETURNS trigger
   LANGUAGE plpgsql
@@ -5767,19 +5764,11 @@ CREATE TRIGGER transition_table_base_upd_trig
   REFERENCING OLD TABLE AS oldtable NEW TABLE AS newtable
   FOR EACH STATEMENT
   EXECUTE PROCEDURE transition_table_base_upd_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 UPDATE transition_table_base
   SET val = '*' || val || '*'
   WHERE id BETWEEN 2 AND 3;
-INFO:  Hash Full Join
-  Output: COALESCE(ot.id, nt.id), ot.val, nt.val
-  Hash Cond: (ot.id = nt.id)
-  ->  Named Tuplestore Scan
-        Output: ot.id, ot.val
-  ->  Hash
-        Output: nt.id, nt.val
-        ->  Named Tuplestore Scan
-              Output: nt.id, nt.val
-
 CREATE TABLE transition_table_level1
 (
       level1_no serial NOT NULL ,
@@ -5818,6 +5807,8 @@ CREATE TRIGGER transition_table_level1_ri_parent_del_trigger
   REFERENCING OLD TABLE AS p
   FOR EACH STATEMENT EXECUTE PROCEDURE
     transition_table_level1_ri_parent_del_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 CREATE FUNCTION transition_table_level1_ri_parent_upd_func()
   RETURNS TRIGGER
   LANGUAGE plpgsql
@@ -5845,6 +5836,8 @@ CREATE TRIGGER transition_table_level1_ri_parent_upd_trigger
   REFERENCING OLD TABLE AS d NEW TABLE AS i
   FOR EACH STATEMENT EXECUTE PROCEDURE
     transition_table_level1_ri_parent_upd_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 CREATE FUNCTION transition_table_level2_ri_child_insupd_func()
   RETURNS TRIGGER
   LANGUAGE plpgsql
@@ -5865,11 +5858,15 @@ CREATE TRIGGER transition_table_level2_ri_child_ins_trigger
   REFERENCING NEW TABLE AS i
   FOR EACH STATEMENT EXECUTE PROCEDURE
     transition_table_level2_ri_child_insupd_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 CREATE TRIGGER transition_table_level2_ri_child_upd_trigger
   AFTER UPDATE ON transition_table_level2
   REFERENCING NEW TABLE AS i
   FOR EACH STATEMENT EXECUTE PROCEDURE
     transition_table_level2_ri_child_insupd_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 -- create initial test data
 INSERT INTO transition_table_level1 (level1_no)
   SELECT generate_series(1,200);
@@ -5901,30 +5898,24 @@ CREATE TRIGGER transition_table_level2_bad_usage_trigger
   REFERENCING OLD TABLE AS d
   FOR EACH STATEMENT EXECUTE PROCEDURE
     transition_table_level2_bad_usage_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 DELETE FROM transition_table_level2
   WHERE level2_no BETWEEN 301 AND 305;
-ERROR:  relation "d" cannot be the target of a modifying statement
-CONTEXT:  SQL statement "INSERT INTO d VALUES (1000000, 1000000, 'x')"
-PL/pgSQL function transition_table_level2_bad_usage_func() line 3 at SQL statement
 DROP TRIGGER transition_table_level2_bad_usage_trigger
   ON transition_table_level2;
+ERROR:  trigger "transition_table_level2_bad_usage_trigger" for table "transition_table_level2" does not exist
 -- attempt modifications which would break RI (should all fail)
 DELETE FROM transition_table_level1
   WHERE level1_no = 25;
-ERROR:  RI error
-CONTEXT:  PL/pgSQL function transition_table_level1_ri_parent_del_func() line 6 at RAISE
 UPDATE transition_table_level1 SET level1_no = -1
   WHERE level1_no = 30;
-ERROR:  RI error
-CONTEXT:  PL/pgSQL function transition_table_level1_ri_parent_upd_func() line 15 at RAISE
+ERROR:  could not plan this distributed update
+DETAIL:  correlated UPDATE or updating distribution column currently not supported in Postgres-XL.
 INSERT INTO transition_table_level2 (level2_no, parent_no)
   VALUES (10000, 10000);
-ERROR:  RI error
-CONTEXT:  PL/pgSQL function transition_table_level2_ri_child_insupd_func() line 8 at RAISE
 UPDATE transition_table_level2 SET parent_no = 2000
   WHERE level2_no = 40;
-ERROR:  RI error
-CONTEXT:  PL/pgSQL function transition_table_level2_ri_child_insupd_func() line 8 at RAISE
 -- attempt modifications which would not break RI (should all succeed)
 DELETE FROM transition_table_level1
   WHERE level1_no BETWEEN 201 AND 1000;
@@ -5933,7 +5924,7 @@ DELETE FROM transition_table_level1
 SELECT count(*) FROM transition_table_level1;
  count 
 -------
-   200
+   199
 (1 row)
 
 DELETE FROM transition_table_level2
@@ -5941,7 +5932,7 @@ DELETE FROM transition_table_level2
 SELECT count(*) FROM transition_table_level2;
  count 
 -------
-  9989
+  9985
 (1 row)
 
 CREATE TABLE alter_table_under_transition_tables
@@ -5967,36 +5958,30 @@ CREATE TRIGGER alter_table_under_transition_tables_upd_trigger
   REFERENCING OLD TABLE AS d NEW TABLE AS i
   FOR EACH STATEMENT EXECUTE PROCEDURE
     alter_table_under_transition_tables_upd_func();
-ERROR:  TRUNCATE triggers with transition tables are not supported
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 -- should work
 CREATE TRIGGER alter_table_under_transition_tables_upd_trigger
   AFTER UPDATE ON alter_table_under_transition_tables
   REFERENCING OLD TABLE AS d NEW TABLE AS i
   FOR EACH STATEMENT EXECUTE PROCEDURE
     alter_table_under_transition_tables_upd_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 INSERT INTO alter_table_under_transition_tables
   VALUES (1, '1'), (2, '2'), (3, '3');
 UPDATE alter_table_under_transition_tables
   SET name = name || name;
-WARNING:  old table = 1=1,2=2,3=3, new table = 1=11,2=22,3=33
-NOTICE:  one = 1
 -- now change 'name' to an integer to see what happens...
 ALTER TABLE alter_table_under_transition_tables
   ALTER COLUMN name TYPE int USING name::integer;
 UPDATE alter_table_under_transition_tables
   SET name = (name::text || name::text)::integer;
-WARNING:  old table = 1=11,2=22,3=33, new table = 1=1111,2=2222,3=3333
-NOTICE:  one = 1
 -- now drop column 'name'
 ALTER TABLE alter_table_under_transition_tables
   DROP column name;
 UPDATE alter_table_under_transition_tables
   SET id = id;
-ERROR:  column "name" does not exist
-LINE 1: SELECT (SELECT string_agg(id || '=' || name, ',') FROM d)
-                                               ^
-QUERY:  SELECT (SELECT string_agg(id || '=' || name, ',') FROM d)
-CONTEXT:  PL/pgSQL function alter_table_under_transition_tables_upd_func() line 3 at RAISE
 --
 -- Check type parsing and record fetching from partitioned tables
 --
@@ -6041,3 +6026,4 @@ SELECT * FROM list_partitioned_table() AS t;
  1
  2
 (2 rows)
+

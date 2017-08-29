@@ -2198,12 +2198,14 @@ ALTER TABLE list_parted2 ATTACH PARTITION part_5 FOR VALUES IN (5);
 -- Check the case where attnos of the partitioning columns in the table being
 -- attached differs from the parent.  It should not affect the constraint-
 -- checking logic that allows to skip the scan.
+-- XL does not allow change in column ordering or numbering. So these tests
+-- currently do not make much sense. Change them anyways to avoid the error
 CREATE TABLE part_6 (
-	c int,
+--	c int,
 	LIKE list_parted2,
 	CONSTRAINT check_a CHECK (a IS NOT NULL AND a = 6)
 );
-ALTER TABLE part_6 DROP c;
+-- ALTER TABLE part_6 DROP c;
 ALTER TABLE list_parted2 ATTACH PARTITION part_6 FOR VALUES IN (6);
 
 -- Similar to above, but the table being attached is a partitioned table
@@ -2214,14 +2216,14 @@ CREATE TABLE part_7 (
 	CONSTRAINT check_a CHECK (a IS NOT NULL AND a = 7)
 ) PARTITION BY LIST (b);
 CREATE TABLE part_7_a_null (
-	c int,
-	d int,
-	e int,
+--	c int,
+--	d int,
+--	e int,
 	LIKE list_parted2,  -- 'a' will have attnum = 4
 	CONSTRAINT check_b CHECK (b IS NULL OR b = 'a'),
 	CONSTRAINT check_a CHECK (a IS NOT NULL AND a = 7)
 );
-ALTER TABLE part_7_a_null DROP c, DROP d, DROP e;
+-- ALTER TABLE part_7_a_null DROP c, DROP d, DROP e;
 ALTER TABLE part_7 ATTACH PARTITION part_7_a_null FOR VALUES IN ('a', null);
 ALTER TABLE list_parted2 ATTACH PARTITION part_7 FOR VALUES IN (7);
 

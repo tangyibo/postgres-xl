@@ -332,26 +332,26 @@ SELECT * FROM connectby('connectby_text', 'keyid', 'parent_keyid', 'pos', 'row2'
 CREATE TABLE connectby_int(keyid int, parent_keyid int);
 \copy connectby_int from 'data/connectby_int.data'
 -- with branch
-SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0, '~') AS t(keyid int, parent_keyid int, level int, branch text);
+SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0, '~') AS t(keyid int, parent_keyid int, level int, branch text) ORDER BY keyid;
  keyid | parent_keyid | level | branch  
 -------+--------------+-------+---------
      2 |              |     0 | 2
      4 |            2 |     1 | 2~4
+     5 |            2 |     1 | 2~5
      6 |            4 |     2 | 2~4~6
      8 |            6 |     3 | 2~4~6~8
-     5 |            2 |     1 | 2~5
      9 |            5 |     2 | 2~5~9
 (6 rows)
 
 -- without branch
-SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0) AS t(keyid int, parent_keyid int, level int);
+SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0) AS t(keyid int, parent_keyid int, level int) ORDER BY keyid;
  keyid | parent_keyid | level 
 -------+--------------+-------
      2 |              |     0
      4 |            2 |     1
+     5 |            2 |     1
      6 |            4 |     2
      8 |            6 |     3
-     5 |            2 |     1
      9 |            5 |     2
 (6 rows)
 
@@ -363,14 +363,14 @@ INSERT INTO connectby_int VALUES(9,11);
 SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0, '~') AS t(keyid int, parent_keyid int, level int, branch text);
 ERROR:  infinite recursion detected
 -- infinite recursion failure avoided by depth limit
-SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 4, '~') AS t(keyid int, parent_keyid int, level int, branch text);
+SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 4, '~') AS t(keyid int, parent_keyid int, level int, branch text) ORDER BY keyid;
  keyid | parent_keyid | level |   branch    
 -------+--------------+-------+-------------
      2 |              |     0 | 2
      4 |            2 |     1 | 2~4
+     5 |            2 |     1 | 2~5
      6 |            4 |     2 | 2~4~6
      8 |            6 |     3 | 2~4~6~8
-     5 |            2 |     1 | 2~5
      9 |            5 |     2 | 2~5~9
     10 |            9 |     3 | 2~5~9~10
     11 |           10 |     4 | 2~5~9~10~11

@@ -163,10 +163,10 @@ CREATE TABLE connectby_int(keyid int, parent_keyid int);
 \copy connectby_int from 'data/connectby_int.data'
 
 -- with branch
-SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0, '~') AS t(keyid int, parent_keyid int, level int, branch text);
+SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0, '~') AS t(keyid int, parent_keyid int, level int, branch text) ORDER BY keyid;
 
 -- without branch
-SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0) AS t(keyid int, parent_keyid int, level int);
+SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0) AS t(keyid int, parent_keyid int, level int) ORDER BY keyid;
 
 -- recursion detection
 INSERT INTO connectby_int VALUES(10,9);
@@ -177,7 +177,7 @@ INSERT INTO connectby_int VALUES(9,11);
 SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0, '~') AS t(keyid int, parent_keyid int, level int, branch text);
 
 -- infinite recursion failure avoided by depth limit
-SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 4, '~') AS t(keyid int, parent_keyid int, level int, branch text);
+SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 4, '~') AS t(keyid int, parent_keyid int, level int, branch text) ORDER BY keyid;
 
 -- should fail as first two columns must have the same type
 SELECT * FROM connectby('connectby_int', 'keyid', 'parent_keyid', '2', 0, '~') AS t(keyid text, parent_keyid int, level int, branch text);

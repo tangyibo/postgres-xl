@@ -30,34 +30,40 @@ SET enable_seqscan=off;
 SET enable_bitmapscan=on;
 SET enable_indexscan=on;
 EXPLAIN (COSTS OFF) SELECT count(*) FROM tst WHERE i = 7;
-                QUERY PLAN                 
--------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tst
-         Recheck Cond: (i = 7)
-         ->  Bitmap Index Scan on bloomidx
-               Index Cond: (i = 7)
-(5 rows)
+                   QUERY PLAN                    
+-------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_2
+   ->  Aggregate
+         ->  Bitmap Heap Scan on tst
+               Recheck Cond: (i = 7)
+               ->  Bitmap Index Scan on bloomidx
+                     Index Cond: (i = 7)
+(7 rows)
 
 EXPLAIN (COSTS OFF) SELECT count(*) FROM tst WHERE t = '5';
-                QUERY PLAN                 
--------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tst
-         Recheck Cond: (t = '5'::text)
-         ->  Bitmap Index Scan on bloomidx
-               Index Cond: (t = '5'::text)
-(5 rows)
+                        QUERY PLAN                         
+-----------------------------------------------------------
+ Finalize Aggregate
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Partial Aggregate
+               ->  Bitmap Heap Scan on tst
+                     Recheck Cond: (t = '5'::text)
+                     ->  Bitmap Index Scan on bloomidx
+                           Index Cond: (t = '5'::text)
+(7 rows)
 
 EXPLAIN (COSTS OFF) SELECT count(*) FROM tst WHERE i = 7 AND t = '5';
-                       QUERY PLAN                        
----------------------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tst
-         Recheck Cond: ((i = 7) AND (t = '5'::text))
-         ->  Bitmap Index Scan on bloomidx
-               Index Cond: ((i = 7) AND (t = '5'::text))
-(5 rows)
+                          QUERY PLAN                           
+---------------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_2
+   ->  Aggregate
+         ->  Bitmap Heap Scan on tst
+               Recheck Cond: ((i = 7) AND (t = '5'::text))
+               ->  Bitmap Index Scan on bloomidx
+                     Index Cond: ((i = 7) AND (t = '5'::text))
+(7 rows)
 
 SELECT count(*) FROM tst WHERE i = 7;
  count 
@@ -149,34 +155,40 @@ SET enable_seqscan=off;
 SET enable_bitmapscan=on;
 SET enable_indexscan=on;
 EXPLAIN (COSTS OFF) SELECT count(*) FROM tstu WHERE i = 7;
-                 QUERY PLAN                 
---------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tstu
-         Recheck Cond: (i = 7)
-         ->  Bitmap Index Scan on bloomidxu
-               Index Cond: (i = 7)
-(5 rows)
+                    QUERY PLAN                    
+--------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_2
+   ->  Aggregate
+         ->  Bitmap Heap Scan on tstu
+               Recheck Cond: (i = 7)
+               ->  Bitmap Index Scan on bloomidxu
+                     Index Cond: (i = 7)
+(7 rows)
 
 EXPLAIN (COSTS OFF) SELECT count(*) FROM tstu WHERE t = '5';
-                 QUERY PLAN                 
---------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tstu
-         Recheck Cond: (t = '5'::text)
-         ->  Bitmap Index Scan on bloomidxu
-               Index Cond: (t = '5'::text)
-(5 rows)
+                        QUERY PLAN                         
+-----------------------------------------------------------
+ Finalize Aggregate
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Partial Aggregate
+               ->  Bitmap Heap Scan on tstu
+                     Recheck Cond: (t = '5'::text)
+                     ->  Bitmap Index Scan on bloomidxu
+                           Index Cond: (t = '5'::text)
+(7 rows)
 
 EXPLAIN (COSTS OFF) SELECT count(*) FROM tstu WHERE i = 7 AND t = '5';
-                       QUERY PLAN                        
----------------------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on tstu
-         Recheck Cond: ((i = 7) AND (t = '5'::text))
-         ->  Bitmap Index Scan on bloomidxu
-               Index Cond: ((i = 7) AND (t = '5'::text))
-(5 rows)
+                          QUERY PLAN                           
+---------------------------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_2
+   ->  Aggregate
+         ->  Bitmap Heap Scan on tstu
+               Recheck Cond: ((i = 7) AND (t = '5'::text))
+               ->  Bitmap Index Scan on bloomidxu
+                     Index Cond: ((i = 7) AND (t = '5'::text))
+(7 rows)
 
 SELECT count(*) FROM tstu WHERE i = 7;
  count 

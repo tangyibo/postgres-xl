@@ -30,11 +30,13 @@ SELECT count(*) FROM test_tablesample TABLESAMPLE system_rows (100);
 -- bad parameters should get through planning, but not execution:
 EXPLAIN (COSTS OFF)
 SELECT id FROM test_tablesample TABLESAMPLE system_rows (-1);
-               QUERY PLAN               
-----------------------------------------
- Sample Scan on test_tablesample
-   Sampling: system_rows ('-1'::bigint)
-(2 rows)
+                  QUERY PLAN                  
+----------------------------------------------
+ Remote Fast Query Execution
+   Node/s: datanode_1, datanode_2
+   ->  Sample Scan on test_tablesample
+         Sampling: system_rows ('-1'::bigint)
+(4 rows)
 
 SELECT id FROM test_tablesample TABLESAMPLE system_rows (-1);
 ERROR:  sample size must not be negative
@@ -49,14 +51,15 @@ SELECT * FROM
   (VALUES (0),(10),(100)) v(nrows),
   LATERAL (SELECT count(*) FROM test_tablesample
            TABLESAMPLE system_rows (nrows)) ss;
-                        QUERY PLAN                        
-----------------------------------------------------------
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  Nested Loop
    ->  Values Scan on "*VALUES*"
    ->  Aggregate
-         ->  Sample Scan on test_tablesample
-               Sampling: system_rows ("*VALUES*".column1)
-(5 rows)
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               ->  Sample Scan on test_tablesample
+                     Sampling: system_rows ("*VALUES*".column1)
+(6 rows)
 
 SELECT * FROM
   (VALUES (0),(10),(100)) v(nrows),

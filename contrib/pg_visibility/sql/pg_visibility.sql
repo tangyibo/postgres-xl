@@ -38,16 +38,6 @@ select pg_visibility_map_summary('test_sequence');
 select pg_check_frozen('test_sequence');
 select pg_truncate_visibility_map('test_sequence');
 
-create foreign data wrapper dummy;
-create server dummy_server foreign data wrapper dummy;
-create foreign table test_foreign_table () server dummy_server;
--- foreign tables do not have VMs, so these all fail
-select pg_visibility('test_foreign_table', 0);
-select pg_visibility_map('test_foreign_table');
-select pg_visibility_map_summary('test_foreign_table');
-select pg_check_frozen('test_foreign_table');
-select pg_truncate_visibility_map('test_foreign_table');
-
 -- check some of the allowed relkinds
 create table regular_table (a int);
 insert into regular_table values (1), (2);
@@ -76,8 +66,5 @@ select pg_truncate_visibility_map('test_partition');
 drop table test_partitioned;
 drop view test_view;
 drop sequence test_sequence;
-drop foreign table test_foreign_table;
-drop server dummy_server;
-drop foreign data wrapper dummy;
 drop materialized view matview_visibility_test;
 drop table regular_table;

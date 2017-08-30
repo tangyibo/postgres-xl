@@ -77,6 +77,16 @@ CheckLogicalDecodingRequirements(void)
 {
 	CheckSlotRequirements();
 
+	/*
+	 * Postgres-XL does not support logical replication for now. We could create
+	 * the logical replication slot, but attempts to decode the WAL would crash
+	 * and burn as ReorderBufferCommit() uses subtransactions internally. We need
+	 */
+	ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			 errmsg("Postgres-XL does not support logical replication"),
+			 errdetail("The feature is not currently supported")));
+
 	if (wal_level < WAL_LEVEL_LOGICAL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),

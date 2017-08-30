@@ -72,7 +72,7 @@ explain (costs off)
   select * from test2 where t ~* 'DEF';
 select * from test2 where t ~ '[abc]{3}';
 select * from test2 where t ~ 'a[bc]+d';
-select * from test2 where t ~ '(abc)*$';
+select * from test2 where t ~ '(abc)*$' ORDER BY t;
 select * from test2 where t ~* 'DEF';
 select * from test2 where t ~ 'dEf';
 select * from test2 where t ~* '^q';
@@ -110,7 +110,7 @@ explain (costs off)
   select * from test2 where t ~* 'DEF';
 select * from test2 where t ~ '[abc]{3}';
 select * from test2 where t ~ 'a[bc]+d';
-select * from test2 where t ~ '(abc)*$';
+select * from test2 where t ~ '(abc)*$' ORDER BY t;
 select * from test2 where t ~* 'DEF';
 select * from test2 where t ~ 'dEf';
 select * from test2 where t ~* '^q';

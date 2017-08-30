@@ -152,12 +152,14 @@ select t,word_similarity('Kabankala',t) as sml from test_trgm2 where t %> 'Kaban
 
 explain (costs off)
 select t <->> 'Kabankala', t from test_trgm2 order by t <->> 'Kabankala' limit 7;
-                   QUERY PLAN                   
-------------------------------------------------
+                         QUERY PLAN                         
+------------------------------------------------------------
  Limit
-   ->  Index Scan using trgm_idx2 on test_trgm2
-         Order By: (t <->> 'Kabankala'::text)
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Limit
+               ->  Index Scan using trgm_idx2 on test_trgm2
+                     Order By: (t <->> 'Kabankala'::text)
+(5 rows)
 
 select t <->> 'Kabankala', t from test_trgm2 order by t <->> 'Kabankala' limit 7;
  ?column? |                t                 

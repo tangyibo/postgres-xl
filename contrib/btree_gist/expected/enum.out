@@ -80,12 +80,14 @@ SELECT count(*) FROM enumtmp WHERE a >  'g'::rainbow;
 
 EXPLAIN (COSTS OFF)
 SELECT count(*) FROM enumtmp WHERE a >= 'g'::rainbow;
-                  QUERY PLAN                   
------------------------------------------------
- Aggregate
-   ->  Bitmap Heap Scan on enumtmp
-         Recheck Cond: (a >= 'g'::rainbow)
-         ->  Bitmap Index Scan on enumidx
-               Index Cond: (a >= 'g'::rainbow)
-(5 rows)
+                        QUERY PLAN                         
+-----------------------------------------------------------
+ Finalize Aggregate
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Partial Aggregate
+               ->  Bitmap Heap Scan on enumtmp
+                     Recheck Cond: (a >= 'g'::rainbow)
+                     ->  Bitmap Index Scan on enumidx
+                           Index Cond: (a >= 'g'::rainbow)
+(7 rows)
 

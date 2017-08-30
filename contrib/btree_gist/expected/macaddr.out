@@ -67,14 +67,17 @@ SELECT count(*) FROM macaddrtmp WHERE a >  '22:00:5c:e5:9b:0d'::macaddr;
 -- Test index-only scans
 SET enable_bitmapscan=off;
 EXPLAIN (COSTS OFF)
-SELECT * FROM macaddrtmp WHERE a < '02:03:04:05:06:07'::macaddr;
-                    QUERY PLAN                    
---------------------------------------------------
- Index Only Scan using macaddridx on macaddrtmp
-   Index Cond: (a < '02:03:04:05:06:07'::macaddr)
-(2 rows)
+SELECT * FROM macaddrtmp WHERE a < '02:03:04:05:06:07'::macaddr ORDER BY a;
+                          QUERY PLAN                          
+--------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Sort
+         Sort Key: a
+         ->  Index Only Scan using macaddridx on macaddrtmp
+               Index Cond: (a < '02:03:04:05:06:07'::macaddr)
+(5 rows)
 
-SELECT * FROM macaddrtmp WHERE a < '02:03:04:05:06:07'::macaddr;
+SELECT * FROM macaddrtmp WHERE a < '02:03:04:05:06:07'::macaddr ORDER BY a;
          a         
 -------------------
  01:02:37:05:4f:36

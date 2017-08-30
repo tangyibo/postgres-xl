@@ -74,12 +74,14 @@ SELECT count(*) FROM timestamptmp WHERE a >  '2004-10-26 08:55:08'::timestamp;
 
 EXPLAIN (COSTS OFF)
 SELECT a, a <-> '2004-10-26 08:55:08' FROM timestamptmp ORDER BY a <-> '2004-10-26 08:55:08' LIMIT 3;
-                                    QUERY PLAN                                     
------------------------------------------------------------------------------------
+                                          QUERY PLAN                                           
+-----------------------------------------------------------------------------------------------
  Limit
-   ->  Index Only Scan using timestampidx on timestamptmp
-         Order By: (a <-> 'Tue Oct 26 08:55:08 2004'::timestamp without time zone)
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Limit
+               ->  Index Only Scan using timestampidx on timestamptmp
+                     Order By: (a <-> 'Tue Oct 26 08:55:08 2004'::timestamp without time zone)
+(5 rows)
 
 SELECT a, a <-> '2004-10-26 08:55:08' FROM timestamptmp ORDER BY a <-> '2004-10-26 08:55:08' LIMIT 3;
             a             |              ?column?              

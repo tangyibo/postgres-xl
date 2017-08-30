@@ -74,12 +74,14 @@ SELECT count(*) FROM intervaltmp WHERE a >  '199 days 21:21:23'::interval;
 
 EXPLAIN (COSTS OFF)
 SELECT a, a <-> '199 days 21:21:23' FROM intervaltmp ORDER BY a <-> '199 days 21:21:23' LIMIT 3;
-                                QUERY PLAN                                 
----------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Limit
-   ->  Index Only Scan using intervalidx on intervaltmp
-         Order By: (a <-> '@ 199 days 21 hours 21 mins 23 secs'::interval)
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Limit
+               ->  Index Only Scan using intervalidx on intervaltmp
+                     Order By: (a <-> '@ 199 days 21 hours 21 mins 23 secs'::interval)
+(5 rows)
 
 SELECT a, a <-> '199 days 21:21:23' FROM intervaltmp ORDER BY a <-> '199 days 21:21:23' LIMIT 3;
                   a                  |               ?column?               
@@ -92,12 +94,14 @@ SELECT a, a <-> '199 days 21:21:23' FROM intervaltmp ORDER BY a <-> '199 days 21
 SET enable_indexonlyscan=off;
 EXPLAIN (COSTS OFF)
 SELECT a, a <-> '199 days 21:21:23' FROM intervaltmp ORDER BY a <-> '199 days 21:21:23' LIMIT 3;
-                                QUERY PLAN                                 
----------------------------------------------------------------------------
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
  Limit
-   ->  Index Scan using intervalidx on intervaltmp
-         Order By: (a <-> '@ 199 days 21 hours 21 mins 23 secs'::interval)
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Limit
+               ->  Index Scan using intervalidx on intervaltmp
+                     Order By: (a <-> '@ 199 days 21 hours 21 mins 23 secs'::interval)
+(5 rows)
 
 SELECT a, a <-> '199 days 21:21:23' FROM intervaltmp ORDER BY a <-> '199 days 21:21:23' LIMIT 3;
                   a                  |               ?column?               

@@ -74,12 +74,14 @@ SELECT count(*) FROM timetmp WHERE a >  '10:57:11'::time;
 
 EXPLAIN (COSTS OFF)
 SELECT a, a <-> '10:57:11' FROM timetmp ORDER BY a <-> '10:57:11' LIMIT 3;
-                          QUERY PLAN                          
---------------------------------------------------------------
+                                QUERY PLAN                                
+--------------------------------------------------------------------------
  Limit
-   ->  Index Only Scan using timeidx on timetmp
-         Order By: (a <-> '10:57:11'::time without time zone)
-(3 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Limit
+               ->  Index Only Scan using timeidx on timetmp
+                     Order By: (a <-> '10:57:11'::time without time zone)
+(5 rows)
 
 SELECT a, a <-> '10:57:11' FROM timetmp ORDER BY a <-> '10:57:11' LIMIT 3;
     a     |    ?column?     

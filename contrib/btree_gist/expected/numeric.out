@@ -190,13 +190,14 @@ SELECT count(*) FROM numerictmp WHERE a >  0 ;
 SET enable_bitmapscan=off;
 EXPLAIN (COSTS OFF)
 SELECT * FROM numerictmp WHERE a BETWEEN 1 AND 300 ORDER BY a;
-                             QUERY PLAN                              
----------------------------------------------------------------------
- Sort
-   Sort Key: a
-   ->  Index Only Scan using numericidx on numerictmp
-         Index Cond: ((a >= '1'::numeric) AND (a <= '300'::numeric))
-(4 rows)
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Sort
+         Sort Key: a
+         ->  Index Only Scan using numericidx on numerictmp
+               Index Cond: ((a >= '1'::numeric) AND (a <= '300'::numeric))
+(5 rows)
 
 SELECT * FROM numerictmp WHERE a BETWEEN 1 AND 300 ORDER BY a;
      a      

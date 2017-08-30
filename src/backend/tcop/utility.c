@@ -2576,7 +2576,26 @@ ProcessUtilitySlow(ParseState *pstate,
 				address = CreateStatistics((CreateStatsStmt *) parsetree);
 #ifdef PGXC
 				if (IS_PGXC_LOCAL_COORDINATOR)
-					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
+				{
+					bool is_temp;
+					CreateStatsStmt *stmt = (CreateStatsStmt *) parsetree;
+					RangeVar *rln = linitial(stmt->relations);
+					Relation rel = relation_openrv((RangeVar *) rln, ShareUpdateExclusiveLock);
+
+					/*
+					 * Get the target nodes to run the CREATE STATISTICS
+					 * command. Since the grammar does not tell us about the
+					 * underlying object type, we use the other variant to
+					 * fetch the nodes. This is ok because the command must
+					 * only be even used on some kind of relation.
+					 */ 
+					RemoteQueryExecType exec_type =
+						ExecUtilityFindNodesRelkind(RelationGetRelid(rel), &is_temp);
+
+					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+						false, exec_type, false);
+					relation_close(rel, NoLock);
+				}
 #endif
 				break;
 

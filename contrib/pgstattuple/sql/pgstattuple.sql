@@ -81,17 +81,6 @@ select pgstatindex('test_view');
 select pgstatginindex('test_view');
 select pgstathashindex('test_view');
 
-create foreign data wrapper dummy;
-create server dummy_server foreign data wrapper dummy;
-create foreign table test_foreign_table () server dummy_server;
--- these should all fail
-select pgstattuple('test_foreign_table');
-select pgstattuple_approx('test_foreign_table');
-select pg_relpages('test_foreign_table');
-select pgstatindex('test_foreign_table');
-select pgstatginindex('test_foreign_table');
-select pgstathashindex('test_foreign_table');
-
 -- a partition of a partitioned table should work though
 create table test_partition partition of test_partitioned for values from (1) to (100);
 select pgstattuple('test_partition');
@@ -112,6 +101,3 @@ select pgstathashindex('test_partition_hash_idx');
 
 drop table test_partitioned;
 drop view test_view;
-drop foreign table test_foreign_table;
-drop server dummy_server;
-drop foreign data wrapper dummy;

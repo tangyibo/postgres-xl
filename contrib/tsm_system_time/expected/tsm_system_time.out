@@ -11,6 +11,13 @@ SELECT count(*) FROM test_tablesample TABLESAMPLE system_time (0);
      0
 (1 row)
 
+-- ... and we assume that this will finish before running out of time:
+SELECT count(*) FROM test_tablesample TABLESAMPLE system_time (100000);
+ count 
+-------
+    31
+(1 row)
+
 -- bad parameters should get through planning, but not execution:
 EXPLAIN (COSTS OFF)
 SELECT id FROM test_tablesample TABLESAMPLE system_time (-1);
@@ -35,17 +42,16 @@ SELECT * FROM
   (VALUES (0),(100000)) v(time),
   LATERAL (SELECT COUNT(*) FROM test_tablesample
            TABLESAMPLE system_time (100000)) ss;
-                                     QUERY PLAN                                     
-------------------------------------------------------------------------------------
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
  Nested Loop
    ->  Aggregate
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Aggregate
-                     ->  Materialize
-                           ->  Sample Scan on test_tablesample
-                                 Sampling: system_time ('100000'::double precision)
+               ->  Materialize
+                     ->  Sample Scan on test_tablesample
+                           Sampling: system_time ('100000'::double precision)
    ->  Values Scan on "*VALUES*"
-(8 rows)
+(7 rows)
 
 SELECT * FROM
   (VALUES (0),(100000)) v(time),
@@ -62,17 +68,26 @@ SELECT * FROM
   (VALUES (0),(100000)) v(time),
   LATERAL (SELECT COUNT(*) FROM test_tablesample
            TABLESAMPLE system_time (time)) ss;
-                                 QUERY PLAN                                 
-----------------------------------------------------------------------------
+                              QUERY PLAN                              
+----------------------------------------------------------------------
  Nested Loop
    ->  Values Scan on "*VALUES*"
    ->  Aggregate
          ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-               ->  Aggregate
-                     ->  Materialize
-                           ->  Sample Scan on test_tablesample
-                                 Sampling: system_time ("*VALUES*".column1)
-(8 rows)
+               ->  Materialize
+                     ->  Sample Scan on test_tablesample
+                           Sampling: system_time ("*VALUES*".column1)
+(7 rows)
+
+SELECT * FROM
+  (VALUES (0),(100000)) v(time),
+  LATERAL (SELECT COUNT(*) FROM test_tablesample
+           TABLESAMPLE system_time (time)) ss;
+  time  | count 
+--------+-------
+      0 |     0
+ 100000 |    31
+(2 rows)
 
 CREATE VIEW vv AS
   SELECT * FROM test_tablesample TABLESAMPLE system_time (20);
@@ -88,6 +103,3 @@ DROP EXTENSION tsm_system_time;  -- fail, view depends on extension
 ERROR:  cannot drop extension tsm_system_time because other objects depend on it
 DETAIL:  view vv depends on function system_time(internal)
 HINT:  Use DROP ... CASCADE to drop the dependent objects too.
-DROP VIEW vv;
-DROP TABLE test_tablesample;
-DROP EXTENSION tsm_system_time;

@@ -246,6 +246,8 @@ restore_command = 'copy "C:\\server\\archivedir\\%f" "%p"'  # Windows
         one of <varname>recovery_target_xid</>,
         <xref linkend="recovery-target-time"> and 
         <varname>recovery_target_barrier</> can be specified.
+       </para>
+      </listitem>
      </varlistentry>
 
      <varlistentry id="recovery-target-lsn" xreflabel="recovery_target_lsn">

@@ -2149,7 +2149,7 @@ postgres$ <userinput>/usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data</>
     </varlistentry>
 
     <varlistentry>
-     <term><envar>min_pool_size</envar><term>
+     <term><envar>min_pool_size</envar></term>
      <listitem>
       <para>
        A Coordinator is associated with a connection pooler which takes care of
@@ -2302,7 +2302,7 @@ postgres$ <userinput>/usr/local/pgsql/bin/initdb -D /usr/local/pgsql/data</>
     </varlistentry>
 
     </variablelist>                                                             
-
+   </step>
    <step>
     <para>
      Now you should configure <filename>postgresql.conf</> for each Datanode.

@@ -504,41 +504,17 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 		case T_ClosePortalStmt:
 		case T_FetchStmt:
 		case T_DoStmt:
-			break;
-
 		case T_CreateTableSpaceStmt:
-			break;
-
 		case T_DropTableSpaceStmt:
-			break;
-
 		case T_AlterTableSpaceOptionsStmt:
-			break;
-
 		case T_TruncateStmt:
-			break;
-
 		case T_CopyStmt:
-			break;
-
 		case T_PrepareStmt:
-			break;
-
 		case T_ExecuteStmt:
-			break;
-
 		case T_DeallocateStmt:
-			break;
-
 		case T_GrantRoleStmt:
-			break;
-
 		case T_CreatedbStmt:
-			break;
-
 		case T_AlterDatabaseStmt:
-			break;
-
 		case T_AlterDatabaseSetStmt:
 			break;
 
@@ -559,17 +535,9 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 
 			/* Query-level asynchronous notification */
 		case T_NotifyStmt:
-			break;
-
 		case T_ListenStmt:
-			break;
-
 		case T_UnlistenStmt:
-			break;
-
 		case T_LoadStmt:
-			break;
-
 		case T_ClusterStmt:
 			break;
 
@@ -593,17 +561,9 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_ExplainStmt:
-			break;
-
 		case T_AlterSystemStmt:
-			break;
-
 		case T_VariableSetStmt:
-			break;
-
 		case T_VariableShowStmt:
-			break;
-
 		case T_DiscardStmt:
 			break;
 
@@ -620,26 +580,12 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			 * ******************************** ROLE statements ****
 			 */
 		case T_CreateRoleStmt:
-			break;
-
 		case T_AlterRoleStmt:
-			break;
-
 		case T_AlterRoleSetStmt:
-			break;
-
 		case T_DropRoleStmt:
-			break;
-
 		case T_ReassignOwnedStmt:
-			break;
-
 		case T_LockStmt:
-			break;
-
 		case T_ConstraintsSetStmt:
-			break;
-
 		case T_CheckPointStmt:
 			break;
 
@@ -679,16 +625,7 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_ReindexStmt:
-			break;
-
-			/*
-			 * The following statements are supported by Event Triggers only
-			 * in some cases, so we "fast path" them in the other cases.
-			 */
-
 		case T_GrantStmt:
-			break;
-
 		case T_DropStmt:
 			break;
 
@@ -737,11 +674,7 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_AlterObjectDependsStmt:
-			break;
-
 		case T_AlterObjectSchemaStmt:
-			break;
-
 		case T_AlterOwnerStmt:
 			break;
 
@@ -766,27 +699,12 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_CommentStmt:
-			break;
-
 		case T_SecLabelStmt:
-			break;
-
 		case T_CreateSchemaStmt:
-			break;
-
 		case T_CreateStmt:
 		case T_CreateForeignTableStmt:
-			break;
-
 		case T_AlterTableStmt:
-			break;
-
 		case T_AlterDomainStmt:
-			break;
-
-			/*
-			 * ************* object creation / destruction **************
-			 */
 		case T_DefineStmt:
 			break;
 
@@ -805,11 +723,7 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_CreateExtensionStmt:
-			break;
-
 		case T_AlterExtensionStmt:
-			break;
-
 		case T_AlterExtensionContentsStmt:
 			break;
 
@@ -841,44 +755,18 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_AlterUserMappingStmt:
-			break;
-
 		case T_DropUserMappingStmt:
-			break;
-
 		case T_ImportForeignSchemaStmt:
-			break;
-
 		case T_CompositeTypeStmt:	/* CREATE TYPE (composite) */
-			break;
-
 		case T_CreateEnumStmt:	/* CREATE TYPE AS ENUM */
-			break;
-
 		case T_CreateRangeStmt: /* CREATE TYPE AS RANGE */
-			break;
-
 		case T_AlterEnumStmt:	/* ALTER TYPE (enum) */
-			break;
-
 		case T_ViewStmt:	/* CREATE VIEW */
-			break;
-
 		case T_CreateFunctionStmt:	/* CREATE FUNCTION */
-			break;
-
 		case T_AlterFunctionStmt:	/* ALTER FUNCTION */
-			break;
-
 		case T_RuleStmt:	/* CREATE RULE */
-			break;
-
 		case T_CreateSeqStmt:
-			break;
-
 		case T_AlterSeqStmt:
-			break;
-
 		case T_CreateTableAsStmt:
 			break;
 
@@ -920,53 +808,21 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_CreatePLangStmt:
-			break;
-
 		case T_CreateDomainStmt:
-			break;
-
 		case T_CreateConversionStmt:
-			break;
-
 		case T_CreateCastStmt:
-			break;
-
 		case T_CreateOpClassStmt:
-			break;
-
 		case T_CreateOpFamilyStmt:
-			break;
-
 		case T_CreateTransformStmt:
-			break;
-
 		case T_AlterOpFamilyStmt:
-			break;
-
 		case T_AlterTSDictionaryStmt:
-			break;
-
 		case T_AlterTSConfigurationStmt:
-			break;
-
 		case T_AlterTableMoveAllStmt:
-			break;
-
 		case T_AlterOperatorStmt:
-			break;
-
 		case T_DropOwnedStmt:
-			break;
-
 		case T_AlterDefaultPrivilegesStmt:
-			break;
-
 		case T_CreatePolicyStmt:	/* CREATE POLICY */
-			break;
-
 		case T_AlterPolicyStmt: /* ALTER POLICY */
-			break;
-
 		case T_CreateAmStmt:
 			break;
 
@@ -990,14 +846,8 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			break;
 
 		case T_AlterSubscriptionStmt:
-			break;
-
 		case T_DropSubscriptionStmt:
-			break;
-
 		case T_CreateStatsStmt:
-			break;
-
 		case T_AlterCollationStmt:
 			break;
 
@@ -1025,26 +875,106 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			 * ******************** transactions ********************
 			 */
 		case T_TransactionStmt:
-			break;
 		case T_DeclareCursorStmt:
 		case T_ClosePortalStmt:
 		case T_FetchStmt:
 		case T_DoStmt:
+		case T_CopyStmt:
+		case T_PrepareStmt:
+		case T_ExecuteStmt:
+		case T_DeallocateStmt:
+		case T_NotifyStmt:
+		case T_ListenStmt:
+		case T_UnlistenStmt:
+		case T_VacuumStmt:
+		case T_ExplainStmt:
+		case T_AlterSystemStmt:
+		case T_VariableSetStmt:
+		case T_VariableShowStmt:
+		case T_CreateEventTrigStmt:
+		case T_AlterEventTrigStmt:
+		case T_BarrierStmt:
+		case T_PauseClusterStmt:
+		case T_AlterNodeStmt:
+		case T_CreateNodeStmt:
+		case T_DropNodeStmt:
+		case T_CreateGroupStmt:
+		case T_DropGroupStmt:
+		case T_DropStmt:
+		case T_RenameStmt:
+		case T_AlterObjectDependsStmt:
+		case T_RemoteQuery:
+		case T_CleanConnStmt:
+		case T_SecLabelStmt:
+		case T_CreateSchemaStmt:
+		case T_CreateStmt:
+		case T_CreateForeignTableStmt:
+		case T_AlterTableStmt:
+		case T_CreateFdwStmt:
+		case T_AlterFdwStmt:
+		case T_CreateForeignServerStmt:
+		case T_AlterForeignServerStmt:
+		case T_CreateUserMappingStmt:
+		case T_AlterUserMappingStmt:
+		case T_DropUserMappingStmt:
+		case T_ImportForeignSchemaStmt:
+		case T_RefreshMatViewStmt:
+		case T_CreateTransformStmt:
+		case T_AlterOperatorStmt:
+		case T_CreatePublicationStmt:
+		case T_AlterPublicationStmt:
+		case T_CreateSubscriptionStmt:
+		case T_AlterSubscriptionStmt:
+		case T_DropSubscriptionStmt:
+		case T_AlterCollationStmt:
 			break;
 
 		case T_CreateTableSpaceStmt:
+		case T_CreatedbStmt:
 			if (IS_PGXC_LOCAL_COORDINATOR)
 				ExecUtilityWithMessage(queryString, sentToRemote, false);
 			break;
 
 		case T_DropTableSpaceStmt:
+		case T_AlterTableSpaceOptionsStmt:
+		case T_GrantRoleStmt:
+		case T_AlterDatabaseSetStmt:
+		case T_DropdbStmt:
+		case T_CreateRoleStmt:
+		case T_AlterRoleStmt:
+		case T_AlterRoleSetStmt:
+		case T_DropRoleStmt:
+		case T_ReassignOwnedStmt:
+		case T_LockStmt:
+		case T_AlterOwnerStmt:
+		case T_AlterDomainStmt:
+		case T_DefineStmt:
+		case T_CreateExtensionStmt:
+		case T_AlterExtensionStmt:
+		case T_AlterExtensionContentsStmt:
+		case T_CompositeTypeStmt:	/* CREATE TYPE (composite) */
+		case T_CreateEnumStmt:	/* CREATE TYPE AS ENUM */
+		case T_CreateRangeStmt: /* CREATE TYPE AS RANGE */
+		case T_CreateFunctionStmt:	/* CREATE FUNCTION */
+		case T_AlterFunctionStmt:	/* ALTER FUNCTION */
+		case T_CreateTrigStmt:
+		case T_CreatePLangStmt:
+		case T_CreateDomainStmt:
+		case T_CreateConversionStmt:
+		case T_CreateCastStmt:
+		case T_CreateOpClassStmt:
+		case T_CreateOpFamilyStmt:
+		case T_AlterOpFamilyStmt:
+		case T_AlterTSDictionaryStmt:
+		case T_AlterTSConfigurationStmt:
+		case T_AlterTableMoveAllStmt:
+		case T_DropOwnedStmt:
+		case T_AlterDefaultPrivilegesStmt:
+		case T_CreatePolicyStmt:	/* CREATE POLICY */
+		case T_AlterPolicyStmt: /* ALTER POLICY */
+		case T_CreateAmStmt:
 			if (IS_PGXC_COORDINATOR)
 				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterTableSpaceOptionsStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_ALL_NODES, false);
 			break;
 
 		case T_TruncateStmt:
@@ -1076,28 +1006,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_CopyStmt:
-			break;
-
-		case T_PrepareStmt:
-			break;
-
-		case T_ExecuteStmt:
-			break;
-
-		case T_DeallocateStmt:
-			break;
-
-		case T_GrantRoleStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreatedbStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityWithMessage(queryString, sentToRemote, false);
-			break;
-
 		case T_AlterDatabaseStmt:
 			if (IS_PGXC_LOCAL_COORDINATOR)
 			{
@@ -1112,49 +1020,16 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_AlterDatabaseSetStmt:
-			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_DropdbStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-			/* Query-level asynchronous notification */
-		case T_NotifyStmt:
-			break;
-
-		case T_ListenStmt:
-			break;
-
-		case T_UnlistenStmt:
-			break;
-
 		case T_LoadStmt:
+		case T_ConstraintsSetStmt:
 			if (IS_PGXC_LOCAL_COORDINATOR)
 				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_DATANODES, false);
 			break;
 
 		case T_ClusterStmt:
+		case T_CheckPointStmt:
 			if (IS_PGXC_LOCAL_COORDINATOR)
 				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_DATANODES, false);
-			break;
-
-		case T_VacuumStmt:
-			break;
-
-		case T_ExplainStmt:
-			break;
-
-		case T_AlterSystemStmt:
-			break;
-
-		case T_VariableSetStmt:
-			break;
-
-		case T_VariableShowStmt:
 			break;
 
 		case T_DiscardStmt:
@@ -1165,93 +1040,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			 */
 			if (IS_PGXC_COORDINATOR)
 				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateEventTrigStmt:
-			break;
-
-		case T_AlterEventTrigStmt:
-			break;
-
-		case T_CreateRoleStmt:
-#ifdef PGXC
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-#endif
-			break;
-
-		case T_AlterRoleStmt:
-#ifdef PGXC
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-#endif
-			break;
-
-		case T_AlterRoleSetStmt:
-#ifdef PGXC
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-#endif
-			break;
-
-		case T_DropRoleStmt:
-#ifdef PGXC
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-#endif
-			break;
-
-		case T_ReassignOwnedStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_LockStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_ConstraintsSetStmt:
-			/*
-			 * Just send statement to all the datanodes. It is effectively noop
-			 * if no transaction, because transaction will be committed and
-			 * changes will be cleared after completion.
-			 * Side effect of that command is that session takes a connection
-			 * to each Datanode and holds it while transaction lasts, even if
-			 * subsequent statements won't use some of them.
-			 */
-			ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false,
-					EXEC_ON_DATANODES, false);
-			break;
-
-		case T_CheckPointStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, true, EXEC_ON_DATANODES, false);
-			break;
-
-		case T_BarrierStmt:
-			break;
-		case T_PauseClusterStmt:
-			break;
-
-			/*
-			 * Node DDL is an operation local to Coordinator.
-			 * In case of a new node being created in the cluster,
-			 * it is necessary to create this node on all the Coordinators independently.
-			 */
-		case T_AlterNodeStmt:
-			break;
-
-		case T_CreateNodeStmt:
-			break;
-
-		case T_DropNodeStmt:
-			break;
-
-		case T_CreateGroupStmt:
-			break;
-
-		case T_DropGroupStmt:
 			break;
 
 		case T_ReindexStmt:
@@ -1342,15 +1130,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_DropStmt:
-			break;
-
-		case T_RenameStmt:
-			break;
-
-		case T_AlterObjectDependsStmt:
-			break;
-
 		case T_AlterObjectSchemaStmt:
 			if (IS_PGXC_LOCAL_COORDINATOR)
 			{
@@ -1392,17 +1171,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_AlterOwnerStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_RemoteQuery:
-			break;
-
-		case T_CleanConnStmt:
-			break;
-
 		case T_CommentStmt:
 			/* Comment objects depending on their object and temporary types */
 			if (IS_PGXC_LOCAL_COORDINATOR)
@@ -1412,32 +1180,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 				RemoteQueryExecType exec_type = GetNodesForCommentUtility(stmt, &is_temp);
 				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, exec_type, is_temp);
 			}
-			break;
-
-		case T_SecLabelStmt:
-			break;
-
-		case T_CreateSchemaStmt:
-			break;
-
-		case T_CreateStmt:
-		case T_CreateForeignTableStmt:
-			break;
-
-		case T_AlterTableStmt:
-			break;
-
-		case T_AlterDomainStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-			/*
-			 * ************* object creation / destruction **************
-			 */
-		case T_DefineStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
 			break;
 
 		case T_IndexStmt:	/* CREATE INDEX */
@@ -1461,68 +1203,13 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_CreateExtensionStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterExtensionStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterExtensionContentsStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateFdwStmt:
-			break;
-
-		case T_AlterFdwStmt:
-			break;
-
-		case T_CreateForeignServerStmt:
-			break;
-
-		case T_AlterForeignServerStmt:
-			break;
-
-		case T_CreateUserMappingStmt:
-			break;
-
-		case T_AlterUserMappingStmt:
-			break;
-
-		case T_DropUserMappingStmt:
-			break;
-
-		case T_ImportForeignSchemaStmt:
-			break;
-
-		case T_CompositeTypeStmt:	/* CREATE TYPE (composite) */
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateEnumStmt:	/* CREATE TYPE AS ENUM */
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateRangeStmt: /* CREATE TYPE AS RANGE */
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
 		case T_AlterEnumStmt:	/* ALTER TYPE (enum) */
 			/*
 			 * In this case force autocommit, this transaction cannot be launched
 			 * inside a transaction block.
 			 */
 			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
-						false , EXEC_ON_ALL_NODES, false);
+				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false , EXEC_ON_ALL_NODES, false);
 			break;
 
 		case T_ViewStmt:	/* CREATE VIEW */
@@ -1533,16 +1220,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 				if (stmt->view->relpersistence != RELPERSISTENCE_TEMP)
 						ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_COORDS, false);
 			}
-			break;
-
-		case T_CreateFunctionStmt:	/* CREATE FUNCTION */
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterFunctionStmt:	/* ALTER FUNCTION */
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
 			break;
 
 		case T_RuleStmt:	/* CREATE RULE */
@@ -1610,110 +1287,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			}
 			break;
 
-		case T_RefreshMatViewStmt:
-			break;
-
-		case T_CreateTrigStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreatePLangStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateDomainStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateConversionStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateCastStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateOpClassStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateOpFamilyStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateTransformStmt:
-			break;
-
-		case T_AlterOpFamilyStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterTSDictionaryStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterTSConfigurationStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterTableMoveAllStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterOperatorStmt:
-			break;
-
-		case T_DropOwnedStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterDefaultPrivilegesStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreatePolicyStmt:	/* CREATE POLICY */
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_AlterPolicyStmt: /* ALTER POLICY */
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreateAmStmt:
-			if (IS_PGXC_LOCAL_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote, false, EXEC_ON_ALL_NODES, false);
-			break;
-
-		case T_CreatePublicationStmt:
-			break;
-
-		case T_AlterPublicationStmt:
-			break;
-
-		case T_CreateSubscriptionStmt:
-			break;
-
-		case T_AlterSubscriptionStmt:
-			break;
-
-		case T_DropSubscriptionStmt:
-			break;
-
 		case T_CreateStatsStmt:
 			if (IS_PGXC_LOCAL_COORDINATOR)
 			{
@@ -1736,9 +1309,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 					false, exec_type, false);
 				relation_close(rel, NoLock);
 			}
-			break;
-
-		case T_AlterCollationStmt:
 			break;
 
 		default:

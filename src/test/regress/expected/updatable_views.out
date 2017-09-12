@@ -911,32 +911,38 @@ INSERT INTO base_tbl SELECT i, 'Row ' || i FROM generate_series(-2, 2) g(i);
 CREATE VIEW rw_view1 AS SELECT b AS bb, a AS aa FROM base_tbl;
 CREATE FUNCTION rw_view1_aa(x rw_view1)
   RETURNS int AS $$ SELECT x.aa $$ LANGUAGE sql;
-ERROR:  type rw_view1 does not exist
 UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v)=2
   RETURNING rw_view1_aa(v), v.bb;
-ERROR:  function rw_view1_aa(rw_view1) does not exist
-LINE 1: UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v...
-                                                       ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+ rw_view1_aa |      bb       
+-------------+---------------
+           2 | Updated row 2
+(1 row)
+
 SELECT * FROM base_tbl;
- a  |   b    
-----+--------
+ a  |       b       
+----+---------------
  -2 | Row -2
  -1 | Row -1
   0 | Row 0
   1 | Row 1
-  2 | Row 2
+  2 | Updated row 2
 (5 rows)
 
 EXPLAIN (costs off, nodes off)
 UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v)=2
   RETURNING rw_view1_aa(v), v.bb;
-ERROR:  function rw_view1_aa(rw_view1) does not exist
-LINE 2: UPDATE rw_view1 v SET bb='Updated row 2' WHERE rw_view1_aa(v...
-                                                       ^
-HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+                       QUERY PLAN                       
+--------------------------------------------------------
+ Remote Subquery Scan on any
+   ->  Update on base_tbl
+         ->  Index Scan using base_tbl_pkey on base_tbl
+               Index Cond: (a = 2)
+(4 rows)
+
 DROP TABLE base_tbl CASCADE;
-NOTICE:  drop cascades to view rw_view1
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to view rw_view1
+drop cascades to function rw_view1_aa(rw_view1)
 -- permissions checks
 CREATE USER regress_view_user1;
 CREATE USER regress_view_user2;

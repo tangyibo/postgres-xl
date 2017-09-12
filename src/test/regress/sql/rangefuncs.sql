@@ -228,8 +228,8 @@ DROP TABLE foo2;
 DROP TABLE foo;
 
 -- Rescan tests --
-CREATE TEMPORARY SEQUENCE foo_rescan_seq1;
-CREATE TEMPORARY SEQUENCE foo_rescan_seq2;
+CREATE SEQUENCE foo_rescan_seq1;
+CREATE SEQUENCE foo_rescan_seq2;
 CREATE TYPE foo_rescan_t AS (i integer, s bigint);
 
 CREATE FUNCTION foo_sql(int,int) RETURNS setof foo_rescan_t AS 'SELECT i, nextval(''foo_rescan_seq1'') FROM generate_series($1,$2) i;' LANGUAGE SQL;

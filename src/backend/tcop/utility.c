@@ -1231,8 +1231,8 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 			if (IS_PGXC_LOCAL_COORDINATOR)
 			{
 				ViewStmt *stmt = (ViewStmt *) parsetree;
-				if (stmt->view->relpersistence != RELPERSISTENCE_TEMP)
-					exec_type = EXEC_ON_COORDS;
+				is_temp = stmt->view->relpersistence == RELPERSISTENCE_TEMP;
+				exec_type = is_temp ? EXEC_ON_DATANODES : EXEC_ON_ALL_NODES;
 			}
 			break;
 
@@ -1252,7 +1252,7 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 				/* In case this query is related to a SERIAL execution, just bypass */
 				if (!stmt->is_serial)
 					is_temp = stmt->sequence->relpersistence == RELPERSISTENCE_TEMP;
-				exec_type = EXEC_ON_ALL_NODES;
+				exec_type = is_temp ? EXEC_ON_DATANODES : EXEC_ON_ALL_NODES;
 			}
 			break;
 
@@ -1287,8 +1287,8 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 				 * CREATE TABLE + SELECT INTO
 				 */
 				Assert(stmt->relkind == OBJECT_MATVIEW);
-				if (stmt->into->rel->relpersistence != RELPERSISTENCE_TEMP)
-					exec_type = EXEC_ON_COORDS;
+				is_temp = stmt->into->rel->relpersistence == RELPERSISTENCE_TEMP;
+				exec_type = is_temp ? EXEC_ON_DATANODES : EXEC_ON_ALL_NODES;
 			}
 			break;
 
@@ -2578,9 +2578,14 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_CreateTableAsStmt:
-				address = ExecCreateTableAs((CreateTableAsStmt *) parsetree,
-											queryString, params, queryEnv,
-											completionTag);
+				{
+					CreateTableAsStmt *stmt = (CreateTableAsStmt *) parsetree;
+					if (IS_PGXC_DATANODE && stmt->relkind == OBJECT_MATVIEW)
+						stmt->into->skipData = true;
+					address = ExecCreateTableAs((CreateTableAsStmt *) parsetree,
+												queryString, params, queryEnv,
+												completionTag);
+				}
 				break;
 
 			case T_RefreshMatViewStmt:
@@ -4697,55 +4702,18 @@ ExecUtilityFindNodes(ObjectType object_type,
 	{
 		case OBJECT_SEQUENCE:
 			*is_temp = IsTempTable(object_id);
-			exec_type = EXEC_ON_ALL_NODES;
+			if (*is_temp)
+				exec_type = EXEC_ON_DATANODES;
+			else
+				exec_type = EXEC_ON_ALL_NODES;
 			break;
 
 		case OBJECT_TABLE:
-			/* Do the check on relation kind */
-			exec_type = ExecUtilityFindNodesRelkind(object_id, is_temp);
-			break;
-
-			/*
-			 * Views and rules, both permanent or temporary are created
-			 * on Coordinators only.
-			 */
 		case OBJECT_RULE:
 		case OBJECT_VIEW:
 		case OBJECT_MATVIEW:
-			/* Check if object is a temporary view */
-			if ((*is_temp = IsTempTable(object_id)))
-				exec_type = EXEC_ON_NONE;
-			else
-				exec_type = EXEC_ON_COORDS;
-			break;
-
 		case OBJECT_INDEX:
-			/* Check if given index uses temporary tables */
-			{
-				Relation	rel;
-				bool		is_matview;
-
-				rel = relation_open(object_id, NoLock);
-				
-				*is_temp = (rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP);
-				is_matview = (rel->rd_rel->relkind == RELKIND_MATVIEW);
-				
-				relation_close(rel, NoLock);
-
-				exec_type = EXEC_ON_NONE;
-				if (*is_temp)
-				{
-					if (!is_matview)
-						exec_type = EXEC_ON_DATANODES;
-				}
-				else
-				{
-					if (!is_matview)
-						exec_type = EXEC_ON_ALL_NODES;
-					else
-						exec_type = EXEC_ON_COORDS;
-				}
-			}
+			exec_type = ExecUtilityFindNodesRelkind(object_id, is_temp);
 			break;
 
 		default:
@@ -4771,7 +4739,6 @@ ExecUtilityFindNodesRelkind(Oid relid, bool *is_temp)
 
 	switch (relkind_str)
 	{
-		case RELKIND_SEQUENCE:
 		case RELKIND_RELATION:
 		case RELKIND_PARTITIONED_TABLE:
 			if ((*is_temp = IsTempTable(relid)))
@@ -4798,7 +4765,7 @@ ExecUtilityFindNodesRelkind(Oid relid, bool *is_temp)
 
 					/* Release system cache BEFORE looking at the parent table */
 					ReleaseSysCache(tuple);
-					return ExecUtilityFindNodesRelkind(table_relid, is_temp);
+					exec_type = ExecUtilityFindNodesRelkind(table_relid, is_temp);
 				}
 				else
 				{
@@ -4809,18 +4776,13 @@ ExecUtilityFindNodesRelkind(Oid relid, bool *is_temp)
 			break;
 
 		case RELKIND_VIEW:
-			if ((*is_temp = IsTempTable(relid)))
-				exec_type = EXEC_ON_NONE;
-			else
-				exec_type = EXEC_ON_COORDS;
-			break;
-
+		case RELKIND_SEQUENCE:
 		case RELKIND_MATVIEW:
 			/* Check if object is a temporary view */
 			if ((*is_temp = IsTempTable(relid)))
-				exec_type = EXEC_ON_NONE;
+				exec_type = EXEC_ON_DATANODES;
 			else
-				exec_type = EXEC_ON_COORDS;
+				exec_type = EXEC_ON_ALL_NODES;
 			break;
 
 		default:

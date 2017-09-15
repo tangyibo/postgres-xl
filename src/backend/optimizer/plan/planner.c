@@ -3930,8 +3930,14 @@ create_grouping_paths(PlannerInfo *root,
 
 	/*
 	 * The distributed aggregation however works even if there are no partial
-	 * paths, and for grouping sets (we need to be able to at least push them
-	 * on top of remote subplan).
+	 * paths (when the distribution key is included in the grouping keys, we
+	 * may simply push down the whole aggregate).
+	 *
+	 * XXX We currently don't even try to push down grouping sets, although we
+	 * might do that when all grouping sets include the distribution key. But
+	 * that seems like a fairly rare case, as in most cases there will be
+	 * empty grouping set () aggregating all the data. So let's look into this
+	 * optimization later.
 	 */
 	if (!grouped_rel->consider_parallel)
 	{
@@ -3944,6 +3950,11 @@ create_grouping_paths(PlannerInfo *root,
 		 * We don't know how to do parallel aggregation unless we have either
 		 * some aggregates or a grouping clause.
 		 */
+		try_distributed_aggregation = false;
+	}
+	else if (parse->groupingSets)
+	{
+		/* We don't know how to do grouping sets in parallel. */
 		try_distributed_aggregation = false;
 	}
 	else if (agg_costs->hasNonPartial || agg_costs->hasNonSerial)

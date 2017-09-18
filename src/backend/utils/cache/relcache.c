@@ -1340,7 +1340,20 @@ RelationBuildDesc(Oid targetRelId, bool insertIt)
 	 * Fetch rules and triggers that affect this relation
 	 */
 	if (relation->rd_rel->relhasrules)
+	{
+		/*
+		 * We could be in the middle of reading a portable input string and get
+		 * called to build the relation descriptor. This might require
+		 * recursive calls to stringToNode (e.g. while reading rules) and those
+		 * must not be done with portable input turned on (because the
+		 * stringified versions are not created with portable output turned
+		 * on). So temporarily reset portable input to false and restore once
+		 * we are done with reading rules.
+		 */
+		bool saved_portable_input = set_portable_input(false);
 		RelationBuildRuleLock(relation);
+		set_portable_input(saved_portable_input);
+	}
 	else
 	{
 		relation->rd_rules = NULL;
@@ -1358,7 +1371,12 @@ RelationBuildDesc(Oid targetRelId, bool insertIt)
 		RelationBuildLocator(relation);
 #endif
 	if (relation->rd_rel->relrowsecurity)
+	{
+		/* See comments near RelationBuildRuleLocok for details */
+		bool saved_portable_input = set_portable_input(false);
 		RelationBuildRowSecurity(relation);
+		set_portable_input(saved_portable_input);
+	}
 	else
 		relation->rd_rsdesc = NULL;
 

@@ -5600,8 +5600,26 @@ ExecInitRemoteSubplan(RemoteSubplan *node, EState *estate, int eflags)
 		rstmt.distributionNodes = node->distributionNodes;
 		rstmt.distributionRestrict = node->distributionRestrict;
 
-		set_portable_output(true);
-		remotestate->subplanstr = nodeToString(&rstmt);
+		/*
+		 * A try-catch block to ensure that we don't leave behind a stale state
+		 * if nodeToString fails for whatever reason.
+		 *
+		 * XXX We should probably rewrite it someday by either passing a
+		 * context to nodeToString() or remembering this information somewhere
+		 * else which gets reset in case of errors. But for now, this seems
+		 * enough.
+		 */
+		PG_TRY();
+		{
+			set_portable_output(true);
+			remotestate->subplanstr = nodeToString(&rstmt);
+		}
+		PG_CATCH();
+		{
+			set_portable_output(false);
+			PG_RE_THROW();
+		}
+		PG_END_TRY();
 		set_portable_output(false);
 
 		/*

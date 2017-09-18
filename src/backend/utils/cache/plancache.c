@@ -2017,9 +2017,26 @@ SetRemoteSubplan(CachedPlanSource *plansource, const char *plan_string)
 
 	/*
 	 * Restore query plan.
+	 *
+	 * A try-catch block to ensure that we don't leave behind a stale state
+	 * if nodeToString fails for whatever reason.
+	 *
+	 * XXX We should probably rewrite it someday by either passing a
+	 * context to nodeToString() or remembering this information somewhere
+	 * else which gets reset in case of errors. But for now, this seems
+	 * enough.
 	 */
-	set_portable_input(true);
-	rstmt = (RemoteStmt *) stringToNode((char *) plan_string);
+	PG_TRY();
+	{
+		set_portable_input(true);
+		rstmt = (RemoteStmt *) stringToNode((char *) plan_string);
+	}
+	PG_CATCH();
+	{
+		set_portable_input(false);
+		PG_RE_THROW();
+	}
+	PG_END_TRY();
 	set_portable_input(false);
 
 	stmt = makeNode(PlannedStmt);

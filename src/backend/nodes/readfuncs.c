@@ -59,10 +59,12 @@
  * Later we may want to add extra parameter in stringToNode() function
  */
 static bool portable_input = false;
-void
+bool
 set_portable_input(bool value)
 {
+	bool old_portable_input = portable_input;
 	portable_input = value;
+	return old_portable_input;
 }
 #endif /* XCP */
 

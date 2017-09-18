@@ -651,7 +651,7 @@ extern char *bmsToString(const struct Bitmapset *bms);
  * nodes/{readfuncs.c,read.c}
  */
 #ifdef XCP
-extern void set_portable_input(bool value);
+extern bool set_portable_input(bool value);
 #endif
 extern void *stringToNode(char *str);
 extern struct Bitmapset *readBitmapset(void);

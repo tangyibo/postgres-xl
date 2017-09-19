@@ -173,18 +173,42 @@ static void outChar(StringInfo str, char c);
 				Oid relid = lfirst_oid(lc); \
 				appendStringInfoString(str, sep); \
 				WRITE_RELID_INTERNAL(relid); \
-				sep = ","; \
+				sep = " , "; \
 			} \
-			appendStringInfoChar(str, ')'); \
+			appendStringInfoString(str, " )"); \
 		} \
 	}  while (0)
+
+#define WRITE_TYPID_INTERNAL(typid) \
+	(outToken(str, OidIsValid(typid) ? NSP_NAME(get_typ_namespace(typid)) : NULL), \
+	 appendStringInfoChar(str, ' '), \
+	 outToken(str, OidIsValid(typid) ? get_typ_name(typid) : NULL))
 
 /* write an OID which is a data type OID */
 #define WRITE_TYPID_FIELD(fldname) \
 	(appendStringInfo(str, " :" CppAsString(fldname) " "), \
-	 outToken(str, OidIsValid(node->fldname) ? NSP_NAME(get_typ_namespace(node->fldname)) : NULL), \
-	 appendStringInfoChar(str, ' '), \
-	 outToken(str, OidIsValid(node->fldname) ? get_typ_name(node->fldname) : NULL))
+	 WRITE_TYPID_INTERNAL(node->fldname))
+
+#define WRITE_TYPID_LIST_FIELD(fldname) \
+	do { \
+		ListCell *lc; \
+		char *sep = ""; \
+		appendStringInfo(str, " :" CppAsString(fldname) " "); \
+		if (node->fldname == NIL || list_length(node->fldname) == 0) \
+			appendStringInfoString(str, "<>"); \
+		else \
+		{ \
+			appendStringInfoChar(str, '('); \
+			foreach (lc, node->fldname) \
+			{ \
+				Oid typid = lfirst_oid(lc); \
+				appendStringInfoString(str, sep); \
+				WRITE_TYPID_INTERNAL(typid); \
+				sep = " , "; \
+			} \
+			appendStringInfoString(str, " )"); \
+		} \
+	}  while (0)
 
 /* write an OID which is a function OID */
 #define WRITE_FUNCID_FIELD(fldname) \
@@ -1868,6 +1892,11 @@ _outAggref(StringInfo str, const Aggref *node)
 	else
 #endif
 	WRITE_OID_FIELD(aggtranstype);
+#ifdef XCP
+	if (portable_output)
+		WRITE_TYPID_LIST_FIELD(aggargtypes);
+	else
+#endif
 	WRITE_NODE_FIELD(aggargtypes);
 	WRITE_NODE_FIELD(aggdirectargs);
 	WRITE_NODE_FIELD(args);

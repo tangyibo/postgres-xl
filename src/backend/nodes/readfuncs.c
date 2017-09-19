@@ -243,20 +243,53 @@ set_portable_input(bool value)
 	} while (0)
 
 /* Read data type identifier and lookup the OID */
-#define READ_TYPID_FIELD(fldname) \
+#define READ_TYPID_INTERNAL(typid) \
 	do { \
 		char	   *nspname; /* namespace name */ \
 		char	   *typname; /* data type name */ \
-		token = pg_strtok(&length);		/* skip :fldname */ \
 		token = pg_strtok(&length); /* get nspname */ \
 		nspname = nullable_string(token, length); \
 		token = pg_strtok(&length); /* get typname */ \
 		typname = nullable_string(token, length); \
 		if (typname) \
-			local_node->fldname = get_typname_typid(typname, \
-													NSP_OID(nspname)); \
+		{ \
+			typid = get_typname_typid(typname, \
+										NSP_OID(nspname)); \
+			if (!OidIsValid((typid))) \
+				elog(WARNING, "could not find OID for type %s.%s", nspname,\
+						typname); \
+		} \
 		else \
-			local_node->fldname = InvalidOid; \
+			typid = InvalidOid; \
+	} while (0)
+
+#define READ_TYPID_FIELD(fldname) \
+	do { \
+		Oid typid; \
+		token = pg_strtok(&length);		/* skip :fldname */ \
+		READ_TYPID_INTERNAL(typid); \
+		local_node->fldname = typid; \
+	} while (0)
+
+#define READ_TYPID_LIST_FIELD(fldname) \
+	do { \
+		token = pg_strtok(&length);		/* skip :fldname */ \
+		token = pg_strtok(&length); 	/* skip '(' */ \
+		if (length > 0 ) \
+		{ \
+			Assert(token[0] == '('); \
+			for (;;) \
+			{ \
+				Oid typid; \
+				READ_TYPID_INTERNAL(typid); \
+				local_node->fldname = lappend_oid(local_node->fldname, typid); \
+				token = pg_strtok(&length); \
+				if (token[0] == ')') \
+				break; \
+			} \
+		} \
+		else \
+			local_node->fldname = NIL; \
 	} while (0)
 
 /* Read function identifier and lookup the OID */
@@ -882,6 +915,11 @@ _readAggref(void)
 	else
 #endif
 	READ_OID_FIELD(aggtranstype);
+#ifdef XCP
+	if (portable_input)
+		READ_TYPID_LIST_FIELD(aggargtypes);
+	else
+#endif
 	READ_NODE_FIELD(aggargtypes);
 	READ_NODE_FIELD(aggdirectargs);
 	READ_NODE_FIELD(args);

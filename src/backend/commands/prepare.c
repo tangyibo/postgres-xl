@@ -735,6 +735,7 @@ DropPreparedStatement(const char *stmt_name, bool showError)
 		if (entry->use_resowner)
 			ResourceOwnerForgetPreparedStmt(CurTransactionResourceOwner,
 					entry->stmt_name);
+		SharedQueueDisconnectConsumer(entry->stmt_name);
 #endif		
 	}
 }

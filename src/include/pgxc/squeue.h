@@ -53,8 +53,10 @@ extern void SharedQueueWrite(SharedQueue squeue, int consumerIdx,
 				 MemoryContext tmpcxt);
 extern bool SharedQueueRead(SharedQueue squeue, int consumerIdx,
 				TupleTableSlot *slot, bool canwait);
+extern void SharedQueueDisconnectConsumer(const char *sqname);
 extern void SharedQueueReset(SharedQueue squeue, int consumerIdx);
 extern void SharedQueueResetNotConnected(SharedQueue squeue);
 extern bool SharedQueueCanPause(SharedQueue squeue);
+extern bool SharedQueueWaitOnProducerLatch(SharedQueue squeue, long timeout);
 
 #endif

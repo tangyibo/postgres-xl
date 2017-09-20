@@ -14,6 +14,7 @@
  */
 
 #include "postgres.h"
+#include "miscadmin.h"
 
 #include "executor/producerReceiver.h"
 #include "pgxc/nodemgr.h"
@@ -157,6 +158,8 @@ producerDestroyReceiver(DestReceiver *self)
 	/* Make sure all data are in the squeue */
 	while (myState->tstores)
 	{
+		CHECK_FOR_INTERRUPTS();
+
 		if (SharedQueueFinish(myState->squeue, myState->typeinfo,
 							  myState->tstores) == 0)
 		{
@@ -166,15 +169,15 @@ producerDestroyReceiver(DestReceiver *self)
 		}
 		else
 		{
-			elog(DEBUG2, "producerDestroyReceiver - sleeping for 10 seconds waiting for consumers to connect");
-			pg_usleep(10*1000*1000l);
-			/*
-			 * Do not wait for consumers that was not even connected after 10
-			 * seconds after start waiting for their disconnection.
-			 * That should help to break the loop which would otherwise endless.
-			 * The error will be emitted later in SharedQueueUnBind
-			 */
-			SharedQueueResetNotConnected(myState->squeue);
+			if (SharedQueueWaitOnProducerLatch(myState->squeue, 10000L))
+				/*
+				 * Do not wait for consumers that was not even connected after
+				 * 10 seconds after start waiting for their disconnection.
+				 * That should help to break the loop which would otherwise
+				 * endless.  The error will be emitted later in
+				 * SharedQueueUnBind
+				 */
+				SharedQueueResetNotConnected(myState->squeue);
 		}
 	}
 

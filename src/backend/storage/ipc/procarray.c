@@ -74,6 +74,7 @@
 #include "utils/snapmgr.h"
 #ifdef PGXC
 #include "pgxc/pgxc.h"
+#include "gtm/gtm.h"
 #include "access/gtm.h"
 #include "storage/ipc.h"
 #include "utils/guc.h"
@@ -290,7 +291,8 @@ CreateSharedProcArray(void)
 		procArray->numProcs = 0;
 		procArray->maxProcs = PROCARRAY_MAXPROCS;
 		procArray->replication_slot_xmin = InvalidTransactionId;
-		procArray->maxKnownAssignedXids = TOTAL_MAX_CACHED_SUBXIDS;
+		procArray->maxKnownAssignedXids = TOTAL_MAX_CACHED_SUBXIDS +
+			CONTROL_INTERVAL;
 		procArray->numKnownAssignedXids = 0;
 		procArray->tailKnownAssignedXids = 0;
 		procArray->headKnownAssignedXids = 0;
@@ -307,11 +309,12 @@ CreateSharedProcArray(void)
 		KnownAssignedXids = (TransactionId *)
 			ShmemInitStruct("KnownAssignedXids",
 							mul_size(sizeof(TransactionId),
-									 TOTAL_MAX_CACHED_SUBXIDS),
+									 procArray->maxKnownAssignedXids),
 							&found);
 		KnownAssignedXidsValid = (bool *)
 			ShmemInitStruct("KnownAssignedXidsValid",
-							mul_size(sizeof(bool), TOTAL_MAX_CACHED_SUBXIDS),
+							mul_size(sizeof(bool),
+								procArray->maxKnownAssignedXids),
 							&found);
 	}
 

@@ -2401,7 +2401,7 @@ insert into wcowrtest_v values (1);
 ERROR:  new row violates check option for view "wcowrtest_v"
 DETAIL:  Failing row contains (1).
 alter table wcowrtest add b text;
-create table wcowrtest2 (b text, c int, a int);
+create table wcowrtest2 (a int, b text, c int);
 alter table wcowrtest2 drop c;
 alter table wcowrtest attach partition wcowrtest2 for values in (2);
 create table sometable (a int, b text);

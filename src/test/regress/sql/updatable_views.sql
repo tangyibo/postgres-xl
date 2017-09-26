@@ -1150,7 +1150,7 @@ create view wcowrtest_v as select * from wcowrtest where wcowrtest = '(2)'::wcow
 insert into wcowrtest_v values (1);
 
 alter table wcowrtest add b text;
-create table wcowrtest2 (b text, c int, a int);
+create table wcowrtest2 (a int, b text, c int);
 alter table wcowrtest2 drop c;
 alter table wcowrtest attach partition wcowrtest2 for values in (2);
 

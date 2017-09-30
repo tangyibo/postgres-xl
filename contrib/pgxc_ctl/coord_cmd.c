@@ -304,7 +304,7 @@ cmd_t *prepare_initCoordinatorSlave(char *nodeName)
 	 */
 	appendCmdEl(cmdBuildDir, (cmdBaseBkup = initCmd(aval(VAR_coordSlaveServers)[idx])));
 	snprintf(newCommand(cmdBaseBkup), MAXLINE,
-			 "pg_basebackup -p %s -h %s -D %s -x",
+			 "pg_basebackup -p %s -h %s -D %s -X stream",
 			 aval(VAR_coordPorts)[idx], aval(VAR_coordMasterServers)[idx], aval(VAR_coordSlaveDirs)[idx]);
 
 	/* Configure recovery.conf file at the slave */
@@ -1414,7 +1414,7 @@ int add_coordinatorSlave(char *name, char *host, int port, int pooler_port, char
 	doImmediate(aval(VAR_coordMasterServers)[idx], NULL, 
 				"pg_ctl start -w -Z coordinator -D %s", aval(VAR_coordMasterDirs)[idx]);
 	/* pg_basebackup */
-	doImmediate(host, NULL, "pg_basebackup -p %s -h %s -D %s -x",
+	doImmediate(host, NULL, "pg_basebackup -p %s -h %s -D %s -X stream",
 				aval(VAR_coordPorts)[idx], aval(VAR_coordMasterServers)[idx], dir);
 	/* Update the slave configuration with hot standby and port */
 	if ((f = pgxc_popen_w(host, "cat >> %s/postgresql.conf", dir)) == NULL)

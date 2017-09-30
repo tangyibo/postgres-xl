@@ -327,7 +327,7 @@ cmd_t *prepare_initDatanodeSlave(char *nodeName)
 	/* Obtain base backup of the master */
 	appendCmdEl(cmdBuildDir, (cmdBaseBkup = initCmd(aval(VAR_datanodeSlaveServers)[idx])));
 	snprintf(newCommand(cmdBaseBkup), MAXLINE, 
-			 "pg_basebackup -p %s -h %s -D %s -x",
+			 "pg_basebackup -p %s -h %s -D %s -X stream",
 			 aval(VAR_datanodePorts)[idx], aval(VAR_datanodeMasterServers)[idx],
 			 aval(VAR_datanodeSlaveDirs)[idx]);
 
@@ -1484,7 +1484,7 @@ int add_datanodeSlave(char *name, char *host, int port, int pooler, char *dir,
 	doImmediate(aval(VAR_datanodeMasterServers)[idx], NULL, 
 				"pg_ctl start -w -Z datanode -D %s", aval(VAR_datanodeMasterDirs)[idx]);
 	/* pg_basebackup */
-	doImmediate(host, NULL, "pg_basebackup -p %s -h %s -D %s -x %s %s",
+	doImmediate(host, NULL, "pg_basebackup -p %s -h %s -D %s -X stream %s %s",
 				aval(VAR_datanodePorts)[idx],
 				aval(VAR_datanodeMasterServers)[idx], dir,
 				wal ? "--xlogdir" : "",

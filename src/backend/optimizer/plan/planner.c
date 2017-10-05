@@ -368,6 +368,9 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	final_rel = fetch_upper_rel(root, UPPERREL_FINAL, NULL);
 	best_path = get_cheapest_fractional_path(final_rel, tuple_fraction);
 
+	if (!root->distribution)
+		root->distribution = best_path->distribution;
+
 	top_plan = create_plan(root, best_path);
 #ifdef XCP
 	if (root->distribution)
@@ -6915,23 +6918,45 @@ equal_distributions(PlannerInfo *root, Distribution *dst1,
 	return false;
 }
 
+/*
+ * adjust_path_distribution
+ *		Adjust distribution of the path to match what's expected by ModifyTable.
+ *
+ * We use root->distribution to communicate distribution expected by a ModifyTable.
+ * Currently it's set either in preprocess_targetlist() for simple target relations,
+ * or in inheritance_planner() for targets that are inheritance trees.
+ *
+ * If root->distribution is NULL, we don't need to do anything and we can leave the
+ * path distribution as it is. This happens when there is no ModifyTable node, for
+ * example.
+ *
+ * If the root->distribution is set, we need to inspect it and redistribute the data
+ * if needed (when it root->distribution does not match path->distribution).
+ *
+ * We also detect DML (e.g. correlated UPDATE/DELETE or updates of distribution key)
+ * that we can't handle at this point.
+ *
+ * XXX We must not update root->distribution here, because we need to do this on all
+ * paths considered by grouping_planner(), and there's no obvious guarantee all the
+ * paths will share the same distribution. Postgres-XL 9.5 was allowed to do that,
+ * because prior to the pathification (in PostgreSQL 9.6) grouping_planner() picked
+ * before the distributions were adjusted.
+ */
 static Path *
 adjust_path_distribution(PlannerInfo *root, Query *parse, Path *path)
 {
-	/* if the root distribution is NULL, set it to path distribution */
+	/* if there is no root distribution, no redistribution is needed */
 	if (!root->distribution)
-	{
-		root->distribution = path->distribution;
-		return path;
-	}
-
-	/* don't touch paths without distribution attached (catalogs etc.) */
-	if ((path->distribution == NULL) && (root->distribution == NULL))
 		return path;
 
+	/* and also skip dummy paths */
 	if (IS_DUMMY_PATH(path))
 		return path;
 
+	/*
+	 * Both the path and root have distribution. Let's see if they differ,
+	 * and do a redistribution if not.
+	 */
 	if (equal_distributions(root, root->distribution, path->distribution))
 	{
 		if (IsLocatorReplicated(path->distribution->distributionType) &&

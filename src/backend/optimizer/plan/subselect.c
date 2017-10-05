@@ -548,6 +548,9 @@ make_subplan(PlannerInfo *root, Query *orig_subquery,
 	final_rel = fetch_upper_rel(subroot, UPPERREL_FINAL, NULL);
 	best_path = get_cheapest_fractional_path(final_rel, tuple_fraction);
 
+	if (!subroot->distribution)
+		subroot->distribution = best_path->distribution;
+
 	plan = create_plan(subroot, best_path);
 
 #ifdef XCP
@@ -1222,6 +1225,9 @@ SS_process_ctes(PlannerInfo *root)
 		 */
 		final_rel = fetch_upper_rel(subroot, UPPERREL_FINAL, NULL);
 		best_path = final_rel->cheapest_total_path;
+
+		if (!subroot->distribution)
+			subroot->distribution = best_path->distribution;
 
 		plan = create_plan(subroot, best_path);
 

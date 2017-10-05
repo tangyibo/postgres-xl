@@ -1964,7 +1964,7 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 											 subpath->pathkeys,
 											 make_tlist_from_pathtarget(subpath->pathtarget));
 
-		if (subroot->distribution && subroot->distribution->distributionExpr)
+		if (subpath->distribution && subpath->distribution->distributionExpr)
 		{
 			ListCell *lc;
 
@@ -1976,14 +1976,14 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 			 * be from the rel, need conversion.
 			 */
 			distribution = makeNode(Distribution);
-			distribution->distributionType = subroot->distribution->distributionType;
-			distribution->nodes = bms_copy(subroot->distribution->nodes);
-			distribution->restrictNodes = bms_copy(subroot->distribution->restrictNodes);
+			distribution->distributionType = subpath->distribution->distributionType;
+			distribution->nodes = bms_copy(subpath->distribution->nodes);
+			distribution->restrictNodes = bms_copy(subpath->distribution->restrictNodes);
 
 			foreach(lc, targetlist)
 			{
 				TargetEntry *tle = (TargetEntry *) lfirst(lc);
-				if (equal(tle->expr, subroot->distribution->distributionExpr))
+				if (equal(tle->expr, subpath->distribution->distributionExpr))
 				{
 					distribution->distributionExpr = (Node *)
 							makeVarFromTargetEntry(rel->relid, tle);
@@ -1992,7 +1992,7 @@ set_subquery_pathlist(PlannerInfo *root, RelOptInfo *rel,
 			}
 		}
 		else
-			distribution = subroot->distribution;
+			distribution = subpath->distribution;
 
 		/* Generate outer path using this subpath */
 		add_path(rel, (Path *)

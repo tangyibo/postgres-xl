@@ -62,7 +62,8 @@
 
 
 static bool contains_temp_tables(List *rtable);
-static PlannedStmt *pgxc_FQS_planner(Query *query, ParamListInfo boundParams);
+static PlannedStmt *pgxc_FQS_planner(Query *query, int cursorOptions,
+									 ParamListInfo boundParams);
 static RemoteQuery *pgxc_FQS_create_remote_plan(Query *query,
 												ExecNodes *exec_nodes,
 												bool is_exec_direct);
@@ -225,7 +226,7 @@ pgxc_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
 	PlannedStmt *result;
 
 	/* see if can ship the query completely */
-	result = pgxc_FQS_planner(query, boundParams);
+	result = pgxc_FQS_planner(query, cursorOptions, boundParams);
 	if (result)
 		return result;
 
@@ -259,7 +260,7 @@ pgxc_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
  * fqs in the name of function is acronym for fast query shipping.
  */
 static PlannedStmt *
-pgxc_FQS_planner(Query *query, ParamListInfo boundParams)
+pgxc_FQS_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
 {
 	PlannedStmt		*result;
 	PlannerGlobal	*glob;
@@ -271,9 +272,8 @@ pgxc_FQS_planner(Query *query, ParamListInfo boundParams)
 	if (!enable_fast_query_shipping)
 		return NULL;
 
-	/* Do not FQS cursor statements */
-	if (query->utilityStmt &&
-		IsA(query->utilityStmt, DeclareCursorStmt))
+	/* Do not FQS cursor statements that require backward scrolling */
+	if (cursorOptions & CURSOR_OPT_SCROLL)
 		return NULL;
 
 	/* Do not FQS EXEC DIRECT statements */

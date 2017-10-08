@@ -2861,7 +2861,7 @@ begin
 end;
 $$ language plpgsql;
 
-select * from sc_test() order by 1;
+select * from sc_test();
 
 create or replace function sc_test() returns setof integer as $$
 declare
@@ -2878,7 +2878,7 @@ begin
 end;
 $$ language plpgsql;
 
-select * from sc_test() order by 1;  -- fails because of NO SCROLL specification
+select * from sc_test();  -- fails because of NO SCROLL specification
 
 create or replace function sc_test() returns setof integer as $$
 declare
@@ -2895,14 +2895,14 @@ begin
 end;
 $$ language plpgsql;
 
-select * from sc_test() order by 1;
+select * from sc_test();
 
 create or replace function sc_test() returns setof integer as $$
 declare
   c refcursor;
   x integer;
 begin
-  open c scroll for execute 'select f1 from int4_tbl order by 1';
+  open c scroll for execute 'select f1 from int4_tbl';
   fetch last from c into x;
   while found loop
     return next x;
@@ -2919,7 +2919,7 @@ declare
   c refcursor;
   x integer;
 begin
-  open c scroll for execute 'select f1 from int4_tbl order by 1';
+  open c scroll for execute 'select f1 from int4_tbl';
   fetch last from c into x;
   while found loop
     return next x;

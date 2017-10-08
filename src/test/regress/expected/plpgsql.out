@@ -3415,10 +3415,15 @@ begin
   close c;
 end;
 $$ language plpgsql;
-select * from sc_test() order by 1;
- sc_test 
----------
-(0 rows)
+select * from sc_test();
+   sc_test   
+-------------
+ -2147483647
+  2147483647
+     -123456
+      123456
+           0
+(5 rows)
 
 create or replace function sc_test() returns setof integer as $$
 declare
@@ -3434,7 +3439,7 @@ begin
   close c;
 end;
 $$ language plpgsql;
-select * from sc_test() order by 1;  -- fails because of NO SCROLL specification
+select * from sc_test();  -- fails because of NO SCROLL specification
 ERROR:  cursor can only scan forward
 HINT:  Declare it with SCROLL option to enable backward scan.
 CONTEXT:  PL/pgSQL function sc_test() line 7 at FETCH
@@ -3452,17 +3457,22 @@ begin
   close c;
 end;
 $$ language plpgsql;
-select * from sc_test() order by 1;
- sc_test 
----------
-(0 rows)
+select * from sc_test();
+   sc_test   
+-------------
+ -2147483647
+  2147483647
+     -123456
+      123456
+           0
+(5 rows)
 
 create or replace function sc_test() returns setof integer as $$
 declare
   c refcursor;
   x integer;
 begin
-  open c scroll for execute 'select f1 from int4_tbl order by 1';
+  open c scroll for execute 'select f1 from int4_tbl';
   fetch last from c into x;
   while found loop
     return next x;
@@ -3472,16 +3482,19 @@ begin
 end;
 $$ language plpgsql;
 select * from sc_test();
- sc_test 
----------
-(0 rows)
+   sc_test   
+-------------
+ -2147483647
+     -123456
+           0
+(3 rows)
 
 create or replace function sc_test() returns setof integer as $$
 declare
   c refcursor;
   x integer;
 begin
-  open c scroll for execute 'select f1 from int4_tbl order by 1';
+  open c scroll for execute 'select f1 from int4_tbl';
   fetch last from c into x;
   while found loop
     return next x;
@@ -3492,9 +3505,11 @@ begin
 end;
 $$ language plpgsql;
 select * from sc_test();
- sc_test 
----------
-(0 rows)
+   sc_test   
+-------------
+ -2147483647
+      123456
+(2 rows)
 
 create or replace function sc_test() returns setof integer as $$
 declare

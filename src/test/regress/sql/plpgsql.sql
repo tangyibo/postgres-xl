@@ -2952,7 +2952,7 @@ begin
 end;
 $$ language plpgsql;
 
-select * from sc_test() order by 1;
+select * from sc_test();
 
 create or replace function sc_test() returns setof integer as $$
 declare
@@ -2969,7 +2969,7 @@ begin
 end;
 $$ language plpgsql;
 
-select * from sc_test() order by 1;
+select * from sc_test();
 
 drop function sc_test();
 
@@ -3007,7 +3007,7 @@ begin
 end;
 $$ language plpgsql;
 
-select * from ret_query1() order by 1, 2;
+select * from ret_query1();
 
 create type record_type as (x text, y int, z boolean);
 
@@ -3018,7 +3018,7 @@ begin
 end;
 $$ language plpgsql;
 
-select * from ret_query2(8) order by 1;
+select * from ret_query2(8);
 
 -- test EXECUTE USING
 create function exc_using(int, text) returns int as $$
@@ -3160,7 +3160,7 @@ begin
 end;
 $$ language plpgsql;
 
-select * from return_dquery() order by 1;
+select * from return_dquery();
 
 drop function return_dquery();
 

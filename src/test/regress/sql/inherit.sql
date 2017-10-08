@@ -515,9 +515,9 @@ insert into patest2
 create index patest0i on patest0(id);
 create index patest1i on patest1(id);
 create index patest2i on patest2(id);
-analyze patest0;
-analyze patest1;
-analyze patest2;
+vacuum analyze patest0;
+vacuum analyze patest1;
+vacuum analyze patest2;
 analyze int4_tbl;
 
 explain (costs off, num_nodes off, nodes off)

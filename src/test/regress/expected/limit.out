@@ -397,8 +397,8 @@ select currval('testseq');
 explain (verbose, costs off)
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by unique2 limit 7;
-                              QUERY PLAN                              
-----------------------------------------------------------------------
+                                                                               QUERY PLAN                                                                                
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  Limit
    Output: unique1, unique2, (generate_series(1, 10))
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
@@ -406,9 +406,11 @@ select unique1, unique2, generate_series(1,10)
          Sort Key: tenk1.unique2
          ->  Limit
                Output: unique1, unique2, (generate_series(1, 10))
-               ->  Index Scan using tenk1_unique2 on public.tenk1
+               ->  ProjectSet
                      Output: unique1, unique2, generate_series(1, 10)
-(9 rows)
+                     ->  Index Scan using tenk1_unique2 on public.tenk1
+                           Output: unique1, unique2, two, four, ten, twenty, hundred, thousand, twothousand, fivethous, tenthous, odd, even, stringu1, stringu2, string4
+(11 rows)
 
 select unique1, unique2, generate_series(1,10)
   from tenk1 order by unique2 limit 7;
@@ -435,7 +437,7 @@ select unique1, unique2, generate_series(1,10)
          Sort Key: tenk1.tenthous
          ->  Limit
                Output: unique1, unique2, (generate_series(1, 10)), tenthous
-               ->  Result
+               ->  ProjectSet
                      Output: unique1, unique2, generate_series(1, 10), tenthous
                      ->  Sort
                            Output: unique1, unique2, tenthous

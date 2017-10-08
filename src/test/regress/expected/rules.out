@@ -2656,7 +2656,11 @@ NOTICE:  drop cascades to 4 other objects
 --
 create temp table t1 (a integer primary key) distribute by replication;
 create temp table t1_1 (check (a >= 0 and a < 10)) inherits (t1) distribute by replication;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 create temp table t1_2 (check (a >= 10 and a < 20)) inherits (t1) distribute by replication;
+WARNING:  Inherited/partition tables inherit distribution from the parent
+DETAIL:  Explicitly specified distribution will be ignored
 create rule t1_ins_1 as on insert to t1
 	where new.a >= 0 and new.a < 10
 	do instead

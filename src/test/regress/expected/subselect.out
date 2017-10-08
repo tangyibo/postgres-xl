@@ -337,7 +337,7 @@ select count(*) from
    where unique1 IN (select hundred from tenk1 b)) ss;
  count 
 -------
-   200
+   100
 (1 row)
 
 select count(distinct ss.ten) from
@@ -893,26 +893,30 @@ select * from int4_tbl where
 explain (verbose, costs off)
 select * from int4_tbl o where (f1, f1) in
   (select f1, generate_series(1,2) / 10 g from int4_tbl i group by f1);
-                              QUERY PLAN                              
-----------------------------------------------------------------------
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1)
    Output: o.f1
-   ->  Hash Semi Join
+   ->  Nested Loop Semi Join
          Output: o.f1
-         Hash Cond: (o.f1 = "ANY_subquery".f1)
+         Join Filter: (o.f1 = "ANY_subquery".f1)
          ->  Seq Scan on public.int4_tbl o
                Output: o.f1
-         ->  Hash
+         ->  Materialize
                Output: "ANY_subquery".f1, "ANY_subquery".g
                ->  Subquery Scan on "ANY_subquery"
                      Output: "ANY_subquery".f1, "ANY_subquery".g
                      Filter: ("ANY_subquery".f1 = "ANY_subquery".g)
-                     ->  HashAggregate
-                           Output: i.f1, (generate_series(1, 2) / 10)
-                           Group Key: i.f1
-                           ->  Seq Scan on public.int4_tbl i
-                                 Output: i.f1
-(17 rows)
+                     ->  Result
+                           Output: i.f1, ((generate_series(1, 2)) / 10)
+                           ->  ProjectSet
+                                 Output: generate_series(1, 2), i.f1
+                                 ->  HashAggregate
+                                       Output: i.f1
+                                       Group Key: i.f1
+                                       ->  Seq Scan on public.int4_tbl i
+                                             Output: i.f1
+(21 rows)
 
 select * from int4_tbl o where (f1, f1) in
   (select f1, generate_series(1,2) / 10 g from int4_tbl i group by f1);

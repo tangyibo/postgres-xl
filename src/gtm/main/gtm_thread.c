@@ -256,6 +256,11 @@ GTM_ThreadCreate(GTM_ConnectionInfo *conninfo,
 													   8 * 1024,
 													   false);
 
+	/*
+	 * Set the sn_xip pointer to the statically-allocated array (see GTM_ThreadInfo).
+	 */
+	thrinfo->thr_snapshot.sn_xip = thrinfo->thr_xip;
+
 	thrinfo->thr_startroutine = startroutine;
 
 	/*

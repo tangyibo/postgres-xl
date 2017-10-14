@@ -59,6 +59,13 @@ typedef struct GTM_ThreadInfo
 	GTM_RWLock			thr_lock;
 	gtm_List			*thr_cached_txninfo;
 	GTM_SnapshotData    thr_snapshot;
+
+	/*
+	 * Statically allocated XID array for the snapshot. Every thread will need
+	 * a snapshot anyway, and this way we don't have to worry about allocation
+	 * and freeing of the memory at thread exit.
+	 */
+	GlobalTransactionId	thr_xip[GTM_MAX_GLOBAL_TRANSACTIONS];
 } GTM_ThreadInfo;
 
 typedef struct GTM_Threads

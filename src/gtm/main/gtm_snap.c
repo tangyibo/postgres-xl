@@ -103,6 +103,10 @@ GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[], int txn_count, int *s
 
 	Assert(snapshot != NULL);
 
+	/*
+	 * This can only happen when using a snapshot from GTMTransactions, as the
+	 * thread-specific sn_xip array is allocated statically as part of GTM_ThreadInfo.
+	 */
 	if (snapshot->sn_xip == NULL)
 	{
 		/*

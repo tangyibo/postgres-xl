@@ -329,6 +329,7 @@ pgxc_FQS_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
 		result->resultRelations = list_make1_int(query->resultRelation);
 	result->planTree = top_plan;
 	result->rtable = query->rtable;
+	result->queryId = query->queryId;
 	result->relationOids = glob->relationOids;
 	result->invalItems = glob->invalItems;
 

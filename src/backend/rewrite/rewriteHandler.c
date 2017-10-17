@@ -96,17 +96,6 @@ static Query *fireRIRrules(Query *parsetree, List *activeRIRs,
 static bool view_has_instead_trigger(Relation view, CmdType event);
 static Bitmapset *adjust_view_column_set(Bitmapset *cols, List *targetlist);
 
-#ifdef PGXC
-typedef struct pull_qual_vars_context
-{
-	List *varlist;
-	int sublevels_up;
-	int resultRelation;
-} pull_qual_vars_context;
-static List * pull_qual_vars(Node *node, int varno);
-static bool pull_qual_vars_walker(Node *node, pull_qual_vars_context *context);
-#endif
-
 /*
  * AcquireRewriteLocks -
  *	  Acquire suitable locks on all the relations mentioned in the Query.
@@ -1308,69 +1297,6 @@ rewriteValuesRTE(RangeTblEntry *rte, Relation target_relation, List *attrnos)
 	rte->values_lists = newValues;
 }
 
-
-#ifdef PGXC
-/*
- * pull_qual_vars(Node *node, int varno)
- * Extract vars from quals belonging to resultRelation. This function is mainly
- * taken from pull_qual_vars_clause(), but since the later does not peek into
- * subquery, we need to write this walker.
- */
-static List *
-pull_qual_vars(Node *node, int varno)
-{
-	pull_qual_vars_context context;
-	context.varlist = NIL;
-	context.sublevels_up = 0;
-	context.resultRelation = varno;
-
-	query_or_expression_tree_walker(node,
-									pull_qual_vars_walker,
-									(void *) &context,
-									0);
-	return context.varlist;
-}
-
-static bool
-pull_qual_vars_walker(Node *node, pull_qual_vars_context *context)
-{
-	if (node == NULL)
-		return false;
-	if (IsA(node, Var))
-	{
-		Var *var = (Var *) node;
-
-		/*
-		 * Add only if this var belongs to the resultRelation and refers to the table
-		 * from the same query.
-		 */
-		if (var->varno == context->resultRelation &&
-		    var->varlevelsup == context->sublevels_up)
-		{
-			Var *newvar = palloc(sizeof(Var));
-			*newvar = *var;
-			newvar->varlevelsup = 0;
-			context->varlist = lappend(context->varlist, newvar);
-		}
-		return false;
-	}
-	if (IsA(node, Query))
-	{
-		/* Recurse into RTE subquery or not-yet-planned sublink subquery */
-		bool		result;
-
-		context->sublevels_up++;
-		result = query_tree_walker((Query *) node, pull_qual_vars_walker,
-								   (void *) context, 0);
-		context->sublevels_up--;
-		return result;
-	}
-	return expression_tree_walker(node, pull_qual_vars_walker,
-								  (void *) context);
-}
-
-#endif /* PGXC */
-
 /*
  * rewriteTargetListUD - rewrite UPDATE/DELETE targetlist as needed
  *
@@ -1391,45 +1317,6 @@ rewriteTargetListUD(Query *parsetree, RangeTblEntry *target_rte,
 	Var		   *var = NULL;
 	const char *attrname;
 	TargetEntry *tle;
-
-#ifdef PGXC
-	List *var_list = NIL;
-	ListCell *elt;
-
-	/*
-	 * In Postgres-XC, we need to evaluate quals of the parse tree and determine
-	 * if they are Coordinator quals. If they are, their attribute need to be
-	 * added to target list for evaluation. In case some are found, add them as
-	 * junks in the target list. The junk status will be used by remote UPDATE
-	 * planning to associate correct element to a clause.
-	 * For DELETE, having such columns in target list helps to evaluate Quals
-	 * correctly on Coordinator.
-	 * PGXCTODO: This list could be reduced to keep only in target list the
-	 * vars using Coordinator Quals.
-	 */
-	if (IS_PGXC_COORDINATOR && parsetree->jointree)
-		var_list = pull_qual_vars((Node *) parsetree->jointree, parsetree->resultRelation);
-
-	foreach(elt, var_list)
-	{
-		Form_pg_attribute att_tup;
-		int numattrs = RelationGetNumberOfAttributes(target_relation);
-
-		var = (Var *) lfirst(elt);
-		/* Bypass in case of extra target items like ctid */
-		if (var->varattno < 1 || var->varattno > numattrs)
-			continue;
-
-
-		att_tup = target_relation->rd_att->attrs[var->varattno - 1];
-		tle = makeTargetEntry((Expr *) var,
-							  list_length(parsetree->targetList) + 1,
-							  pstrdup(NameStr(att_tup->attname)),
-							  true);
-
-		parsetree->targetList = lappend(parsetree->targetList, tle);
-	}
-#endif
 
 #ifdef PGXC
 	/*

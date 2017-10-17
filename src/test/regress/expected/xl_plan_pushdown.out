@@ -54,7 +54,7 @@ EXPLAIN VERBOSE UPDATE xl_pp SET b=2 where a=200;
                                 QUERY PLAN                                 
 ---------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: 2, xl_pp.a, xl_pp.xc_node_id, xl_pp.ctid
+   Output: 2, xl_pp.xc_node_id, xl_pp.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_pp SET b = 2 WHERE (a = 200)
    ->  Update on public.xl_pp  (cost=0.00..35.50 rows=10 width=18)
@@ -67,7 +67,7 @@ EXPLAIN VERBOSE UPDATE xl_pp SET b=2 where a=200::bigint;
                                 QUERY PLAN                                 
 ---------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: 2, xl_pp.a, xl_pp.xc_node_id, xl_pp.ctid
+   Output: 2, xl_pp.xc_node_id, xl_pp.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_pp SET b = 2 WHERE (a = (200)::bigint)
    ->  Update on public.xl_pp  (cost=0.00..35.50 rows=10 width=18)
@@ -80,7 +80,7 @@ EXPLAIN VERBOSE DELETE FROM xl_pp where a=200;
                                 QUERY PLAN                                
 --------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: xl_pp.a, xl_pp.xc_node_id, xl_pp.ctid
+   Output: xl_pp.xc_node_id, xl_pp.ctid
    Node/s: datanode_1
    Remote query: DELETE FROM xl_pp WHERE (a = 200)
    ->  Delete on public.xl_pp  (cost=0.00..35.50 rows=10 width=6)
@@ -103,7 +103,7 @@ EXPLAIN VERBOSE DELETE FROM xl_pp where a=200;
                                 QUERY PLAN                                
 --------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: xl_pp.a, xl_pp.xc_node_id, xl_pp.ctid
+   Output: xl_pp.xc_node_id, xl_pp.ctid
    Node/s: datanode_1
    Remote query: DELETE FROM xl_pp WHERE (a = 200)
    ->  Delete on public.xl_pp  (cost=0.00..35.50 rows=10 width=6)
@@ -116,7 +116,7 @@ EXPLAIN VERBOSE DELETE FROM xl_pp where a=200::bigint;
                                 QUERY PLAN                                
 --------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: xl_pp.a, xl_pp.xc_node_id, xl_pp.ctid
+   Output: xl_pp.xc_node_id, xl_pp.ctid
    Node/s: datanode_1
    Remote query: DELETE FROM xl_pp WHERE (a = (200)::bigint)
    ->  Delete on public.xl_pp  (cost=0.00..35.50 rows=10 width=6)
@@ -168,7 +168,7 @@ EXPLAIN VERBOSE UPDATE xl_ppm SET b=2 where a=200;
                                  QUERY PLAN                                 
 ----------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: 2, xl_ppm.a, xl_ppm.xc_node_id, xl_ppm.ctid
+   Output: 2, xl_ppm.xc_node_id, xl_ppm.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_ppm SET b = 2 WHERE (a = 200)
    ->  Update on public.xl_ppm  (cost=0.00..40.00 rows=12 width=12)
@@ -181,7 +181,7 @@ EXPLAIN VERBOSE UPDATE xl_ppm SET b=2 where a=200::INT2;
                                  QUERY PLAN                                 
 ----------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: 2, xl_ppm.a, xl_ppm.xc_node_id, xl_ppm.ctid
+   Output: 2, xl_ppm.xc_node_id, xl_ppm.ctid
    Node/s: datanode_1
    Remote query: UPDATE xl_ppm SET b = 2 WHERE (a = (200)::smallint)
    ->  Update on public.xl_ppm  (cost=0.00..40.00 rows=12 width=12)
@@ -194,7 +194,7 @@ EXPLAIN VERBOSE DELETE FROM xl_ppm where a=200;
                                 QUERY PLAN                                 
 ---------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: xl_ppm.a, xl_ppm.xc_node_id, xl_ppm.ctid
+   Output: xl_ppm.xc_node_id, xl_ppm.ctid
    Node/s: datanode_1
    Remote query: DELETE FROM xl_ppm WHERE (a = 200)
    ->  Delete on public.xl_ppm  (cost=0.00..40.00 rows=12 width=6)
@@ -217,7 +217,7 @@ EXPLAIN VERBOSE DELETE FROM xl_ppm where a=200;
                                 QUERY PLAN                                 
 ---------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: xl_ppm.a, xl_ppm.xc_node_id, xl_ppm.ctid
+   Output: xl_ppm.xc_node_id, xl_ppm.ctid
    Node/s: datanode_1
    Remote query: DELETE FROM xl_ppm WHERE (a = 200)
    ->  Delete on public.xl_ppm  (cost=0.00..40.00 rows=12 width=6)
@@ -230,7 +230,7 @@ EXPLAIN VERBOSE DELETE FROM xl_ppm where a=200::INT2;
                                 QUERY PLAN                                 
 ---------------------------------------------------------------------------
  Remote Fast Query Execution  (cost=0.00..0.00 rows=0 width=0)
-   Output: xl_ppm.a, xl_ppm.xc_node_id, xl_ppm.ctid
+   Output: xl_ppm.xc_node_id, xl_ppm.ctid
    Node/s: datanode_1
    Remote query: DELETE FROM xl_ppm WHERE (a = (200)::smallint)
    ->  Delete on public.xl_ppm  (cost=0.00..40.00 rows=12 width=6)

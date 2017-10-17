@@ -82,12 +82,12 @@ SELECT id, name FROM xc_alter_table_1 ORDER BY 1;
 
 -- Check for query generation of remote UPDATE
 EXPLAIN (VERBOSE true, COSTS false, NODES false) UPDATE xc_alter_table_1 SET name = 'zzz' WHERE id = currval('xc_alter_table_1_id_seq');
-                                         QUERY PLAN                                          
----------------------------------------------------------------------------------------------
+                                         QUERY PLAN                                         
+--------------------------------------------------------------------------------------------
  Remote Subquery Scan on all
    ->  Update on public.xc_alter_table_1
          ->  Seq Scan on public.xc_alter_table_1
-               Output: id, 'zzz'::character varying(80), NULL::integer, id, xc_node_id, ctid
+               Output: id, 'zzz'::character varying(80), NULL::integer, xc_node_id, ctid
                Filter: (xc_alter_table_1.id = currval('xc_alter_table_1_id_seq'::regclass))
 (5 rows)
 
@@ -147,12 +147,12 @@ SELECT b, c FROM xc_alter_table_2 ORDER BY b;
 
 -- Check for query generation of remote UPDATE
 EXPLAIN (VERBOSE true, COSTS false, NODES false) UPDATE xc_alter_table_2 SET b = 'Morphee', c = false WHERE b = 'Neo';
-                                                     QUERY PLAN                                                      
----------------------------------------------------------------------------------------------------------------------
+                                                    QUERY PLAN                                                    
+------------------------------------------------------------------------------------------------------------------
  Remote Subquery Scan on any
    ->  Update on public.xc_alter_table_2
          ->  Seq Scan on public.xc_alter_table_2
-               Output: NULL::integer, 'Morphee'::character varying(20), false, NULL::integer, NULL::integer, b, ctid
+               Output: NULL::integer, 'Morphee'::character varying(20), false, NULL::integer, NULL::integer, ctid
                Filter: ((xc_alter_table_2.b)::text = 'Neo'::text)
 (5 rows)
 
@@ -192,12 +192,12 @@ SELECT a, a2, b, c FROM xc_alter_table_2 ORDER BY b;
 
 -- Check for query generation of remote UPDATE
 EXPLAIN (VERBOSE true, COSTS false, NODES false) UPDATE xc_alter_table_2 SET a = 200, a2 = 'CTO' WHERE b = 'John';
-                                                     QUERY PLAN                                                      
----------------------------------------------------------------------------------------------------------------------
+                                                    QUERY PLAN                                                    
+------------------------------------------------------------------------------------------------------------------
  Remote Subquery Scan on any
    ->  Update on public.xc_alter_table_2
          ->  Seq Scan on public.xc_alter_table_2
-               Output: NULL::integer, b, c, NULL::integer, NULL::integer, 200, 'CTO'::character varying(20), b, ctid
+               Output: NULL::integer, b, c, NULL::integer, NULL::integer, 200, 'CTO'::character varying(20), ctid
                Filter: ((xc_alter_table_2.b)::text = 'John'::text)
 (5 rows)
 

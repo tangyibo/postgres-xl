@@ -1514,7 +1514,7 @@ ExplainNode(PlanState *planstate, List *ancestors,
 		case T_RemoteQuery:
 			/* Remote query */
 			ExplainRemoteQuery((RemoteQuery *)plan, planstate, ancestors, es);
-			show_scan_qual(plan->qual, "Coordinator quals", planstate, ancestors, es);
+			Assert(!plan->qual);
 			break;
 #endif
 #ifdef XCP

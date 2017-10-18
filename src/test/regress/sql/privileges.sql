@@ -169,7 +169,9 @@ CREATE OPERATOR >>> (procedure = leak2, leftarg = integer, rightarg = integer,
 EXPLAIN (COSTS OFF) SELECT * FROM atest12 WHERE a >>> 0;
 
 -- This plan should use hashjoin, as it will expect many rows to be selected.
+SET random_page_cost = 8.5;
 EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
+RESET random_page_cost;
 
 -- Now regress_user1 grants sufficient access to regress_user2.
 SET SESSION AUTHORIZATION regress_user1;

@@ -115,7 +115,8 @@ static Datum ind_fetch_func(VacAttrStatsP stats, int rownum, bool *isNull);
 
 #ifdef XCP
 static void analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
-						VacAttrStats **vacattrstats);
+						VacAttrStats **vacattrstats, int nindexes,
+						Relation *indexes, AnlIndexData *indexdata);
 #endif
 
 /*
@@ -424,30 +425,6 @@ do_analyze_rel(Relation onerel, int options, VacuumParams *params,
 		attr_cnt = tcnt;
 	}
 
-#ifdef XCP
-	if (IS_PGXC_COORDINATOR && onerel->rd_locator_info)
-	{
-		/*
-		 * Fetch relation statistics from remote nodes and update
-		 */
-		vacuum_rel_coordinator(onerel, in_outer_xact);
-
-		/*
-		 * Fetch attribute statistics from remote nodes.
-		 */
-		analyze_rel_coordinator(onerel, inh, attr_cnt, vacattrstats);
-
-		/*
-		 * Skip acquiring local stats. Coordinator does not store data of
-		 * distributed tables.
-		 */
-		nindexes = 0;
-		hasindex = false;
-		Irel = NULL;
-		goto cleanup;
-	}
-#endif
-
 	/*
 	 * Open all indexes of the relation, and see if there are any analyzable
 	 * columns in the indexes.  We do not analyze index columns if there was
@@ -504,6 +481,28 @@ do_analyze_rel(Relation onerel, int options, VacuumParams *params,
 			}
 		}
 	}
+
+#ifdef XCP
+	if (IS_PGXC_COORDINATOR && onerel->rd_locator_info)
+	{
+		/*
+		 * Fetch relation statistics from remote nodes and update
+		 */
+		vacuum_rel_coordinator(onerel, in_outer_xact);
+
+		/*
+		 * Fetch attribute statistics from remote nodes.
+		 */
+		analyze_rel_coordinator(onerel, inh, attr_cnt, vacattrstats,
+								nindexes, Irel, indexdata);
+
+		/*
+		 * Skip acquiring local stats. Coordinator does not store data of
+		 * distributed tables.
+		 */
+		goto cleanup;
+	}
+#endif
 
 	/*
 	 * Determine how many rows we need to sample, using the worst case from
@@ -2944,9 +2943,24 @@ compare_mcvs(const void *a, const void *b)
 
 
 #ifdef XCP
+/*
+ * coord_collect_simple_stats
+ *		Collect simple stats for a relation (pg_statistic contents).
+ *
+ * Collects statistics from the datanodes, and then keeps the one of the
+ * received statistics for each attribute (the first one we receive, but
+ * it's mostly random).
+ *
+ * XXX We do not try to build statistics covering data fro all the nodes,
+ * either by collecting fresh sample of rows or merging the statistics
+ * somehow. The current approach is very simple and cheap, but may have
+ * negative impact on estimate accuracy as the stats only covers data
+ * from a single node, and we may end up with stats from different node
+ * for each attribute.
+ */
 static void
-analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
-						VacAttrStats **vacattrstats)
+coord_collect_simple_stats(Relation onerel, bool inh, int attr_cnt,
+						   VacAttrStats **vacattrstats)
 {
 	char 		   *nspname;
 	char 		   *relname;
@@ -2960,13 +2974,10 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 	int 			i;
 	/* Number of data nodes from which attribute statistics are received. */
 	int			   *numnodes;
-	List		   *stat_oids;
 
 	/* Get the relation identifier */
 	relname = RelationGetRelationName(onerel);
 	nspname = get_namespace_name(RelationGetNamespace(onerel));
-
-	elog(LOG, "Getting detailed statistics for %s.%s", nspname, relname);
 
 	/* Make up query string */
 	initStringInfo(&query);
@@ -3367,6 +3378,38 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 		}
 	}
 	update_attstats(RelationGetRelid(onerel), inh, attr_cnt, vacattrstats);
+}
+
+/*
+ * coord_collect_extended_stats
+ *		Collect extended stats for a relation (pg_statistic_ext contents).
+ *
+ * Collects statistics from the datanodes, and then keeps the one of the
+ * received statistics for each attribute (the first one we receive, but
+ * it's mostly random).
+ *
+ * XXX This has similar issues as coord_collect_simple_stats.
+ */
+static void
+coord_collect_extended_stats(Relation onerel, int attr_cnt)
+{
+	char 		   *nspname;
+	char 		   *relname;
+	/* Fields to run query to read statistics from data nodes */
+	StringInfoData  query;
+	EState 		   *estate;
+	MemoryContext 	oldcontext;
+	RemoteQuery	    *step;
+	RemoteQueryState *node;
+	TupleTableSlot *result;
+	int 			i;
+	/* Number of data nodes from which attribute statistics are received. */
+	int			   *numnodes;
+	List		   *stat_oids;
+
+	/* Get the relation identifier */
+	relname = RelationGetRelationName(onerel);
+	nspname = get_namespace_name(RelationGetNamespace(onerel));
 
 	/*
 	 * Build extended statistics on the coordinator.
@@ -3520,5 +3563,35 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 		result = ExecRemoteQuery((PlanState *) node);
 	}
 	ExecEndRemoteQuery(node);
+}
+
+/*
+ * analyze_rel_coordinator
+ *		Collect all statistics for a particular relation.
+ *
+ * We collect three types of statistics for each table:
+ *
+ * - simple statistics (pg_statistic)
+ * - extended statistics (pg_statistic_ext)
+ * - index statistics (including expression indexes)
+ */
+static void
+analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
+						VacAttrStats **vacattrstats, int nindexes,
+						Relation *indexes, AnlIndexData *indexdata)
+{
+	int i;
+
+	/* simple statistics (pg_statistic) for the relation */
+	coord_collect_simple_stats(onerel, inh, attr_cnt, vacattrstats);
+
+	/* simple statistics (pg_statistic) for all indexes */
+	for (i = 0; i < nindexes; i++)
+		coord_collect_simple_stats(indexes[i], false,
+								   indexdata[i].attr_cnt,
+								   indexdata[i].vacattrstats);
+
+	/* extended statistics (pg_statistic) for the relation */
+	coord_collect_extended_stats(onerel, attr_cnt);
 }
 #endif

@@ -97,14 +97,14 @@ INSERT INTO atest1 SELECT 1, b FROM atest1; -- ok
 UPDATE atest1 SET a = 1 WHERE a = 2; -- ok
 UPDATE atest2 SET col2 = NOT col2; -- fail
 ERROR:  permission denied for relation atest2
-SELECT * FROM atest1 ORDER BY 1 FOR UPDATE; -- ok
+SELECT * FROM atest1 FOR UPDATE; -- ok
  a |  b  
 ---+-----
  1 | two
  1 | two
 (2 rows)
 
-SELECT * FROM atest2 ORDER BY 1 FOR UPDATE; -- fail
+SELECT * FROM atest2 FOR UPDATE; -- fail
 ERROR:  permission denied for relation atest2
 DELETE FROM atest2; -- fail
 ERROR:  permission denied for relation atest2
@@ -136,7 +136,7 @@ SELECT session_user, current_user;
  regress_user3 | regress_user3
 (1 row)
 
-SELECT * FROM atest1 ORDER BY 1; -- ok
+SELECT * FROM atest1; -- ok
  a |  b  
 ---+-----
  1 | two
@@ -177,7 +177,7 @@ SELECT * FROM atest2 WHERE ( col1 IN ( SELECT b FROM atest1 ) );
 ERROR:  permission denied for relation atest2
 SET SESSION AUTHORIZATION regress_user4;
 COPY atest2 FROM stdin; -- ok
-SELECT * FROM atest1 ORDER BY 1; -- ok
+SELECT * FROM atest1; -- ok
  a |  b  
 ---+-----
  1 | two

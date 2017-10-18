@@ -222,7 +222,7 @@ SET SESSION AUTHORIZATION regress_user4;
 
 SELECT * FROM atestv1; -- ok
 SELECT * FROM atestv2; -- fail
-SELECT * FROM atestv3; -- fail due to issue 3520503, see above
+SELECT * FROM atestv3; -- ok
 SELECT * FROM atestv0; -- fail
 
 -- Appendrels excluded by constraints failed to check permissions in 8.4-9.2.
@@ -241,7 +241,7 @@ where x < 0;
 reset constraint_exclusion;
 
 CREATE VIEW atestv4 AS SELECT * FROM atestv3; -- nested view
-SELECT * FROM atestv4; -- fail due to issue 3520503, see above
+SELECT * FROM atestv4; -- ok
 GRANT SELECT ON atestv4 TO regress_user2;
 
 SET SESSION AUTHORIZATION regress_user2;
@@ -249,7 +249,6 @@ SET SESSION AUTHORIZATION regress_user2;
 -- Two complex cases:
 
 SELECT * FROM atestv3; -- fail
--- fail due to issue 3520503, see above
 SELECT * FROM atestv4; -- ok (even though regress_user2 cannot access underlying atestv3)
 
 SELECT * FROM atest2; -- ok
@@ -299,7 +298,7 @@ SET SESSION AUTHORIZATION regress_user4;
 SELECT one, two FROM atest5 NATURAL JOIN atest6; -- ok now
 
 -- test column-level privileges for INSERT and UPDATE
-INSERT INTO atest5 (two) VALUES (3); -- fail due to issue 3520503, see above
+INSERT INTO atest5 (two) VALUES (3); -- ok
 COPY atest5 FROM stdin; -- fail
 COPY atest5 (two) FROM stdin; -- ok
 1
@@ -403,9 +402,9 @@ GRANT SELECT(fx) ON atestc TO regress_user2;
 
 SET SESSION AUTHORIZATION regress_user2;
 SELECT fx FROM atestp2; -- ok
-SELECT fy FROM atestp2; -- fail due to issue 3520503, see above
-SELECT atestp2 FROM atestp2; -- fail due to issue 3520503, see above
-SELECT oid FROM atestp2; -- fail due to issue 3520503, see above
+SELECT fy FROM atestp2; -- ok
+SELECT atestp2 FROM atestp2; -- ok
+SELECT oid FROM atestp2; -- ok
 SELECT fy FROM atestc; -- fail
 
 SET SESSION AUTHORIZATION regress_user1;
@@ -414,7 +413,7 @@ GRANT SELECT(fy,oid) ON atestc TO regress_user2;
 SET SESSION AUTHORIZATION regress_user2;
 SELECT fx FROM atestp2; -- still ok
 SELECT fy FROM atestp2; -- ok
-SELECT atestp2 FROM atestp2; -- fail due to issue 3520503, see above
+SELECT atestp2 FROM atestp2; -- ok
 SELECT oid FROM atestp2; -- ok
 
 -- privileges on functions, languages
@@ -449,7 +448,7 @@ CREATE FUNCTION testfunc3(int) RETURNS int AS 'select 2 * $1;' LANGUAGE sql; -- 
 SET SESSION AUTHORIZATION regress_user3;
 SELECT testfunc1(5); -- fail
 SELECT col1 FROM atest2 WHERE col2 = true; -- fail
-SELECT testfunc4(true); -- fail due to issue 3520503, see above
+SELECT testfunc4(true); -- ok
 
 SET SESSION AUTHORIZATION regress_user4;
 SELECT testfunc1(5); -- ok

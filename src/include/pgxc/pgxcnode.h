@@ -175,11 +175,9 @@ extern int	pgxc_node_send_timestamp(PGXCNodeHandle * handle, TimestampTz timesta
 extern bool	pgxc_node_receive(const int conn_count,
 				  PGXCNodeHandle ** connections, struct timeval * timeout);
 extern int	pgxc_node_read_data(PGXCNodeHandle * conn, bool close_if_error);
-extern int	pgxc_node_is_data_enqueued(PGXCNodeHandle *conn);
 
 extern int	send_some(PGXCNodeHandle * handle, int len);
 extern int	pgxc_node_flush(PGXCNodeHandle *handle);
-extern void	pgxc_node_flush_read(PGXCNodeHandle *handle);
 
 extern char get_message(PGXCNodeHandle *conn, int *len, char **msg);
 
@@ -202,4 +200,8 @@ extern bool PgxcNodeDiffBackendHandles(List **nodes_alter,
 			   List **nodes_delete, List **nodes_add);
 extern void PgxcNodeRefreshBackendHandlesShmem(List *nodes_alter);
 extern void HandlePoolerMessages(void);
+
+/* Check health of nodes in the connection pool. */
+extern void PoolPingNodeRecheck(Oid nodeoid);
+
 #endif /* PGXCNODE_H */

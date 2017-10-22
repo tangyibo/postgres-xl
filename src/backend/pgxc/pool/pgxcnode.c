@@ -1,9 +1,103 @@
 /*-------------------------------------------------------------------------
  *
  * pgxcnode.c
+ *	  Functions for communication with nodes through pooled connections.
  *
- *	  Functions for the Coordinator communicating with the PGXC nodes:
- *	  Datanodes and Coordinators
+ * This is mostly a backend-side counterpart to the pool manager. Each
+ * session acquires connections to remote nodes, and uses them to execute
+ * queries.
+ *
+ * Currently, we only allow a single connection to each remote node. If
+ * a query includes multiple nodes that communicate with a given remote
+ * node (e.g. Append with multiple RemoteSubquery children), then the
+ * connection may need to be buffered (see BufferConnection).
+ *
+ * Following is an overview of the basic methods for node management and
+ * communication over the handles.
+ *
+ *
+ * node handle management
+ * ----------------------
+ * get_any_handle      - acquire handle for replicated table
+ * get_handles         - acquire handles to all specified nodes
+ * get_current_handles - return already acquired handles
+ * release_handles     - release all connection (back to pool)
+ *
+ *
+ * connection functions (TODO move to poolmgr.c)
+ * --------------------
+ * PGXCNodeConnect    - open libpq connection using connection string
+ * PGXCNodePing       - ping node using connection string
+ * PGXCNodeClose      - close libpq connection
+ * PGXCNodeConnected  - verify connection status
+ * PGXCNodeConnStr    - build connection string
+ *
+ *
+ * node handle management
+ * ----------------------
+ * PGXCNodeGetNodeOid        - OID for node by index in handle array
+ * PGXCNodeGetNodeIdFromName - determine index in handle array by name
+ * PGXCNodeGetNodeId         - determine index in handle array from OID
+ *
+ *
+ * session/transaction parameters
+ * ------------------------------
+ * PGXCNodeSetParam               - add new parameter
+ * PGXCNodeResetParams            - reset (local or session) parameters
+ * PGXCNodeGetTransactionParamStr - generate SET with transaction params
+ * PGXCNodeGetSessionParamStr     - generate SET with session params
+ *
+ *
+ * low-level TCP buffer access
+ * ---------------------------
+ * pgxc_node_receive   - receive data into input buffers for connections
+ * pgxc_node_read_data - read data for one particular connection
+ * get_message         - read one complete message from a handle
+ * send_some           - send a chunk of data to remote node
+ *
+ *
+ * send higher-level messages to remote node
+ * -----------------------------------------
+ * pgxc_node_send_parse    - sends PARSE (part of extended protocol)
+ * pgxc_node_send_bind     - sends BIND (part of extended protocol)
+ * pgxc_node_send_describe - sends DESCRIBE (part of extended protocol)
+ * pgxc_node_send_execute  - sends EXECUTE (part of extended protocol)
+ * pgxc_node_send_flush    - sends FLUSH (part of extended protocol)
+ * pgxc_node_send_close    - sends close (C)
+ * pgxc_node_send_sync     - sends sync (S)
+ * pgxc_node_send_query    - simple query protocol (Q)
+ * pgxc_node_send_rollback - simple query on failed connection (Q)
+ * pgxc_node_send_query_extended - extended query protocol (PARSE, ...)
+ *
+ *
+ * XL-specific messages to remote nodes
+ * ------------------------------------
+ * pgxc_node_send_plan       - sends plan to remote node (p)
+ * pgxc_node_send_gxid       - sends GXID to remote node (g)
+ * pgxc_node_send_cmd_id     - sends CommandId to remote node (M)
+ * pgxc_node_send_snapshot   - sends snapshot to remote node (s)
+ * pgxc_node_send_timestamp  - sends timestamp to remote node (t)
+ *
+ *
+ * misc functions
+ * --------------
+ * pgxc_node_set_query  - send SET by simple protocol, wait for "ready"
+ * pgxc_node_flush      - flush all data from the output buffer
+ *
+ *
+ * XXX We should add the custom messages (gxid, snapshot, ...) to the SGML
+ * documentation describing message formats.
+ *
+ * XXX What about using simple list, instead of the arrays? Or define new
+ * structure grouping all the important parameters (buffer, size, maxsize).
+ *
+ * XXX The comments claim that dn_handles and co_handles are allocated in
+ * Transaction context, but in fact those are allocated in TopMemoryContext.
+ * Otherwise we wouldn't be able to use persistent connections, which keeps
+ * connections for the whole session.
+ *
+ * XXX The comment at pgxc_node_free mentions TopTransactionContext, so
+ * perhaps we should consider using that?
  *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
@@ -11,8 +105,7 @@
  * Portions Copyright (c) 2010-2012 Postgres-XC Development Group
  *
  * IDENTIFICATION
- *	  $$
- *
+ *	  src/backend/pgxc/pool/pgxcnode.c
  *
  *-------------------------------------------------------------------------
  */
@@ -31,24 +124,28 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+
 #include "access/gtm.h"
 #include "access/transam.h"
 #include "access/xact.h"
 #include "access/htup_details.h"
 #include "catalog/pg_type.h"
+#include "catalog/pg_collation.h"
+#include "catalog/pgxc_node.h"
 #include "commands/prepare.h"
 #include "gtm/gtm_c.h"
+#include "miscadmin.h"
 #include "nodes/nodes.h"
-#include "pgxc/pgxcnode.h"
 #include "pgxc/execRemote.h"
-#include "catalog/pgxc_node.h"
-#include "catalog/pg_collation.h"
 #include "pgxc/locator.h"
 #include "pgxc/nodemgr.h"
+#include "pgxc/pause.h"
 #include "pgxc/pgxc.h"
+#include "pgxc/pgxcnode.h"
 #include "pgxc/poolmgr.h"
-#include "tcop/dest.h"
+#include "storage/ipc.h"
 #include "storage/lwlock.h"
+#include "tcop/dest.h"
 #include "utils/builtins.h"
 #include "utils/elog.h"
 #include "utils/memutils.h"
@@ -57,14 +154,9 @@
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
 #include "utils/formatting.h"
+#include "utils/snapmgr.h"
 #include "utils/tqual.h"
 #include "../interfaces/libpq/libpq-fe.h"
-#ifdef XCP
-#include "miscadmin.h"
-#include "storage/ipc.h"
-#include "pgxc/pause.h"
-#include "utils/snapmgr.h"
-#endif
 
 #define CMD_ID_MSG_LEN 8
 
@@ -73,35 +165,29 @@ static int	datanode_count = 0;
 static int	coord_count = 0;
 
 /*
- * Datanode handles saved in Transaction memory context
- * when PostgresMain is launched.
- * Those handles are used inside a transaction by Coordinator to Datanodes.
+ * Datanode and coordinator handles (sockets obtained from the pooler),
+ * initialized in the TopMemoryContext memory context. Those connections
+ * are used during query execution to communicate wit the nodes.
+ *
+ * XXX At this point we have only a single connection to each node, and
+ * use multiplex it for multiple cursors (see BufferConnection).
  */
-static PGXCNodeHandle *dn_handles = NULL;
+static PGXCNodeHandle *dn_handles = NULL;	/* datanodes */
+static PGXCNodeHandle *co_handles = NULL;	/* coordinators */
 
-/*
- * Coordinator handles saved in Transaction memory context
- * when PostgresMain is launched.
- * Those handles are used inside a transaction by Coordinator to Coordinators
- */
-static PGXCNodeHandle *co_handles = NULL;
-
-/* Current size of dn_handles and co_handles */
+/* Current number of datanode and coordinator handles. */
 int			NumDataNodes;
 int 		NumCoords;
 
-
-#ifdef XCP
 volatile bool HandlesInvalidatePending = false;
 volatile bool HandlesRefreshPending = false;
 
 /*
- * Session and transaction parameters need to to be set on newly connected
- * remote nodes.
+ * Session/transaction parameters that need to to be set on new connections.
  */
 static List *session_param_list = NIL;
 static List	*local_param_list = NIL;
-static StringInfo 	session_params;
+static StringInfo	session_params;
 static StringInfo	local_params;
 
 typedef struct
@@ -114,14 +200,9 @@ typedef struct
 
 static bool DoInvalidateRemoteHandles(void);
 static bool DoRefreshRemoteHandles(void);
-#endif
 
-#ifdef XCP
 static void pgxc_node_init(PGXCNodeHandle *handle, int sock,
 		bool global_session, int pid);
-#else
-static void pgxc_node_init(PGXCNodeHandle *handle, int sock);
-#endif
 static void pgxc_node_free(PGXCNodeHandle *handle);
 static void pgxc_node_all_free(void);
 
@@ -130,7 +211,7 @@ static int	get_char(PGXCNodeHandle * conn, char *out);
 
 
 /*
- * Initialize PGXCNodeHandle struct
+ * Initialize empty PGXCNodeHandle struct
  */
 static void
 init_pgxc_handle(PGXCNodeHandle *pgxc_handle)
@@ -165,17 +246,21 @@ init_pgxc_handle(PGXCNodeHandle *pgxc_handle)
 
 
 /*
- * Allocate and initialize memory to store Datanode and Coordinator handles.
+ * InitMultinodeExecutor
+ *	  Initialize datanode and coordinator handles.
+ *
+ * Acquires list of nodes from the node manager, and initializes handle
+ * for each one.
+ *
+ * Also determines PGXCNodeId to index in the proper array of handles
+ * (co_handles or dn_handles), depending on the type of this node.
  */
 void
 InitMultinodeExecutor(bool is_force)
 {
 	int				count;
 	Oid				*coOids, *dnOids;
-#ifdef XCP
 	MemoryContext	oldcontext;
-#endif
-
 
 	/* Free all the existing information first */
 	if (is_force)
@@ -192,13 +277,11 @@ InitMultinodeExecutor(bool is_force)
 	/* Get classified list of node Oids */
 	PgxcNodeGetOids(&coOids, &dnOids, &NumCoords, &NumDataNodes, true);
 
-#ifdef XCP
 	/*
 	 * Coordinator and datanode handles should be available during all the
 	 * session lifetime
 	 */
 	oldcontext = MemoryContextSwitchTo(TopMemoryContext);
-#endif
 
 	/* Do proper initialization of handles */
 	if (NumDataNodes > 0)
@@ -244,6 +327,15 @@ InitMultinodeExecutor(bool is_force)
 
 	MemoryContextSwitchTo(oldcontext);
 
+	/*
+	 * Determine index of a handle representing this node, either in the
+	 * coordinator or datanode handles, depending on the type of this
+	 * node. The index gets stored in PGXCNodeId.
+	 *
+	 * XXX It's a bit confusing that this may point either to co_handles
+	 * or dn_handles, and may easily lead to bugs when used with the
+	 * incorrect array.
+	 */
 	if (IS_PGXC_COORDINATOR)
 	{
 		for (count = 0; count < NumCoords; count++)
@@ -265,7 +357,13 @@ InitMultinodeExecutor(bool is_force)
 }
 
 /*
- * Builds up a connection string
+ * PGXCNodeConnStr
+ *	  Builds a connection string for the provided connection parameters.
+ *
+ * Aside from the usual connection parameters (host, port, ...) we also
+ * pass information about type of the parent node and remote node type.
+ *
+ * XXX Shouldn't this rather throw an ERROR instead of returning NULL?
  */
 char *
 PGXCNodeConnStr(char *host, int port, char *dbname,
@@ -278,6 +376,8 @@ PGXCNodeConnStr(char *host, int port, char *dbname,
 	/*
 	 * Build up connection string
 	 * remote type can be Coordinator, Datanode or application.
+	 *
+	 * XXX What's application remote type?
 	 */
 	num = snprintf(connstr, sizeof(connstr),
 				   "host=%s port=%d dbname=%s user=%s application_name='pgxc:%s' sslmode=disable options='-c remotetype=%s -c parentnode=%s %s'",
@@ -299,7 +399,8 @@ PGXCNodeConnStr(char *host, int port, char *dbname,
 
 
 /*
- * Connect to a Datanode using a connection string
+ * PGXCNodeConnect
+ *	  Connect to a Datanode using a constructed connection string.
  */
 NODE_CONNECTION *
 PGXCNodeConnect(char *connstr)
@@ -311,7 +412,12 @@ PGXCNodeConnect(char *connstr)
 	return (NODE_CONNECTION *) conn;
 }
 
-int PGXCNodePing(const char *connstr)
+/*
+ * PGXCNodePing
+ *	  Check that a node (identified the connstring) responds correctly.
+ */
+int
+PGXCNodePing(const char *connstr)
 {
 	if (connstr[0])
 	{
@@ -326,22 +432,23 @@ int PGXCNodePing(const char *connstr)
 }
 
 /*
- * Close specified connection
+ * PGXCNodeClose
+ *	  Close connection connection.
  */
 void
 PGXCNodeClose(NODE_CONNECTION *conn)
 {
-	/* Delegate call to the pglib */
+	/* Delegate call to the libpq */
 	PQfinish((PGconn *) conn);
 }
 
 /*
- * Checks if connection active
+ * PGXCNodeConnected
+ *	  Check if the provided connection is open and valid.
  */
 int
 PGXCNodeConnected(NODE_CONNECTION *conn)
 {
-	/* Delegate call to the pglib */
 	PGconn	   *pgconn = (PGconn *) conn;
 
 	/*
@@ -352,12 +459,13 @@ PGXCNodeConnected(NODE_CONNECTION *conn)
 }
 
 
-
-/* Close the socket handle (this process' copy) and free occupied memory
+/*
+ * pgxc_node_free
+ *	  Close the socket handle (local copy) and free occupied memory.
  *
- * Note that we do not free the handle and its members. This will be
- * taken care of when the transaction ends, when TopTransactionContext
- * is destroyed in xact.c.
+ * Note that this only closes the socket, but we do not free the handle
+ * and its members. This will be taken care of when the transaction ends,
+ * when TopTransactionContext is destroyed in xact.c.
  */
 static void
 pgxc_node_free(PGXCNodeHandle *handle)
@@ -368,7 +476,8 @@ pgxc_node_free(PGXCNodeHandle *handle)
 }
 
 /*
- * Free all the node handles cached
+ * pgxc_node_all_free
+ *	  Free all the node handles cached in TopMemoryContext.
  */
 static void
 pgxc_node_all_free(void)
@@ -410,9 +519,11 @@ pgxc_node_all_free(void)
 }
 
 /*
- * Create and initialise internal structure to communicate to
- * Datanode via supplied socket descriptor.
- * Structure stores state info and I/O buffers
+ * pgxc_node_init
+ *	  Initialize the handle to communicate to node throught the socket.
+ *
+ * Stored PID of the remote backend, and of requested, sends the global
+ * session string to the remote node.
  */
 static void
 pgxc_node_init(PGXCNodeHandle *handle, int sock, bool global_session, int pid)
@@ -435,9 +546,10 @@ pgxc_node_init(PGXCNodeHandle *handle, int sock, bool global_session, int pid)
 	handle->inEnd = 0;
 	handle->inCursor = 0;
 	handle->needSync = false;
+
 	/*
 	 * We got a new connection, set on the remote node the session parameters
-	 * if defined. The transaction parameter should be sent after BEGIN
+	 * if defined. The transaction parameter should be sent after BEGIN.
 	 */
 	if (global_session)
 	{
@@ -451,8 +563,9 @@ pgxc_node_init(PGXCNodeHandle *handle, int sock, bool global_session, int pid)
 
 
 /*
- * Wait while at least one of specified connections has data available and read
- * the data into the buffer
+ * pgxc_node_receive
+ *	  Wait while at least one of the connections has data available, and
+ * read the data into the buffer.
  */
 bool
 pgxc_node_receive(const int conn_count,
@@ -605,28 +718,10 @@ retry:
 	return NO_ERROR_OCCURED;
 }
 
-/*
- * Is there any data enqueued in the TCP input buffer waiting
- * to be read sent by the PGXC node connection
- */
-
-int
-pgxc_node_is_data_enqueued(PGXCNodeHandle *conn)
-{
-	int ret;
-	int enqueued;
-
-	if (conn->sock < 0)
-		return 0;
-	ret = ioctl(conn->sock, FIONREAD, &enqueued);
-	if (ret != 0)
-		return 0;
-
-	return enqueued;
-}
 
 /*
- * Read up incoming messages from the PGXC node connection
+ * pgxc_node_read_data
+ *	  Read incoming data from the node TCP connection.
  */
 int
 pgxc_node_read_data(PGXCNodeHandle *conn, bool close_if_error)
@@ -769,7 +864,10 @@ retry:
 
 
 /*
- * Get one character from the connection buffer and advance cursor
+ * Get one character from the connection buffer and advance cursor.
+ *
+ * Returns 0 if enough data is available in the buffer (and the value is
+ * returned in the 'out' parameter). Otherwise the function returns EOF.
  */
 static int
 get_char(PGXCNodeHandle * conn, char *out)
@@ -783,7 +881,12 @@ get_char(PGXCNodeHandle * conn, char *out)
 }
 
 /*
- * Read an integer from the connection buffer and advance cursor
+ * Try reading an integer from the connection buffer and advance cursor.
+ *
+ * Returns 0 if enough data is available in the buffer (and the value is
+ * returned in the 'out' parameter). Otherwise the function returns EOF.
+ *
+ * XXX We only ever call this once with len=4, so simplify the function.
  */
 static int
 get_int(PGXCNodeHandle *conn, size_t len, int *out)
@@ -791,6 +894,10 @@ get_int(PGXCNodeHandle *conn, size_t len, int *out)
 	unsigned short tmp2;
 	unsigned int tmp4;
 
+	/*
+	 * XXX This seems somewhat inconsistent with get_char(). Perhaps this
+	 * should use >= to behave in the same way?
+	 */
 	if (conn->inCursor + len > conn->inEnd)
 		return EOF;
 
@@ -817,49 +924,70 @@ get_int(PGXCNodeHandle *conn, size_t len, int *out)
 
 /*
  * get_message
- * If connection has enough data read entire message from the connection buffer
- * and returns message type. Message data and data length are returned as
- * var parameters.
- * If buffer does not have enough data leaves cursor unchanged, changes
- * connection status to DN_CONNECTION_STATE_QUERY indicating it needs to
- * receive more and returns \0
+ *	  Attempt to read the whole message from the input buffer, if possible.
+ *
+ * If the entire message is in the input buffer of the connection, reads it
+ * into a buffer (len and msg parameters) and returns the message type.
+ *
+ * If the input buffer does not contain the whole message, the cursor is
+ * left unchanged, the connection status is se to DN_CONNECTION_STATE_QUERY
+ * indicating it needs to receive more data, and \0 is returned (instead of
+ * an actual message type).
+ *
  * conn - connection to read from
  * len - returned length of the data where msg is pointing to
- * msg - returns pointer to memory in the incoming buffer. The buffer probably
- * will be overwritten upon next receive, so if caller wants to refer it later
- * it should make a copy.
+ * msg - returns pointer to position in the incoming buffer
+ *
+ * The buffer probably will be overwritten upon next receive, so if caller
+ * wants to refer it later it should make a copy.
  */
 char
 get_message(PGXCNodeHandle *conn, int *len, char **msg)
 {
 	char 		msgtype;
 
+	/*
+	 * Try reading the first char (message type) and integer (message length).
+	 *
+	 * Both functions return 0 (false) in case of success, and EOF (true) in
+	 * case of failure. So we call get_char() first, and only if it succeeds
+	 * the get_int() gets called.
+	 */
 	if (get_char(conn, &msgtype) || get_int(conn, 4, len))
 	{
-		/* Successful get_char would move cursor, restore position */
+		/* Successful get_char/get_int would move cursor, restore position. */
 		conn->inCursor = conn->inStart;
 		return '\0';
 	}
 
+	/* The message length includes the length header too, so subtract it. */
 	*len -= 4;
 
+	/*
+	 * If the whole message is not in the buffer, we need to read more data.
+	 *
+	 * Reading function will discard already consumed data in the buffer till
+	 * conn->inCursor. To avoid extra/handle cycles we need to fit the whole
+	 * message (and not just a part of it) into the buffer. So let's ensure
+	 * the buffer is large enough.
+	 *
+	 * We need 1 byte for for message type, 4 bytes for message length and
+	 * the message itself (the length is currently in *len). The buffer may
+	 * already be large enough, in which case ensure_in_buffer_capacity()
+	 * will return immediately .
+	 */
 	if (conn->inCursor + *len > conn->inEnd)
 	{
-		/*
-		 * Not enough data in the buffer, we should read more.
-		 * Reading function will discard already consumed data in the buffer
-		 * till conn->inBegin. Then we want the message that is partly in the
-		 * buffer now has been read completely, to avoid extra read/handle
-		 * cycles. The space needed is 1 byte for message type, 4 bytes for
-		 * message length and message itself which size is currently in *len.
-		 * The buffer may already be large enough, in this case the function
-		 * ensure_in_buffer_capacity() will immediately return
+		/* ensure space for the whole message (including 5B header)
+		 *
+		 * FIXME Add check of the return value. Non-zero value means failure.
 		 */
 		ensure_in_buffer_capacity(5 + (size_t) *len, conn);
 		conn->inCursor = conn->inStart;
 		return '\0';
 	}
 
+	/* Great, the whole message in the buffer. */
 	*msg = conn->inBuffer + conn->inCursor;
 	conn->inCursor += *len;
 	conn->inStart = conn->inCursor;
@@ -868,8 +996,8 @@ get_message(PGXCNodeHandle *conn, int *len, char **msg)
 
 
 /*
- * Release all Datanode and Coordinator connections
- * back to pool and release occupied memory
+ * release_handles
+ *	  Release all node connections back to pool and free the memory.
  */
 void
 release_handles(void)
@@ -887,6 +1015,7 @@ release_handles(void)
 	if (cluster_ex_lock_held)
 		return;
 
+	/* quick exit if we have no connections to release */
 	if (datanode_count == 0 && coord_count == 0)
 		return;
 
@@ -917,9 +1046,14 @@ release_handles(void)
 		}
 	}
 
+	/*
+	 * XXX Not sure why we coordinator connections are only released when on
+	 * a coordinator. Perhaps we never acquire connections to coordinators on
+	 * datanodes? Seems like a rather minor optimization anyway.
+	 */
 	if (IS_PGXC_COORDINATOR)
 	{
-		/* Collect Coordinator handles */
+		/* Free Coordinator handles */
 		for (i = 0; i < NumCoords; i++)
 		{
 			PGXCNodeHandle *handle = &co_handles[i];
@@ -943,7 +1077,10 @@ release_handles(void)
 		}
 	}
 
-	/* And finally release all the connections on pooler */
+	/*
+	 * And finally release all the connections held by this backend back
+	 * to the connection pool.
+	 */
 	PoolManagerReleaseConnections(destroy);
 
 	datanode_count = 0;
@@ -951,15 +1088,20 @@ release_handles(void)
 }
 
 /*
- * Ensure that the supplied buffer has enough capacity and if not, it's
- * extended to an appropriate size.
+ * ensure_buffer_capacity
+ *	  Ensure that the supplied buffer has at least the required capacity.
  *
- * currbuf is the currently used buffer of currsize. bytes_needed is the
- * minimum size required. We shall return the new buffer, if allocated
- * successfully and set newsize_p to contain the size of the repalloced buffer.
+ * currbuf  - the currently allocated buffer
+ * currsize - size of the current buffer (in bytes)
+ * bytes_needed - required capacity (in bytes)
+ *
+ * We shall return the new buffer, if allocated successfully and set newsize_p
+ * to contain the size of the repalloc-ed buffer.
+ *
  * If allocation fails, NULL is returned.
  *
- * The function checks for requests beyond MaxAllocSize and throw an error.
+ * The function checks for requests beyond MaxAllocSize and throws an error
+ * if the request exceeds the limit.
  */
 static char *
 ensure_buffer_capacity(char *currbuf, size_t currsize, size_t bytes_needed, size_t *newsize_p)
@@ -967,6 +1109,7 @@ ensure_buffer_capacity(char *currbuf, size_t currsize, size_t bytes_needed, size
 	char	   *newbuf;
 	Size		newsize = (Size) currsize;
 
+	/* XXX Perhaps use AllocSizeIsValid instead? */
 	if (((Size) bytes_needed) >= MaxAllocSize)
 		ereport(ERROR,
 				(ENOSPC,
@@ -974,6 +1117,7 @@ ensure_buffer_capacity(char *currbuf, size_t currsize, size_t bytes_needed, size
 				 errdetail("Cannot enlarge buffer containing %ld bytes by %ld more bytes.",
 						   currsize, bytes_needed)));
 
+	/* if the buffer is already large enough, we're done */
 	if (bytes_needed <= newsize)
 	{
 		*newsize_p = currsize;
@@ -1028,8 +1172,10 @@ ensure_buffer_capacity(char *currbuf, size_t currsize, size_t bytes_needed, size
 }
 
 /*
- * Ensure specified amount of data can fit to the incoming buffer and
- * increase it if necessary
+ * ensure_in_buffer_capacity
+ *	  Ensure specified amount of data can fit to the input buffer of a handle.
+ *
+ * Returns 0 in case of success, EOF otherwise.
  */
 int
 ensure_in_buffer_capacity(size_t bytes_needed, PGXCNodeHandle *handle)
@@ -1047,8 +1193,10 @@ ensure_in_buffer_capacity(size_t bytes_needed, PGXCNodeHandle *handle)
 }
 
 /*
- * Ensure specified amount of data can fit to the outgoing buffer and
- * increase it if necessary
+ * ensure_out_buffer_capacity
+ *	  Ensure specified amount of data can fit to the output buffer of a handle.
+ *
+ * Returns 0 in case of success, EOF otherwise.
  */
 int
 ensure_out_buffer_capacity(size_t bytes_needed, PGXCNodeHandle *handle)
@@ -1067,7 +1215,8 @@ ensure_out_buffer_capacity(size_t bytes_needed, PGXCNodeHandle *handle)
 
 
 /*
- * Send specified amount of data from the outgoing buffer over the connection
+ * send_some
+ *	  Send specified amount of data from the output buffer over the handle.
  */
 int
 send_some(PGXCNodeHandle *handle, int len)
@@ -1195,11 +1344,12 @@ send_some(PGXCNodeHandle *handle, int len)
 }
 
 /*
- * Send PARSE message with specified statement down to the Datanode
+ * pgxc_node_send_parse
+ *	  Send PARSE message with specified statement down to the datanode.
  */
 int
 pgxc_node_send_parse(PGXCNodeHandle * handle, const char* statement,
-						const char *query, short num_params, Oid *param_types)
+					 const char *query, short num_params, Oid *param_types)
 {
 	/* statement name size (allow NULL) */
 	int			stmtLen = statement ? strlen(statement) + 1 : 1;
@@ -1283,7 +1433,8 @@ pgxc_node_send_parse(PGXCNodeHandle * handle, const char* statement,
 }
 
 /*
- * Send PLAN message down to the Data node
+ * pgxc_node_send_plan
+ *	  Send PLAN message down to the datanode.
  */
 int
 pgxc_node_send_plan(PGXCNodeHandle * handle, const char *statement,
@@ -1364,7 +1515,8 @@ pgxc_node_send_plan(PGXCNodeHandle * handle, const char *statement,
 }
 
 /*
- * Send BIND message down to the Datanode
+ * pgxc_node_send_bind
+ *	  Send BIND message down to the datanode.
  */
 int
 pgxc_node_send_bind(PGXCNodeHandle * handle, const char *portal,
@@ -1446,7 +1598,8 @@ pgxc_node_send_bind(PGXCNodeHandle * handle, const char *portal,
 
 
 /*
- * Send DESCRIBE message (portal or statement) down to the Datanode
+ * pgxc_node_send_describe
+ *	  Send DESCRIBE message (portal or statement) down to the datanode.
  */
 int
 pgxc_node_send_describe(PGXCNodeHandle * handle, bool is_statement,
@@ -1494,7 +1647,8 @@ pgxc_node_send_describe(PGXCNodeHandle * handle, bool is_statement,
 
 
 /*
- * Send CLOSE message (portal or statement) down to the Datanode
+ * pgxc_node_send_close
+ *	  Send CLOSE message (portal or statement) down to the datanode.
  */
 int
 pgxc_node_send_close(PGXCNodeHandle * handle, bool is_statement,
@@ -1534,7 +1688,8 @@ pgxc_node_send_close(PGXCNodeHandle * handle, bool is_statement,
 }
 
 /*
- * Send EXECUTE message down to the Datanode
+ * pgxc_node_send_execute
+ *	  Send EXECUTE message down to the datanode.
  */
 int
 pgxc_node_send_execute(PGXCNodeHandle * handle, const char *portal, int fetch)
@@ -1579,7 +1734,8 @@ pgxc_node_send_execute(PGXCNodeHandle * handle, const char *portal, int fetch)
 
 
 /*
- * Send FLUSH message down to the Datanode
+ * pgxc_node_send_flush
+ *	  Send FLUSH message down to the datanode.
  */
 int
 pgxc_node_send_flush(PGXCNodeHandle * handle)
@@ -1606,7 +1762,8 @@ pgxc_node_send_flush(PGXCNodeHandle * handle)
 
 
 /*
- * Send SYNC message down to the Datanode
+ * pgxc_node_send_sync
+ *	  Send SYNC message down to the datanode.
  */
 int
 pgxc_node_send_sync(PGXCNodeHandle * handle)
@@ -1635,7 +1792,8 @@ pgxc_node_send_sync(PGXCNodeHandle * handle)
 
 
 /*
- * Send series of Extended Query protocol messages to the data node
+ * pgxc_node_send_query_extended
+ *	  Send series of Extended Query protocol messages to the datanode.
  */
 int
 pgxc_node_send_query_extended(PGXCNodeHandle *handle, const char *query,
@@ -1664,8 +1822,11 @@ pgxc_node_send_query_extended(PGXCNodeHandle *handle, const char *query,
 
 
 /*
- * This method won't return until connection buffer is empty or error occurs
- * To ensure all data are on the wire before waiting for response
+ * pgxc_node_flush
+ *	  Flush all data from the output buffer of a node handle.
+ *
+ * This method won't return until connection buffer is empty or error occurs.
+ * To ensure all data are on the wire before waiting for a response.
  */
 int
 pgxc_node_flush(PGXCNodeHandle *handle)
@@ -1693,39 +1854,10 @@ pgxc_node_flush(PGXCNodeHandle *handle)
 	return 0;
 }
 
-/*
- * This method won't return until network buffer is empty or error occurs
- * To ensure all data in network buffers is read and wasted
- */
-void
-pgxc_node_flush_read(PGXCNodeHandle *handle)
-{
-	bool	is_ready;
-	int	read_result;
-
-	if (handle == NULL)
-		return;
-
-	/*
-	 * Before reading input send Sync to make sure
-	 * we will eventually receive ReadyForQuery
-	 */
-	pgxc_node_send_sync(handle);
-	while(true)
-	{
-		read_result = pgxc_node_read_data(handle, false);
-		if (read_result < 0)
-			break;
-
-		is_ready = is_data_node_ready(handle);
-		if (is_ready == true)
-			break;
-
-	}
-}
 
 /*
- * Send specified statement down to the PGXC node
+ * pgxc_node_send_query_internal
+ *	  Send the statement down to the PGXC node.
  */
 static int
 pgxc_node_send_query_internal(PGXCNodeHandle * handle, const char *query,
@@ -1768,21 +1900,32 @@ pgxc_node_send_query_internal(PGXCNodeHandle * handle, const char *query,
  	return pgxc_node_flush(handle);
 }
 
+/*
+ * pgxc_node_send_rollback
+ *	  Send the rollback command to the remote node.
+ *
+ * XXX The only effect of the "rollback" is that we try sending the query
+ * even on invalid/failed connections (when everything else is prohibited).
+ */
 int
 pgxc_node_send_rollback(PGXCNodeHandle *handle, const char *query)
 {
 	return pgxc_node_send_query_internal(handle, query, true);
 }
 
+/*
+ * pgxc_node_send_query
+ *	  Send the query to the remote node.
+ */
 int
 pgxc_node_send_query(PGXCNodeHandle *handle, const char *query)
 {
 	return pgxc_node_send_query_internal(handle, query, false);
 }
 
-
 /*
- * Send the GXID down to the PGXC node
+ * pgxc_node_send_gxid
+ *	  Send the GXID (global transaction ID) down to the remote node.
  */
 int
 pgxc_node_send_gxid(PGXCNodeHandle *handle, GlobalTransactionId gxid)
@@ -1812,7 +1955,8 @@ pgxc_node_send_gxid(PGXCNodeHandle *handle, GlobalTransactionId gxid)
 }
 
 /*
- * Send the Command ID down to the PGXC node
+ * pgxc_node_send_cmd_id
+ *	  Send the Command ID down to the remote node
  */
 int
 pgxc_node_send_cmd_id(PGXCNodeHandle *handle, CommandId cid)
@@ -1847,7 +1991,8 @@ pgxc_node_send_cmd_id(PGXCNodeHandle *handle, CommandId cid)
 }
 
 /*
- * Send the snapshot down to the PGXC node
+ * pgxc_node_send_snapshot
+ *	  Send the snapshot down to the remote node.
  */
 int
 pgxc_node_send_snapshot(PGXCNodeHandle *handle, Snapshot snapshot)
@@ -1901,7 +2046,8 @@ pgxc_node_send_snapshot(PGXCNodeHandle *handle, Snapshot snapshot)
 }
 
 /*
- * Send the timestamp down to the PGXC node
+ * pgxc_node_send_timestamp
+ *	  Send the timestamp down to the remote node
  */
 int
 pgxc_node_send_timestamp(PGXCNodeHandle *handle, TimestampTz timestamp)
@@ -1947,8 +2093,9 @@ pgxc_node_send_timestamp(PGXCNodeHandle *handle, TimestampTz timestamp)
 
 
 /*
- * Add another message to the list of errors to be returned back to the client
- * at the convenient time
+ * add_error_message
+ *	  Add a message to the list of errors to be returned back to the client
+ * at a convenient time.
  */
 void
 add_error_message(PGXCNodeHandle *handle, const char *message)
@@ -1964,11 +2111,17 @@ add_error_message(PGXCNodeHandle *handle, const char *message)
 		handle->error = pstrdup(message);
 }
 
+/* index of the last node returned by get_any_handled (round-robin) */
 static int load_balancer = 0;
+
 /*
- * Get one of the specified nodes to query replicated data source.
- * If session already owns one or more  of the requested connection,
- * the function returns existing one to avoid contacting pooler.
+ * get_any_handle
+ *	  Get one of the specified nodes to query replicated data source.
+ *
+ * If session already owns one or more of requested datanode connections,
+ * the function returns one of those existing ones to avoid unnecessary
+ * pooler requests.
+ *
  * Performs basic load balancing.
  */
 PGXCNodeHandle *
@@ -1998,6 +2151,7 @@ get_any_handle(List *datanodelist)
 		/* At the moment node is an index in the array, and we may need to wrap it */
 		if (node >= NumDataNodes)
 			node -= NumDataNodes;
+
 		/* See if handle is already used */
 		if (dn_handles[node].sock != NO_SOCKET)
 		{
@@ -2079,13 +2233,16 @@ get_any_handle(List *datanodelist)
 }
 
 /*
- * for specified list return array of PGXCNodeHandles
- * acquire from pool if needed.
- * the lenth of returned array is the same as of nodelist
- * For Datanodes, Special case is empty or NIL nodeList, in this case return all the nodes.
- * The returned list should be pfree'd when no longer needed.
- * For Coordinator, do not get a connection if Coordinator list is NIL,
- * Coordinator fds is returned only if transaction uses a DDL
+ * get_handles
+ *	  Return array of node handles (PGXCNodeHandles) for requested nodes.
+ *
+ * If we don't have the handles in the pool, acquire from pool if needed.
+ *
+ * For datanodes, the specified list may be set to NIL, in which case we
+ * return handles for all datanodes.
+ *
+ * For coordinators, we do not acquire any handles when NIL list is used.
+ * Coordinator handles are needed only for transaction performing DDL.
  */
 PGXCNodeAllHandles *
 get_handles(List *datanodelist, List *coordlist, bool is_coord_only_query, bool is_global_session)
@@ -2360,6 +2517,10 @@ get_handles(List *datanodelist, List *coordlist, bool is_coord_only_query, bool 
 	return result;
 }
 
+/*
+ * get_current_handles
+ *	  Return currently acquired handles.
+ */
 PGXCNodeAllHandles *
 get_current_handles(void)
 {
@@ -2414,7 +2575,10 @@ get_current_handles(void)
 	return result;
 }
 
-/* Free PGXCNodeAllHandles structure */
+/*
+ * pfree_pgxc_all_handles
+ *	  Free memory allocated for the PGXCNodeAllHandles structure.
+ */
 void
 pfree_pgxc_all_handles(PGXCNodeAllHandles *pgxc_handles)
 {
@@ -2433,11 +2597,14 @@ pfree_pgxc_all_handles(PGXCNodeAllHandles *pgxc_handles)
 
 /*
  * PGXCNodeGetNodeId
- *		Look at the data cached for handles and return node position
- * 		If node type is PGXC_NODE_COORDINATOR look only in coordinator list,
- *		if node type is PGXC_NODE_DATANODE look only in datanode list,
- *		if other (assume PGXC_NODE_NODE) search both, in last case return actual
- *		node type.
+ *	  Lookup index of the requested node (by OID) in the cached handles.
+ *
+ * Optionally, the node type may be restricted using the second parameter.
+ * If the type is PGXC_NODE_COORDINATOR, we only look in coordinator list.
+ * If the node is PGXC_NODE_DATANODE, we only look in datanode list.
+ *
+ * For other values (assume PGXC_NODE_NONE) we search for both node types,
+ * and then also return the actual node type in the second parameter.
  */
 int
 PGXCNodeGetNodeId(Oid nodeoid, char *node_type)
@@ -2478,7 +2645,9 @@ PGXCNodeGetNodeId(Oid nodeoid, char *node_type)
 
 /*
  * PGXCNodeGetNodeOid
- *		Look at the data cached for handles and return node Oid
+ *	  Look at the data cached for handles and return node Oid.
+ *
+ * XXX Unlike PGXCNodeGetNodeId, this requires node type parameter.
  */
 Oid
 PGXCNodeGetNodeOid(int nodeid, char node_type)
@@ -2504,8 +2673,7 @@ PGXCNodeGetNodeOid(int nodeid, char node_type)
 
 /*
  * pgxc_node_str
- *
- * get the name of the node
+ *	  get the name of the current node
  */
 Datum
 pgxc_node_str(PG_FUNCTION_ARGS)
@@ -2515,7 +2683,7 @@ pgxc_node_str(PG_FUNCTION_ARGS)
 
 /*
  * PGXCNodeGetNodeIdFromName
- *		Return node position in handles array
+ *	  Return position of the node (specified by name) in handles array.
  */
 int
 PGXCNodeGetNodeIdFromName(char *node_name, char *node_type)
@@ -2544,42 +2712,48 @@ PGXCNodeGetNodeIdFromName(char *node_name, char *node_type)
 	return PGXCNodeGetNodeId(nodeoid, node_type);
 }
 
+/*
+ * paramlist_delete_param
+ *	  Delete parameter with the specified name from the parameter list.
+ */
 static List *
 paramlist_delete_param(List *param_list, const char *name)
 {
-	   ListCell   *cur_item;
-	   ListCell   *prev_item;
+	ListCell   *cur_item;
+	ListCell   *prev_item;
 
-	   prev_item = NULL;
-	   cur_item = list_head(param_list);
+	prev_item = NULL;
+	cur_item = list_head(param_list);
 
-	   while (cur_item != NULL)
-	   {
-			   ParamEntry *entry = (ParamEntry *) lfirst(cur_item);
+	while (cur_item != NULL)
+	{
+		ParamEntry *entry = (ParamEntry *) lfirst(cur_item);
 
-			   if (strcmp(NameStr(entry->name), name) == 0)
-			   {
-					   /* cur_item must be removed */
-					   param_list = list_delete_cell(param_list, cur_item, prev_item);
-					   pfree(entry);
-					   if (prev_item)
-							   cur_item = lnext(prev_item);
-					   else
-							   cur_item = list_head(param_list);
-			   }
-			   else
-			   {
-					   prev_item = cur_item;
-					   cur_item = lnext(prev_item);
-			   }
-	   }
+		if (strcmp(NameStr(entry->name), name) == 0)
+		{
+			/* cur_item must be removed */
+			param_list = list_delete_cell(param_list, cur_item, prev_item);
+			pfree(entry);
+			if (prev_item)
+				cur_item = lnext(prev_item);
+			else
+				cur_item = list_head(param_list);
+		}
+		else
+		{
+			prev_item = cur_item;
+			cur_item = lnext(prev_item);
+		}
+	}
 
-	   return param_list;
+	return param_list;
 }
 
 /*
- * Remember new value of a session or transaction parameter, and set same
- * values on newly connected remote nodes.
+ * PGXCNodeSetParam
+ *	  Remember new value of a session/transaction parameter.
+ *
+ * We'll set this parameter value for new connections to remote nodes.
  */
 void
 PGXCNodeSetParam(bool local, const char *name, const char *value, int flags)
@@ -2617,8 +2791,9 @@ PGXCNodeSetParam(bool local, const char *name, const char *value, int flags)
 
 	/*
 	 * Special case for
-	 * 	RESET SESSION AUTHORIZATION
-	 * 	SET SESSION AUTHORIZATION TO DEFAULT
+	 *
+	 *	RESET SESSION AUTHORIZATION
+	 *	SET SESSION AUTHORIZATION TO DEFAULT
 	 *
 	 * We must also forget any SET ROLE commands since RESET SESSION
 	 * AUTHORIZATION also resets current role to session default
@@ -2636,8 +2811,8 @@ PGXCNodeSetParam(bool local, const char *name, const char *value, int flags)
 
 
 /*
- * Forget all parameter values set either for transaction or both transaction
- * and session.
+ * PGXCNodeResetParams
+ *	  Forget all transaction (or session too) parameters.
  */
 void
 PGXCNodeResetParams(bool only_local)
@@ -2662,6 +2837,10 @@ PGXCNodeResetParams(bool only_local)
 	local_params = NULL;
 }
 
+/*
+ * get_set_command
+ *	  Construct a command setting all parameters from a given list.
+ */
 static void
 get_set_command(List *param_list, StringInfo command, bool local)
 {
@@ -2687,22 +2866,29 @@ get_set_command(List *param_list, StringInfo command, bool local)
 
 
 /*
- * Returns SET commands needed to initialize remote session.
- * The command may already be biult and valid, return it right away if the case.
- * Otherwise build it up.
- * To support Distributed Session machinery coordinator should generate and
- * send a distributed session identifier to remote nodes. Generate it here.
+ * PGXCNodeGetSessionParamStr
+ *	  Returns SET commands needed to initialize remote session.
+ *
+ * The SET command may already be built and valid (in the session_params),
+ * in which case we simply return it. Otherwise we build if from session
+ * parameter list.
+ *
+ * To support "Distributed Session" machinery, the coordinator should
+ * generate and send a distributed session identifier to remote nodes.
+ * Generate it here (simply as nodename_PID).
+ *
+ * We always define a parameter with PID of the parent process (which is
+ * this backend).
  */
 char *
 PGXCNodeGetSessionParamStr(void)
 {
 	/*
-	 * If no session parameters are set and that is a coordinator we need to set
-	 * global_session anyway, even if there were no other parameters.
-	 * We do not want this string to disappear, so create it in the
-	 * TopMemoryContext. However if we add first session parameter we will need
-	 * to free the buffer and recreate it in the same context as the hash table
-	 * to avoid memory leakage.
+	 * If no session parameters are set and this is a coordinator node, we
+	 * need to set global_session anyway, even if there are no other params.
+	 *
+	 * We do not want this string to simply disappear, so create it in the
+	 * TopMemoryContext.
 	 */
 	if (session_params == NULL)
 	{
@@ -2711,7 +2897,7 @@ PGXCNodeGetSessionParamStr(void)
 		MemoryContextSwitchTo(oldcontext);
 	}
 
-	/* If the paramstr invalid build it up */
+	/* If the parameter string is empty, build it up. */
 	if (session_params->len == 0)
 	{
 		if (IS_PGXC_COORDINATOR)
@@ -2726,9 +2912,11 @@ PGXCNodeGetSessionParamStr(void)
 
 
 /*
- * Returns SET commands needed to initialize transaction on a remote session.
- * The command may already be biult and valid, return it right away if the case.
- * Otherwise build it up.
+ * PGXCNodeGetTransactionParamStr
+ *	  Returns SET commands needed to initialize transaction on a remote node.
+ *
+ * The command may already be built and valid (in local_params StringInfo), in
+ * which case we return it right away. Otherwise build it up.
  */
 char *
 PGXCNodeGetTransactionParamStr(void)
@@ -2738,7 +2926,7 @@ PGXCNodeGetTransactionParamStr(void)
 		return NULL;
 
 	/*
-	 * If the paramstr invalid build it up.
+	 * If the StringInfo is not allocated yed, do it in TopTransactionContext.
 	 */
 	if (local_params == NULL)
 	{
@@ -2746,25 +2934,30 @@ PGXCNodeGetTransactionParamStr(void)
 		local_params = makeStringInfo();
 		MemoryContextSwitchTo(oldcontext);
 	}
+
 	/*
-	 * If parameter string exists it is valid, it is truncated when parameters
-	 * are modified.
+	 * If the parameter string is empty, it was reset in PGXCNodeSetParam. So
+	 * recompute it, using the current local_param_list (we know it's not
+	 * empty, otherwise we wound't get here through the first condition).
 	 */
 	if (local_params->len == 0)
 	{
 		get_set_command(local_param_list, local_params, true);
 	}
+
 	return local_params->len == 0 ? NULL : local_params->data;
 }
 
 
 /*
- * Send down specified query, read and discard all responses until ReadyForQuery
+ * pgxc_node_set_query
+ *	  Send down specified query, discard all responses until ReadyForQuery.
  */
 void
 pgxc_node_set_query(PGXCNodeHandle *handle, const char *set_query)
 {
 	pgxc_node_send_query(handle, set_query);
+
 	/*
 	 * Now read responses until ReadyForQuery.
 	 * XXX We may need to handle possible errors here.

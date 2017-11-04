@@ -35,6 +35,10 @@
 
 #define MAX_IDLE_TIME 60
 
+/* Connection to nodes maintained by Pool Manager */
+typedef struct PGconn NODE_CONNECTION;
+typedef struct PGcancel NODE_CANCEL;
+
 /*
  * One connection in the pool (to datanode or coordinator).
  *

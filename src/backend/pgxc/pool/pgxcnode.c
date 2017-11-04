@@ -24,15 +24,6 @@
  * release_handles     - release all connection (back to pool)
  *
  *
- * connection functions (TODO move to poolmgr.c)
- * --------------------
- * PGXCNodeConnect    - open libpq connection using connection string
- * PGXCNodePing       - ping node using connection string
- * PGXCNodeClose      - close libpq connection
- * PGXCNodeConnected  - verify connection status
- * PGXCNodeConnStr    - build connection string
- *
- *
  * node handle management
  * ----------------------
  * PGXCNodeGetNodeOid        - OID for node by index in handle array
@@ -355,109 +346,6 @@ InitMultinodeExecutor(bool is_force)
 		}
 	}
 }
-
-/*
- * PGXCNodeConnStr
- *	  Builds a connection string for the provided connection parameters.
- *
- * Aside from the usual connection parameters (host, port, ...) we also
- * pass information about type of the parent node and remote node type.
- *
- * XXX Shouldn't this rather throw an ERROR instead of returning NULL?
- */
-char *
-PGXCNodeConnStr(char *host, int port, char *dbname,
-				char *user, char *pgoptions, char *remote_type, char *parent_node)
-{
-	char	   *out,
-				connstr[1024];
-	int			num;
-
-	/*
-	 * Build up connection string
-	 * remote type can be Coordinator, Datanode or application.
-	 *
-	 * XXX What's application remote type?
-	 */
-	num = snprintf(connstr, sizeof(connstr),
-				   "host=%s port=%d dbname=%s user=%s application_name='pgxc:%s' sslmode=disable options='-c remotetype=%s -c parentnode=%s %s'",
-				   host, port, dbname, user, parent_node, remote_type, parent_node,
-				   pgoptions);
-
-	/* Check for overflow */
-	if (num > 0 && num < sizeof(connstr))
-	{
-		/* Output result */
-		out = (char *) palloc(num + 1);
-		strcpy(out, connstr);
-		return out;
-	}
-
-	/* return NULL if we have problem */
-	return NULL;
-}
-
-
-/*
- * PGXCNodeConnect
- *	  Connect to a Datanode using a constructed connection string.
- */
-NODE_CONNECTION *
-PGXCNodeConnect(char *connstr)
-{
-	PGconn	   *conn;
-
-	/* Delegate call to the pglib */
-	conn = PQconnectdb(connstr);
-	return (NODE_CONNECTION *) conn;
-}
-
-/*
- * PGXCNodePing
- *	  Check that a node (identified the connstring) responds correctly.
- */
-int
-PGXCNodePing(const char *connstr)
-{
-	if (connstr[0])
-	{
-		PGPing status = PQping(connstr);
-		if (status == PQPING_OK)
-			return 0;
-		else
-			return 1;
-	}
-	else
-		return -1;
-}
-
-/*
- * PGXCNodeClose
- *	  Close connection connection.
- */
-void
-PGXCNodeClose(NODE_CONNECTION *conn)
-{
-	/* Delegate call to the libpq */
-	PQfinish((PGconn *) conn);
-}
-
-/*
- * PGXCNodeConnected
- *	  Check if the provided connection is open and valid.
- */
-int
-PGXCNodeConnected(NODE_CONNECTION *conn)
-{
-	PGconn	   *pgconn = (PGconn *) conn;
-
-	/*
-	 * Simple check, want to do more comprehencive -
-	 * check if it is ready for guery
-	 */
-	return pgconn && PQstatus(pgconn) == CONNECTION_OK;
-}
-
 
 /*
  * pgxc_node_free

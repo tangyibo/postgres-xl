@@ -184,7 +184,15 @@
  * - PoolManagerReloadConnectionInfo   close all connections
  *
  * There's a number of additional helper functions, but those are mostly
- * internal and marked as static.
+ * internal and marked as static. Example of such functions are functions
+ * constructing connection strings, opening/closing connections, pinging
+ * nodes, etc.
+ *
+ * - PGXCNodeConnect    - open libpq connection using connection string
+ * - PGXCNodePing       - ping node using connection string
+ * - PGXCNodeClose      - close libpq connection
+ * - PGXCNodeConnected  - verify connection status
+ * - PGXCNodeConnStr    - build connection string
  *
  *
  * XXX Why do we even need a separate connection pool manager? Can't we
@@ -205,6 +213,11 @@
  * XXX The message types are hard-coded in the various methods as magic
  * constants (e.g. PoolManagerAbortTransactions uses 'a'). Perhaps
  * define this somewhere in a clear manner, e.g. like a #define.
+ *
+ * XXX The PGXCNode* functions were originally placed in pgxcnode.c, but
+ * were moved into poolmgr as that's the only place using them. But the
+ * name still reflects the original location, so perhaps rename them?
+ *
  *
  * Portions Copyright (c) 2012-2014, TransLattice, Inc.
  * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
@@ -381,6 +394,16 @@ static void pooler_quickdie(SIGNAL_ARGS);
 static void pooler_sighup(SIGNAL_ARGS);
 
 static void TryPingUnhealthyNode(Oid nodeoid);
+
+/* Open/close connection routines (invoked from Pool Manager) */
+static char *PGXCNodeConnStr(char *host, int port, char *dbname, char *user,
+							 char *pgoptions,
+							 char *remote_type, char *parent_node);
+static NODE_CONNECTION *PGXCNodeConnect(char *connstr);
+static void PGXCNodeClose(NODE_CONNECTION * conn);
+static int PGXCNodeConnected(NODE_CONNECTION * conn);
+static int PGXCNodePing(const char *connstr);
+
 
 /*
  * Flags set by interrupt handlers for later service in the main loop.
@@ -3650,4 +3673,106 @@ check_persistent_connections(bool *newval, void **extra, GucSource source)
 		*newval = false;
 	}
 	return true;
+}
+
+/*
+ * PGXCNodeConnStr
+ *	  Builds a connection string for the provided connection parameters.
+ *
+ * Aside from the usual connection parameters (host, port, ...) we also
+ * pass information about type of the parent node and remote node type.
+ *
+ * XXX Shouldn't this rather throw an ERROR instead of returning NULL?
+ */
+static char *
+PGXCNodeConnStr(char *host, int port, char *dbname,
+				char *user, char *pgoptions, char *remote_type, char *parent_node)
+{
+	char	   *out,
+				connstr[1024];
+	int			num;
+
+	/*
+	 * Build up connection string
+	 * remote type can be Coordinator, Datanode or application.
+	 *
+	 * XXX What's application remote type?
+	 */
+	num = snprintf(connstr, sizeof(connstr),
+				   "host=%s port=%d dbname=%s user=%s application_name='pgxc:%s' sslmode=disable options='-c remotetype=%s -c parentnode=%s %s'",
+				   host, port, dbname, user, parent_node, remote_type, parent_node,
+				   pgoptions);
+
+	/* Check for overflow */
+	if (num > 0 && num < sizeof(connstr))
+	{
+		/* Output result */
+		out = (char *) palloc(num + 1);
+		strcpy(out, connstr);
+		return out;
+	}
+
+	/* return NULL if we have problem */
+	return NULL;
+}
+
+
+/*
+ * PGXCNodeConnect
+ *	  Connect to a Datanode using a constructed connection string.
+ */
+static NODE_CONNECTION *
+PGXCNodeConnect(char *connstr)
+{
+	PGconn	   *conn;
+
+	/* Delegate call to the pglib */
+	conn = PQconnectdb(connstr);
+	return (NODE_CONNECTION *) conn;
+}
+
+/*
+ * PGXCNodePing
+ *	  Check that a node (identified the connstring) responds correctly.
+ */
+static int
+PGXCNodePing(const char *connstr)
+{
+	if (connstr[0])
+	{
+		PGPing status = PQping(connstr);
+		if (status == PQPING_OK)
+			return 0;
+		else
+			return 1;
+	}
+	else
+		return -1;
+}
+
+/*
+ * PGXCNodeClose
+ *	  Close connection connection.
+ */
+static void
+PGXCNodeClose(NODE_CONNECTION *conn)
+{
+	/* Delegate call to the libpq */
+	PQfinish((PGconn *) conn);
+}
+
+/*
+ * PGXCNodeConnected
+ *	  Check if the provided connection is open and valid.
+ */
+static int
+PGXCNodeConnected(NODE_CONNECTION *conn)
+{
+	PGconn	   *pgconn = (PGconn *) conn;
+
+	/*
+	 * Simple check, want to do more comprehencive -
+	 * check if it is ready for guery
+	 */
+	return pgconn && PQstatus(pgconn) == CONNECTION_OK;
 }

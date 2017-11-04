@@ -25,10 +25,6 @@
 
 #define NO_SOCKET -1
 
-/* Connection to Datanode maintained by Pool Manager */
-typedef struct PGconn NODE_CONNECTION;
-typedef struct PGcancel NODE_CANCEL;
-
 /* Helper structure to access Datanode from Session */
 typedef enum
 {
@@ -113,15 +109,7 @@ typedef struct
 extern void InitMultinodeExecutor(bool is_force);
 
 /* Open/close connection routines (invoked from Pool Manager) */
-extern char *PGXCNodeConnStr(char *host, int port, char *dbname, char *user,
-							 char *pgoptions,
-							 char *remote_type, char *parent_node);
-extern NODE_CONNECTION *PGXCNodeConnect(char *connstr);
-extern void PGXCNodeClose(NODE_CONNECTION * conn);
-extern int PGXCNodeConnected(NODE_CONNECTION * conn);
-extern int PGXCNodeConnClean(NODE_CONNECTION * conn);
 extern void PGXCNodeCleanAndRelease(int code, Datum arg);
-extern int PGXCNodePing(const char *connstr);
 
 extern PGXCNodeHandle *get_any_handle(List *datanodelist);
 /* Look at information cached in node handles */

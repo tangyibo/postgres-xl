@@ -87,22 +87,17 @@ typedef struct GTM_RestoreContext {
 
 int GTM_ThreadAdd(GTM_ThreadInfo *thrinfo);
 int GTM_ThreadRemove(GTM_ThreadInfo *thrinfo);
-int GTM_ThreadJoin(GTM_ThreadInfo *thrinfo);
-void GTM_ThreadExit(void);
 void ConnFree(Port *port);
-void GTM_LockAllOtherThreads(void);
-void GTM_UnlockAllOtherThreads(void);
 void GTM_DoForAllOtherThreads(void (* process_routine)(GTM_ThreadInfo *));
 void GTM_SetInitialAndNextClientIdentifierAtPromote(void);
 
 GTM_ThreadInfo *GTM_ThreadCreate(GTM_ConnectionInfo *conninfo,
 				  void *(* startroutine)(void *));
-GTM_ThreadInfo * GTM_GetThreadInfo(GTM_ThreadID thrid);
-#ifdef XCP
+
 extern void SaveControlInfo(void);
 void GTM_RestoreSeqInfo(FILE *ctlf, struct GTM_RestoreContext *context);
+
 #define CONTROL_INTERVAL		50000
-#endif
 
 /*
  * pthread keys to get thread specific information
@@ -137,14 +132,6 @@ extern GTM_ThreadID						TopMostThreadID;
 
 #define GTM_MAX_CACHED_TRANSINFO		0
 #define GTM_HaveEnoughCachedTransInfo()	(gtm_list_length(GTM_CachedTransInfo) >= GTM_MAX_CACHED_TRANSINFO)
-
-#define START_CRIT_SECTION()  (CritSectionCount++)
-
-#define END_CRIT_SECTION() \
-	do { \
-		    Assert(CritSectionCount > 0); \
-		    CritSectionCount--; \
-	} while(0)
 
 #define GTM_CLIENT_ID_EQ(a, b)		\
 	((a) == (b))

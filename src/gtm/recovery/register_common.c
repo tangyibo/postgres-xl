@@ -68,6 +68,9 @@ static int pgxcnode_remove_info(GTM_PGXCNodeInfo *node);
 static int pgxcnode_add_info(GTM_PGXCNodeInfo *node);
 static char *pgxcnode_copy_char(const char *str);
 
+static void Recovery_RecordRegisterInfo(GTM_PGXCNodeInfo *nodeinfo,
+										bool is_register);
+
 #define pgxcnode_type_equal(type1,type2) (type1 == type2)
 #define pgxcnode_port_equal(port1,port2) (port1 == port2)
 
@@ -582,7 +585,7 @@ Recovery_SaveRegisterInfo(void)
 /*
  * Add a Register or Unregister record on PGXC Node file on disk.
  */
-void
+static void
 Recovery_RecordRegisterInfo(GTM_PGXCNodeInfo *nodeinfo, bool is_register)
 {
 	int ctlfd;
@@ -726,7 +729,7 @@ Recovery_PGXCNodeDisconnect(Port *myport)
 	MemoryContextSwitchTo(oldContext);
 }
 
-int
+static int
 Recovery_PGXCNodeBackendDisconnect(GTM_PGXCNodeType type, char *nodename, int socket)
 {
 	GTM_PGXCNodeInfo *nodeinfo = pgxcnode_find_info(type, nodename);

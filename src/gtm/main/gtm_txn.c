@@ -35,7 +35,6 @@ extern bool Backup_synchronously;
 #define GTM_CONTROL_VERSION	20160302
 
 /* Local functions */
-static XidStatus GlobalTransactionIdGetStatus(GlobalTransactionId transactionId);
 static bool GTM_SetDoVacuum(GTM_TransactionHandle handle);
 static void init_GTM_TransactionInfo(GTM_TransactionInfo *gtm_txninfo,
 									 GTM_TransactionHandle txn,
@@ -47,6 +46,9 @@ static void init_GTM_TransactionInfo(GTM_TransactionInfo *gtm_txninfo,
 static void clean_GTM_TransactionInfo(GTM_TransactionInfo *gtm_txninfo);
 static GTM_TransactionHandle GTM_GlobalSessionIDToHandle(
 									const char *global_sessionid);
+static bool GTM_NeedXidRestoreUpdate(void);
+static int GTM_CommitTransaction(GTM_TransactionHandle txn,
+		int waited_xid_count, GlobalTransactionId *waited_xids);
 
 GlobalTransactionId ControlXid;  /* last one written to control file */
 GTM_Transactions GTMTransactions;
@@ -118,33 +120,6 @@ GTM_InitTxnManager(void)
 	return;
 }
 
-/*
- * Get the status of current or past transaction.
- */
-static XidStatus
-GlobalTransactionIdGetStatus(GlobalTransactionId transactionId)
-{
-	XidStatus	xidstatus = TRANSACTION_STATUS_IN_PROGRESS;
-
-	/*
-	 * Also, check to see if the transaction ID is a permanent one.
-	 */
-	if (!GlobalTransactionIdIsNormal(transactionId))
-	{
-		if (GlobalTransactionIdEquals(transactionId, BootstrapGlobalTransactionId))
-			return TRANSACTION_STATUS_COMMITTED;
-		if (GlobalTransactionIdEquals(transactionId, FrozenGlobalTransactionId))
-			return TRANSACTION_STATUS_COMMITTED;
-		return TRANSACTION_STATUS_ABORTED;
-	}
-
-	/*
-	 * TODO To be implemented
-	 * This code is not completed yet and the latter code must not be reached.
-	 */
-	Assert(0);
-	return xidstatus;
-}
 
 /*
  * Given the GXID, find the corresponding transaction handle.
@@ -210,7 +185,7 @@ GTM_GlobalSessionIDToHandle(const char *global_sessionid)
 	return InvalidTransactionHandle;
 }
 
-bool
+static bool
 GTM_IsGXIDInProgress(GlobalTransactionId gxid)
 {
 	return (GTM_GXIDToHandle_Internal(gxid, false) !=
@@ -220,7 +195,7 @@ GTM_IsGXIDInProgress(GlobalTransactionId gxid)
  * Given the GID (for a prepared transaction), find the corresponding
  * transaction handle.
  */
-GTM_TransactionHandle
+static GTM_TransactionHandle
 GTM_GIDToHandle(char *gid)
 {
 	gtm_ListCell *elem = NULL;
@@ -424,59 +399,6 @@ GTMGetLastClientIdentifier(void)
 }
 
 /*
- * GlobalTransactionIdDidCommit
- *		True iff transaction associated with the identifier did commit.
- *
- * Note:
- *		Assumes transaction identifier is valid.
- */
-bool							/* true if given transaction committed */
-GlobalTransactionIdDidCommit(GlobalTransactionId transactionId)
-{
-	XidStatus	xidstatus;
-
-	xidstatus = GlobalTransactionIdGetStatus(transactionId);
-
-	/*
-	 * If it's marked committed, it's committed.
-	 */
-	if (xidstatus == TRANSACTION_STATUS_COMMITTED)
-		return true;
-
-	/*
-	 * It's not committed.
-	 */
-	return false;
-}
-
-/*
- * GlobalTransactionIdDidAbort
- *		True iff transaction associated with the identifier did abort.
- *
- * Note:
- *		Assumes transaction identifier is valid.
- */
-bool							/* true if given transaction aborted */
-GlobalTransactionIdDidAbort(GlobalTransactionId transactionId)
-{
-	XidStatus	xidstatus;
-
-	xidstatus = GlobalTransactionIdGetStatus(transactionId);
-
-	/*
-	 * If it's marked aborted, it's aborted.
-	 */
-	if (xidstatus == TRANSACTION_STATUS_ABORTED)
-		return true;
-
-	/*
-	 * It's not aborted.
-	 */
-	return false;
-}
-
-
-/*
  * Set that the transaction is doing vacuum
  *
  */
@@ -498,7 +420,7 @@ GTM_SetDoVacuum(GTM_TransactionHandle handle)
  * The new XID is also stored into the transaction info structure of the given
  * transaction before returning.
  */
-bool
+static bool
 GTM_GetGlobalTransactionIdMulti(GTM_TransactionHandle handle[], int txn_count,
 		GlobalTransactionId gxid[], GTM_TransactionHandle new_handle[],
 		int *new_txn_count)
@@ -668,7 +590,7 @@ SetControlXid(GlobalTransactionId gxid)
 }
 
 /* Transaction Control */
-int
+static int
 GTM_BeginTransactionMulti(GTM_IsolationLevel isolevel[],
 					 bool readonly[],
 					 const char *global_sessionid[],
@@ -762,7 +684,7 @@ GTM_BeginTransactionMulti(GTM_IsolationLevel isolevel[],
 }
 
 /* Transaction Control */
-GTM_TransactionHandle
+static GTM_TransactionHandle
 GTM_BeginTransaction(GTM_IsolationLevel isolevel,
 					 bool readonly,
 					 const char *global_sessionid)
@@ -912,7 +834,7 @@ clean_GTM_TransactionInfo(GTM_TransactionInfo *gtm_txninfo)
 }
 
 
-void
+static void
 GTM_BkupBeginTransactionMulti(GTM_IsolationLevel *isolevel,
 							  bool *readonly,
 							  const char **global_sessionid,
@@ -937,7 +859,7 @@ GTM_BkupBeginTransactionMulti(GTM_IsolationLevel *isolevel,
 	MemoryContextSwitchTo(oldContext);
 }
 
-void
+static void
 GTM_BkupBeginTransaction(GTM_IsolationLevel isolevel,
 						 bool readonly,
 						 const char *global_sessionid,
@@ -949,20 +871,11 @@ GTM_BkupBeginTransaction(GTM_IsolationLevel isolevel,
 			&global_sessionid,
 			&client_id, &connid, 1);
 }
-/*
- * Same as GTM_RollbackTransaction, but takes GXID as input
- */
-int
-GTM_RollbackTransactionGXID(GlobalTransactionId gxid)
-{
-	GTM_TransactionHandle txn = GTM_GXIDToHandle(gxid);
-	return GTM_RollbackTransaction(txn);
-}
 
 /*
  * Rollback multiple transactions in one go
  */
-int
+static int
 GTM_RollbackTransactionMulti(GTM_TransactionHandle txn[], int txn_count, int status[])
 {
 	GTM_TransactionInfo *gtm_txninfo[txn_count];
@@ -995,7 +908,7 @@ GTM_RollbackTransactionMulti(GTM_TransactionHandle txn[], int txn_count, int sta
 /*
  * Rollback a transaction
  */
-int
+static int
 GTM_RollbackTransaction(GTM_TransactionHandle txn)
 {
 	int status;
@@ -1003,21 +916,10 @@ GTM_RollbackTransaction(GTM_TransactionHandle txn)
 	return status;
 }
 
-
-/*
- * Same as GTM_CommitTransaction but takes GXID as input
- */
-int
-GTM_CommitTransactionGXID(GlobalTransactionId gxid)
-{
-	GTM_TransactionHandle txn = GTM_GXIDToHandle(gxid);
-	return GTM_CommitTransaction(txn, 0, NULL);
-}
-
 /*
  * Commit multiple transactions in one go
  */
-int
+static int
 GTM_CommitTransactionMulti(GTM_TransactionHandle txn[], int txn_count,
 		int waited_xid_count, GlobalTransactionId *waited_xids,
 		int status[])
@@ -1080,7 +982,7 @@ GTM_CommitTransactionMulti(GTM_TransactionHandle txn[], int txn_count,
 /*
  * Prepare a transaction
  */
-int
+static int
 GTM_PrepareTransaction(GTM_TransactionHandle txn)
 {
 	GTM_TransactionInfo *gtm_txninfo = NULL;
@@ -1103,7 +1005,7 @@ GTM_PrepareTransaction(GTM_TransactionHandle txn)
 /*
  * Commit a transaction
  */
-int
+static int
 GTM_CommitTransaction(GTM_TransactionHandle txn, int waited_xid_count,
 		GlobalTransactionId *waited_xids)
 {
@@ -1115,7 +1017,7 @@ GTM_CommitTransaction(GTM_TransactionHandle txn, int waited_xid_count,
 /*
  * Prepare a transaction
  */
-int
+static int
 GTM_StartPreparedTransaction(GTM_TransactionHandle txn,
 							 char *gid,
 							 char *nodestring)
@@ -1158,19 +1060,7 @@ GTM_StartPreparedTransaction(GTM_TransactionHandle txn,
 	return STATUS_OK;
 }
 
-/*
- * Same as GTM_PrepareTransaction but takes GXID as input
- */
-int
-GTM_StartPreparedTransactionGXID(GlobalTransactionId gxid,
-								 char *gid,
-								 char *nodestring)
-{
-	GTM_TransactionHandle txn = GTM_GXIDToHandle(gxid);
-	return GTM_StartPreparedTransaction(txn, gid, nodestring);
-}
-
-int
+static int
 GTM_GetGIDData(GTM_TransactionHandle prepared_txn,
 			   GlobalTransactionId *prepared_gxid,
 			   char **nodestring)
@@ -1198,26 +1088,6 @@ GTM_GetGIDData(GTM_TransactionHandle prepared_txn,
 	MemoryContextSwitchTo(oldContext);
 
 	return STATUS_OK;
-}
-
-/*
- * Get status of the given transaction
- */
-GTM_TransactionStates
-GTM_GetStatus(GTM_TransactionHandle txn)
-{
-	GTM_TransactionInfo *gtm_txninfo = GTM_HandleToTransactionInfo(txn);
-	return gtm_txninfo->gti_state;
-}
-
-/*
- * Same as GTM_GetStatus but takes GXID as input
- */
-GTM_TransactionStates
-GTM_GetStatusGXID(GlobalTransactionId gxid)
-{
-	GTM_TransactionHandle txn = GTM_GXIDToHandle(gxid);
-	return GTM_GetStatus(txn);
 }
 
 /*
@@ -2814,16 +2684,10 @@ GTM_SetShuttingDown(void)
 	GTM_RWLockRelease(&GTMTransactions.gt_XidGenLock);
 }
 
+static
 bool GTM_NeedXidRestoreUpdate(void)
 {
 	return(GlobalTransactionIdPrecedesOrEquals(GTMTransactions.gt_backedUpXid, GTMTransactions.gt_nextXid));
-}
-
-
-GlobalTransactionId
-GTM_GetLatestCompletedXID(void)
-{
-	return GTMTransactions.gt_latestCompletedXid;
 }
 
 void
@@ -2890,15 +2754,3 @@ GTM_RememberAlteredSequence(GlobalTransactionId gxid, void *seq)
 	gtm_txninfo->gti_altered_seqs = gtm_lcons(seq,
 			gtm_txninfo->gti_altered_seqs);
 }
-
-
-/*
- * TODO
- */
-int GTM_GetAllTransactions(GTM_TransactionInfo txninfo[], uint32 txncnt);
-
-/*
- * TODO
- */
-uint32 GTM_GetAllPrepared(GlobalTransactionId gxids[], uint32 gxidcnt);
-

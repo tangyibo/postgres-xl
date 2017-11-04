@@ -55,16 +55,13 @@ extern bool GTM_RWLockAcquire(GTM_RWLock *lock, GTM_LockMode mode);
 extern bool GTM_RWLockRelease(GTM_RWLock *lock);
 extern int GTM_RWLockInit(GTM_RWLock *lock);
 extern int GTM_RWLockDestroy(GTM_RWLock *lock);
-extern bool GTM_RWLockConditionalAcquire(GTM_RWLock *lock, GTM_LockMode mode);
 
 extern bool GTM_MutexLockAcquire(GTM_MutexLock *lock);
 extern bool GTM_MutexLockRelease(GTM_MutexLock *lock);
 extern int GTM_MutexLockInit(GTM_MutexLock *lock);
 extern int GTM_MutexLockDestroy(GTM_MutexLock *lock);
-extern bool GTM_MutexLockConditionalAcquire(GTM_MutexLock *lock);
 
 extern int GTM_CVInit(GTM_CV *cv);
-extern int GTM_CVDestroy(GTM_CV *cv);
 extern int GTM_CVSignal(GTM_CV *cv);
 extern int GTM_CVBcast(GTM_CV *cv);
 extern int GTM_CVWait(GTM_CV *cv, GTM_MutexLock *lock);

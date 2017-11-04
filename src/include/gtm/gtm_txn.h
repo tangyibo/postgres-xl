@@ -29,32 +29,24 @@ typedef int XidStatus;
 #define TRANSACTION_STATUS_ABORTED          0x02
 
 struct GTM_RestoreContext;
-/*
- * prototypes for functions in transam/transam.c
- */
-extern bool GlobalTransactionIdDidCommit(GlobalTransactionId transactionId);
-extern bool GlobalTransactionIdDidAbort(GlobalTransactionId transactionId);
-extern void GlobalTransactionIdAbort(GlobalTransactionId transactionId);
 
-/* in transam/varsup.c */
+/* gtm/main/gtm_txn.c */
 extern GlobalTransactionId GTM_GetGlobalTransactionId(GTM_TransactionHandle handle);
-extern bool GTM_GetGlobalTransactionIdMulti(
-		GTM_TransactionHandle handle[],
-		int txn_count,
-		GlobalTransactionId gxids[],
-		GTM_TransactionHandle new_handle[],
-		int *new_txn_count);
 extern GlobalTransactionId ReadNewGlobalTransactionId(void);
-extern GlobalTransactionId GTM_GetLatestCompletedXID(void);
-extern void SetGlobalTransactionIdLimit(GlobalTransactionId oldest_datfrozenxid);
 extern void SetNextGlobalTransactionId(GlobalTransactionId gxid);
 extern void SetControlXid(GlobalTransactionId gxid);
 extern void GTM_SetShuttingDown(void);
 
-/* For restoration point backup */
-extern bool GTM_NeedXidRestoreUpdate(void);
+/* for restoration point backup (gtm/main/gtm_backup.c) */
 extern void GTM_WriteRestorePointXid(FILE *f);
+extern void GTM_WriteRestorePointVersion(FILE *f);
+extern void GTM_RestoreStart(FILE *ctlf, struct GTM_RestoreContext *context);
+extern void GTM_SaveTxnInfo(FILE *ctlf);
+extern void GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
+						struct GTM_RestoreContext *context, bool force_xid);
 
+
+/* States of the GTM component */
 typedef enum GTM_States
 {
 	GTM_STARTING,
@@ -77,6 +69,7 @@ typedef enum GTM_TransactionStates
 
 #define GTM_MAX_SESSION_ID_LEN			64
 
+/* Information about a global transaction tracked by the GTM */
 typedef struct GTM_TransactionInfo
 {
 	GTM_TransactionHandle	gti_handle;
@@ -102,13 +95,13 @@ typedef struct GTM_TransactionInfo
 	gtm_List				*gti_altered_seqs;
 } GTM_TransactionInfo;
 
-#define GTM_MAX_2PC_NODES				16
 /* By default a GID length is limited to 256 bits in PostgreSQL */
 #define GTM_MAX_GID_LEN					256
 #define GTM_MAX_NODESTRING_LEN			1024
 #define GTM_CheckTransactionHandle(x)	((x) >= 0 && (x) < GTM_MAX_GLOBAL_TRANSACTIONS)
 #define GTM_IsTransSerializable(x)		((x)->gti_isolevel == GTM_ISOLATION_SERIALIZABLE)
 
+/* Array of all global transactions tracked by the GTM */
 typedef struct GTM_Transactions
 {
 	uint32				gt_txn_count;
@@ -145,75 +138,29 @@ typedef struct GTM_Transactions
 
 extern GTM_Transactions	GTMTransactions;
 
-/* NOTE: This macro should be used with READ lock held on gt_TransArrayLock! */
-#define GTM_CountOpenTransactions()	(gtm_list_length(GTMTransactions.gt_open_transactions))
-
 /*
  * Two hash tables will be maintained to quickly find the
  * GTM_TransactionInfo block given either the GXID or the GTM_TransactionHandle.
+ *
+ * XXX seems we don't actually have the hash tables, and we simply lookup the
+ * transactions by index (handle) or by walking through open transactions and
+ * checking the GXID.
  */
 
 GTM_TransactionInfo *GTM_HandleToTransactionInfo(GTM_TransactionHandle handle);
 GTM_TransactionHandle GTM_GXIDToHandle(GlobalTransactionId gxid);
-GTM_TransactionHandle GTM_GIDToHandle(char *gid);
-bool GTM_IsGXIDInProgress(GlobalTransactionId gxid);
 
 /* Transaction Control */
 void GTM_InitTxnManager(void);
-GTM_TransactionHandle GTM_BeginTransaction(GTM_IsolationLevel isolevel,
-										   bool readonly,
-										   const char *global_sessionid);
-int GTM_BeginTransactionMulti(GTM_IsolationLevel isolevel[],
-										   bool readonly[],
-										   const char *global_sessionid[],
-										   GTMProxy_ConnID connid[],
-										   int txn_count,
-										   GTM_TransactionHandle txns[]);
-int GTM_RollbackTransaction(GTM_TransactionHandle txn);
-int GTM_RollbackTransactionMulti(GTM_TransactionHandle txn[], int txn_count, int status[]);
-int GTM_RollbackTransactionGXID(GlobalTransactionId gxid);
-int GTM_CommitTransaction(GTM_TransactionHandle txn,
-		int waited_xid_count, GlobalTransactionId *waited_xids);
-int GTM_CommitTransactionMulti(GTM_TransactionHandle txn[], int txn_count,
-		int waited_xid_count, GlobalTransactionId *waited_xids,
-		int status[]);
-int GTM_CommitTransactionGXID(GlobalTransactionId gxid);
-int GTM_PrepareTransaction(GTM_TransactionHandle txn);
-int GTM_StartPreparedTransaction(GTM_TransactionHandle txn,
-								 char *gid,
-								 char *nodestring);
-int GTM_StartPreparedTransactionGXID(GlobalTransactionId gxid,
-									 char *gid,
-									 char *nodestring);
-int GTM_GetGIDData(GTM_TransactionHandle prepared_txn,
-				   GlobalTransactionId *prepared_gxid,
-				   char **nodestring);
-uint32 GTM_GetAllPrepared(GlobalTransactionId gxids[], uint32 gxidcnt);
-GTM_TransactionStates GTM_GetStatus(GTM_TransactionHandle txn);
-GTM_TransactionStates GTM_GetStatusGXID(GlobalTransactionId gxid);
-int GTM_GetAllTransactions(GTM_TransactionInfo txninfo[], uint32 txncnt);
 void GTM_RemoveAllTransInfos(uint32 client_id, int backend_id);
-uint32 GTMGetFirstClientIdentifier(void);
 uint32 GTMGetLastClientIdentifier(void);
 
-GTM_Snapshot GTM_GetSnapshotData(GTM_TransactionInfo *my_txninfo,
-								 GTM_Snapshot snapshot);
-GTM_Snapshot GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[],
-		int txn_count, int *status);
-void GTM_FreeCachedTransInfo(void);
-
+/* processing of messages in gtm_txn.c */
 void ProcessBeginTransactionCommand(Port *myport, StringInfo message);
 void ProcessBkupBeginTransactionCommand(Port *myport, StringInfo message);
-void GTM_BkupBeginTransactionMulti(GTM_IsolationLevel *isolevel,
-								   bool *readonly,
-								   const char **global_sessionid,
-								   uint32 *client_id,
-								   GTMProxy_ConnID *connid,
-								   int	txn_count);
-
-void ProcessBeginTransactionCommandMulti(Port *myport, StringInfo message);
 void ProcessBeginTransactionGetGXIDCommand(Port *myport, StringInfo message);
 void ProcessCommitTransactionCommand(Port *myport, StringInfo message, bool is_backup);
+void ProcessCommitTransactionCommandMulti(Port *myport, StringInfo message, bool is_backup);
 void ProcessCommitPreparedTransactionCommand(Port *myport, StringInfo message, bool is_backup);
 void ProcessRollbackTransactionCommand(Port *myport, StringInfo message, bool is_backup);
 void ProcessStartPreparedTransactionCommand(Port *myport, StringInfo message, bool is_backup);
@@ -228,18 +175,8 @@ void ProcessBeginTransactionGetGXIDAutovacuumCommand(Port *myport, StringInfo me
 void ProcessBkupBeginTransactionGetGXIDAutovacuumCommand(Port *myport, StringInfo message);
 
 void ProcessBeginTransactionGetGXIDCommandMulti(Port *myport, StringInfo message);
-void ProcessCommitTransactionCommandMulti(Port *myport, StringInfo message, bool is_backup);
 void ProcessRollbackTransactionCommandMulti(Port *myport, StringInfo message, bool is_backup) ;
 
-void GTM_WriteRestorePointVersion(FILE *f);
-void GTM_RestoreStart(FILE *ctlf, struct GTM_RestoreContext *context);
-void GTM_SaveTxnInfo(FILE *ctlf);
-void GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
-		struct GTM_RestoreContext *context, bool force_xid);
-void GTM_BkupBeginTransaction(GTM_IsolationLevel isolevel,
-							  bool readonly,
-							  const char *global_sessionid,
-							  uint32 client_id);
 void ProcessBkupBeginTransactionGetGXIDCommand(Port *myport, StringInfo message);
 void ProcessBkupBeginTransactionGetGXIDCommandMulti(Port *myport, StringInfo message);
 
@@ -249,7 +186,6 @@ void ProcessBkupBeginTransactionGetGXIDCommandMulti(Port *myport, StringInfo mes
  */
 void ProcessGetSnapshotCommand(Port *myport, StringInfo message, bool get_gxid);
 void ProcessGetSnapshotCommandMulti(Port *myport, StringInfo message);
-void GTM_FreeSnapshotData(GTM_Snapshot snapshot);
 void GTM_RememberDroppedSequence(GlobalTransactionId gxid, void *seq);
 void GTM_ForgetCreatedSequence(GlobalTransactionId gxid, void *seq);
 void GTM_RememberCreatedSequence(GlobalTransactionId gxid, void *seq);

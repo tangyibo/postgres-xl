@@ -17,8 +17,6 @@
 #include "gtm/libpq-int.h"
 #include "gtm/gtm_msg.h"
 
-void gtm_util_init_nametabs(void);
 char *gtm_util_message_name(GTM_MessageType type);
-char *gtm_util_result_name(GTM_ResultType type);
 
 #endif /* GTM_UTILS_H */

@@ -149,6 +149,7 @@ static int message_max;
 static char **result_name = NULL;
 static int result_max;
 
+static
 void gtm_util_init_nametabs(void)
 {
 	int ii;
@@ -189,13 +190,4 @@ char *gtm_util_message_name(GTM_MessageType type)
 	if (type > message_max)
 		return "UNKNOWN_MESSAGE";
 	return message_name[type];
-}
-
-char *gtm_util_result_name(GTM_ResultType type)
-{
-	if (result_name == NULL)
-		gtm_util_init_nametabs();
-	if (type > result_max)
-		return "UNKNOWN_RESULT";
-	return result_name[type];
 }

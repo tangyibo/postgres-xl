@@ -49,7 +49,7 @@
  * Note: this function should probably not be called with an argument that's
  * not statically allocated (see xip allocation below).
  */
-GTM_Snapshot
+static GTM_Snapshot
 GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[], int txn_count, int *status)
 {
 	GlobalTransactionId xmin;
@@ -448,21 +448,4 @@ retry:
 #endif
 
 	return;
-}
-
-/*
- * Free the snapshot data. The snapshot itself is not freed though
- */
-void
-GTM_FreeSnapshotData(GTM_Snapshot snapshot)
-{
-	if (snapshot == NULL)
-		return;
-
-	if (snapshot->sn_xip != NULL)
-	{
-		Assert(snapshot->sn_xcnt);
-		pfree(snapshot->sn_xip);
-		snapshot->sn_xip = NULL;
-	}
 }

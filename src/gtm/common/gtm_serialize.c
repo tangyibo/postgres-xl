@@ -43,7 +43,7 @@
  * ---> sn_xcnt ---> GXID * sn_xcnt
  *  |<--- sn_xip -->|
  */
-size_t
+static size_t
 gtm_get_snapshotdata_size(GTM_SnapshotData *data)
 {
 	size_t len = 0;
@@ -63,7 +63,7 @@ gtm_get_snapshotdata_size(GTM_SnapshotData *data)
  * gtm_serialize_snapshotdata
  * Serialize a GTM_SnapshotData structure
  */
-size_t
+static size_t
 gtm_serialize_snapshotdata(GTM_SnapshotData *data, char *buf, size_t buflen)
 {
 	int len = 0;
@@ -109,7 +109,7 @@ gtm_serialize_snapshotdata(GTM_SnapshotData *data, char *buf, size_t buflen)
  * Deserialize a GTM_SnapshotData structure
  * -----------------------------------------------------
  */
-size_t
+static size_t
 gtm_deserialize_snapshotdata(GTM_SnapshotData *data, const char *buf, size_t buflen)
 {
 	size_t len = 0;
@@ -153,7 +153,7 @@ gtm_deserialize_snapshotdata(GTM_SnapshotData *data, const char *buf, size_t buf
  * Original gti_gid serialization was just "null-terminated string".
  * This should be prefixed with the length of the string.
  */
-size_t
+static size_t
 gtm_get_transactioninfo_size(GTM_TransactionInfo *data)
 {
 	size_t len = 0;
@@ -191,7 +191,7 @@ gtm_get_transactioninfo_size(GTM_TransactionInfo *data)
  * Serialize a GTM_TransactionInfo structure
  * -----------------------------------------------------
  */
-size_t
+static size_t
 gtm_serialize_transactioninfo(GTM_TransactionInfo *data, char *buf, size_t buflen)
 {
 	int len = 0;
@@ -304,7 +304,7 @@ gtm_serialize_transactioninfo(GTM_TransactionInfo *data, char *buf, size_t bufle
  * Deserialize a GTM_TransactionInfo structure
  * -----------------------------------------------------
  */
-size_t
+static size_t
 gtm_deserialize_transactioninfo(GTM_TransactionInfo *data, const char *buf, size_t maxlen)
 {
 	int len = 0;

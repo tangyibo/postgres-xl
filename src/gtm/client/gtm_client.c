@@ -110,12 +110,6 @@ connect_gtm(const char *connect_string)
 	return PQconnectGTM(connect_string);
 }
 
-void
-disconnect_gtm(GTM_Conn *conn)
-{
-	GTMPQfinish(conn);
-}
-
 /*
  * begin_replication_initial_sync() acquires several locks to prepare
  * for copying internal transaction, xid and sequence information

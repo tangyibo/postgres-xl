@@ -67,33 +67,8 @@ typedef struct GTM_SeqInfo
 
 /* SEQUENCE Management */
 void GTM_InitSeqManager(void);
-int GTM_SeqOpen(GTM_SequenceKey seqkey,
-			GTM_Sequence increment_by,
-			GTM_Sequence minval,
-			GTM_Sequence maxval,
-			GTM_Sequence startval,
-			bool cycle,
-			GlobalTransactionId gxid);
-int GTM_SeqAlter(GTM_SequenceKey seqkey,
-				 GTM_Sequence increment_by,
-				 GTM_Sequence minval,
-				 GTM_Sequence maxval,
-				 GTM_Sequence startval,
-				 GTM_Sequence lastval,
-				 bool cycle,
-				 bool is_restart);
-int GTM_SeqClose(GTM_SequenceKey seqkey, GlobalTransactionId gxid);
-int GTM_SeqRename(GTM_SequenceKey seqkey, GTM_SequenceKey newseqkey,
-				  GlobalTransactionId gxid);
-int GTM_SeqGetNext(GTM_SequenceKey seqkey, char *coord_name,
-			   int coord_procid, GTM_Sequence range,
-			   GTM_Sequence *result, GTM_Sequence *rangemax);
-void GTM_SeqGetCurrent(GTM_SequenceKey seqkey, char *coord_name,
-				  int coord_procid, GTM_Sequence *result);
-int GTM_SeqSetVal(GTM_SequenceKey seqkey, char *coord_name,
-			  int coord_procid, GTM_Sequence nextval, bool iscalled);
-int GTM_SeqReset(GTM_SequenceKey seqkey);
 
+/* sequence commands in gtm/main/gtm_seq.c */
 void ProcessSequenceInitCommand(Port *myport, StringInfo message, bool is_backup);
 void ProcessSequenceGetCurrentCommand(Port *myport, StringInfo message);
 void ProcessSequenceGetNextCommand(Port *myport, StringInfo message, bool is_backup);

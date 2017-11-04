@@ -98,9 +98,7 @@ int Recovery_PGXCNodeUnregister(GTM_PGXCNodeType type,
 								char *node_name,
 								bool in_recovery,
 								int socket);
-int Recovery_PGXCNodeBackendDisconnect(GTM_PGXCNodeType type, char *nodename, int socket);
 
-void Recovery_RecordRegisterInfo(GTM_PGXCNodeInfo *nodeinfo, bool is_register);
 void Recovery_SaveRegisterInfo(void);
 void Recovery_PGXCNodeDisconnect(Port *myport);
 void Recovery_SaveRegisterFileName(char *dir);

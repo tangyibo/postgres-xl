@@ -358,7 +358,7 @@ seq_copy_key(GTM_SequenceKey key)
 /*
  * Initialize a new sequence. Optionally set the initial value of the sequence.
  */
-int
+static int
 GTM_SeqOpen(GTM_SequenceKey seqkey,
 			GTM_Sequence increment_by,
 			GTM_Sequence minval,
@@ -478,14 +478,15 @@ GTM_SeqOpen(GTM_SequenceKey seqkey,
  * We don't track altered sequences because changes to sequence values are not
  * transactional and must not be rolled back if the transaction aborts.
  */
-int GTM_SeqAlter(GTM_SequenceKey seqkey,
-				 GTM_Sequence increment_by,
-				 GTM_Sequence minval,
-				 GTM_Sequence maxval,
-				 GTM_Sequence startval,
-				 GTM_Sequence lastval,
-				 bool cycle,
-				 bool is_restart)
+static int
+GTM_SeqAlter(GTM_SequenceKey seqkey,
+			 GTM_Sequence increment_by,
+			 GTM_Sequence minval,
+			 GTM_Sequence maxval,
+			 GTM_Sequence startval,
+			 GTM_Sequence lastval,
+			 bool cycle,
+			 bool is_restart)
 {
 	GTM_SeqInfo *seqinfo = seq_find_seqinfo(seqkey);
 
@@ -585,7 +586,7 @@ GTM_SeqRestore(GTM_SequenceKey seqkey,
 /*
  * Destroy the given sequence depending on type of given key
  */
-int
+static int
 GTM_SeqClose(GTM_SequenceKey seqkey, GlobalTransactionId gxid)
 {
 	int res;
@@ -753,7 +754,7 @@ seq_drop_with_dbkey(GTM_SequenceKey nsp)
 /*
  * Rename an existing sequence with a new name
  */
-int
+static int
 GTM_SeqRename(GTM_SequenceKey seqkey, GTM_SequenceKey newseqkey,
 		GlobalTransactionId gxid)
 {
@@ -788,7 +789,7 @@ GTM_SeqRename(GTM_SequenceKey seqkey, GTM_SequenceKey newseqkey,
 /*
  * Get current value for the sequence without incrementing it
  */
-void
+static void
 GTM_SeqGetCurrent(GTM_SequenceKey seqkey, char *coord_name,
 				  int coord_procid, GTM_Sequence *result)
 {
@@ -899,7 +900,7 @@ seq_set_lastval(GTM_SeqInfo *seqinfo, char *coord_name,
 /*
  * Set values for the sequence
  */
-int
+static int
 GTM_SeqSetVal(GTM_SequenceKey seqkey, char *coord_name,
 			  int coord_procid, GTM_Sequence nextval, bool iscalled)
 {
@@ -933,7 +934,7 @@ GTM_SeqSetVal(GTM_SequenceKey seqkey, char *coord_name,
 /*
  * Get next value for the sequence
  */
-int
+static int
 GTM_SeqGetNext(GTM_SequenceKey seqkey, char *coord_name,
 			   int coord_procid, GTM_Sequence range,
 			   GTM_Sequence *result, GTM_Sequence *rangemax)
@@ -1089,7 +1090,7 @@ get_rangemax(GTM_SeqInfo *seqinfo, GTM_Sequence range)
 /*
  * Reset the sequence
  */
-int
+static int
 GTM_SeqReset(GTM_SequenceKey seqkey)
 {
 	GTM_SeqInfo *seqinfo = seq_find_seqinfo(seqkey);

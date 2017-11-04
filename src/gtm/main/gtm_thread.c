@@ -299,37 +299,6 @@ GTM_ThreadCreate(GTM_ConnectionInfo *conninfo,
 }
 
 /*
- * Exit the current thread
- */
-void
-GTM_ThreadExit(void)
-{
-	/* XXX To be implemented */
-}
-
-int
-GTM_ThreadJoin(GTM_ThreadInfo *thrinfo)
-{
-	int error;
-	void *data;
-
-	error = pthread_join(thrinfo->thr_id, &data);
-
-	return error;
-}
-
-/*
- * Get thread information for the given thread, identified by the
- * thread_id
- */
-GTM_ThreadInfo *
-GTM_GetThreadInfo(GTM_ThreadID thrid)
-{
-
-	return NULL;
-}
-
-/*
  * Cleanup routine for the thread
  */
 static void
@@ -438,32 +407,6 @@ GTM_ThreadMainWrapper(void *argp)
 	pthread_cleanup_pop(1);
 
 	return thrinfo;
-}
-
-void
-GTM_LockAllOtherThreads(void)
-{
-	GTM_ThreadInfo *my_threadinfo = GetMyThreadInfo;
-	int ii;
-
-	for (ii = 0; ii < GTMThreads->gt_array_size; ii++)
-	{
-		if (GTMThreads->gt_threads[ii] && GTMThreads->gt_threads[ii] != my_threadinfo)
-			GTM_RWLockAcquire(&GTMThreads->gt_threads[ii]->thr_lock, GTM_LOCKMODE_WRITE);
-	}
-}
-
-void
-GTM_UnlockAllOtherThreads(void)
-{
-	GTM_ThreadInfo *my_threadinfo = GetMyThreadInfo;
-	int ii;
-
-	for (ii = 0; ii < GTMThreads->gt_array_size; ii++)
-	{
-		if (GTMThreads->gt_threads[ii] && GTMThreads->gt_threads[ii] != my_threadinfo)
-			GTM_RWLockRelease(&GTMThreads->gt_threads[ii]->thr_lock);
-	}
 }
 
 void

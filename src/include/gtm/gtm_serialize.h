@@ -22,14 +22,6 @@
 #include "gtm/register.h"
 #include "gtm/gtm_seq.h"
 
-size_t gtm_get_snapshotdata_size(GTM_SnapshotData *);
-size_t gtm_serialize_snapshotdata(GTM_SnapshotData *, char *, size_t);
-size_t gtm_deserialize_snapshotdata(GTM_SnapshotData *, const char *, size_t);
-
-size_t gtm_get_transactioninfo_size(GTM_TransactionInfo *);
-size_t gtm_serialize_transactioninfo(GTM_TransactionInfo *, char *, size_t);
-size_t gtm_deserialize_transactioninfo(GTM_TransactionInfo *, const char *, size_t);
-
 size_t gtm_get_transactions_size(GTM_Transactions *);
 size_t gtm_serialize_transactions(GTM_Transactions *, char *, size_t);
 size_t gtm_deserialize_transactions(GTM_Transactions *, const char *, size_t);

@@ -167,7 +167,6 @@ typedef struct GTM_Result
  * Connection Management API
  */
 GTM_Conn *connect_gtm(const char *connect_string);
-void disconnect_gtm(GTM_Conn *conn);
 
 int begin_replication_initial_sync(GTM_Conn *);
 int end_replication_initial_sync(GTM_Conn *);

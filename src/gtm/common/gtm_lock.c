@@ -204,63 +204,6 @@ GTM_RWLockDestroy(GTM_RWLock *lock)
 }
 
 /*
- * Conditionally acquire a lock. If the lock is not available, the function
- * immediately returns without blocking.
- *
- * Returns true if lock is successfully acquired. Otherwise returns false
- */
-bool
-GTM_RWLockConditionalAcquire(GTM_RWLock *lock, GTM_LockMode mode)
-{
-	int status = EINVAL;
-
-	switch (mode)
-	{
-		case GTM_LOCKMODE_WRITE:
-			status = pthread_rwlock_trywrlock(&lock->lk_lock);
-#ifdef GTM_LOCK_DEBUG
-			if (!status)
-			{
-				pthread_mutex_lock(&lock->lk_debug_mutex);
-				lock->wr_granted = true;
-				lock->wr_owner = pthread_self();
-				lock->rd_holders_count = 0;
-				lock->rd_holders_overflow = false;
-				pthread_mutex_unlock(&lock->lk_debug_mutex);
-			}
-#endif
-			break;
-
-		case GTM_LOCKMODE_READ:
-			status = pthread_rwlock_tryrdlock(&lock->lk_lock);
-#ifdef GTM_LOCK_DEBUG
-			if (!status)
-			{
-				pthread_mutex_lock(&lock->lk_debug_mutex);
-				if (lock->rd_holders_count == GTM_LOCK_DEBUG_MAX_READ_TRACKERS)
-				{
-					elog(WARNING, "Too many threads waiting for a read-lock");
-					lock->rd_holders_overflow = true;
-				}
-				else
-				{
-					lock->rd_holders[lock->rd_holders_count++] = pthread_self();
-					lock->rd_holders_overflow = false;
-				}
-				pthread_mutex_unlock(&lock->lk_debug_mutex);
-			}
-#endif
-			break;
-
-		default:
-			elog(ERROR, "Invalid lockmode");
-			break;
-	}
-
-	return status ? false : true;
-}
-
-/*
  * Initialize a mutex lock
  */
 int
@@ -300,34 +243,12 @@ GTM_MutexLockRelease(GTM_MutexLock *lock)
 }
 
 /*
- * Conditionally acquire a lock. If the lock is not available, the function
- * immediately returns without blocking.
- *
- * Returns true if lock is successfully acquired. Otherwise returns false
- */
-bool
-GTM_MutexLockConditionalAcquire(GTM_MutexLock *lock)
-{
-	int status = pthread_mutex_trylock(&lock->lk_lock);
-	return status ? false : true;
-}
-
-/*
  * Initialize a condition variable
  */
 int
 GTM_CVInit(GTM_CV *cv)
 {
 	return pthread_cond_init(&cv->cv_condvar, NULL);
-}
-
-/*
- * Destroy the conditional variable
- */
-int
-GTM_CVDestroy(GTM_CV *cv)
-{
-	return pthread_cond_destroy(&cv->cv_condvar);
 }
 
 /*

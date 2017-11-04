@@ -32,9 +32,9 @@ struct GTM_RestoreContext;
 
 /* gtm/main/gtm_txn.c */
 extern GlobalTransactionId GTM_GetGlobalTransactionId(GTM_TransactionHandle handle);
-extern GlobalTransactionId ReadNewGlobalTransactionId(void);
-extern void SetNextGlobalTransactionId(GlobalTransactionId gxid);
-extern void SetControlXid(GlobalTransactionId gxid);
+extern GlobalTransactionId GTM_ReadNewGlobalTransactionId(void);
+extern void GTM_SetNextGlobalTransactionId(GlobalTransactionId gxid);
+extern void GTM_SetControlXid(GlobalTransactionId gxid);
 extern void GTM_SetShuttingDown(void);
 
 /* for restoration point backup (gtm/main/gtm_backup.c) */
@@ -153,7 +153,7 @@ GTM_TransactionHandle GTM_GXIDToHandle(GlobalTransactionId gxid);
 /* Transaction Control */
 void GTM_InitTxnManager(void);
 void GTM_RemoveAllTransInfos(uint32 client_id, int backend_id);
-uint32 GTMGetLastClientIdentifier(void);
+uint32 GTM_GetLastClientIdentifier(void);
 
 /* processing of messages in gtm_txn.c */
 void ProcessBeginTransactionCommand(Port *myport, StringInfo message);

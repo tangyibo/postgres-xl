@@ -432,7 +432,7 @@ void
 GTM_SetInitialAndNextClientIdentifierAtPromote(void)
 {
 	GTM_RWLockAcquire(&GTMThreads->gt_lock, GTM_LOCKMODE_WRITE);
-	GTMThreads->gt_starting_client_id = GTMGetLastClientIdentifier();
+	GTMThreads->gt_starting_client_id = GTM_GetLastClientIdentifier();
 	GTMThreads->gt_next_client_id =
 		GTM_CLIENT_ID_NEXT(GTMThreads->gt_starting_client_id);
 	GTM_RWLockRelease(&GTMThreads->gt_lock);

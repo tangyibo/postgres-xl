@@ -2367,7 +2367,7 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 			 * Add in extra amount in case we had not gracefully stopped
 			 */
 			next_gxid = saved_gxid + CONTROL_INTERVAL;
-			SetControlXid(next_gxid);
+			GTM_SetControlXid(next_gxid);
 		}
 		else
 			saved_gxid = next_gxid = InitialGXIDValue_Default;
@@ -2391,7 +2391,7 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 		GTMTransactions.gt_recent_global_xmin = next_gxid;
 	}
 
-	SetNextGlobalTransactionId(next_gxid);
+	GTM_SetNextGlobalTransactionId(next_gxid);
 	elog(LOG, "Restoring last GXID to %u\n", next_gxid);
 	elog(LOG, "Restoring global xmin to %u\n",
 			GTMTransactions.gt_recent_global_xmin);
@@ -2413,7 +2413,7 @@ GTM_SaveTxnInfo(FILE *ctlf)
 	GlobalTransactionId next_gxid;
 	GlobalTransactionId global_xmin = GTMTransactions.gt_recent_global_xmin;
 
-	next_gxid = ReadNewGlobalTransactionId();
+	next_gxid = GTM_ReadNewGlobalTransactionId();
 
 	elog(DEBUG1, "Saving transaction info - next_gxid: %u, global_xmin: %u",
 			next_gxid, global_xmin);

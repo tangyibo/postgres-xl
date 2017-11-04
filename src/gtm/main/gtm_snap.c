@@ -9,7 +9,79 @@
  *
  *
  * IDENTIFICATION
- *	  $PostgreSQL$
+ *	  src/gtm/main/gtm_snap.c
+ *
+ *
+ * Functions in this source file manage transaction snapshots for global
+ * transactions, i.e. a list of transactions (GXIDs) a particular transaction
+ * sees as "running." The concept is mostly the same as in PostgreSQL (see
+ * GetSnapshotData in src/backend/storage/ipc/procarray.c for details), except
+ * that the snapshots are not computed on nodes but on GTM.
+ *
+ * The API is very simple as it consists of a single function:
+ *
+ *		GTM_GetTransactionSnapshot
+ *
+ * that builds a snapshot and stores it in the main GTMTransactions array
+ * tracking all in-progress transactions. When multiple snapshot requests get
+ * grouped by GTM Proxy, we compute the snapshot only once and then use it
+ * for all transactions in the request. As computing the snapshot is quite
+ * expensive, this is a major benefit.
+ *
+ * There are also two functions handling the communication with GTM clients
+ * (either nodes or GTM proxies):
+ *
+ *		ProcessGetSnapshotCommand
+ *		ProcessGetSnapshotCommandMulti
+ *
+ * These functions are responsible for parsing of network messages, and then
+ * simply call GTM_GetTransactionSnapshot with the proper arguments.
+ *
+ *
+ * Memory management (GTM_SnapshotData)
+ * ------------------------------------
+ * The snapshots are allocated in TopMostMemoryContext - we can't allocate
+ * them in per-thread contexts as the transactions may outlive the client
+ * connection (e.g. with prepared transactions).
+ *
+ * When building the snapshot, we use sn_xip from the first transaction (if
+ * it was already allocated), or a thread-local variable (multiple threads
+ * may be building snapshots at the same time).
+ *
+ * Once the snapshot is built, we copy it into the GTMTransaction array
+ * for each of the transactions passed to GTM_GetTransactionSnapshot.
+ *
+ * Snapshot for each transaction is stored in gti_current_snapshot in the
+ * global GTMTransactions array. We only need to allocate the sn_xip field,
+ * tracking the GXIDs of running transactions, and allocate it just once
+ * when the first transaction gets assigned to that slot, and then keep the
+ * buffer for all future transactions in the slot (until GTM shuts down).
+ *
+ * The sn_xip buffer is always allocated with space for the maximum number
+ * of GXIDSs, otherwise we might need to reallocate it. That means we need
+ * space for up to GTM_MAX_GLOBAL_TRANSACTIONS, which is currently 16384.
+ * Each GXID is 32 bits, so this means 64kB per GTMTransaction slot. There
+ * are GTM_MAX_GLOBAL_TRANSACTIONS slots, so this means 16k sn_xip buffers
+ * or 1GB of memory in total.
+ *
+ * XXX We may as well allocate all the memory at the very beginning - we
+ * will eventually allocate the same memory anyway (it only takes a few
+ * loops over GTMTransactions, so a few thousand transactions), and it
+ * would completely eliminate the palloc/pfree calls.
+ *
+ * XXX There's a memory leak in thr_snapshot - the memory is allocated in
+ * the global memory context, but we don't pfree it when the thread exits.
+ * We can either allocate it in per-thread context or statically (as a
+ * variable in the function).
+ *
+ * XXX While this eliminates the palloc/pfree calls, we still need to do
+ * a number of memcpy() calls when copying the built snapshot data into
+ * GTMTransaction for each of the transactions. Perhaps we should invent
+ * shapshots directly "shared" by multiple transactions. That is, keep the
+ * snapshots in a separate data structure (list?), track the number of
+ * transactions using it (refcount). And reuse it when refcount gets to 0
+ * (after all the transactions either close or get a new snapshot). Not
+ * sure it's worth the additional complexity, though.
  *
  *-------------------------------------------------------------------------
  */
@@ -24,6 +96,9 @@
 #include "gtm/pqformat.h"
 
 /*
+ * GTM_GetTransactionSnapshot
+ *		Compute and store snapshot(s) for specified transactions.
+ *
  * Get snapshot for the given transactions. If this is the first call in the
  * transaction, a fresh snapshot is taken and returned back. For a serializable
  * transaction, repeated calls to the function will return the same snapshot.
@@ -83,6 +158,10 @@ GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[], int txn_count, int *s
 		/*
 		 * If the transaction does not exist, just mark the status field with
 		 * a STATUS_ERROR code
+		 *
+		 * FIXME This comment seems to be misplaced/stale - we're not checking
+		 * if a transaction exists (we've already done that above and set the
+		 * status to STATUS_NOT_FOUND).
 		 */
 		if ((mygtm_txninfo != NULL) && (snapshot == NULL))
 			snapshot = &mygtm_txninfo->gti_current_snapshot;

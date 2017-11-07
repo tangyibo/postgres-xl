@@ -2935,33 +2935,30 @@ release_connection(DatabasePool *dbPool, PGXCNodePoolSlot *slot,
 		return;
 	}
 
-	/*
-	 * The node pool exists, but we've been asked to forcefully close
-	 * the connection, so do as asked.
-	 */
+	/* return or discard */
 	if (!force_destroy)
 	{
-		elog(DEBUG1, "Cleaning up connection from pool %s (node %d), closing",
-			nodePool->connstr, node);
-
+		/*
+		 * Everything peachy, so just insert the connection (slot) into the
+		 * array and increase the number of free connections in the pool.
+		 * Also note the timestamp when the connection was released.
+		 */
+		nodePool->slot[(nodePool->freeSize)++] = slot;
+		slot->released = time(NULL);
+	}
+	else
+	{
+		/*
+		 * The node pool exists, but we've been asked to forcefully close
+		 * the connection, so do as asked.
+		 */
+		elog(DEBUG1, "Cleaning up connection from pool %s, closing", nodePool->connstr);
 		destroy_slot(slot);
-
 		/* Decrement pool size */
 		(nodePool->size)--;
-
 		/* Ensure we are not below minimum size */
 		grow_pool(dbPool, node);
-
-		return;
 	}
-
-	/*
-	 * Everything peachy, so just insert the connection (slot) into the
-	 * array and increase the number of free connections in the pool.
-	 * Also note the timestamp when the connection was released.
-	 */
-	nodePool->slot[(nodePool->freeSize)++] = slot;
-	slot->released = time(NULL);
 }
 
 

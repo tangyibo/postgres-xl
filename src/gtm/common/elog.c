@@ -66,15 +66,14 @@ char	   *Log_line_prefix = "%l:%p:%m -";		/* format for extra log line info */
 
 #define FORMATTED_TS_LEN 128
 static char formatted_start_time[FORMATTED_TS_LEN];
-static char formatted_log_time[FORMATTED_TS_LEN];
 
 static void log_line_prefix(StringInfo buf);
-static void setup_formatted_log_time(void);
+static void setup_formatted_log_time(char formatted_log_time[FORMATTED_TS_LEN]);
 /*
  * setup formatted_log_time, for consistent times between CSV and regular logs
  */
 static void
-setup_formatted_log_time(void)
+setup_formatted_log_time(char formatted_log_time[FORMATTED_TS_LEN])
 {
 	struct timeval tv;
 	time_t	stamp_time;
@@ -101,6 +100,7 @@ log_line_prefix(StringInfo buf)
 {
 	/* static counter for line numbers */
 	static long log_line_number = 0;
+	static char formatted_log_time[FORMATTED_TS_LEN];
 
 	/* has counter been reset in current process? */
 	static int	log_my_pid = 0;
@@ -150,7 +150,8 @@ log_line_prefix(StringInfo buf)
 				appendStringInfo(buf, "%ld", log_line_number);
 				break;
 			case 'm':
-				setup_formatted_log_time();
+				formatted_log_time[0] = '\0';
+				setup_formatted_log_time(formatted_log_time);
 				appendStringInfoString(buf, formatted_log_time);
 				break;
 			default:
@@ -790,8 +791,6 @@ send_message_to_server_log(ErrorData *edata)
 	StringInfoData buf;
 
 	initStringInfo(&buf);
-
-	formatted_log_time[0] = '\0';
 
 	log_line_prefix(&buf);
 	appendStringInfo(&buf, "%s:  ", error_severity(edata->elevel));

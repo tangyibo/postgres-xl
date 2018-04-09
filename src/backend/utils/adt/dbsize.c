@@ -1235,7 +1235,6 @@ pgxc_execute_on_nodes(int numnodes, Oid *nodelist, char *query)
 
 	}
 	plan->sql_statement = query;
-	plan->force_autocommit = false;
 	/*
 	 * We only need the target entry to determine result data type.
 	 * So create dummy even if real expression is a function.

@@ -4921,3 +4921,27 @@ BEGIN
 END; $$ LANGUAGE plpgsql;
 
 SELECT * FROM list_partitioned_table() AS t;
+
+-- ensure that all statements in a function are correctly executed in a
+-- transaction block.
+create table plp_mt_tab(a int, b int);
+create function plpgsql_multistmt() returns void as $$
+begin
+	insert into plp_mt_tab(a) values (1);
+	insert into plp_mt_tab(a) values (2);
+	insert into plp_mt_tab(a) values (3/0);
+end
+$$ language plpgsql;
+
+select plpgsql_multistmt();
+select * from plp_mt_tab;
+
+create or replace function plpgsql_multistmt() returns void as $$
+begin
+	insert into plp_mt_tab(a) values (3);
+	update plp_mt_tab set b = 1 where (a / 0) = 0;
+end
+$$ language plpgsql;
+
+select plpgsql_multistmt();
+select * from plp_mt_tab;

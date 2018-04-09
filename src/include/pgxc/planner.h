@@ -88,7 +88,6 @@ typedef struct
 	CombineType		combine_type;
 	SimpleSort		*sort;
 	bool			read_only;		/* do not use 2PC when committing read only steps */
-	bool			force_autocommit;	/* some commands like VACUUM require autocommit mode */
 	char			*statement;		/* if specified use it as a PreparedStatement name on Datanodes */
 	char			*cursor;		/* if specified use it as a Portal name on Datanodes */
 	int             rq_num_params;      /* number of parameters present in

@@ -888,7 +888,6 @@ distrib_execute_query(char *sql, bool is_temp, ExecNodes *exec_nodes)
 	step->combine_type = COMBINE_TYPE_SAME;
 	step->exec_nodes = exec_nodes;
 	step->sql_statement = pstrdup(sql);
-	step->force_autocommit = false;
 
 	/* Redistribution operations only concern Datanodes */
 	step->exec_type = EXEC_ON_DATANODES;

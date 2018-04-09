@@ -7445,7 +7445,6 @@ set_config_option(const char *name, const char *value,
 		step->exec_nodes = NULL;
 		step->sql_statement = poolcmd.data;
 		/* force_autocommit is actually does not start transaction on nodes */
-		step->force_autocommit = true;
 		step->exec_type = EXEC_ON_CURRENT;
 		ExecRemoteUtility(step);
 		pfree(step);

@@ -27,6 +27,7 @@
 #include "pgxc/poolutils.h"
 #include "pgxc/pgxcnode.h"
 #include "access/gtm.h"
+#include "access/transam.h"
 #include "access/xact.h"
 #include "catalog/pgxc_node.h"
 #include "commands/dbcommands.h"
@@ -97,10 +98,10 @@ pgxc_pool_check(PG_FUNCTION_ARGS)
 Datum
 pgxc_pool_reload(PG_FUNCTION_ARGS)
 {
-	if (IsTransactionBlock())
+	if (TransactionIdIsValid(GetTopTransactionIdIfAny()))
 		ereport(ERROR,
 				(errcode(ERRCODE_ACTIVE_SQL_TRANSACTION),
-				 errmsg("pgxc_pool_reload cannot run inside a transaction block")));
+				 errmsg("pgxc_pool_reload cannot run with a transaction ID assigned")));
 
 	/*
 	 * Always check if we can get away with a LESS destructive refresh

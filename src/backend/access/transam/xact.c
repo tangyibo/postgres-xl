@@ -6766,8 +6766,13 @@ AtEOXact_WaitedXids(void)
 	 * subtransactions) had waited-for to the coordinator. The coordinator will
 	 * then forward the list to the GTM who ensures that the logical ordering
 	 * between these transactions and this transaction is correctly followed.
+	 *
+	 * Non XL clients are not prepared to deal with this message. So ensure we
+	 * check for remote end first. It's not enough to check if we're NOT a
+	 * local coordinator (as we were doing before) since one might be running
+	 * pg_restore to create a new coordinator or a datanode in --restoremode.
 	 */
-	if (whereToSendOutput == DestRemote && !IS_PGXC_LOCAL_COORDINATOR)
+	if (whereToSendOutput == DestRemote && !IsConnFromApp())
 	{
 		if (s->waitedForXidsCount > 0)
 		{

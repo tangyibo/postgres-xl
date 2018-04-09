@@ -3048,7 +3048,6 @@ coord_collect_simple_stats(Relation onerel, bool inh, int attr_cnt,
 	step->combine_type = COMBINE_TYPE_NONE;
 	step->exec_nodes = NULL;
 	step->sql_statement = query.data;
-	step->force_autocommit = true;
 	step->exec_type = EXEC_ON_DATANODES;
 
 	/* Add targetlist entries */

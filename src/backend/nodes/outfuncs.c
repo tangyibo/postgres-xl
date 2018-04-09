@@ -875,7 +875,6 @@ _outRemoteQuery(StringInfo str, const RemoteQuery *node)
 	WRITE_NODE_FIELD(exec_nodes);
 	WRITE_ENUM_FIELD(combine_type, CombineType);
 	WRITE_BOOL_FIELD(read_only);
-	WRITE_BOOL_FIELD(force_autocommit);
 	WRITE_STRING_FIELD(statement);
 	WRITE_STRING_FIELD(cursor);
 	WRITE_INT_FIELD(rq_num_params);

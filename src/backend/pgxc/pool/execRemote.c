@@ -1895,6 +1895,9 @@ pgxc_node_begin(int conn_count, PGXCNodeHandle **connections,
 		if (connections[i]->state == DN_CONNECTION_STATE_QUERY)
 			BufferConnection(connections[i]);
 
+		elog(DEBUG2, "Sending gxid %u to remote node %s, need_tran_block %d",
+				gxid, connections[i]->nodename, need_tran_block);
+
 		/* Send GXID and check for errors */
 		if (GlobalTransactionIdIsValid(gxid) && pgxc_node_send_gxid(connections[i], gxid))
 			return EOF;
@@ -1908,7 +1911,7 @@ pgxc_node_begin(int conn_count, PGXCNodeHandle **connections,
 		else if (IS_PGXC_REMOTE_COORDINATOR)
 			need_tran_block = false;
 
-		elog(DEBUG5, "need_tran_block %d, connections[%d]->transaction_status %c",
+		elog(DEBUG2, "need_tran_block %d, connections[%d]->transaction_status %c",
 				need_tran_block, i, connections[i]->transaction_status);
 		/* Send BEGIN if not already in transaction */
 		if (need_tran_block && connections[i]->transaction_status == 'I')
@@ -2805,7 +2808,7 @@ DataNodeCopyBegin(RemoteCopyData *rcstate)
 	 * If more than one nodes are involved or if we are already in a
 	 * transaction block, we must the remote statements in a transaction block
 	 */
-	need_tran_block = (conn_count > 1) || (TransactionBlockStatusCode() == 'T');
+	need_tran_block = (conn_count > 1) || IsRemoteTransactionBlockRequired();
 
 	elog(DEBUG1, "conn_count = %d, need_tran_block = %s", conn_count,
 			need_tran_block ? "true" : "false");
@@ -3400,7 +3403,7 @@ ExecRemoteUtility(RemoteQuery *node)
 {
 	RemoteQueryState *remotestate;
 	ResponseCombiner *combiner;
-	bool		force_autocommit = node->force_autocommit;
+	bool		force_autocommit = IsRemoteTransactionAutoCommit();
 	RemoteQueryExecType exec_type = node->exec_type;
 	GlobalTransactionId gxid = InvalidGlobalTransactionId;
 	Snapshot snapshot = NULL;
@@ -4624,12 +4627,17 @@ ExecRemoteQuery(PlanState *pstate)
 		 * Start transaction on data nodes if we are in explicit transaction
 		 * or going to use extended query protocol or write to multiple nodes
 		 */
-		if (step->force_autocommit)
+		elog(DEBUG2, "cursor %s, read_only %d,"
+				" total_conn_count %d, transaction block status %c",
+				step->cursor, step->read_only,
+				total_conn_count, TransactionBlockStatusCode());
+
+		if (IsRemoteTransactionAutoCommit())
 			need_tran_block = false;
 		else
 			need_tran_block = step->cursor ||
 					(!step->read_only && total_conn_count > 1) ||
-					(TransactionBlockStatusCode() == 'T');
+					IsRemoteTransactionBlockRequired();
 
 		stat_statement();
 		stat_transaction(total_conn_count);

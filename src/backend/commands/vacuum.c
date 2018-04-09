@@ -1724,7 +1724,6 @@ get_remote_relstat(char *nspname, char *relname, bool replicated,
 	step->combine_type = COMBINE_TYPE_NONE;
 	step->exec_nodes = NULL;
 	step->sql_statement = query.data;
-	step->force_autocommit = true;
 	step->exec_type = EXEC_ON_DATANODES;
 
 	/* Add targetlist entries */

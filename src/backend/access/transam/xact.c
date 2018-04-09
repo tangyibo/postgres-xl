@@ -90,6 +90,8 @@
 #define implicit2PC_head "_$XC$"
 #endif
 
+#define XACT_REMOTE_TRANSACTION_AUTOCOMMIT	0x01
+#define XACT_REMOTE_TRANSACTION_BLOCK		0x02
 
 /*
  *	User-tweakable parameters
@@ -221,6 +223,11 @@ typedef struct TransactionStateData
 	int			parallelModeLevel;	/* Enter/ExitParallelMode counter */
 	struct TransactionStateData *parent;	/* back link to parent */
 #ifdef XCP
+	/*
+	 * flags to track whether to run the remote transaction in a transaction
+	 * block or in autocommit mode.
+	 */
+	int				remoteTransactionBlockFlags;
 	int				waitedForXidsCount;	/* count of xids we waited to finish */
 	TransactionId	*waitedForXids;		/* xids we waited to finish */
 #endif
@@ -2758,6 +2765,7 @@ AtEOXact_GlobalTxn(bool commit)
 	}
 	s->waitedForXids = NULL;
 	s->waitedForXidsCount = 0;
+	s->remoteTransactionBlockFlags = 0;
 
 	SetNextTransactionId(InvalidTransactionId);
 }
@@ -3116,6 +3124,7 @@ PrepareTransaction(void)
 	}
 	s->waitedForXids = NULL;
 	s->waitedForXidsCount = 0;
+	s->remoteTransactionBlockFlags = 0;
 #endif
 
 	SetNextTransactionId(InvalidTransactionId);
@@ -3429,6 +3438,7 @@ CleanupTransaction(void)
 	}
 	s->waitedForXids = NULL;
 	s->waitedForXidsCount = 0;
+	s->remoteTransactionBlockFlags = 0;
 #endif
 
 	/*
@@ -3930,8 +3940,8 @@ AbortCurrentTransaction(void)
  *	making callers do it.)
  *	stmtType: statement type name, for error messages.
  */
-void
-PreventTransactionChain(bool isTopLevel, const char *stmtType)
+static void
+PreventTransactionChainInternal(bool isTopLevel, const char *stmtType, bool remote)
 {
 	/*
 	 * xact block already started?
@@ -3968,6 +3978,21 @@ PreventTransactionChain(bool isTopLevel, const char *stmtType)
 		CurrentTransactionState->blockState != TBLOCK_STARTED)
 		elog(FATAL, "cannot prevent transaction chain");
 	/* all okay */
+
+	if (remote)
+		SetRequireRemoteTransactionAutoCommit();
+}
+
+void
+PreventTransactionChain(bool isTopLevel, const char *stmtType)
+{
+	PreventTransactionChainInternal(isTopLevel, stmtType, true);
+}
+
+void
+PreventTransactionChainLocal(bool isTopLevel, const char *stmtType)
+{
+	PreventTransactionChainInternal(isTopLevel, stmtType, false);
 }
 
 /*
@@ -4300,6 +4325,8 @@ BeginTransactionBlock(void)
 	 */
 	if (IS_PGXC_LOCAL_COORDINATOR)
 		SetSendCommandId(true);
+
+	SetRequireRemoteTransactionBlock();
 #endif
 }
 
@@ -6914,6 +6941,44 @@ SetTopTransactionId(GlobalTransactionId xid)
 		if (whereToSendOutput == DestRemote)
 			pq_putmessage('x', (const char *) &xid, sizeof (GlobalTransactionId));
 	}
+}
+
+void
+SetRequireRemoteTransactionBlock(void)
+{
+	TransactionState s = CurrentTransactionState;
+
+	if (s->remoteTransactionBlockFlags & XACT_REMOTE_TRANSACTION_AUTOCOMMIT)
+		elog(ERROR, "Can't run a query marked for autocommit in a transaction block");
+	s->remoteTransactionBlockFlags |= XACT_REMOTE_TRANSACTION_BLOCK;
+}
+
+bool
+IsRemoteTransactionBlockRequired(void)
+{
+	TransactionState s = CurrentTransactionState;
+
+	return s->remoteTransactionBlockFlags & XACT_REMOTE_TRANSACTION_BLOCK;
+
+}
+
+void
+SetRequireRemoteTransactionAutoCommit(void)
+{
+	TransactionState s = CurrentTransactionState;
+
+	if (s->remoteTransactionBlockFlags & XACT_REMOTE_TRANSACTION_BLOCK)
+		elog(ERROR, "Can't run a query marked for a transaction block in autocommit mode");
+	s->remoteTransactionBlockFlags |= XACT_REMOTE_TRANSACTION_AUTOCOMMIT;
+}
+
+bool
+IsRemoteTransactionAutoCommit(void)
+{
+	TransactionState s = CurrentTransactionState;
+
+	return s->remoteTransactionBlockFlags & XACT_REMOTE_TRANSACTION_AUTOCOMMIT;
+
 }
 #endif
 #endif

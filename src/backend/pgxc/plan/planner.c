@@ -17,6 +17,7 @@
 #include "postgres.h"
 #include "miscadmin.h"
 #include "access/transam.h"
+#include "access/xact.h"
 #include "catalog/pg_aggregate.h"
 #include "catalog/pg_class.h"
 #include "catalog/pg_inherits_fn.h"
@@ -232,6 +233,16 @@ pgxc_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
 
 	/* we need Coordinator for evaluation, invoke standard planner */
 	result = standard_planner(query, cursorOptions, boundParams);
+
+	/*
+	 * For coordinator side execution, we must always force a transaction block
+	 * on the remote side. This ensures that all queries resulting from the
+	 * coordinator side execution are run within a block. For example, this
+	 * could be a user-defined function, which internally runs several queries,
+	 * where each query is separately checked for fast-query-shipping. We must
+	 * run all these queries inside a block.
+	 */ 
+	SetRequireRemoteTransactionBlock();
 	return result;
 }
 

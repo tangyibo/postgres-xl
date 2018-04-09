@@ -1234,7 +1234,6 @@ _copyRemoteQuery(const RemoteQuery *from)
 	COPY_SCALAR_FIELD(combine_type);
 	COPY_NODE_FIELD(sort);
 	COPY_SCALAR_FIELD(read_only);
-	COPY_SCALAR_FIELD(force_autocommit);
 	COPY_STRING_FIELD(statement);
 	COPY_STRING_FIELD(cursor);
 	COPY_SCALAR_FIELD(rq_num_params);

@@ -403,6 +403,7 @@ extern bool IsTransactionOrTransactionBlock(void);
 extern char TransactionBlockStatusCode(void);
 extern void AbortOutOfAnyTransaction(void);
 extern void PreventTransactionChain(bool isTopLevel, const char *stmtType);
+extern void PreventTransactionChainLocal(bool isTopLevel, const char *stmtType);
 extern void RequireTransactionChain(bool isTopLevel, const char *stmtType);
 extern void WarnNoTransactionChain(bool isTopLevel, const char *stmtType);
 extern bool IsInTransactionChain(bool isTopLevel);
@@ -429,6 +430,10 @@ extern void SetSendCommandId(bool status);
 extern bool IsPGXCNodeXactReadOnly(void);
 extern bool IsPGXCNodeXactDatanodeDirect(void);
 extern void TransactionRecordXidWait(TransactionId xid);
+extern void SetRequireRemoteTransactionBlock(void);
+extern bool IsRemoteTransactionBlockRequired(void);
+extern void SetRequireRemoteTransactionAutoCommit(void);
+extern bool IsRemoteTransactionAutoCommit(void);
 #endif
 
 extern int	xactGetCommittedChildren(TransactionId **ptr);

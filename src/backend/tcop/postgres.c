@@ -824,6 +824,13 @@ pg_analyze_and_rewrite(Node *parsetree, const char *query_string,
 	 */
 	querytree_list = pg_rewrite_query(query);
 
+	/*
+	 * If we rewrote the query into more than one queries, then we must
+	 * enforce a transaction block while running remote queries.
+	 */
+	if (list_length(querytree_list) > 1)
+		SetRequireRemoteTransactionBlock();
+
 	TRACE_POSTGRESQL_QUERY_REWRITE_DONE(query_string);
 
 	return querytree_list;
@@ -1257,8 +1264,18 @@ exec_simple_query(const char *query_string)
 		 */
 		if (IS_PGXC_DATANODE && IsPostmasterEnvironment)
 		{
-			if (IsA(parsetree, VacuumStmt) || IsA(parsetree, ClusterStmt))
-				 SetForceXidFromGTM(true);
+			if (IsA(parsetree, VacuumStmt))
+			{
+				VacuumStmt *stmt = (VacuumStmt *) parsetree;
+				if (stmt->options & VACOPT_VACUUM)
+					SetForceXidFromGTM(true);
+			}
+			else if (IsA(parsetree, ClusterStmt))
+			{
+				ClusterStmt *stmt = (ClusterStmt *) parsetree;
+				if (stmt->relation == NULL)
+					SetForceXidFromGTM(true);
+			}
 			else if (IsA(parsetree, ReindexStmt))
 			{
 				ReindexStmt *stmt = (ReindexStmt *) parsetree;

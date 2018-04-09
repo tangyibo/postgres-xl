@@ -2558,7 +2558,6 @@ transformExecDirectStmt(ParseState *pstate, ExecDirectStmt *stmt)
 	step->combine_type = COMBINE_TYPE_NONE;
 	step->sort = NULL;
 	step->read_only = true;
-	step->force_autocommit = false;
 	step->cursor = NULL;
 
 	/* This is needed by executor */
@@ -2581,7 +2580,6 @@ transformExecDirectStmt(ParseState *pstate, ExecDirectStmt *stmt)
 	step->join_condition = NULL;
 
 	/* Change the list of nodes that will be executed for the query and others */
-	step->force_autocommit = false;
 	step->combine_type = COMBINE_TYPE_SAME;
 	step->read_only = true;
 	step->exec_direct_type = EXEC_DIRECT_NONE;

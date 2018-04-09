@@ -630,7 +630,6 @@ storm_gather_remote_coord_info(Oid funcid)
 	step->combine_type = COMBINE_TYPE_NONE;
 	step->exec_nodes = NULL;
 	step->sql_statement = query;
-	step->force_autocommit = false;
 	step->read_only = true;
 	step->exec_type = EXEC_ON_COORDS;
 

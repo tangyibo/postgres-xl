@@ -3494,7 +3494,6 @@ ExplainRemoteQuery(RemoteQuery *plan, PlanState *planstate, List *ancestors, Exp
 			step->exec_nodes->nodeList =
 				list_make1_int(linitial_int(plan->exec_nodes->nodeList));
 
-		step->force_autocommit = true;
 		step->exec_type = EXEC_ON_DATANODES;
 
 		dummy = makeVar(1, 1, TEXTOID, -1, InvalidOid, 0);

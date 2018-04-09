@@ -1577,7 +1577,7 @@ AlterDatabase(AlterDatabaseStmt *stmt, bool isTopLevel)
 		/* ... but we allow it on remote nodes */
 		if (IS_PGXC_LOCAL_COORDINATOR)
 #endif
-			PreventTransactionChain(isTopLevel, "ALTER DATABASE SET TABLESPACE");
+			PreventTransactionChainLocal(isTopLevel, "ALTER DATABASE SET TABLESPACE");
 
 		movedb(stmt->dbname, defGetString(dtablespace));
 		return InvalidOid;

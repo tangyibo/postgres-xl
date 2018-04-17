@@ -2103,7 +2103,7 @@ UPDATE v1 SET a=100 WHERE snoop(a) AND leakproof(a) AND a = 3;
          Update on public.t12 t1
          Update on public.t111 t1
          ->  Subquery Scan on t1
-               Output: 100, t1.b, t1.c, t1.a, t1.a, t1.a, t1.a, t1.a, t1.a, t1.ctid
+               Output: 100, t1.b, t1.c, t1.a, t1.a, t1.a, t1.ctid
                Filter: snoop(t1.a)
                ->  LockRows
                      Output: t1_5.a, t1_5.ctid, t1_5.b, t1_5.c, t1_5.ctid, t12.ctid, t12.tableoid
@@ -2120,7 +2120,7 @@ UPDATE v1 SET a=100 WHERE snoop(a) AND leakproof(a) AND a = 3;
                                        Output: t111.ctid, t111.tableoid, t111.a
                                        Filter: (t111.a = 3)
          ->  Subquery Scan on t1_1
-               Output: 100, t1_1.b, t1_1.c, t1_1.d, t1_1.a, t1_1.a, t1_1.a, t1_1.a, t1_1.a, t1_1.a, t1_1.ctid
+               Output: 100, t1_1.b, t1_1.c, t1_1.d, t1_1.a, t1_1.a, t1_1.a, t1_1.ctid
                Filter: snoop(t1_1.a)
                ->  LockRows
                      Output: t11.a, t11.ctid, t11.b, t11.c, t11.d, t11.ctid, t12_1.ctid, t12_1.tableoid
@@ -2137,7 +2137,7 @@ UPDATE v1 SET a=100 WHERE snoop(a) AND leakproof(a) AND a = 3;
                                        Output: t111_1.ctid, t111_1.tableoid, t111_1.a
                                        Filter: (t111_1.a = 3)
          ->  Subquery Scan on t1_2
-               Output: 100, t1_2.b, t1_2.c, t1_2.e, t1_2.a, t1_2.a, t1_2.a, t1_2.a, t1_2.a, t1_2.a, t1_2.ctid
+               Output: 100, t1_2.b, t1_2.c, t1_2.e, t1_2.a, t1_2.a, t1_2.a, t1_2.ctid
                Filter: snoop(t1_2.a)
                ->  LockRows
                      Output: t12_2.a, t12_2.ctid, t12_2.b, t12_2.c, t12_2.e, t12_2.ctid, t12_3.ctid, t12_3.tableoid
@@ -2154,7 +2154,7 @@ UPDATE v1 SET a=100 WHERE snoop(a) AND leakproof(a) AND a = 3;
                                        Output: t111_2.ctid, t111_2.tableoid, t111_2.a
                                        Filter: (t111_2.a = 3)
          ->  Subquery Scan on t1_3
-               Output: 100, t1_3.b, t1_3.c, t1_3.d, t1_3.e, t1_3.a, t1_3.a, t1_3.a, t1_3.a, t1_3.a, t1_3.a, t1_3.ctid
+               Output: 100, t1_3.b, t1_3.c, t1_3.d, t1_3.e, t1_3.a, t1_3.a, t1_3.a, t1_3.ctid
                Filter: snoop(t1_3.a)
                ->  LockRows
                      Output: t111_3.a, t111_3.ctid, t111_3.b, t111_3.c, t111_3.d, t111_3.e, t111_3.ctid, t12_4.ctid, t12_4.tableoid
@@ -2194,7 +2194,7 @@ UPDATE v1 SET a=a+1 WHERE snoop(a) AND leakproof(a) AND a = 8;
          Update on public.t12 t1
          Update on public.t111 t1
          ->  Subquery Scan on t1
-               Output: (t1.a + 1), t1.b, t1.c, t1.a, t1.a, t1.a, t1.a, t1.a, t1.a, t1.ctid
+               Output: (t1.a + 1), t1.b, t1.c, t1.a, t1.a, t1.a, t1.ctid
                Filter: snoop(t1.a)
                ->  LockRows
                      Output: t1_5.a, t1_5.ctid, t1_5.b, t1_5.c, t1_5.ctid, t12.ctid, t12.tableoid
@@ -2211,7 +2211,7 @@ UPDATE v1 SET a=a+1 WHERE snoop(a) AND leakproof(a) AND a = 8;
                                        Output: t111.ctid, t111.tableoid, t111.a
                                        Filter: (t111.a = 8)
          ->  Subquery Scan on t1_1
-               Output: (t1_1.a + 1), t1_1.b, t1_1.c, t1_1.d, t1_1.a, t1_1.a, t1_1.a, t1_1.a, t1_1.a, t1_1.a, t1_1.ctid
+               Output: (t1_1.a + 1), t1_1.b, t1_1.c, t1_1.d, t1_1.a, t1_1.a, t1_1.a, t1_1.ctid
                Filter: snoop(t1_1.a)
                ->  LockRows
                      Output: t11.a, t11.ctid, t11.b, t11.c, t11.d, t11.ctid, t12_1.ctid, t12_1.tableoid
@@ -2228,7 +2228,7 @@ UPDATE v1 SET a=a+1 WHERE snoop(a) AND leakproof(a) AND a = 8;
                                        Output: t111_1.ctid, t111_1.tableoid, t111_1.a
                                        Filter: (t111_1.a = 8)
          ->  Subquery Scan on t1_2
-               Output: (t1_2.a + 1), t1_2.b, t1_2.c, t1_2.e, t1_2.a, t1_2.a, t1_2.a, t1_2.a, t1_2.a, t1_2.a, t1_2.ctid
+               Output: (t1_2.a + 1), t1_2.b, t1_2.c, t1_2.e, t1_2.a, t1_2.a, t1_2.a, t1_2.ctid
                Filter: snoop(t1_2.a)
                ->  LockRows
                      Output: t12_2.a, t12_2.ctid, t12_2.b, t12_2.c, t12_2.e, t12_2.ctid, t12_3.ctid, t12_3.tableoid
@@ -2245,7 +2245,7 @@ UPDATE v1 SET a=a+1 WHERE snoop(a) AND leakproof(a) AND a = 8;
                                        Output: t111_2.ctid, t111_2.tableoid, t111_2.a
                                        Filter: (t111_2.a = 8)
          ->  Subquery Scan on t1_3
-               Output: (t1_3.a + 1), t1_3.b, t1_3.c, t1_3.d, t1_3.e, t1_3.a, t1_3.a, t1_3.a, t1_3.a, t1_3.a, t1_3.a, t1_3.ctid
+               Output: (t1_3.a + 1), t1_3.b, t1_3.c, t1_3.d, t1_3.e, t1_3.a, t1_3.a, t1_3.a, t1_3.ctid
                Filter: snoop(t1_3.a)
                ->  LockRows
                      Output: t111_3.a, t111_3.ctid, t111_3.b, t111_3.c, t111_3.d, t111_3.e, t111_3.ctid, t12_4.ctid, t12_4.tableoid

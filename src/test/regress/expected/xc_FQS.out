@@ -420,7 +420,7 @@ explain (verbose on, nodes off, costs off) update tab1_rr set val2 = 1000 where 
                            QUERY PLAN                           
 ----------------------------------------------------------------
  Remote Fast Query Execution
-   Output: 1000, tab1_rr.val, tab1_rr.xc_node_id, tab1_rr.ctid
+   Output: 1000
    Remote query: UPDATE tab1_rr SET val2 = 1000 WHERE (val = 7)
    ->  Update on public.tab1_rr
          ->  Seq Scan on public.tab1_rr
@@ -437,17 +437,16 @@ select * from tab1_rr where val = 7;
 
 delete from tab1_rr where val = 7; 
 explain (verbose on, costs off) delete from tab1_rr where val = 7; 
-                       QUERY PLAN                        
----------------------------------------------------------
+                     QUERY PLAN                      
+-----------------------------------------------------
  Remote Fast Query Execution
-   Output: tab1_rr.val, tab1_rr.xc_node_id, tab1_rr.ctid
    Node/s: datanode_1, datanode_2
    Remote query: DELETE FROM tab1_rr WHERE (val = 7)
    ->  Delete on public.tab1_rr
          ->  Seq Scan on public.tab1_rr
                Output: ctid
                Filter: (tab1_rr.val = 7)
-(8 rows)
+(7 rows)
 
 select * from tab1_rr where val = 7;
  val | val2 
@@ -826,10 +825,10 @@ explain (verbose on, nodes off, costs off, num_nodes on) select distinct val2 fr
 -- DMLs
 update tab1_hash set val2 = 1000 where val = 7; 
 explain (verbose on, nodes off, costs off) update tab1_hash set val2 = 1000 where val = 7; 
-                             QUERY PLAN                              
----------------------------------------------------------------------
+                            QUERY PLAN                            
+------------------------------------------------------------------
  Remote Fast Query Execution
-   Output: 1000, tab1_hash.val, tab1_hash.xc_node_id, tab1_hash.ctid
+   Output: 1000
    Remote query: UPDATE tab1_hash SET val2 = 1000 WHERE (val = 7)
    ->  Update on public.tab1_hash
          ->  Seq Scan on public.tab1_hash
@@ -846,17 +845,16 @@ select * from tab1_hash where val = 7;
 
 delete from tab1_hash where val = 7; 
 explain (verbose on, costs off) delete from tab1_hash where val = 7; 
-                          QUERY PLAN                           
----------------------------------------------------------------
+                      QUERY PLAN                       
+-------------------------------------------------------
  Remote Fast Query Execution
-   Output: tab1_hash.val, tab1_hash.xc_node_id, tab1_hash.ctid
    Node/s: datanode_2
    Remote query: DELETE FROM tab1_hash WHERE (val = 7)
    ->  Delete on public.tab1_hash
          ->  Seq Scan on public.tab1_hash
                Output: ctid
                Filter: (tab1_hash.val = 7)
-(8 rows)
+(7 rows)
 
 select * from tab1_hash where val = 7;
  val | val2 
@@ -1235,10 +1233,10 @@ explain (verbose on, nodes off, costs off, num_nodes on) select distinct val2 fr
 -- DMLs
 update tab1_modulo set val2 = 1000 where val = 7; 
 explain (verbose on, nodes off, costs off) update tab1_modulo set val2 = 1000 where val = 7; 
-                                QUERY PLAN                                 
----------------------------------------------------------------------------
+                             QUERY PLAN                             
+--------------------------------------------------------------------
  Remote Fast Query Execution
-   Output: 1000, tab1_modulo.val, tab1_modulo.xc_node_id, tab1_modulo.ctid
+   Output: 1000
    Remote query: UPDATE tab1_modulo SET val2 = 1000 WHERE (val = 7)
    ->  Update on public.tab1_modulo
          ->  Seq Scan on public.tab1_modulo
@@ -1255,17 +1253,16 @@ select * from tab1_modulo where val = 7;
 
 delete from tab1_modulo where val = 7; 
 explain (verbose on, costs off) delete from tab1_modulo where val = 7; 
-                             QUERY PLAN                              
----------------------------------------------------------------------
+                       QUERY PLAN                        
+---------------------------------------------------------
  Remote Fast Query Execution
-   Output: tab1_modulo.val, tab1_modulo.xc_node_id, tab1_modulo.ctid
    Node/s: datanode_2
    Remote query: DELETE FROM tab1_modulo WHERE (val = 7)
    ->  Delete on public.tab1_modulo
          ->  Seq Scan on public.tab1_modulo
                Output: ctid
                Filter: (tab1_modulo.val = 7)
-(8 rows)
+(7 rows)
 
 select * from tab1_modulo where val = 7;
  val | val2 
@@ -1496,7 +1493,7 @@ explain (verbose on, nodes off, costs off) update tab1_replicated set val2 = 100
                                QUERY PLAN                               
 ------------------------------------------------------------------------
  Remote Fast Query Execution
-   Output: 1000, tab1_replicated.val, tab1_replicated.ctid
+   Output: 1000
    Remote query: UPDATE tab1_replicated SET val2 = 1000 WHERE (val = 7)
    ->  Update on public.tab1_replicated
          ->  Seq Scan on public.tab1_replicated
@@ -1515,14 +1512,13 @@ explain (verbose on, costs off) delete from tab1_replicated where val = 7;
                          QUERY PLAN                          
 -------------------------------------------------------------
  Remote Fast Query Execution
-   Output: tab1_replicated.val, tab1_replicated.ctid
    Node/s: datanode_1, datanode_2
    Remote query: DELETE FROM tab1_replicated WHERE (val = 7)
    ->  Delete on public.tab1_replicated
          ->  Seq Scan on public.tab1_replicated
                Output: ctid
                Filter: (tab1_replicated.val = 7)
-(8 rows)
+(7 rows)
 
 select * from tab1_replicated where val = 7;
  val | val2 

@@ -186,7 +186,7 @@ extern void ExecutorEnd(QueryDesc *queryDesc);
 extern void standard_ExecutorEnd(QueryDesc *queryDesc);
 extern void ExecutorRewind(QueryDesc *queryDesc);
 extern bool ExecCheckRTPerms(List *rangeTable, bool ereport_on_violation);
-extern void CheckValidResultRel(Relation resultRel, CmdType operation);
+extern void CheckValidResultRel(ResultRelInfo *resultRelInfo, CmdType operation);
 extern void InitResultRelInfo(ResultRelInfo *resultRelInfo,
 				  Relation resultRelationDesc,
 				  Index resultRelationIndex,
@@ -217,6 +217,7 @@ extern void EvalPlanQualSetTuple(EPQState *epqstate, Index rti,
 extern HeapTuple EvalPlanQualGetTuple(EPQState *epqstate, Index rti);
 extern void ExecSetupPartitionTupleRouting(Relation rel,
 							   Index resultRTindex,
+							   EState *estate,
 							   PartitionDispatch **pd,
 							   ResultRelInfo **partitions,
 							   TupleConversionMap ***tup_conv_maps,

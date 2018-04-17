@@ -318,7 +318,7 @@ static void MergeDistributionIntoExisting(Relation child_rel, Relation parent_re
 static void StoreCatalogInheritance(Oid relationId, List *supers,
 						bool child_is_partition);
 static void StoreCatalogInheritance1(Oid relationId, Oid parentOid,
-						 int16 seqNumber, Relation inhRelation,
+						 int32 seqNumber, Relation inhRelation,
 						 bool child_is_partition);
 static int	findAttrByName(const char *attributeName, List *schema);
 static void AlterIndexNamespaces(Relation classRel, Relation rel,
@@ -2381,7 +2381,7 @@ StoreCatalogInheritance(Oid relationId, List *supers,
 						bool child_is_partition)
 {
 	Relation	relation;
-	int16		seqNumber;
+	int32		seqNumber;
 	ListCell   *entry;
 
 	/*
@@ -2422,7 +2422,7 @@ StoreCatalogInheritance(Oid relationId, List *supers,
  */
 static void
 StoreCatalogInheritance1(Oid relationId, Oid parentOid,
-						 int16 seqNumber, Relation inhRelation,
+						 int32 seqNumber, Relation inhRelation,
 						 bool child_is_partition)
 {
 	TupleDesc	desc = RelationGetDescr(inhRelation);
@@ -2437,7 +2437,7 @@ StoreCatalogInheritance1(Oid relationId, Oid parentOid,
 	 */
 	values[Anum_pg_inherits_inhrelid - 1] = ObjectIdGetDatum(relationId);
 	values[Anum_pg_inherits_inhparent - 1] = ObjectIdGetDatum(parentOid);
-	values[Anum_pg_inherits_inhseqno - 1] = Int16GetDatum(seqNumber);
+	values[Anum_pg_inherits_inhseqno - 1] = Int32GetDatum(seqNumber);
 
 	memset(nulls, 0, sizeof(nulls));
 
@@ -5587,7 +5587,21 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	if (relkind != RELKIND_VIEW && relkind != RELKIND_COMPOSITE_TYPE
 		&& relkind != RELKIND_FOREIGN_TABLE && attribute.attnum > 0)
 	{
-		defval = (Expr *) build_column_default(rel, attribute.attnum);
+		/*
+		 * For an identity column, we can't use build_column_default(),
+		 * because the sequence ownership isn't set yet.  So do it manually.
+		 */
+		if (colDef->identity)
+		{
+			NextValueExpr *nve = makeNode(NextValueExpr);
+
+			nve->seqid = RangeVarGetRelid(colDef->identitySequence, NoLock, false);
+			nve->typeId = typeOid;
+
+			defval = (Expr *) nve;
+		}
+		else
+			defval = (Expr *) build_column_default(rel, attribute.attnum);
 
 		if (!defval && DomainHasConstraints(typeOid))
 		{
@@ -14471,7 +14485,7 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	 * Prevent circularity by seeing if rel is a partition of attachrel. (In
 	 * particular, this disallows making a rel a partition of itself.)
 	 *
-	 * We do that by checking if rel is a member of the list of attachRel's
+	 * We do that by checking if rel is a member of the list of attachrel's
 	 * partitions provided the latter is partitioned at all.  We want to avoid
 	 * having to construct this list again, so we request the strongest lock
 	 * on all partitions.  We need the strongest lock, because we may decide
@@ -14551,7 +14565,7 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 					 errmsg("table \"%s\" contains column \"%s\" not found in parent \"%s\"",
 							RelationGetRelationName(attachrel), attributeName,
 							RelationGetRelationName(rel)),
-					 errdetail("New partition should contain only the columns present in parent.")));
+					 errdetail("The new partition may contain only the columns present in parent.")));
 	}
 
 	/*
@@ -14782,6 +14796,9 @@ ATExecDetachPartition(Relation rel, RangeVar *name)
 	classRel = heap_open(RelationRelationId, RowExclusiveLock);
 	tuple = SearchSysCacheCopy1(RELOID,
 								ObjectIdGetDatum(RelationGetRelid(partRel)));
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "cache lookup failed for relation %u",
+			 RelationGetRelid(partRel));
 	Assert(((Form_pg_class) GETSTRUCT(tuple))->relispartition);
 
 	(void) SysCacheGetAttr(RELOID, tuple, Anum_pg_class_relpartbound,

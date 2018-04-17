@@ -454,6 +454,9 @@ typedef struct EState
 	ResultRelInfo *es_root_result_relations;	/* array of ResultRelInfos */
 	int			es_num_root_result_relations;	/* length of the array */
 
+	/* Info about leaf partitions of partitioned table(s) for insert queries: */
+	List	   *es_leaf_result_relations;	/* List of ResultRelInfos */
+
 	/* Stuff used for firing triggers: */
 	List	   *es_trig_target_relations;	/* trigger-only ResultRelInfos */
 	TupleTableSlot *es_trig_tuple_slot; /* for trigger output tuples */
@@ -508,6 +511,8 @@ typedef struct EState
 
 	/* The per-query shared memory area to use for parallel execution. */
 	struct dsa_area *es_query_dsa;
+
+	bool		es_use_parallel_mode; /* can we use parallel workers? */
 } EState;
 
 
@@ -985,7 +990,9 @@ typedef struct ModifyTableState
 	/* Per partition tuple conversion map */
 	TupleTableSlot *mt_partition_tuple_slot;
 	struct TransitionCaptureState *mt_transition_capture;
-	/* controls transition table population */
+	/* controls transition table population for specified operation */
+	struct TransitionCaptureState *mt_oc_transition_capture;
+	/* controls transition table population for INSERT...ON CONFLICT UPDATE */
 	TupleConversionMap **mt_transition_tupconv_maps;
 	/* Per plan/partition tuple conversion */
 } ModifyTableState;
@@ -1795,7 +1802,7 @@ typedef struct AggState
 	ExprContext **aggcontexts;	/* econtexts for long-lived data (per GS) */
 	ExprContext *tmpcontext;	/* econtext for input expressions */
 	ExprContext *curaggcontext; /* currently active aggcontext */
-	AggStatePerTrans curpertrans;	/* currently active trans state */
+	AggStatePerTrans curpertrans;	/* currently active trans state, if any */
 	bool		input_done;		/* indicates end of input */
 	bool		agg_done;		/* indicates completion of Agg scan */
 	int			projected_set;	/* The last projected grouping set */
@@ -1816,10 +1823,9 @@ typedef struct AggState
 	int			num_hashes;
 	AggStatePerHash perhash;
 	AggStatePerGroup *hash_pergroup;	/* array of per-group pointers */
-	/* support for evaluation of agg inputs */
-	TupleTableSlot *evalslot;	/* slot for agg inputs */
-	ProjectionInfo *evalproj;	/* projection machinery */
-	TupleDesc	evaldesc;		/* descriptor of input tuples */
+	/* support for evaluation of agg input expressions: */
+	ProjectionInfo *combinedproj;	/* projection machinery */
+	AggStatePerAgg curperagg;	/* currently active aggregate, if any */
 } AggState;
 
 /* ----------------
@@ -1913,14 +1919,16 @@ typedef struct UniqueState
 typedef struct GatherState
 {
 	PlanState	ps;				/* its first field is NodeTag */
-	bool		initialized;
-	struct ParallelExecutorInfo *pei;
-	int			nreaders;
-	int			nextreader;
-	int			nworkers_launched;
-	struct TupleQueueReader **reader;
+	bool		initialized;	/* workers launched? */
+	bool		need_to_scan_locally;	/* need to read from local plan? */
+	/* these fields are set up once: */
 	TupleTableSlot *funnel_slot;
-	bool		need_to_scan_locally;
+	struct ParallelExecutorInfo *pei;
+	/* all remaining fields are reinitialized during a rescan: */
+	int			nworkers_launched;	/* original number of workers */
+	int			nreaders;		/* number of still-active workers */
+	int			nextreader;		/* next one to try to read from */
+	struct TupleQueueReader **reader;	/* array with nreaders active entries */
 } GatherState;
 
 /* ----------------
@@ -1931,24 +1939,27 @@ typedef struct GatherState
  *		merge the results into a single sorted stream.
  * ----------------
  */
-struct GMReaderTuple;
+struct GMReaderTupleBuffer;		/* private in nodeGatherMerge.c */
 
 typedef struct GatherMergeState
 {
 	PlanState	ps;				/* its first field is NodeTag */
-	bool		initialized;
+	bool		initialized;	/* workers launched? */
+	bool		gm_initialized; /* gather_merge_init() done? */
+	bool		need_to_scan_locally;	/* need to read from local plan? */
+	/* these fields are set up once: */
+	TupleDesc	tupDesc;		/* descriptor for subplan result tuples */
+	int			gm_nkeys;		/* number of sort columns */
+	SortSupport gm_sortkeys;	/* array of length gm_nkeys */
 	struct ParallelExecutorInfo *pei;
-	int			nreaders;
-	int			nworkers_launched;
-	struct TupleQueueReader **reader;
-	TupleDesc	tupDesc;
-	TupleTableSlot **gm_slots;
+	/* all remaining fields are reinitialized during a rescan */
+	/* (but the arrays are not reallocated, just cleared) */
+	int			nworkers_launched;	/* original number of workers */
+	int			nreaders;		/* number of active workers */
+	TupleTableSlot **gm_slots;	/* array with nreaders+1 entries */
+	struct TupleQueueReader **reader;	/* array with nreaders active entries */
+	struct GMReaderTupleBuffer *gm_tuple_buffers;	/* nreaders tuple buffers */
 	struct binaryheap *gm_heap; /* binary heap of slot indices */
-	bool		gm_initialized; /* gather merge initilized ? */
-	bool		need_to_scan_locally;
-	int			gm_nkeys;
-	SortSupport gm_sortkeys;	/* array of length ms_nkeys */
-	struct GMReaderTupleBuffer *gm_tuple_buffers;	/* tuple buffer per reader */
 } GatherMergeState;
 
 /* ----------------

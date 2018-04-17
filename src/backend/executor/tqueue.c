@@ -578,7 +578,9 @@ tqueueShutdownReceiver(DestReceiver *self)
 {
 	TQueueDestReceiver *tqueue = (TQueueDestReceiver *) self;
 
-	shm_mq_detach(shm_mq_get_queue(tqueue->queue));
+	if (tqueue->queue != NULL)
+		shm_mq_detach(tqueue->queue);
+	tqueue->queue = NULL;
 }
 
 /*
@@ -589,6 +591,9 @@ tqueueDestroyReceiver(DestReceiver *self)
 {
 	TQueueDestReceiver *tqueue = (TQueueDestReceiver *) self;
 
+	/* We probably already detached from queue, but let's be sure */
+	if (tqueue->queue != NULL)
+		shm_mq_detach(tqueue->queue);
 	if (tqueue->tmpcontext != NULL)
 		MemoryContextDelete(tqueue->tmpcontext);
 	if (tqueue->recordhtab != NULL)
@@ -646,11 +651,13 @@ CreateTupleQueueReader(shm_mq_handle *handle, TupleDesc tupledesc)
 
 /*
  * Destroy a tuple queue reader.
+ *
+ * Note: cleaning up the underlying shm_mq is the caller's responsibility.
+ * We won't access it here, as it may be detached already.
  */
 void
 DestroyTupleQueueReader(TupleQueueReader *reader)
 {
-	shm_mq_detach(shm_mq_get_queue(reader->queue));
 	if (reader->typmodmap != NULL)
 		hash_destroy(reader->typmodmap);
 	/* Is it worth trying to free substructure of the remap tree? */

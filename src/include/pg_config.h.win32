@@ -34,6 +34,9 @@
 /* The alignment requirement of a `long long int'. */
 #define ALIGNOF_LONG_LONG_INT 8
 
+/* The normal alignment of `PG_INT128_TYPE', in bytes. */
+#undef ALIGNOF_PG_INT128_TYPE
+
 /* The alignment requirement of a `short'. */
 #define ALIGNOF_SHORT 2
 
@@ -223,12 +226,6 @@
 /* Define to 1 if you have the `z' library (-lz). */
 /* #undef HAVE_LIBZ */
 
-/* Define to 1 if constants of type 'long long int' should have the suffix LL.
-   */
-#if (_MSC_VER > 1200)
-#define HAVE_LL_CONSTANTS 1
-#endif
-
 /* Define to 1 if the system has the type `locale_t'. */
 #define HAVE_LOCALE_T 1
 
@@ -237,7 +234,7 @@
 
 /* Define to 1 if `long long int' works and is 64 bits. */
 #if (_MSC_VER > 1200)
-#define HAVE_LONG_LONG_INT_64
+#define HAVE_LONG_LONG_INT_64 1
 #endif
 
 /* Define to 1 if you have the `mbstowcs_l' function. */
@@ -266,6 +263,9 @@
 
 /* Define to 1 if you have the <poll.h> header file. */
 /* #undef HAVE_POLL_H */
+
+/* Define to 1 if you have the `posix_fallocate' function. */
+/* #undef HAVE_POSIX_FALLOCATE */
 
 /* Define to 1 if you have the `pstat' function. */
 /* #undef HAVE_PSTAT */
@@ -554,7 +554,7 @@
 #define PACKAGE_STRING "Postgres-XL 10alpha2"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "10beta3"
+#define PACKAGE_VERSION "10.3"
 
 /* Define to the name of a signed 128-bit integer type. */
 #undef PG_INT128_TYPE
@@ -563,10 +563,10 @@
 #define PG_INT64_TYPE long long int
 
 /* PostgreSQL version as a string */
-#define PG_VERSION "10beta3"
+#define PG_VERSION "10.3"
 
 /* PostgreSQL version as a number */
-#define PG_VERSION_NUM 100000
+#define PG_VERSION_NUM 100003
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "postgres-xl"

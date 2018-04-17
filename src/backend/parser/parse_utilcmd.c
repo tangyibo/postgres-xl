@@ -122,6 +122,7 @@ typedef struct
 #endif
 	bool		ispartitioned;	/* true if table is partitioned */
 	PartitionBoundSpec *partbound;	/* transformed FOR VALUES */
+	bool		ofType;			/* true if statement contains OF typename */
 } CreateStmtContext;
 
 /* State shared by transformCreateSchemaStmt and its subroutines */
@@ -175,6 +176,7 @@ static List *transformSubclusterNodes(PGXCSubCluster *subcluster);
 static PGXCSubCluster *makeSubCluster(List *nodelist);
 #endif
 static void transformPartitionCmd(CreateStmtContext *cxt, PartitionCmd *cmd);
+static void validateInfiniteBounds(ParseState *pstate, List *blist);
 static Const *transformPartitionBoundValue(ParseState *pstate, A_Const *con,
 							 const char *colName, Oid colType, int32 colTypmod);
 
@@ -291,6 +293,8 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	cxt.subcluster = stmt->subcluster;
 #endif
 	cxt.ispartitioned = stmt->partspec != NULL;
+	cxt.partbound = stmt->partbound;
+	cxt.ofType = (stmt->ofTypename != NULL);
 
 	/*
 	 * Notice that we allow OIDs here only for plain tables, even though
@@ -633,6 +637,14 @@ generateSerialExtraStmts(CreateStmtContext *cxt, ColumnDef *column,
 	cxt->blist = lappend(cxt->blist, seqstmt);
 
 	/*
+	 * Store the identity sequence name that we decided on.  ALTER TABLE
+	 * ... ADD COLUMN ... IDENTITY needs this so that it can fill the new
+	 * column with values from the sequence, while the association of the
+	 * sequence with the table is not set until after the ALTER TABLE.
+	 */
+	column->identitySequence = seqstmt->sequence;
+
+	/*
 	 * Build an ALTER SEQUENCE ... OWNED BY command to mark the sequence as
 	 * owned by this column, and add it to the list of things to be done after
 	 * this CREATE/ALTER TABLE.
@@ -822,6 +834,15 @@ transformColumnDefinition(CreateStmtContext *cxt, ColumnDef *column)
 				{
 					Type		ctype;
 					Oid			typeOid;
+
+					if (cxt->ofType)
+						ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								 errmsg("identity columns are not supported on typed tables")));
+					if (cxt->partbound)
+						ereport(ERROR,
+								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+								 errmsg("identity columns are not supported on partitions")));
 
 					ctype = typenameType(cxt->pstate, column->typeName, NULL);
 					typeOid = HeapTupleGetOid(ctype);
@@ -3022,6 +3043,7 @@ transformAlterTableStmt(Oid relid, AlterTableStmt *stmt,
 #endif
 	cxt.ispartitioned = (rel->rd_rel->relkind == RELKIND_PARTITIONED_TABLE);
 	cxt.partbound = NULL;
+	cxt.ofType = false;
 
 	/*
 	 * The only subtypes that currently require parse transformation handling
@@ -4220,6 +4242,13 @@ transformPartitionBound(ParseState *pstate, Relation parent,
 					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 					 errmsg("TO must specify exactly one value per partitioning column")));
 
+		/*
+		 * Once we see MINVALUE or MAXVALUE for one column, the remaining
+		 * columns must be the same.
+		 */
+		validateInfiniteBounds(pstate, spec->lowerdatums);
+		validateInfiniteBounds(pstate, spec->upperdatums);
+
 		/* Transform all the constants */
 		i = j = 0;
 		result_spec->lowerdatums = result_spec->upperdatums = NIL;
@@ -4289,6 +4318,46 @@ transformPartitionBound(ParseState *pstate, Relation parent,
 		elog(ERROR, "unexpected partition strategy: %d", (int) strategy);
 
 	return result_spec;
+}
+
+/*
+ * validateInfiniteBounds
+ *
+ * Check that a MAXVALUE or MINVALUE specification in a partition bound is
+ * followed only by more of the same.
+ */
+static void
+validateInfiniteBounds(ParseState *pstate, List *blist)
+{
+	ListCell *lc;
+	PartitionRangeDatumKind kind = PARTITION_RANGE_DATUM_VALUE;
+
+	foreach(lc, blist)
+	{
+		PartitionRangeDatum *prd = castNode(PartitionRangeDatum, lfirst(lc));
+
+		if (kind == prd->kind)
+			continue;
+
+		switch (kind)
+		{
+			case PARTITION_RANGE_DATUM_VALUE:
+				kind = prd->kind;
+				break;
+
+			case PARTITION_RANGE_DATUM_MAXVALUE:
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("every bound following MAXVALUE must also be MAXVALUE"),
+						 parser_errposition(pstate, exprLocation((Node *) prd))));
+
+			case PARTITION_RANGE_DATUM_MINVALUE:
+				ereport(ERROR,
+						(errcode(ERRCODE_DATATYPE_MISMATCH),
+						 errmsg("every bound following MINVALUE must also be MINVALUE"),
+						 parser_errposition(pstate, exprLocation((Node *) prd))));
+		}
+	}
 }
 
 /*

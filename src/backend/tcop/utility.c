@@ -2543,7 +2543,7 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_AlterEnumStmt:	/* ALTER TYPE (enum) */
-				address = AlterEnum((AlterEnumStmt *) parsetree);
+				address = AlterEnum((AlterEnumStmt *) parsetree, isTopLevel);
 				break;
 
 			case T_ViewStmt:	/* CREATE VIEW */
@@ -4220,6 +4220,10 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
+		case T_AlterOperatorStmt:
+			lev = LOGSTMT_DDL;
+			break;
+
 		case T_AlterTableMoveAllStmt:
 		case T_AlterTableStmt:
 			lev = LOGSTMT_DDL;
@@ -4501,6 +4505,14 @@ GetCommandLogLevel(Node *parsetree)
 			break;
 
 		case T_DropSubscriptionStmt:
+			lev = LOGSTMT_DDL;
+			break;
+
+		case T_CreateStatsStmt:
+			lev = LOGSTMT_DDL;
+			break;
+
+		case T_AlterCollationStmt:
 			lev = LOGSTMT_DDL;
 			break;
 

@@ -414,13 +414,18 @@ DROP FUNCTION plusone(int);
 
 -- partitioned table cannot participate in regular inheritance
 CREATE TABLE partitioned2 (
-	a int
-) PARTITION BY LIST ((a+1));
+	a int,
+	b text
+) PARTITION BY RANGE ((a+1), substr(b, 1, 5));
 CREATE TABLE fail () INHERITS (partitioned2);
 
 -- Partition key in describe output
 \d partitioned
-\d partitioned2
+\d+ partitioned2
+
+INSERT INTO partitioned2 VALUES (1, 'hello');
+CREATE TABLE part2_1 PARTITION OF partitioned2 FOR VALUES FROM (-1, 'aaaaa') TO (100, 'ccccc');
+\d+ part2_1
 
 DROP TABLE partitioned, partitioned2;
 
@@ -620,14 +625,14 @@ CREATE TABLE part_c_1_10 PARTITION OF part_c FOR VALUES FROM (1) TO (10);
 
 -- check that we get the expected partition constraints
 CREATE TABLE range_parted4 (a int, b int, c int) PARTITION BY RANGE (abs(a), abs(b), c);
-CREATE TABLE unbounded_range_part PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, 0, 0) TO (MAXVALUE, 0, 0);
+CREATE TABLE unbounded_range_part PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (MAXVALUE, MAXVALUE, MAXVALUE);
 \d+ unbounded_range_part
 DROP TABLE unbounded_range_part;
-CREATE TABLE range_parted4_1 PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, 0, 0) TO (1, MAXVALUE, 0);
+CREATE TABLE range_parted4_1 PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (1, MAXVALUE, MAXVALUE);
 \d+ range_parted4_1
 CREATE TABLE range_parted4_2 PARTITION OF range_parted4 FOR VALUES FROM (3, 4, 5) TO (6, 7, MAXVALUE);
 \d+ range_parted4_2
-CREATE TABLE range_parted4_3 PARTITION OF range_parted4 FOR VALUES FROM (6, 8, MINVALUE) TO (9, MAXVALUE, 0);
+CREATE TABLE range_parted4_3 PARTITION OF range_parted4 FOR VALUES FROM (6, 8, MINVALUE) TO (9, MAXVALUE, MAXVALUE);
 \d+ range_parted4_3
 DROP TABLE range_parted4;
 
@@ -641,3 +646,9 @@ COMMENT ON COLUMN parted_col_comment.a IS 'Partition key';
 SELECT obj_description('parted_col_comment'::regclass);
 \d+ parted_col_comment
 DROP TABLE parted_col_comment;
+
+-- list partitioning on array type column
+CREATE TABLE arrlp (a int[]) PARTITION BY LIST (a);
+CREATE TABLE arrlp12 PARTITION OF arrlp FOR VALUES IN ('{1}', '{2}');
+\d+ arrlp12
+DROP TABLE arrlp;

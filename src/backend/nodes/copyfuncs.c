@@ -380,6 +380,7 @@ _copyGather(const Gather *from)
 	 * copy remainder of node
 	 */
 	COPY_SCALAR_FIELD(num_workers);
+	COPY_SCALAR_FIELD(rescan_param);
 	COPY_SCALAR_FIELD(single_copy);
 	COPY_SCALAR_FIELD(invisible);
 
@@ -403,6 +404,7 @@ _copyGatherMerge(const GatherMerge *from)
 	 * copy remainder of node
 	 */
 	COPY_SCALAR_FIELD(num_workers);
+	COPY_SCALAR_FIELD(rescan_param);
 	COPY_SCALAR_FIELD(numCols);
 	COPY_POINTER_FIELD(sortColIdx, from->numCols * sizeof(AttrNumber));
 	COPY_POINTER_FIELD(sortOperators, from->numCols * sizeof(Oid));
@@ -2987,6 +2989,7 @@ _copyColumnDef(const ColumnDef *from)
 	COPY_NODE_FIELD(raw_default);
 	COPY_NODE_FIELD(cooked_default);
 	COPY_SCALAR_FIELD(identity);
+	COPY_NODE_FIELD(identitySequence);
 	COPY_NODE_FIELD(collClause);
 	COPY_SCALAR_FIELD(collOid);
 	COPY_NODE_FIELD(constraints);

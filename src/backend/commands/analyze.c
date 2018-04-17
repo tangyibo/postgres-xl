@@ -121,6 +121,10 @@ static void analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 
 /*
  *	analyze_rel() -- analyze one relation
+ *
+ * relid identifies the relation to analyze.  If relation is supplied, use
+ * the name therein for reporting any failure to open/lock the rel; do not
+ * use it once we've successfully opened the rel, since it might be stale.
  */
 void
 analyze_rel(Oid relid, RangeVar *relation, int options,
@@ -160,7 +164,8 @@ analyze_rel(Oid relid, RangeVar *relation, int options,
 	else
 	{
 		onerel = NULL;
-		if (IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
+		if (relation &&
+			IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
 			ereport(LOG,
 					(errcode(ERRCODE_LOCK_NOT_AVAILABLE),
 					 errmsg("skipping analyze of \"%s\" --- lock not available",
@@ -385,10 +390,14 @@ do_analyze_rel(Relation onerel, int options, VacuumParams *params,
 	/*
 	 * Determine which columns to analyze
 	 *
-	 * Note that system attributes are never analyzed.
+	 * Note that system attributes are never analyzed, so we just reject them
+	 * at the lookup stage.  We also reject duplicate column mentions.  (We
+	 * could alternatively ignore duplicates, but analyzing a column twice
+	 * won't work; we'd end up making a conflicting update in pg_statistic.)
 	 */
 	if (va_cols != NIL)
 	{
+		Bitmapset  *unique_cols = NULL;
 		ListCell   *le;
 
 		vacattrstats = (VacAttrStats **) palloc(list_length(va_cols) *
@@ -404,6 +413,13 @@ do_analyze_rel(Relation onerel, int options, VacuumParams *params,
 						(errcode(ERRCODE_UNDEFINED_COLUMN),
 						 errmsg("column \"%s\" of relation \"%s\" does not exist",
 								col, RelationGetRelationName(onerel))));
+			if (bms_is_member(i, unique_cols))
+				ereport(ERROR,
+						(errcode(ERRCODE_DUPLICATE_COLUMN),
+						 errmsg("column \"%s\" of relation \"%s\" appears more than once",
+								col, RelationGetRelationName(onerel))));
+			unique_cols = bms_add_member(unique_cols, i);
+
 			vacattrstats[tcnt] = examine_attribute(onerel, i, NULL);
 			if (vacattrstats[tcnt] != NULL)
 				tcnt++;

@@ -25,6 +25,7 @@
  *						parallel index-only scan
  *		ExecIndexOnlyScanInitializeDSM	initialize DSM for parallel
  *						index-only scan
+ *		ExecIndexOnlyScanReInitializeDSM	reinitialize DSM for fresh scan
  *		ExecIndexOnlyScanInitializeWorker attach to DSM info in parallel worker
  */
 #include "postgres.h"
@@ -336,16 +337,6 @@ ExecIndexOnlyScan(PlanState *pstate)
 void
 ExecReScanIndexOnlyScan(IndexOnlyScanState *node)
 {
-	bool		reset_parallel_scan = true;
-
-	/*
-	 * If we are here to just update the scan keys, then don't reset parallel
-	 * scan. For detailed reason behind this look in the comments for
-	 * ExecReScanIndexScan.
-	 */
-	if (node->ioss_NumRuntimeKeys != 0 && !node->ioss_RuntimeKeysReady)
-		reset_parallel_scan = false;
-
 	/*
 	 * If we are doing runtime key calculations (ie, any of the index key
 	 * values weren't simple Consts), compute the new key values.  But first,
@@ -366,15 +357,10 @@ ExecReScanIndexOnlyScan(IndexOnlyScanState *node)
 
 	/* reset index scan */
 	if (node->ioss_ScanDesc)
-	{
-
 		index_rescan(node->ioss_ScanDesc,
 					 node->ioss_ScanKeys, node->ioss_NumScanKeys,
 					 node->ioss_OrderByKeys, node->ioss_NumOrderByKeys);
 
-		if (reset_parallel_scan && node->ioss_ScanDesc->parallel_scan)
-			index_parallelrescan(node->ioss_ScanDesc);
-	}
 	ExecScanReScan(&node->ss);
 }
 
@@ -435,11 +421,39 @@ ExecEndIndexOnlyScan(IndexOnlyScanState *node)
 
 /* ----------------------------------------------------------------
  *		ExecIndexOnlyMarkPos
+ *
+ * Note: we assume that no caller attempts to set a mark before having read
+ * at least one tuple.  Otherwise, ioss_ScanDesc might still be NULL.
  * ----------------------------------------------------------------
  */
 void
 ExecIndexOnlyMarkPos(IndexOnlyScanState *node)
 {
+	EState	   *estate = node->ss.ps.state;
+
+	if (estate->es_epqTuple != NULL)
+	{
+		/*
+		 * We are inside an EvalPlanQual recheck.  If a test tuple exists for
+		 * this relation, then we shouldn't access the index at all.  We would
+		 * instead need to save, and later restore, the state of the
+		 * es_epqScanDone flag, so that re-fetching the test tuple is
+		 * possible.  However, given the assumption that no caller sets a mark
+		 * at the start of the scan, we can only get here with es_epqScanDone
+		 * already set, and so no state need be saved.
+		 */
+		Index		scanrelid = ((Scan *) node->ss.ps.plan)->scanrelid;
+
+		Assert(scanrelid > 0);
+		if (estate->es_epqTupleSet[scanrelid - 1])
+		{
+			/* Verify the claim above */
+			if (!estate->es_epqScanDone[scanrelid - 1])
+				elog(ERROR, "unexpected ExecIndexOnlyMarkPos call in EPQ recheck");
+			return;
+		}
+	}
+
 	index_markpos(node->ioss_ScanDesc);
 }
 
@@ -450,6 +464,23 @@ ExecIndexOnlyMarkPos(IndexOnlyScanState *node)
 void
 ExecIndexOnlyRestrPos(IndexOnlyScanState *node)
 {
+	EState	   *estate = node->ss.ps.state;
+
+	if (estate->es_epqTuple != NULL)
+	{
+		/* See comments in ExecIndexOnlyMarkPos */
+		Index		scanrelid = ((Scan *) node->ss.ps.plan)->scanrelid;
+
+		Assert(scanrelid > 0);
+		if (estate->es_epqTupleSet[scanrelid - 1])
+		{
+			/* Verify the claim above */
+			if (!estate->es_epqScanDone[scanrelid - 1])
+				elog(ERROR, "unexpected ExecIndexOnlyRestrPos call in EPQ recheck");
+			return;
+		}
+	}
+
 	index_restrpos(node->ioss_ScanDesc);
 }
 
@@ -669,6 +700,19 @@ ExecIndexOnlyScanInitializeDSM(IndexOnlyScanState *node,
 		index_rescan(node->ioss_ScanDesc,
 					 node->ioss_ScanKeys, node->ioss_NumScanKeys,
 					 node->ioss_OrderByKeys, node->ioss_NumOrderByKeys);
+}
+
+/* ----------------------------------------------------------------
+ *		ExecIndexOnlyScanReInitializeDSM
+ *
+ *		Reset shared state before beginning a fresh scan.
+ * ----------------------------------------------------------------
+ */
+void
+ExecIndexOnlyScanReInitializeDSM(IndexOnlyScanState *node,
+								 ParallelContext *pcxt)
+{
+	index_parallelrescan(node->ioss_ScanDesc);
 }
 
 /* ----------------------------------------------------------------

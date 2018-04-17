@@ -211,7 +211,7 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 	 * Once do_pg_start_backup has been called, ensure that any failure causes
 	 * us to abort the backup so we don't "leak" a backup counter. For this
 	 * reason, *all* functionality between do_pg_start_backup() and
-	 * do_pg_stop_backup() should be inside the error cleanup block!
+	 * the end of do_pg_stop_backup() should be inside the error cleanup block!
 	 */
 
 	PG_ENSURE_ERROR_CLEANUP(base_backup_cleanup, (Datum) 0);
@@ -320,10 +320,11 @@ perform_base_backup(basebackup_options *opt, DIR *tblspcdir)
 			else
 				pq_putemptymessage('c');	/* CopyDone */
 		}
+
+		endptr = do_pg_stop_backup(labelfile->data, !opt->nowait, &endtli);
 	}
 	PG_END_ENSURE_ERROR_CLEANUP(base_backup_cleanup, (Datum) 0);
 
-	endptr = do_pg_stop_backup(labelfile->data, !opt->nowait, &endtli);
 
 	if (opt->includewal)
 	{
@@ -1336,10 +1337,7 @@ _tarWriteDir(const char *pathbuf, int basepathlen, struct stat *statbuf,
 static void
 throttle(size_t increment)
 {
-	TimeOffset	elapsed,
-				elapsed_min,
-				sleep;
-	int			wait_result;
+	TimeOffset	elapsed_min;
 
 	if (throttling_counter < 0)
 		return;
@@ -1348,14 +1346,28 @@ throttle(size_t increment)
 	if (throttling_counter < throttling_sample)
 		return;
 
-	/* Time elapsed since the last measurement (and possible wake up). */
-	elapsed = GetCurrentTimestamp() - throttled_last;
-	/* How much should have elapsed at minimum? */
-	elapsed_min = elapsed_min_unit * (throttling_counter / throttling_sample);
-	sleep = elapsed_min - elapsed;
-	/* Only sleep if the transfer is faster than it should be. */
-	if (sleep > 0)
+	/* How much time should have elapsed at minimum? */
+	elapsed_min = elapsed_min_unit *
+		(throttling_counter / throttling_sample);
+
+	/*
+	 * Since the latch could be set repeatedly because of concurrently WAL
+	 * activity, sleep in a loop to ensure enough time has passed.
+	 */
+	for (;;)
 	{
+		TimeOffset	elapsed,
+					sleep;
+		int			wait_result;
+
+		/* Time elapsed since the last measurement (and possible wake up). */
+		elapsed = GetCurrentTimestamp() - throttled_last;
+
+		/* sleep if the transfer is faster than it should be */
+		sleep = elapsed_min - elapsed;
+		if (sleep <= 0)
+			break;
+
 		ResetLatch(MyLatch);
 
 		/* We're eating a potentially set latch, so check for interrupts */
@@ -1372,6 +1384,10 @@ throttle(size_t increment)
 
 		if (wait_result & WL_LATCH_SET)
 			CHECK_FOR_INTERRUPTS();
+
+		/* Done waiting? */
+		if (wait_result & WL_TIMEOUT)
+			break;
 	}
 
 	/*

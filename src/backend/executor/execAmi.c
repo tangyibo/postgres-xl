@@ -27,6 +27,7 @@
 #include "executor/nodeForeignscan.h"
 #include "executor/nodeFunctionscan.h"
 #include "executor/nodeGather.h"
+#include "executor/nodeGatherMerge.h"
 #include "executor/nodeGroup.h"
 #include "executor/nodeGroup.h"
 #include "executor/nodeHash.h"
@@ -174,6 +175,10 @@ ExecReScan(PlanState *node)
 
 		case T_GatherState:
 			ExecReScanGather((GatherState *) node);
+			break;
+
+		case T_GatherMergeState:
+			ExecReScanGatherMerge((GatherMergeState *) node);
 			break;
 
 		case T_IndexScanState:

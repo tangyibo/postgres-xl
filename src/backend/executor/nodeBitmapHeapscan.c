@@ -705,23 +705,6 @@ ExecReScanBitmapHeapScan(BitmapHeapScanState *node)
 	node->shared_tbmiterator = NULL;
 	node->shared_prefetch_iterator = NULL;
 
-	/* Reset parallel bitmap state, if present */
-	if (node->pstate)
-	{
-		dsa_area   *dsa = node->ss.ps.state->es_query_dsa;
-
-		node->pstate->state = BM_INITIAL;
-
-		if (DsaPointerIsValid(node->pstate->tbmiterator))
-			tbm_free_shared_area(dsa, node->pstate->tbmiterator);
-
-		if (DsaPointerIsValid(node->pstate->prefetch_iterator))
-			tbm_free_shared_area(dsa, node->pstate->prefetch_iterator);
-
-		node->pstate->tbmiterator = InvalidDsaPointer;
-		node->pstate->prefetch_iterator = InvalidDsaPointer;
-	}
-
 	ExecScanReScan(&node->ss);
 
 	/*
@@ -980,6 +963,11 @@ ExecBitmapHeapInitializeDSM(BitmapHeapScanState *node,
 {
 	ParallelBitmapHeapState *pstate;
 	EState	   *estate = node->ss.ps.state;
+	dsa_area   *dsa = node->ss.ps.state->es_query_dsa;
+
+	/* If there's no DSA, there are no workers; initialize nothing. */
+	if (dsa == NULL)
+		return;
 
 	pstate = shm_toc_allocate(pcxt->toc, node->pscan_len);
 
@@ -1000,6 +988,35 @@ ExecBitmapHeapInitializeDSM(BitmapHeapScanState *node,
 }
 
 /* ----------------------------------------------------------------
+ *		ExecBitmapHeapReInitializeDSM
+ *
+ *		Reset shared state before beginning a fresh scan.
+ * ----------------------------------------------------------------
+ */
+void
+ExecBitmapHeapReInitializeDSM(BitmapHeapScanState *node,
+							  ParallelContext *pcxt)
+{
+	ParallelBitmapHeapState *pstate = node->pstate;
+	dsa_area   *dsa = node->ss.ps.state->es_query_dsa;
+
+	/* If there's no DSA, there are no workers; do nothing. */
+	if (dsa == NULL)
+		return;
+
+	pstate->state = BM_INITIAL;
+
+	if (DsaPointerIsValid(pstate->tbmiterator))
+		tbm_free_shared_area(dsa, pstate->tbmiterator);
+
+	if (DsaPointerIsValid(pstate->prefetch_iterator))
+		tbm_free_shared_area(dsa, pstate->prefetch_iterator);
+
+	pstate->tbmiterator = InvalidDsaPointer;
+	pstate->prefetch_iterator = InvalidDsaPointer;
+}
+
+/* ----------------------------------------------------------------
  *		ExecBitmapHeapInitializeWorker
  *
  *		Copy relevant information from TOC into planstate.
@@ -1010,6 +1027,8 @@ ExecBitmapHeapInitializeWorker(BitmapHeapScanState *node, shm_toc *toc)
 {
 	ParallelBitmapHeapState *pstate;
 	Snapshot	snapshot;
+
+	Assert(node->ss.ps.state->es_query_dsa != NULL);
 
 	pstate = shm_toc_lookup(toc, node->ss.ps.plan->plan_node_id, false);
 	node->pstate = pstate;

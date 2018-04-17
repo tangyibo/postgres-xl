@@ -253,6 +253,9 @@ recurse_set_operations(Node *setOp, PlannerInfo *root,
 					   List **pTargetList,
 					   double *pNumGroups)
 {
+	/* Guard against stack overflow due to overly complex setop nests */
+	check_stack_depth();
+
 	if (IsA(setOp, RangeTblRef))
 	{
 		RangeTblRef *rtr = (RangeTblRef *) setOp;
@@ -777,10 +780,6 @@ generate_nonunion_path(SetOperationStmt *op, PlannerInfo *root,
 	/* Identify the grouping semantics */
 	groupList = generate_setop_grouplist(op, tlist);
 
-	/* punt if nothing to group on (can this happen?) */
-	if (groupList == NIL)
-		return path;
-
 	/*
 	 * Estimate number of distinct groups that we'll need hashtable entries
 	 * for; this is the size of the left-hand input for EXCEPT, or the smaller
@@ -807,7 +806,7 @@ generate_nonunion_path(SetOperationStmt *op, PlannerInfo *root,
 								   dNumGroups, dNumOutputRows,
 								   (op->op == SETOP_INTERSECT) ? "INTERSECT" : "EXCEPT");
 
-	if (!use_hash)
+	if (groupList && !use_hash)
 		path = (Path *) create_sort_path(root,
 										 result_rel,
 										 path,
@@ -930,10 +929,6 @@ make_union_unique(SetOperationStmt *op, Path *path, List *tlist,
 	/* Identify the grouping semantics */
 	groupList = generate_setop_grouplist(op, tlist);
 
-	/* punt if nothing to group on (can this happen?) */
-	if (groupList == NIL)
-		return path;
-
 	/*
 	 * XXX for the moment, take the number of distinct groups as equal to the
 	 * total input size, ie, the worst case.  This is too conservative, but we
@@ -964,13 +959,15 @@ make_union_unique(SetOperationStmt *op, Path *path, List *tlist,
 	else
 	{
 		/* Sort and Unique */
-		path = (Path *) create_sort_path(root,
-										 result_rel,
-										 path,
-										 make_pathkeys_for_sortclauses(root,
-																	   groupList,
-																	   tlist),
-										 -1.0);
+		if (groupList)
+			path = (Path *)
+				create_sort_path(root,
+								 result_rel,
+								 path,
+								 make_pathkeys_for_sortclauses(root,
+															   groupList,
+															   tlist),
+								 -1.0);
 		/* We have to manually jam the right tlist into the path; ick */
 		path->pathtarget = create_pathtarget(root, tlist);
 		path = (Path *) create_upper_unique_path(root,
@@ -1441,8 +1438,12 @@ expand_inherited_tables(PlannerInfo *root)
  * table, but with inh = false, to represent the parent table in its role
  * as a simple member of the inheritance set.
  *
- * A childless table is never considered to be an inheritance set; therefore
- * a parent RTE must always have at least two associated AppendRelInfos.
+ * A childless table is never considered to be an inheritance set. For
+ * regular inheritance, a parent RTE must always have at least two associated
+ * AppendRelInfos: one corresponding to the parent table as a simple member of
+ * inheritance set and one or more corresponding to the actual children.
+ * Since a partitioned table is not scanned, it might have only one associated
+ * AppendRelInfo.
  */
 static void
 expand_inherited_rtentry(PlannerInfo *root, RangeTblEntry *rte, Index rti)
@@ -1455,7 +1456,7 @@ expand_inherited_rtentry(PlannerInfo *root, RangeTblEntry *rte, Index rti)
 	List	   *inhOIDs;
 	List	   *appinfos;
 	ListCell   *l;
-	bool		need_append;
+	bool		has_child;
 	PartitionedChildRelInfo *pcinfo;
 	List	   *partitioned_child_rels = NIL;
 
@@ -1529,7 +1530,7 @@ expand_inherited_rtentry(PlannerInfo *root, RangeTblEntry *rte, Index rti)
 
 	/* Scan the inheritance set and expand it */
 	appinfos = NIL;
-	need_append = false;
+	has_child = false;
 	foreach(l, inhOIDs)
 	{
 		Oid			childOID = lfirst_oid(l);
@@ -1583,7 +1584,10 @@ expand_inherited_rtentry(PlannerInfo *root, RangeTblEntry *rte, Index rti)
 		 */
 		if (childrte->relkind != RELKIND_PARTITIONED_TABLE)
 		{
-			need_append = true;
+			/* Remember if we saw a real child. */
+			if (childOID != parentOID)
+				has_child = true;
+
 			appinfo = makeNode(AppendRelInfo);
 			appinfo->parent_relid = rti;
 			appinfo->child_relid = childRTindex;
@@ -1663,7 +1667,7 @@ expand_inherited_rtentry(PlannerInfo *root, RangeTblEntry *rte, Index rti)
 	 * the parent table is harmless, so we don't bother to get rid of it;
 	 * ditto for the useless PlanRowMark node.
 	 */
-	if (!need_append)
+	if (!has_child)
 	{
 		/* Clear flag before returning */
 		rte->inh = false;
@@ -1759,7 +1763,7 @@ make_inh_translation_list(Relation oldrelation, Relation newrelation,
 		 */
 		if (old_attno < newnatts &&
 			(att = new_tupdesc->attrs[old_attno]) != NULL &&
-			!att->attisdropped && att->attinhcount != 0 &&
+			!att->attisdropped &&
 			strcmp(attname, NameStr(att->attname)) == 0)
 			new_attno = old_attno;
 		else
@@ -1767,7 +1771,7 @@ make_inh_translation_list(Relation oldrelation, Relation newrelation,
 			for (new_attno = 0; new_attno < newnatts; new_attno++)
 			{
 				att = new_tupdesc->attrs[new_attno];
-				if (!att->attisdropped && att->attinhcount != 0 &&
+				if (!att->attisdropped &&
 					strcmp(attname, NameStr(att->attname)) == 0)
 					break;
 			}

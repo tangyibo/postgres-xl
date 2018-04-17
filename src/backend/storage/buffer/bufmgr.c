@@ -3349,7 +3349,6 @@ IncrBufferRefCount(Buffer buffer)
 {
 	Assert(BufferIsPinned(buffer));
 	ResourceOwnerEnlargeBuffers(CurrentResourceOwner);
-	ResourceOwnerRememberBuffer(CurrentResourceOwner, buffer);
 	if (BufferIsLocal(buffer))
 		LocalRefCount[-buffer - 1]++;
 	else
@@ -3360,6 +3359,7 @@ IncrBufferRefCount(Buffer buffer)
 		Assert(ref != NULL);
 		ref->refcount++;
 	}
+	ResourceOwnerRememberBuffer(CurrentResourceOwner, buffer);
 }
 
 /*
@@ -4065,8 +4065,8 @@ local_buffer_write_error_callback(void *arg)
 static int
 rnode_comparator(const void *p1, const void *p2)
 {
-	RelFileNode n1 = *(RelFileNode *) p1;
-	RelFileNode n2 = *(RelFileNode *) p2;
+	RelFileNode n1 = *(const RelFileNode *) p1;
+	RelFileNode n2 = *(const RelFileNode *) p2;
 
 	if (n1.relNode < n2.relNode)
 		return -1;
@@ -4175,8 +4175,8 @@ buffertag_comparator(const void *a, const void *b)
 static int
 ckpt_buforder_comparator(const void *pa, const void *pb)
 {
-	const CkptSortItem *a = (CkptSortItem *) pa;
-	const CkptSortItem *b = (CkptSortItem *) pb;
+	const CkptSortItem *a = (const CkptSortItem *) pa;
+	const CkptSortItem *b = (const CkptSortItem *) pb;
 
 	/* compare tablespace */
 	if (a->tsId < b->tsId)
@@ -4196,8 +4196,10 @@ ckpt_buforder_comparator(const void *pa, const void *pb)
 	/* compare block number */
 	else if (a->blockNum < b->blockNum)
 		return -1;
-	else						/* should not be the same block ... */
+	else if (a->blockNum > b->blockNum)
 		return 1;
+	/* equal page IDs are unlikely, but not impossible */
+	return 0;
 }
 
 /*

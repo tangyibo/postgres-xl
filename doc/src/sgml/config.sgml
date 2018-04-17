@@ -1211,7 +1211,7 @@ include_dir 'conf.d'
        <para>
         Note that older clients might lack support for the SCRAM authentication
         mechanism, and hence not work with passwords encrypted with
-        SCRAM-SHA-256.
+        SCRAM-SHA-256.  See <xref linkend="auth-password"> for more details.
        </para>
       </listitem>
      </varlistentry>
@@ -3483,7 +3483,8 @@ ANY <replaceable class="parameter">num_sync</replaceable> ( <replaceable class="
      </para>
 
      <para>
-      Note that <varname>wal_receiver_timeout</varname> and
+      Note that <varname>wal_receiver_timeout</varname>,
+      <varname>wal_receiver_status_interval</varname> and
       <varname>wal_retrieve_retry_interval</varname> configuration parameters
       affect the logical replication workers as well.
      </para>
@@ -6253,6 +6254,13 @@ COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
        </para>
 
        <para>
+        For more information on schema handling, see
+        <xref linkend="ddl-schemas">.  In particular, the default
+        configuration is suitable only when the database has a single user or
+        a few mutually-trusting users.
+       </para>
+
+       <para>
         The current effective value of the search path can be examined
         via the <acronym>SQL</acronym> function
         <function>current_schemas</>
@@ -6261,10 +6269,6 @@ COPY postgres_log FROM '/full/path/to/logfile.csv' WITH csv;
         examining the value of <varname>search_path</varname>, since
         <function>current_schemas</> shows how the items
         appearing in <varname>search_path</varname> were resolved.
-       </para>
-
-       <para>
-        For more information on schema handling, see <xref linkend="ddl-schemas">.
        </para>
       </listitem>
      </varlistentry>

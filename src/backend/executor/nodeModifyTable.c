@@ -343,6 +343,9 @@ ExecInsert(ModifyTableState *mtstate,
 				mtstate->mt_transition_capture->tcs_map = NULL;
 			}
 		}
+		if (mtstate->mt_oc_transition_capture != NULL)
+			mtstate->mt_oc_transition_capture->tcs_map =
+				mtstate->mt_transition_tupconv_maps[leaf_part_index];
 
 		/*
 		 * We might need to convert from the parent rowtype to the partition
@@ -1158,6 +1161,8 @@ lreplace:;
 	/* AFTER ROW UPDATE Triggers */
 	ExecARUpdateTriggers(estate, resultRelInfo, tupleid, oldtuple, tuple,
 						 recheckIndexes,
+						 mtstate->operation == CMD_INSERT ?
+						 mtstate->mt_oc_transition_capture :
 						 mtstate->mt_transition_capture);
 
 	list_free(recheckIndexes);
@@ -1444,7 +1449,7 @@ fireASTriggers(ModifyTableState *node)
 			if (node->mt_onconflict == ONCONFLICT_UPDATE)
 				ExecASUpdateTriggers(node->ps.state,
 									 resultRelInfo,
-									 node->mt_transition_capture);
+									 node->mt_oc_transition_capture);
 			ExecASInsertTriggers(node->ps.state, resultRelInfo,
 								 node->mt_transition_capture);
 			break;
@@ -1474,14 +1479,24 @@ ExecSetupTransitionCaptureState(ModifyTableState *mtstate, EState *estate)
 
 	/* Check for transition tables on the directly targeted relation. */
 	mtstate->mt_transition_capture =
-		MakeTransitionCaptureState(targetRelInfo->ri_TrigDesc);
+		MakeTransitionCaptureState(targetRelInfo->ri_TrigDesc,
+								   RelationGetRelid(targetRelInfo->ri_RelationDesc),
+								   mtstate->operation);
+	if (mtstate->operation == CMD_INSERT &&
+		mtstate->mt_onconflict == ONCONFLICT_UPDATE)
+		mtstate->mt_oc_transition_capture =
+			MakeTransitionCaptureState(targetRelInfo->ri_TrigDesc,
+									   RelationGetRelid(targetRelInfo->ri_RelationDesc),
+									   CMD_UPDATE);
 
 	/*
 	 * If we found that we need to collect transition tuples then we may also
 	 * need tuple conversion maps for any children that have TupleDescs that
-	 * aren't compatible with the tuplestores.
+	 * aren't compatible with the tuplestores.  (We can share these maps
+	 * between the regular and ON CONFLICT cases.)
 	 */
-	if (mtstate->mt_transition_capture != NULL)
+	if (mtstate->mt_transition_capture != NULL ||
+		mtstate->mt_oc_transition_capture != NULL)
 	{
 		ResultRelInfo *resultRelInfos;
 		int			numResultRelInfos;
@@ -1522,10 +1537,12 @@ ExecSetupTransitionCaptureState(ModifyTableState *mtstate, EState *estate)
 		/*
 		 * Install the conversion map for the first plan for UPDATE and DELETE
 		 * operations.  It will be advanced each time we switch to the next
-		 * plan.  (INSERT operations set it every time.)
+		 * plan.  (INSERT operations set it every time, so we need not update
+		 * mtstate->mt_oc_transition_capture here.)
 		 */
-		mtstate->mt_transition_capture->tcs_map =
-			mtstate->mt_transition_tupconv_maps[0];
+		if (mtstate->mt_transition_capture)
+			mtstate->mt_transition_capture->tcs_map =
+				mtstate->mt_transition_tupconv_maps[0];
 	}
 }
 
@@ -1548,7 +1565,7 @@ ExecModifyTable(PlanState *pstate)
 	JunkFilter *junkfilter;
 	TupleTableSlot *slot;
 	TupleTableSlot *planSlot;
-	ItemPointer tupleid = NULL;
+	ItemPointer tupleid;
 	ItemPointerData tuple_ctid;
 	HeapTupleData oldtupdata;
 	HeapTuple	oldtuple;
@@ -1629,11 +1646,17 @@ ExecModifyTable(PlanState *pstate)
 				estate->es_result_relation_info = resultRelInfo;
 				EvalPlanQualSetPlan(&node->mt_epqstate, subplanstate->plan,
 									node->mt_arowmarks[node->mt_whichplan]);
+				/* Prepare to convert transition tuples from this child. */
 				if (node->mt_transition_capture != NULL)
 				{
-					/* Prepare to convert transition tuples from this child. */
 					Assert(node->mt_transition_tupconv_maps != NULL);
 					node->mt_transition_capture->tcs_map =
+						node->mt_transition_tupconv_maps[node->mt_whichplan];
+				}
+				if (node->mt_oc_transition_capture != NULL)
+				{
+					Assert(node->mt_transition_tupconv_maps != NULL);
+					node->mt_oc_transition_capture->tcs_map =
 						node->mt_transition_tupconv_maps[node->mt_whichplan];
 				}
 				continue;
@@ -1665,6 +1688,7 @@ ExecModifyTable(PlanState *pstate)
 		EvalPlanQualSetSlot(&node->mt_epqstate, planSlot);
 		slot = planSlot;
 
+		tupleid = NULL;
 		oldtuple = NULL;
 		if (junkfilter != NULL)
 		{
@@ -1855,7 +1879,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		/*
 		 * Verify result relation is a valid target for the current operation
 		 */
-		CheckValidResultRel(resultRelInfo->ri_RelationDesc, operation);
+		CheckValidResultRel(resultRelInfo, operation);
 
 		/*
 		 * If there are indices on the result relation, open them and save
@@ -1921,6 +1945,7 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 
 		ExecSetupPartitionTupleRouting(rel,
 									   node->nominalRelation,
+									   estate,
 									   &partition_dispatch_info,
 									   &partitions,
 									   &partition_tupconv_maps,
@@ -1934,8 +1959,12 @@ ExecInitModifyTable(ModifyTable *node, EState *estate, int eflags)
 		mtstate->mt_partition_tuple_slot = partition_tuple_slot;
 	}
 
-	/* Build state for collecting transition tuples */
-	ExecSetupTransitionCaptureState(mtstate, estate);
+	/*
+	 * Build state for collecting transition tuples.  This requires having a
+	 * valid trigger query context, so skip it in explain-only mode.
+	 */
+	if (!(eflags & EXEC_FLAG_EXPLAIN_ONLY))
+		ExecSetupTransitionCaptureState(mtstate, estate);
 
 	/*
 	 * Initialize any WITH CHECK OPTION constraints if needed.
@@ -2317,10 +2346,6 @@ void
 ExecEndModifyTable(ModifyTableState *node)
 {
 	int			i;
-
-	/* Free transition tables */
-	if (node->mt_transition_capture != NULL)
-		DestroyTransitionCaptureState(node->mt_transition_capture);
 
 	/*
 	 * Allow any FDWs to shut down

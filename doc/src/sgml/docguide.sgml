@@ -115,7 +115,7 @@
     </varlistentry>
 
     <varlistentry>
-     <term><ulink url="http://wiki.docbook.org/DocBookXslStylesheets">DocBook XSL Stylesheets</ulink></term>
+     <term><ulink url="https://github.com/docbook/wiki/wiki/DocBookXslStylesheets">DocBook XSL Stylesheets</ulink></term>
      <listitem>
       <para>
        These contain the processing instructions for converting the
@@ -511,11 +511,11 @@ checking for fop... fop
     file <filename>~/.foprc</filename>, for example:
 <programlisting>
 # FOP binary distribution
-FOP_OPTS='-Xmx1000m'
+FOP_OPTS='-Xmx1500m'
 # Debian
-JAVA_ARGS='-Xmx1000m'
+JAVA_ARGS='-Xmx1500m'
 # Red Hat
-ADDITIONAL_FLAGS='-Xmx1000m'
+ADDITIONAL_FLAGS='-Xmx1500m'
 </programlisting>
     There is a minimum amount of memory that is required, and to some extent
     more memory appears to make things a bit faster.  On systems with very

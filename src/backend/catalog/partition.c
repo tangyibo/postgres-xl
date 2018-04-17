@@ -916,21 +916,23 @@ map_partition_varattnos(List *expr, int target_varno,
 						Relation partrel, Relation parent,
 						bool *found_whole_row)
 {
-	AttrNumber *part_attnos;
-	bool		my_found_whole_row;
+	bool		my_found_whole_row = false;
 
-	if (expr == NIL)
-		return NIL;
+	if (expr != NIL)
+	{
+		AttrNumber *part_attnos;
 
-	part_attnos = convert_tuples_by_name_map(RelationGetDescr(partrel),
-											 RelationGetDescr(parent),
-											 gettext_noop("could not convert row type"));
-	expr = (List *) map_variable_attnos((Node *) expr,
-										target_varno, 0,
-										part_attnos,
-										RelationGetDescr(parent)->natts,
-										RelationGetForm(partrel)->reltype,
-										&my_found_whole_row);
+		part_attnos = convert_tuples_by_name_map(RelationGetDescr(partrel),
+												 RelationGetDescr(parent),
+												 gettext_noop("could not convert row type"));
+		expr = (List *) map_variable_attnos((Node *) expr,
+											target_varno, 0,
+											part_attnos,
+											RelationGetDescr(parent)->natts,
+											RelationGetForm(partrel)->reltype,
+											&my_found_whole_row);
+	}
+
 	if (found_whole_row)
 		*found_whole_row = my_found_whole_row;
 
@@ -1000,12 +1002,16 @@ get_partition_qual_relid(Oid relid)
  * RelationGetPartitionDispatchInfo
  *		Returns information necessary to route tuples down a partition tree
  *
- * All the partitions will be locked with lockmode, unless it is NoLock.
- * A list of the OIDs of all the leaf partitions of rel is returned in
- * *leaf_part_oids.
+ * The number of elements in the returned array (that is, the number of
+ * PartitionDispatch objects for the partitioned tables in the partition tree)
+ * is returned in *num_parted and a list of the OIDs of all the leaf
+ * partitions of rel is returned in *leaf_part_oids.
+ *
+ * All the relations in the partition tree (including 'rel') must have been
+ * locked (using at least the AccessShareLock) by the caller.
  */
 PartitionDispatch *
-RelationGetPartitionDispatchInfo(Relation rel, int lockmode,
+RelationGetPartitionDispatchInfo(Relation rel,
 								 int *num_parted, List **leaf_part_oids)
 {
 	PartitionDispatchData **pd;
@@ -1020,14 +1026,18 @@ RelationGetPartitionDispatchInfo(Relation rel, int lockmode,
 				offset;
 
 	/*
-	 * Lock partitions and make a list of the partitioned ones to prepare
-	 * their PartitionDispatch objects below.
+	 * We rely on the relcache to traverse the partition tree to build both
+	 * the leaf partition OIDs list and the array of PartitionDispatch objects
+	 * for the partitioned tables in the tree.  That means every partitioned
+	 * table in the tree must be locked, which is fine since we require the
+	 * caller to lock all the partitions anyway.
 	 *
-	 * Cannot use find_all_inheritors() here, because then the order of OIDs
-	 * in parted_rels list would be unknown, which does not help, because we
-	 * assign indexes within individual PartitionDispatch in an order that is
-	 * predetermined (determined by the order of OIDs in individual partition
-	 * descriptors).
+	 * For every partitioned table in the tree, starting with the root
+	 * partitioned table, add its relcache entry to parted_rels, while also
+	 * queuing its partitions (in the order in which they appear in the
+	 * partition descriptor) to be looked at later in the same loop.  This is
+	 * a bit tricky but works because the foreach() macro doesn't fetch the
+	 * next list element until the bottom of the loop.
 	 */
 	*num_parted = 1;
 	parted_rels = list_make1(rel);
@@ -1036,29 +1046,24 @@ RelationGetPartitionDispatchInfo(Relation rel, int lockmode,
 	APPEND_REL_PARTITION_OIDS(rel, all_parts, all_parents);
 	forboth(lc1, all_parts, lc2, all_parents)
 	{
-		Relation	partrel = heap_open(lfirst_oid(lc1), lockmode);
+		Oid			partrelid = lfirst_oid(lc1);
 		Relation	parent = lfirst(lc2);
-		PartitionDesc partdesc = RelationGetPartitionDesc(partrel);
 
-		/*
-		 * If this partition is a partitioned table, add its children to the
-		 * end of the list, so that they are processed as well.
-		 */
-		if (partdesc)
+		if (get_rel_relkind(partrelid) == RELKIND_PARTITIONED_TABLE)
 		{
+			/*
+			 * Already locked by the caller.  Note that it is the
+			 * responsibility of the caller to close the below relcache entry,
+			 * once done using the information being collected here (for
+			 * example, in ExecEndModifyTable).
+			 */
+			Relation	partrel = heap_open(partrelid, NoLock);
+
 			(*num_parted)++;
 			parted_rels = lappend(parted_rels, partrel);
 			parted_rel_parents = lappend(parted_rel_parents, parent);
 			APPEND_REL_PARTITION_OIDS(partrel, all_parts, all_parents);
 		}
-		else
-			heap_close(partrel, NoLock);
-
-		/*
-		 * We keep the partitioned ones open until we're done using the
-		 * information being collected here (for example, see
-		 * ExecEndModifyTable).
-		 */
 	}
 
 	/*
@@ -1244,18 +1249,60 @@ make_partition_op_expr(PartitionKey key, int keynum,
 	{
 		case PARTITION_STRATEGY_LIST:
 			{
-				ScalarArrayOpExpr *saopexpr;
+				List	   *elems = (List *) arg2;
+				int			nelems = list_length(elems);
 
-				/* Build leftop = ANY (rightop) */
-				saopexpr = makeNode(ScalarArrayOpExpr);
-				saopexpr->opno = operoid;
-				saopexpr->opfuncid = get_opcode(operoid);
-				saopexpr->useOr = true;
-				saopexpr->inputcollid = key->partcollation[keynum];
-				saopexpr->args = list_make2(arg1, arg2);
-				saopexpr->location = -1;
+				Assert(nelems >= 1);
+				Assert(keynum == 0);
 
-				result = (Expr *) saopexpr;
+				if (nelems > 1 &&
+					!type_is_array(key->parttypid[keynum]))
+				{
+					ArrayExpr  *arrexpr;
+					ScalarArrayOpExpr *saopexpr;
+
+					/* Construct an ArrayExpr for the right-hand inputs */
+					arrexpr = makeNode(ArrayExpr);
+					arrexpr->array_typeid =
+									get_array_type(key->parttypid[keynum]);
+					arrexpr->array_collid = key->parttypcoll[keynum];
+					arrexpr->element_typeid = key->parttypid[keynum];
+					arrexpr->elements = elems;
+					arrexpr->multidims = false;
+					arrexpr->location = -1;
+
+					/* Build leftop = ANY (rightop) */
+					saopexpr = makeNode(ScalarArrayOpExpr);
+					saopexpr->opno = operoid;
+					saopexpr->opfuncid = get_opcode(operoid);
+					saopexpr->useOr = true;
+					saopexpr->inputcollid = key->partcollation[keynum];
+					saopexpr->args = list_make2(arg1, arrexpr);
+					saopexpr->location = -1;
+
+					result = (Expr *) saopexpr;
+				}
+				else
+				{
+					List	   *elemops = NIL;
+					ListCell   *lc;
+
+					foreach (lc, elems)
+					{
+						Expr   *elem = lfirst(lc),
+							   *elemop;
+
+						elemop = make_opclause(operoid,
+											   BOOLOID,
+											   false,
+											   arg1, elem,
+											   InvalidOid,
+											   key->partcollation[keynum]);
+						elemops = lappend(elemops, elemop);
+					}
+
+					result = nelems > 1 ? makeBoolExpr(OR_EXPR, elemops, -1) : linitial(elemops);
+				}
 				break;
 			}
 
@@ -1287,11 +1334,10 @@ get_qual_for_list(PartitionKey key, PartitionBoundSpec *spec)
 {
 	List	   *result;
 	Expr	   *keyCol;
-	ArrayExpr  *arr;
 	Expr	   *opexpr;
 	NullTest   *nulltest;
 	ListCell   *cell;
-	List	   *arrelems = NIL;
+	List	   *elems = NIL;
 	bool		list_has_null = false;
 
 	/*
@@ -1319,29 +1365,24 @@ get_qual_for_list(PartitionKey key, PartitionBoundSpec *spec)
 		if (val->constisnull)
 			list_has_null = true;
 		else
-			arrelems = lappend(arrelems, copyObject(val));
+			elems = lappend(elems, copyObject(val));
 	}
 
-	if (arrelems)
+	if (elems)
 	{
-		/* Construct an ArrayExpr for the non-null partition values */
-		arr = makeNode(ArrayExpr);
-		arr->array_typeid = !type_is_array(key->parttypid[0])
-			? get_array_type(key->parttypid[0])
-			: key->parttypid[0];
-		arr->array_collid = key->parttypcoll[0];
-		arr->element_typeid = key->parttypid[0];
-		arr->elements = arrelems;
-		arr->multidims = false;
-		arr->location = -1;
-
-		/* Generate the main expression, i.e., keyCol = ANY (arr) */
+		/*
+		 * Generate the operator expression from the non-null partition
+		 * values.
+		 */
 		opexpr = make_partition_op_expr(key, 0, BTEqualStrategyNumber,
-										keyCol, (Expr *) arr);
+										keyCol, (Expr *) elems);
 	}
 	else
 	{
-		/* If there are no partition values, we don't need an = ANY expr */
+		/*
+		 * If there are no partition values, we don't need an operator
+		 * expression.
+		 */
 		opexpr = NULL;
 	}
 

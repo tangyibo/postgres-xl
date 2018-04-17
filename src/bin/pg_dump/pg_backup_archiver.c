@@ -70,6 +70,7 @@ static void _selectOutputSchema(ArchiveHandle *AH, const char *schemaName);
 static void _selectTablespace(ArchiveHandle *AH, const char *tablespace);
 static void processEncodingEntry(ArchiveHandle *AH, TocEntry *te);
 static void processStdStringsEntry(ArchiveHandle *AH, TocEntry *te);
+static void processSearchPathEntry(ArchiveHandle *AH, TocEntry *te);
 static teReqs _tocEntryRequired(TocEntry *te, teSection curSection, RestoreOptions *ropt);
 static RestorePass _tocEntryRestorePass(TocEntry *te);
 static bool _tocEntryIsACL(TocEntry *te);
@@ -904,7 +905,9 @@ restore_toc_entry(ArchiveHandle *AH, TocEntry *te, bool is_parallel)
 						ahprintf(AH, "TRUNCATE TABLE %s%s;\n\n",
 								 (PQserverVersion(AH->connection) >= 80400 ?
 								  "ONLY " : ""),
-								 fmtId(te->tag));
+								 fmtQualifiedId(PQserverVersion(AH->connection),
+												te->namespace,
+												te->tag));
 					}
 
 					/*
@@ -991,10 +994,10 @@ _disableTriggersIfNecessary(ArchiveHandle *AH, TocEntry *te)
 	/*
 	 * Disable them.
 	 */
-	_selectOutputSchema(AH, te->namespace);
-
 	ahprintf(AH, "ALTER TABLE %s DISABLE TRIGGER ALL;\n\n",
-			 fmtId(te->tag));
+			 fmtQualifiedId(PQserverVersion(AH->connection),
+							te->namespace,
+							te->tag));
 }
 
 static void
@@ -1019,10 +1022,10 @@ _enableTriggersIfNecessary(ArchiveHandle *AH, TocEntry *te)
 	/*
 	 * Enable them.
 	 */
-	_selectOutputSchema(AH, te->namespace);
-
 	ahprintf(AH, "ALTER TABLE %s ENABLE TRIGGER ALL;\n\n",
-			 fmtId(te->tag));
+			 fmtQualifiedId(PQserverVersion(AH->connection),
+							te->namespace,
+							te->tag));
 }
 
 /*
@@ -2715,6 +2718,8 @@ ReadToc(ArchiveHandle *AH)
 			processEncodingEntry(AH, te);
 		else if (strcmp(te->desc, "STDSTRINGS") == 0)
 			processStdStringsEntry(AH, te);
+		else if (strcmp(te->desc, "SEARCHPATH") == 0)
+			processSearchPathEntry(AH, te);
 	}
 }
 
@@ -2760,6 +2765,16 @@ processStdStringsEntry(ArchiveHandle *AH, TocEntry *te)
 	else
 		exit_horribly(modulename, "invalid STDSTRINGS item: %s\n",
 					  te->defn);
+}
+
+static void
+processSearchPathEntry(ArchiveHandle *AH, TocEntry *te)
+{
+	/*
+	 * te->defn should contain a command to set search_path.  We just copy it
+	 * verbatim for use later.
+	 */
+	AH->public.searchpath = pg_strdup(te->defn);
 }
 
 static void
@@ -2810,9 +2825,10 @@ _tocEntryRequired(TocEntry *te, teSection curSection, RestoreOptions *ropt)
 {
 	teReqs		res = REQ_SCHEMA | REQ_DATA;
 
-	/* ENCODING and STDSTRINGS items are treated specially */
+	/* These items are treated specially */
 	if (strcmp(te->desc, "ENCODING") == 0 ||
-		strcmp(te->desc, "STDSTRINGS") == 0)
+		strcmp(te->desc, "STDSTRINGS") == 0 ||
+		strcmp(te->desc, "SEARCHPATH") == 0)
 		return REQ_SPECIAL;
 
 	/* If it's an ACL, maybe ignore it */
@@ -2943,14 +2959,22 @@ _tocEntryRequired(TocEntry *te, teSection curSection, RestoreOptions *ropt)
 	if (ropt->schemaOnly)
 	{
 		/*
+		 * The sequence_data option overrides schema-only for SEQUENCE SET.
+		 *
 		 * In binary-upgrade mode, even with schema-only set, we do not mask
 		 * out large objects.  Only large object definitions, comments and
 		 * other information should be generated in binary-upgrade mode (not
 		 * the actual data).
 		 */
 		if (!(ropt->sequence_data && strcmp(te->desc, "SEQUENCE SET") == 0) &&
-			!(ropt->binary_upgrade && strcmp(te->desc, "BLOB") == 0) &&
-			!(ropt->binary_upgrade && strncmp(te->tag, "LARGE OBJECT ", 13) == 0))
+			!(ropt->binary_upgrade &&
+			  (strcmp(te->desc, "BLOB") == 0 ||
+			   (strcmp(te->desc, "ACL") == 0 &&
+				strncmp(te->tag, "LARGE OBJECT ", 13) == 0) ||
+			   (strcmp(te->desc, "COMMENT") == 0 &&
+				strncmp(te->tag, "LARGE OBJECT ", 13) == 0) ||
+			   (strcmp(te->desc, "SECURITY LABEL") == 0 &&
+				strncmp(te->tag, "LARGE OBJECT ", 13) == 0))))
 			res = res & REQ_SCHEMA;
 	}
 
@@ -3032,6 +3056,10 @@ _doSetFixedOutputState(ArchiveHandle *AH)
 	/* Select the role to be used during restore */
 	if (ropt && ropt->use_role)
 		ahprintf(AH, "SET ROLE %s;\n", fmtId(ropt->use_role));
+
+	/* Select the dump-time search_path */
+	if (AH->public.searchpath)
+		ahprintf(AH, "%s", AH->public.searchpath);
 
 	/* Make sure function checking is disabled */
 	ahprintf(AH, "SET check_function_bodies = false;\n");
@@ -3237,6 +3265,15 @@ _selectOutputSchema(ArchiveHandle *AH, const char *schemaName)
 {
 	PQExpBuffer qry;
 
+	/*
+	 * If there was a SEARCHPATH TOC entry, we're supposed to just stay with
+	 * that search_path rather than switching to entry-specific paths.
+	 * Otherwise, it's an old archive that will not restore correctly unless
+	 * we set the search_path as it's expecting.
+	 */
+	if (AH->public.searchpath)
+		return;
+
 	if (!schemaName || *schemaName == '\0' ||
 		(AH->currSchema && strcmp(AH->currSchema, schemaName) == 0))
 		return;					/* no need to do anything */
@@ -3357,6 +3394,7 @@ _getObjectDescription(PQExpBuffer buf, TocEntry *te, ArchiveHandle *AH)
 		strcmp(type, "FOREIGN TABLE") == 0 ||
 		strcmp(type, "TEXT SEARCH DICTIONARY") == 0 ||
 		strcmp(type, "TEXT SEARCH CONFIGURATION") == 0 ||
+		strcmp(type, "STATISTICS") == 0 ||
 	/* non-schema-specified objects */
 		strcmp(type, "DATABASE") == 0 ||
 		strcmp(type, "PROCEDURAL LANGUAGE") == 0 ||
@@ -3368,8 +3406,10 @@ _getObjectDescription(PQExpBuffer buf, TocEntry *te, ArchiveHandle *AH)
 		strcmp(type, "SUBSCRIPTION") == 0 ||
 		strcmp(type, "USER MAPPING") == 0)
 	{
-		/* We already know that search_path was set properly */
-		appendPQExpBuffer(buf, "%s %s", type, fmtId(te->tag));
+		appendPQExpBuffer(buf, "%s ", type);
+		if (te->namespace && *te->namespace)
+			appendPQExpBuffer(buf, "%s.", fmtId(te->namespace));
+		appendPQExpBufferStr(buf, fmtId(te->tag));
 		return;
 	}
 
@@ -3573,6 +3613,7 @@ _printTocEntry(ArchiveHandle *AH, TocEntry *te, bool isData)
 			strcmp(te->desc, "TEXT SEARCH CONFIGURATION") == 0 ||
 			strcmp(te->desc, "FOREIGN DATA WRAPPER") == 0 ||
 			strcmp(te->desc, "SERVER") == 0 ||
+			strcmp(te->desc, "STATISTICS") == 0 ||
 			strcmp(te->desc, "PUBLICATION") == 0 ||
 			strcmp(te->desc, "SUBSCRIPTION") == 0)
 		{
@@ -3594,8 +3635,7 @@ _printTocEntry(ArchiveHandle *AH, TocEntry *te, bool isData)
 				 strcmp(te->desc, "TRIGGER") == 0 ||
 				 strcmp(te->desc, "ROW SECURITY") == 0 ||
 				 strcmp(te->desc, "POLICY") == 0 ||
-				 strcmp(te->desc, "USER MAPPING") == 0 ||
-				 strcmp(te->desc, "STATISTICS") == 0)
+				 strcmp(te->desc, "USER MAPPING") == 0)
 		{
 			/* these object types don't have separate owners */
 		}
@@ -3851,8 +3891,9 @@ restore_toc_entries_prefork(ArchiveHandle *AH, TocEntry *pending_list)
 	 *
 	 * Note: as of 9.2, it should be guaranteed that all PRE_DATA items appear
 	 * before DATA items, and all DATA items before POST_DATA items.  That is
-	 * not certain to be true in older archives, though, so this loop is coded
-	 * to not assume it.
+	 * not certain to be true in older archives, though, and in any case use
+	 * of a list file would destroy that ordering (cf. SortTocFromFile).  So
+	 * this loop cannot assume that it holds.
 	 */
 	AH->restorePass = RESTORE_PASS_MAIN;
 	skipped_some = false;
@@ -3899,7 +3940,7 @@ restore_toc_entries_prefork(ArchiveHandle *AH, TocEntry *pending_list)
 
 			(void) restore_toc_entry(AH, next_work_item, false);
 
-			/* there should be no touch of ready_list here, so pass NULL */
+			/* Reduce dependencies, but don't move anything to ready_list */
 			reduce_dependencies(AH, next_work_item, NULL);
 		}
 		else
@@ -4545,7 +4586,7 @@ identify_locking_dependencies(ArchiveHandle *AH, TocEntry *te)
 /*
  * Remove the specified TOC entry from the depCounts of items that depend on
  * it, thereby possibly making them ready-to-run.  Any pending item that
- * becomes ready should be moved to the ready list.
+ * becomes ready should be moved to the ready_list, if that's provided.
  */
 static void
 reduce_dependencies(ArchiveHandle *AH, TocEntry *te, TocEntry *ready_list)
@@ -4562,15 +4603,19 @@ reduce_dependencies(ArchiveHandle *AH, TocEntry *te, TocEntry *ready_list)
 		otherte->depCount--;
 
 		/*
-		 * It's ready if it has no remaining dependencies and it belongs in
-		 * the current restore pass.  However, don't move it if it has not yet
-		 * been put into the pending list.
+		 * It's ready if it has no remaining dependencies, and it belongs in
+		 * the current restore pass, and it is currently a member of the
+		 * pending list (that check is needed to prevent double restore in
+		 * some cases where a list-file forces out-of-order restoring).
+		 * However, if ready_list == NULL then caller doesn't want any list
+		 * memberships changed.
 		 */
 		if (otherte->depCount == 0 &&
 			_tocEntryRestorePass(otherte) == AH->restorePass &&
-			otherte->par_prev != NULL)
+			otherte->par_prev != NULL &&
+			ready_list != NULL)
 		{
-			/* It must be in the pending list, so remove it ... */
+			/* Remove it from pending list ... */
 			par_list_remove(otherte);
 			/* ... and add to ready_list */
 			par_list_append(ready_list, otherte);

@@ -3091,6 +3091,28 @@ reparameterize_path(PlannerInfo *root, Path *path,
 			return create_subqueryscan_path(root, rel, path->pathkeys,
 											required_outer);
 #endif
+		case T_Append:
+			{
+				AppendPath *apath = (AppendPath *) path;
+				List	   *childpaths = NIL;
+				ListCell   *lc;
+
+				/* Reparameterize the children */
+				foreach(lc, apath->subpaths)
+				{
+					Path	   *spath = (Path *) lfirst(lc);
+
+					spath = reparameterize_path(root, spath,
+												required_outer,
+												loop_count);
+					if (spath == NULL)
+						return NULL;
+					childpaths = lappend(childpaths, spath);
+				}
+				return (Path *)
+					create_append_path(rel, childpaths,
+									   required_outer);
+			}
 		default:
 			break;
 	}

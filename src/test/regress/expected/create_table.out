@@ -437,6 +437,8 @@ Partition key: RANGE (a oid_ops, plusone(b), c, d COLLATE "C")
  a      | integer |           |          |         | plain    |              | 
  b      | text    |           |          |         | extended |              | 
 Partition key: RANGE (((a + 1)), substr(b, 1, 5))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 INSERT INTO partitioned2 VALUES (1, 'hello');
 ERROR:  no partition of relation "partitioned2" found for row
@@ -450,6 +452,8 @@ CREATE TABLE part2_1 PARTITION OF partitioned2 FOR VALUES FROM (-1, 'aaaaa') TO 
  b      | text    |           |          |         | extended |              | 
 Partition of: partitioned2 FOR VALUES FROM ('-1', 'aaaaa') TO (100, 'ccccc')
 Partition constraint: (((a + 1) IS NOT NULL) AND (substr(b, 1, 5) IS NOT NULL) AND (((a + 1) > '-1'::integer) OR (((a + 1) = '-1'::integer) AND (substr(b, 1, 5) >= 'aaaaa'::text))) AND (((a + 1) < 100) OR (((a + 1) = 100) AND (substr(b, 1, 5) < 'ccccc'::text))))
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 DROP TABLE partitioned, partitioned2;
 --
@@ -813,5 +817,7 @@ CREATE TABLE arrlp12 PARTITION OF arrlp FOR VALUES IN ('{1}', '{2}');
  a      | integer[] |           |          |         | extended |              | 
 Partition of: arrlp FOR VALUES IN ('{1}', '{2}')
 Partition constraint: ((a IS NOT NULL) AND (((a)::anyarray OPERATOR(pg_catalog.=) '{1}'::integer[]) OR ((a)::anyarray OPERATOR(pg_catalog.=) '{2}'::integer[])))
+Distribute By: ROUND ROBIN
+Location Nodes: ALL DATANODES
 
 DROP TABLE arrlp;

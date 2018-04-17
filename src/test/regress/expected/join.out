@@ -2316,17 +2316,18 @@ select * from
   j1_tbl full join
   (select * from j2_tbl order by j2_tbl.i desc, j2_tbl.k asc) j2_tbl
   on j1_tbl.i = j2_tbl.i and j1_tbl.i = j2_tbl.k;
-                           QUERY PLAN                            
------------------------------------------------------------------
- Merge Full Join
-   Merge Cond: ((j2_tbl.i = j1_tbl.i) AND (j2_tbl.k = j1_tbl.i))
-   ->  Sort
-         Sort Key: j2_tbl.i DESC, j2_tbl.k
-         ->  Seq Scan on j2_tbl
-   ->  Sort
-         Sort Key: j1_tbl.i DESC
-         ->  Seq Scan on j1_tbl
-(8 rows)
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Merge Full Join
+         Merge Cond: ((j2_tbl.i = j1_tbl.i) AND (j2_tbl.k = j1_tbl.i))
+         ->  Sort
+               Sort Key: j2_tbl.i DESC, j2_tbl.k
+               ->  Seq Scan on j2_tbl
+         ->  Sort
+               Sort Key: j1_tbl.i DESC
+               ->  Seq Scan on j1_tbl
+(9 rows)
 
 select * from
   j1_tbl full join
@@ -2339,19 +2340,19 @@ select * from
    | 0 | zero  |   |   
    |   | null  |   |   
  8 | 8 | eight |   |   
- 7 | 7 | seven |   |   
  6 | 6 | six   |   |   
    |   |       | 5 | -5
    |   |       | 5 | -5
  5 | 0 | five  |   |   
- 4 | 1 | four  |   |   
-   |   |       | 3 | -3
- 3 | 2 | three |   |   
  2 | 3 | two   | 2 |  2
    |   |       | 2 |  4
    |   |       | 1 | -1
-   |   |       | 0 |   
  1 | 4 | one   |   |   
+ 7 | 7 | seven |   |   
+ 4 | 1 | four  |   |   
+   |   |       | 3 | -3
+   |   |       | 0 |   
+ 3 | 2 | three |   |   
  0 |   | zero  |   |   
 (19 rows)
 
@@ -2364,18 +2365,26 @@ select count(*) from
   left join
   (select * from tenk1 y order by y.unique2) y
   on x.thousand = y.unique2 and x.twothousand = y.hundred and x.fivethous = y.unique2;
-                                    QUERY PLAN                                    
-----------------------------------------------------------------------------------
- Aggregate
-   ->  Merge Left Join
-         Merge Cond: (x.thousand = y.unique2)
-         Join Filter: ((x.twothousand = y.hundred) AND (x.fivethous = y.unique2))
-         ->  Sort
-               Sort Key: x.thousand, x.twothousand, x.fivethous
-               ->  Seq Scan on tenk1 x
-         ->  Materialize
-               ->  Index Scan using tenk1_unique2 on tenk1 y
-(9 rows)
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Finalize Aggregate
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Partial Aggregate
+               ->  Merge Left Join
+                     Merge Cond: (x.thousand = y.unique2)
+                     Join Filter: ((x.twothousand = y.hundred) AND (x.fivethous = y.unique2))
+                     ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                           Distribute results by H: thousand
+                           ->  Subquery Scan on x
+                                 ->  Sort
+                                       Sort Key: x_1.thousand, x_1.twothousand, x_1.fivethous
+                                       ->  Seq Scan on tenk1 x_1
+                     ->  Materialize
+                           ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                                 Distribute results by H: unique2
+                                 ->  Subquery Scan on y
+                                       ->  Index Scan using tenk1_unique2 on tenk1 y_1
+(17 rows)
 
 select count(*) from
   (select * from tenk1 x order by x.thousand, x.twothousand, x.fivethous) x

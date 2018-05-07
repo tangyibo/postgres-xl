@@ -1132,12 +1132,11 @@ EXPLAIN (verbose, costs off, nodes off) UPDATE rw_view1 SET b = b + 1 RETURNING 
                             QUERY PLAN                             
 -------------------------------------------------------------------
  Remote Subquery Scan on any
-   Output: base_tbl.a, base_tbl.b
    ->  Update on public.base_tbl
          Output: base_tbl.a, base_tbl.b
          ->  Seq Scan on public.base_tbl
                Output: base_tbl.a, (base_tbl.b + 1), base_tbl.ctid
-(6 rows)
+(5 rows)
 
 UPDATE rw_view1 SET b = b + 1 RETURNING *;
  a | b  

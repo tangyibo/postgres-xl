@@ -1900,6 +1900,11 @@ show_plan_tlist(PlanState *planstate, List *ancestors, ExplainState *es)
 		return;
 	if (IsA(plan, RecursiveUnion))
 		return;
+	/* Ditto for RemoteSubplan on top of ModifyTable */
+	if (IsA(plan, RemoteSubplan) && plan->lefttree &&
+		IsA(plan->lefttree, ModifyTable) &&
+		(((ModifyTable *) plan->lefttree)->returningLists != NIL))
+		return;
 
 	/* Set up deparsing context */
 	context = set_deparse_context_planstate(es->deparse_cxt,

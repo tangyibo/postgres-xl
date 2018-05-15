@@ -2058,8 +2058,7 @@ CONTEXT:  PL/pgSQL function subxact_rollback_semantics() line 6 during statement
 select * from foo;
  f1 
 ----
-  1
-(1 row)
+(0 rows)
 
 drop table foo;
 create function trap_timeout() returns void as $$
@@ -2590,8 +2589,8 @@ begin
 end; $$ language plpgsql;
 select execute_into_test('eifoo');
 NOTICE:  10 1
-NOTICE:  <NULL> <NULL>
-NOTICE:  <NULL> <NULL> <NULL>
+NOTICE:  10 15
+NOTICE:  10 15 20
  execute_into_test 
 -------------------
  (1,2)

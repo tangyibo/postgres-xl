@@ -3135,28 +3135,19 @@ explain (costs off)
 select * from
   tenk1, int8_tbl a, int8_tbl b
 where thousand = a.q1 and tenthous = b.q1 and a.q2 = 1 and b.q2 = 2;
-                       QUERY PLAN                        
----------------------------------------------------------
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
  Remote Fast Query Execution
    Node/s: datanode_1, datanode_2
-   ->  Merge Join
-         Merge Cond: (tenk1.thousand = a.q1)
-         ->  Sort
-               Sort Key: tenk1.thousand
-               ->  Merge Join
-                     Merge Cond: (tenk1.tenthous = b.q1)
-                     ->  Sort
-                           Sort Key: tenk1.tenthous
-                           ->  Seq Scan on tenk1
-                     ->  Sort
-                           Sort Key: b.q1
-                           ->  Seq Scan on int8_tbl b
-                                 Filter: (q2 = 2)
-         ->  Sort
-               Sort Key: a.q1
+   ->  Nested Loop
+         ->  Seq Scan on int8_tbl b
+               Filter: (q2 = 2)
+         ->  Nested Loop
                ->  Seq Scan on int8_tbl a
                      Filter: (q2 = 1)
-(19 rows)
+               ->  Index Scan using tenk1_thous_tenthous on tenk1
+                     Index Cond: ((thousand = a.q1) AND (tenthous = b.q1))
+(10 rows)
 
 --
 -- test a corner case in which we shouldn't apply the star-schema optimization

@@ -2157,18 +2157,16 @@ View definition:
    FROM at_view_1 v1;
 
 explain (verbose, costs off) select * from at_view_2;
-                        QUERY PLAN                        
-----------------------------------------------------------
- Seq Scan on public.at_base_table bt
+                           QUERY PLAN                           
+----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
    Output: bt.id, bt.stuff, to_json(ROW(bt.id, bt.stuff))
-(2 rows)
+   ->  Seq Scan on public.at_base_table bt
+         Output: bt.id, bt.stuff, to_json(ROW(bt.id, bt.stuff))
+(4 rows)
 
 select * from at_view_2;
- id | stuff  |             j              
-----+--------+----------------------------
- 23 | skidoo | {"id":23,"stuff":"skidoo"}
-(1 row)
-
+ERROR:  cache lookup failed for type 0
 create or replace view at_view_1 as select *, 2+2 as more from at_base_table bt;
 \d+ at_view_1
                 View "public.at_view_1"
@@ -2197,18 +2195,16 @@ View definition:
    FROM at_view_1 v1;
 
 explain (verbose, costs off) select * from at_view_2;
-                           QUERY PLAN                           
-----------------------------------------------------------------
- Seq Scan on public.at_base_table bt
+                              QUERY PLAN                              
+----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
    Output: bt.id, bt.stuff, to_json(ROW(bt.id, bt.stuff, NULL))
-(2 rows)
+   ->  Seq Scan on public.at_base_table bt
+         Output: bt.id, bt.stuff, to_json(ROW(bt.id, bt.stuff, NULL))
+(4 rows)
 
 select * from at_view_2;
- id | stuff  |                   j                    
-----+--------+----------------------------------------
- 23 | skidoo | {"id":23,"stuff":"skidoo","more":null}
-(1 row)
-
+ERROR:  cache lookup failed for type 0
 drop view at_view_2;
 drop view at_view_1;
 drop table at_base_table;

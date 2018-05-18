@@ -2847,10 +2847,12 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 	int 			i;
 	/* Number of data nodes from which attribute statistics are received. */
 	int			   *numnodes;
+	bool			istemp;
 
 	/* Get the relation identifier */
 	relname = RelationGetRelationName(onerel);
 	nspname = get_namespace_name(RelationGetNamespace(onerel));
+	istemp = (onerel->rd_rel->relpersistence == RELPERSISTENCE_TEMP);
 
 	elog(LOG, "Getting detailed statistics for %s.%s", nspname, relname);
 
@@ -2898,9 +2900,21 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 								 "    ON s.staop%d = o%d.oid ",
 						 i, i, i, i, i, i, i, i, i,
 						 i, i, i, i, i, i, i, i, i);
-	appendStringInfo(&query, "WHERE nc.nspname = '%s' "
-							  "AND c.relname = '%s'",
-					 nspname, relname);
+
+	/*
+	 * For temporary tables, the namespace may be different on each node. So we
+	 * must not use the namespace from the coordinator. Instead,
+	 * pg_my_temp_schema() does the right thing of finding the correct
+	 * temporary namespace being used for the current session. We use that.
+	 */
+	if (istemp)
+		appendStringInfo(&query, "WHERE nc.oid = pg_my_temp_schema() "
+				"AND c.relname = '%s'",
+				relname);
+	else
+		appendStringInfo(&query, "WHERE nc.nspname = '%s' "
+				"AND c.relname = '%s'",
+				nspname, relname);
 
 	/* Build up RemoteQuery */
 	step = makeNode(RemoteQuery);

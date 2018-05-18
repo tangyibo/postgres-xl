@@ -46,5 +46,5 @@ PG_RMGR(RM_BRIN_ID, "BRIN", brin_redo, brin_desc, brin_identify, NULL, NULL)
 PG_RMGR(RM_COMMIT_TS_ID, "CommitTs", commit_ts_redo, commit_ts_desc, commit_ts_identify, NULL, NULL)
 PG_RMGR(RM_REPLORIGIN_ID, "ReplicationOrigin", replorigin_redo, replorigin_desc, replorigin_identify, NULL, NULL)
 #ifdef PGXC
-PG_RMGR(RM_BARRIER_ID, "Barrier", barrier_redo, barrier_desc, NULL, NULL, NULL) 
+PG_RMGR(RM_BARRIER_ID, "Barrier", barrier_redo, barrier_desc, barrier_identify, NULL, NULL)
 #endif

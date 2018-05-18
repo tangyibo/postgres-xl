@@ -1252,19 +1252,19 @@ exec_simple_query(const char *query_string)
 		 */
 		if (IS_PGXC_DATANODE && IsPostmasterEnvironment)
 		{
-			if (IsA(parsetree, VacuumStmt))
+			if (IsA(parsetree->stmt, VacuumStmt))
 			{
-				VacuumStmt *stmt = (VacuumStmt *) parsetree;
+				VacuumStmt *stmt = (VacuumStmt *) parsetree->stmt;
 				if (stmt->options & VACOPT_VACUUM)
 					SetForceXidFromGTM(true);
 			}
-			else if (IsA(parsetree, ClusterStmt))
+			else if (IsA(parsetree->stmt, ClusterStmt))
 			{
-				ClusterStmt *stmt = (ClusterStmt *) parsetree;
+				ClusterStmt *stmt = (ClusterStmt *) parsetree->stmt;
 				if (stmt->relation == NULL)
 					SetForceXidFromGTM(true);
 			}
-			else if (IsA(parsetree, ReindexStmt))
+			else if (IsA(parsetree->stmt, ReindexStmt))
 			{
 				ReindexStmt *stmt = (ReindexStmt *) parsetree->stmt;
 				if (stmt->kind == REINDEX_OBJECT_SCHEMA ||

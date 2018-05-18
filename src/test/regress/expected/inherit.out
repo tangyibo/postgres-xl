@@ -1520,8 +1520,8 @@ vacuum analyze patest2;
 analyze int4_tbl;
 explain (costs off, num_nodes off, nodes off)
 select * from patest0 join (select f1 from int4_tbl where f1 = 0 limit 1) ss on id = f1;
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Nested Loop
    ->  Limit
          ->  Remote Subquery Scan on all
@@ -1531,17 +1531,13 @@ select * from patest0 join (select f1 from int4_tbl where f1 = 0 limit 1) ss on 
    ->  Materialize
          ->  Remote Subquery Scan on all
                ->  Append
-                     ->  Seq Scan on patest0
-                           Filter: (int4_tbl.f1 = id)
-                     ->  Bitmap Heap Scan on patest1
-                           Recheck Cond: (id = int4_tbl.f1)
-                           ->  Bitmap Index Scan on patest1i
-                                 Index Cond: (id = int4_tbl.f1)
-                     ->  Bitmap Heap Scan on patest2
-                           Recheck Cond: (id = int4_tbl.f1)
-                           ->  Bitmap Index Scan on patest2i
-                                 Index Cond: (id = int4_tbl.f1)
-(19 rows)
+                     ->  Index Scan using patest0i on patest0
+                           Index Cond: (id = int4_tbl.f1)
+                     ->  Index Scan using patest1i on patest1
+                           Index Cond: (id = int4_tbl.f1)
+                     ->  Index Scan using patest2i on patest2
+                           Index Cond: (id = int4_tbl.f1)
+(15 rows)
 
 select * from patest0 join (select f1 from int4_tbl where f1 = 0 limit 1) ss on id = f1;
  id | x | f1 
@@ -1554,8 +1550,8 @@ select * from patest0 join (select f1 from int4_tbl where f1 = 0 limit 1) ss on 
 drop index patest2i;
 explain (costs off, num_nodes off, nodes off)
 select * from patest0 join (select f1 from int4_tbl where f1 = 0 limit 1) ss on id = f1;
-                           QUERY PLAN                           
-----------------------------------------------------------------
+                          QUERY PLAN                          
+--------------------------------------------------------------
  Nested Loop
    ->  Limit
          ->  Remote Subquery Scan on all
@@ -1565,15 +1561,13 @@ select * from patest0 join (select f1 from int4_tbl where f1 = 0 limit 1) ss on 
    ->  Materialize
          ->  Remote Subquery Scan on all
                ->  Append
-                     ->  Seq Scan on patest0
-                           Filter: (int4_tbl.f1 = id)
-                     ->  Bitmap Heap Scan on patest1
-                           Recheck Cond: (id = int4_tbl.f1)
-                           ->  Bitmap Index Scan on patest1i
-                                 Index Cond: (id = int4_tbl.f1)
+                     ->  Index Scan using patest0i on patest0
+                           Index Cond: (id = int4_tbl.f1)
+                     ->  Index Scan using patest1i on patest1
+                           Index Cond: (id = int4_tbl.f1)
                      ->  Seq Scan on patest2
                            Filter: (int4_tbl.f1 = id)
-(17 rows)
+(15 rows)
 
 select * from patest0 join (select f1 from int4_tbl where f1 = 0 limit 1) ss on id = f1;
  id | x | f1 

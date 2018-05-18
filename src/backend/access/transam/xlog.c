@@ -5762,8 +5762,9 @@ recoveryStopsBefore(XLogReaderState *record)
 			(record_info == XLOG_BARRIER_CREATE))
 		{
 			ereport(DEBUG2,
-					(errmsg("checking if barrier record matches the target "
-							"barrier")));
+					(errmsg("checking if barrier record (%s) matches the target "
+							"barrier (%s)",
+							recordBarrierId, recoveryTargetBarrierId)));
 			if (strcmp(recoveryTargetBarrierId, recordBarrierId) == 0)
 				stopsAtThisBarrier = true;
 		}
@@ -5799,17 +5800,6 @@ recoveryStopsBefore(XLogReaderState *record)
 							recoveryStopXid,
 							timestamptz_to_str(recoveryStopTime))));
 		}
-#ifdef PGXC
-		else if (stopsAtThisBarrier)
-		{
-			recoveryStopTime = recordXtime;
-			ereport(LOG,
-					(errmsg("recovery stopping at barrier %s, time %s",
-							recoveryTargetBarrierId,
-							timestamptz_to_str(recoveryStopTime))));
-			return true;
-		}
-#endif
 		else
 		{
 			ereport(LOG,
@@ -5818,6 +5808,17 @@ recoveryStopsBefore(XLogReaderState *record)
 							timestamptz_to_str(recoveryStopTime))));
 		}
 	}
+#ifdef PGXC
+	else if (stopsAtThisBarrier)
+	{
+		recoveryStopTime = recordXtime;
+		ereport(LOG,
+				(errmsg("recovery stopping at barrier %s, time %s",
+						recoveryTargetBarrierId,
+						timestamptz_to_str(recoveryStopTime))));
+		return true;
+	}
+#endif
 
 	return stopsHere;
 }

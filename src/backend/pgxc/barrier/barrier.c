@@ -120,7 +120,7 @@ ProcessCreateBarrierExecute(const char *id)
 		XLogRecPtr recptr;
 
 		XLogBeginInsert();
-		XLogRegisterData((char *) &id, strlen(id) + 1);
+		XLogRegisterData((char *) id, strlen(id) + 1);
 		recptr = XLogInsert(RM_BARRIER_ID, XLOG_BARRIER_CREATE);
 		XLogFlush(recptr);
 	}
@@ -413,7 +413,7 @@ ExecuteBarrier(const char *id)
 		XLogRecPtr recptr;
 
 		XLogBeginInsert();
-		XLogRegisterData((char *) &id, strlen(id) + 1);
+		XLogRegisterData((char *) id, strlen(id) + 1);
 
 		recptr = XLogInsert(RM_BARRIER_ID, XLOG_BARRIER_CREATE);
 		XLogFlush(recptr);

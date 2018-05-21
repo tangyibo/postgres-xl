@@ -1772,16 +1772,12 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 		{
 			validpages++;
 			*pages += DatumGetInt32(value);
-			elog(LOG, "get_remote_relstat: relname:%s, remote relpages: %d",
-					relname, DatumGetInt32(value));
 		}
 		value = slot_getattr(result, 2, &isnull); /* reltuples */
 		if (!isnull)
 		{
 			validtuples++;
 			*tuples += DatumGetFloat4(value);
-			elog(LOG, "get_remote_relstat: relname:%s, remote reltuples: %f",
-					relname, DatumGetFloat4(value));
 		}
 		value = slot_getattr(result, 3, &isnull); /* relallvisible */
 		if (!isnull)
@@ -1872,8 +1868,6 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 	relname = RelationGetRelationName(onerel);
 	nspname = get_namespace_name(RelationGetNamespace(onerel));
 	istemp = (onerel->rd_rel->relpersistence == RELPERSISTENCE_TEMP);
-
-	elog(LOG, "Getting relation statistics for %s.%s", nspname, relname);
 
 	replicated = IsLocatorReplicated(RelationGetLocatorType(onerel));
 	/*

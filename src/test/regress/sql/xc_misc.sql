@@ -209,6 +209,12 @@ FETCH ALL FROM c3; -- should not show the row (5)
 
 END;
 
+-- test if type name requiring quoting works fine
+CREATE TYPE "Item" AS ( id integer, category integer, amount integer);
+CREATE TABLE package ( user_id bigint primary key, items "Item"[]);
+SELECT * FROM package;
+DROP TYPE "Item" CASCADE;
+
 DROP TABLE tt_22;
 
 -----------------------------------

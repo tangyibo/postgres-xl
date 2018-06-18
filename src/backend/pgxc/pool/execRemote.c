@@ -44,6 +44,7 @@
 #include "pgxc/poolmgr.h"
 #include "storage/ipc.h"
 #include "storage/proc.h"
+#include "utils/builtins.h"
 #include "utils/datum.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -342,7 +343,7 @@ create_tuple_desc(char *msg_body, size_t len)
 		msg_body += 2;
 
 		/* Get the OID type and mode type from typename */
-		parseTypeString(typname, &oidtypeid, NULL, false);
+		parseTypeString(quote_identifier(typname), &oidtypeid, NULL, false);
 
 		TupleDescInitEntry(result, attnum, attname, oidtypeid, typmod, 0);
 	}

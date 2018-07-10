@@ -16,6 +16,7 @@
 #include "gtm/gtm_c.h"
 #include "gtm/gtm_lock.h"
 #include "gtm/elog.h"
+#include "gtm/gtm.h"
 
 /*
  * Acquire the request lock. Block if the lock is not available
@@ -131,7 +132,11 @@ GTM_RWLockAcquire(GTM_RWLock *lock, GTM_LockMode mode)
 			break;
 	}
 
-	return status ? false : true;
+	if (status != 0)
+		return false;
+
+	RWLocksHeld[NumRWLocksHeld++] = lock;
+	return true;
 }
 
 /*
@@ -140,7 +145,9 @@ GTM_RWLockAcquire(GTM_RWLock *lock, GTM_LockMode mode)
 bool
 GTM_RWLockRelease(GTM_RWLock *lock)
 {
-	int status;
+	int         i;
+	int 		status;
+
 	status = pthread_rwlock_unlock(&lock->lk_lock);
 #ifdef GTM_LOCK_DEBUG
 	if (status)
@@ -178,7 +185,25 @@ GTM_RWLockRelease(GTM_RWLock *lock)
 		pthread_mutex_unlock(&lock->lk_debug_mutex);
 	}
 #endif
-	return status ? false : true;
+	if (status != 0)
+	   return false;
+
+	/*
+	 * Remove lock from list of locks held.  Usually, but not always, it will
+	 * be the latest-acquired lock; so search array backwards.
+	 */
+	for (i = NumRWLocksHeld; --i >= 0;)
+		if (lock == RWLocksHeld[i])
+			break;
+
+	if (i < 0)
+		elog(ERROR, "lock is not held");
+
+	NumRWLocksHeld--;
+	for (; i < NumRWLocksHeld; i++)
+		RWLocksHeld[i] = RWLocksHeld[i + 1];
+
+	return true;
 }
 
 /*
@@ -201,6 +226,13 @@ int
 GTM_RWLockDestroy(GTM_RWLock *lock)
 {
 	return pthread_rwlock_destroy(&lock->lk_lock);
+}
+
+void
+GTM_RWLockReleaseAll(void)
+{
+	while (NumRWLocksHeld > 0)
+		GTM_RWLockRelease(RWLocksHeld[NumRWLocksHeld - 1]);
 }
 
 /*
@@ -230,7 +262,12 @@ bool
 GTM_MutexLockAcquire(GTM_MutexLock *lock)
 {
 	int status = pthread_mutex_lock(&lock->lk_lock);
-	return status ? false : true;
+
+	if (status != 0)
+		return false;
+
+	MutexLocksHeld[NumMutexLocksHeld++] = lock;
+	return true;
 }
 
 /*
@@ -239,7 +276,35 @@ GTM_MutexLockAcquire(GTM_MutexLock *lock)
 bool
 GTM_MutexLockRelease(GTM_MutexLock *lock)
 {
-	return pthread_mutex_unlock(&lock->lk_lock);
+	int         i;
+	int			status = pthread_mutex_unlock(&lock->lk_lock);
+
+	if (status != 0)
+		return false;
+
+	/*
+	 * Remove lock from list of locks held.  Usually, but not always, it will
+	 * be the latest-acquired lock; so search array backwards.
+	 */
+	for (i = NumMutexLocksHeld; --i >= 0;)
+		if (lock == MutexLocksHeld[i])
+			break;
+
+	if (i < 0)
+		elog(ERROR, "mutex is not held");
+
+	NumMutexLocksHeld--;
+	for (; i < NumMutexLocksHeld; i++)
+		MutexLocksHeld[i] = MutexLocksHeld[i + 1];
+
+	return true;
+}
+
+void
+GTM_MutexLockReleaseAll(void)
+{
+	while (NumMutexLocksHeld > 0)
+		GTM_MutexLockRelease(MutexLocksHeld[NumMutexLocksHeld - 1]);
 }
 
 /*

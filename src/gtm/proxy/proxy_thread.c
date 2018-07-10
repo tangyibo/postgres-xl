@@ -51,7 +51,10 @@ GTMProxy_ThreadAdd(GTMProxy_ThreadInfo *thrinfo)
 		 * allocation
 		 */
 		if (GTMProxyThreads->gt_array_size == GTM_PROXY_MAX_THREADS)
+		{
+			GTM_RWLockRelease(&GTMProxyThreads->gt_lock);
 			elog(ERROR, "Too many threads active");
+		}
 
 		if (GTMProxyThreads->gt_array_size == 0)
 			newsize = GTM_PROXY_MIN_THREADS;
@@ -134,12 +137,8 @@ GTMProxy_ThreadCreate(void *(* startroutine)(void *), int idx)
 	GTMProxy_ThreadInfo *thrinfo;
 	int err;
 
-	/*
-	 * We are still running in the context of the main thread. So the
-	 * allocation below would last as long as the main thread exists or the
-	 * memory is explicitely freed.
-	 */
-	thrinfo = (GTMProxy_ThreadInfo *)palloc0(sizeof (GTMProxy_ThreadInfo));
+	thrinfo = (GTMProxy_ThreadInfo *)malloc(sizeof (GTMProxy_ThreadInfo));
+	memset(thrinfo, 0, sizeof (GTMProxy_ThreadInfo));
 
 	GTM_MutexLockInit(&thrinfo->thr_lock);
 	GTM_CVInit(&thrinfo->thr_cv);
@@ -263,6 +262,10 @@ GTMProxy_ThreadCleanup(void *argp)
 	GTMProxy_ThreadInfo *thrinfo = (GTMProxy_ThreadInfo *)argp;
 
 	elog(DEBUG1, "Cleaning up thread state");
+
+	/* Release any currently held mutex and rwlocks */
+	GTM_MutexLockReleaseAll();
+	GTM_RWLockReleaseAll();
 
 	/*
 	 * TODO Close the open connection.

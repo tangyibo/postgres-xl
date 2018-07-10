@@ -125,6 +125,7 @@ seq_find_seqinfo(GTM_SequenceKey seqkey)
 		{
 			elog(LOG, "Sequence not active");
 			GTM_RWLockRelease(&curr_seqinfo->gs_lock);
+			GTM_RWLockRelease(&bucket->shb_lock);
 			return NULL;
 		}
 		Assert(curr_seqinfo->gs_ref_count != SEQ_MAX_REFCOUNT);
@@ -1416,6 +1417,7 @@ ProcessSequenceListCommand(Port *myport, StringInfo message)
 					if (newcount <= seq_maxcount)
 					{
 						/* give up */
+						GTM_RWLockRelease(&b->shb_lock);
 						ereport(ERROR,
 								(ERANGE,
 								 errmsg("Can not list all the sequences")));
@@ -2217,7 +2219,7 @@ GTM_SaveSeqInfo2(FILE *ctlf, bool isBackup)
 					(seqinfo->gs_called ? 't' : 'f'),
 					seqinfo->gs_state);
 
-				GTM_RWLockRelease(&seqinfo->gs_lock);
+			GTM_RWLockRelease(&seqinfo->gs_lock);
 		}
 		GTM_RWLockRelease(&bucket->shb_lock);
 	}

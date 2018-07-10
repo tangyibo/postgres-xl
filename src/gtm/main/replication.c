@@ -51,6 +51,11 @@ ProcessBeginReplicationInitialSyncRequest(Port *myport, StringInfo message)
 	oldContext = MemoryContextSwitchTo(TopMemoryContext);
 
 	/* Acquire global locks to copy resource data to the standby. */
+
+	/*
+	 * XXX Weird locking semantics.. the locks are released in
+	 * ProcessEndReplicationInitialSyncRequest()
+	 */
 	GTM_RWLockAcquire(&GTMTransactions.gt_XidGenLock, GTM_LOCKMODE_WRITE);
 	GTM_RWLockAcquire(&GTMTransactions.gt_TransArrayLock, GTM_LOCKMODE_WRITE);
 	elog(LOG, "Prepared for copying data with holding XidGenLock and TransArrayLock.");

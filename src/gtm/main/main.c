@@ -165,7 +165,6 @@ MainThreadInit()
 
 	thrinfo->is_main_thread = true;
 	GTM_RWLockInit(&thrinfo->thr_lock);
-	GTM_RWLockAcquire(&thrinfo->thr_lock, GTM_LOCKMODE_WRITE);
 
 	if (SetMyThreadInfo(thrinfo))
 	{
@@ -174,6 +173,9 @@ MainThreadInit()
 		fflush(stderr);
 		exit(1);
 	}
+
+	/* Must be done after thread-info is set */
+	GTM_RWLockAcquire(&thrinfo->thr_lock, GTM_LOCKMODE_WRITE);
 
 	TopMostThreadID = pthread_self();
 
@@ -1051,13 +1053,16 @@ initMasks(fd_set *rmask)
 void *
 GTM_ThreadMain(void *argp)
 {
-	GTM_ThreadInfo *thrinfo = (GTM_ThreadInfo *)argp;
-	int qtype;
-	StringInfoData input_message;
-	sigjmp_buf  local_sigjmp_buf;
+	GTM_ThreadInfo		*thrinfo = (GTM_ThreadInfo *)argp;
+	int 				qtype;
+	StringInfoData 		input_message;
+	sigjmp_buf  		local_sigjmp_buf;
+	char				startup_type;
+	GTM_StartupPacket	sp;
+	StringInfoData		inBuf;
+	StringInfoData		buf;
 
 	elog(DEBUG3, "Starting the connection helper thread");
-
 
 	/*
 	 * Create the memory context we will use in the main loop.
@@ -1080,75 +1085,69 @@ GTM_ThreadMain(void *argp)
 	 */
 	GTM_RWLockAcquire(&thrinfo->thr_lock, GTM_LOCKMODE_WRITE);
 
+	/*
+	 * We expect a startup message at the very start. The message type is
+	 * REGISTER_COORD, followed by the 4 byte Coordinator ID
+	 */
+
+	startup_type = pq_getbyte(thrinfo->thr_conn->con_port);
+
+	if (startup_type != 'A')
 	{
-		/*
-		 * We expect a startup message at the very start. The message type is
-		 * REGISTER_COORD, followed by the 4 byte Coordinator ID
-		 */
-		char startup_type;
-		GTM_StartupPacket sp;
-		StringInfoData inBuf;
-
-		startup_type = pq_getbyte(thrinfo->thr_conn->con_port);
-
-		if (startup_type != 'A')
-			ereport(ERROR,
-					(EPROTO,
-					 errmsg("Expecting a startup message, but received %c",
-						 startup_type)));
-
-		initStringInfo(&inBuf);
-
-		/*
-		 * All frontend messages have a length word next
-		 * after the type code; we can read the message contents independently of
-		 * the type.
-		 */
-		if (pq_getmessage(thrinfo->thr_conn->con_port, &inBuf, 0))
-			ereport(ERROR,
-					(EPROTO,
-					 errmsg("Expecting coordinator ID, but received EOF")));
-
-		memcpy(&sp,
-			   pq_getmsgbytes(&inBuf, sizeof (GTM_StartupPacket)),
-			   sizeof (GTM_StartupPacket));
-		pq_getmsgend(&inBuf);
-
-		GTM_RegisterPGXCNode(thrinfo->thr_conn->con_port, sp.sp_node_name);
-
-		thrinfo->thr_conn->con_port->remote_type = sp.sp_remotetype;
-		thrinfo->thr_conn->con_port->is_postmaster = sp.sp_ispostmaster;
-
-		/*
-		 * If the client has resent the identifier assigned to it previously
-		 * (by GTM master), use that identifier. 
-		 * 
-		 * We only accept identifiers which are lesser or equal to the last
-		 * identifier we had seen when we were promoted. All other identifiers
-		 * will be overwritten by what we have assigned
-		 */
-		if ((sp.sp_client_id != 0) &&
-			(sp.sp_client_id <= GTMThreads->gt_starting_client_id))
-		{
-			thrinfo->thr_client_id = sp.sp_client_id;
-		}
+		ereport(ERROR,
+				(EPROTO,
+				 errmsg("Expecting a startup message, but received %c",
+					 startup_type)));
 	}
 
-	{
-		/*
-		 * Send a dummy authentication request message 'R' as the client
-		 * expects that in the current protocol. Also send the client
-		 * identifier issued by us (or sent by the client in the startup packet
-		 * if we concluded to use the same)
-		 */
-		StringInfoData buf;
-		pq_beginmessage(&buf, 'R');
-		pq_sendint(&buf, thrinfo->thr_client_id, 4);
-		pq_endmessage(thrinfo->thr_conn->con_port, &buf);
-		pq_flush(thrinfo->thr_conn->con_port);
+	initStringInfo(&inBuf);
 
-		elog(DEBUG3, "Sent connection authentication message to the client");
+	/*
+	 * All frontend messages have a length word next
+	 * after the type code; we can read the message contents independently of
+	 * the type.
+	 */
+	if (pq_getmessage(thrinfo->thr_conn->con_port, &inBuf, 0))
+		ereport(ERROR,
+				(EPROTO,
+				 errmsg("Expecting coordinator ID, but received EOF")));
+
+	memcpy(&sp,
+		   pq_getmsgbytes(&inBuf, sizeof (GTM_StartupPacket)),
+		   sizeof (GTM_StartupPacket));
+	pq_getmsgend(&inBuf);
+
+	GTM_RegisterPGXCNode(thrinfo->thr_conn->con_port, sp.sp_node_name);
+
+	thrinfo->thr_conn->con_port->remote_type = sp.sp_remotetype;
+	thrinfo->thr_conn->con_port->is_postmaster = sp.sp_ispostmaster;
+
+	/*
+	 * If the client has resent the identifier assigned to it previously
+	 * (by GTM master), use that identifier.
+	 *
+	 * We only accept identifiers which are lesser or equal to the last
+	 * identifier we had seen when we were promoted. All other identifiers
+	 * will be overwritten by what we have assigned.
+	 */
+	if ((sp.sp_client_id != 0) &&
+		(sp.sp_client_id <= GTMThreads->gt_starting_client_id))
+	{
+		thrinfo->thr_client_id = sp.sp_client_id;
 	}
+
+	/*
+	 * Send a dummy authentication request message 'R' as the client
+	 * expects that in the current protocol. Also send the client
+	 * identifier issued by us (or sent by the client in the startup packet
+	 * if we concluded to use the same)
+	 */
+	pq_beginmessage(&buf, 'R');
+	pq_sendint(&buf, thrinfo->thr_client_id, 4);
+	pq_endmessage(thrinfo->thr_conn->con_port, &buf);
+	pq_flush(thrinfo->thr_conn->con_port);
+
+	elog(DEBUG3, "Sent connection authentication message to the client");
 
 	/*
 	 * Get the input_message in the TopMemoryContext so that we don't need to
@@ -1175,13 +1174,12 @@ GTM_ThreadMain(void *argp)
 
 	if (sigsetjmp(local_sigjmp_buf, 1) != 0)
 	{
-		/*
-		 * NOTE: if you are tempted to add more code in this if-block,
-		 * consider the high probability that it should be in
-		 * AbortTransaction() instead.	The only stuff done directly here
-		 * should be stuff that is guaranteed to apply *only* for outer-level
-		 * error recovery, such as adjusting the FE/BE protocol status.
-		 */
+		/* Release all mutex and rwlocks */
+		GTM_MutexLockReleaseAll();
+		GTM_RWLockReleaseAll();
+
+		/* We're expected to hold this lock */
+		GTM_RWLockAcquire(&thrinfo->thr_lock, GTM_LOCKMODE_WRITE);
 
 		/* Report the error to the client and/or server log */
 		if (thrinfo->thr_conn)

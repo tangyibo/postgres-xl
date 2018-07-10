@@ -25,8 +25,13 @@ static void GTM_ThreadCleanup(void *argp);
 GTM_Threads	GTMThreadsData;
 GTM_Threads *GTMThreads = &GTMThreadsData;
 
-#define GTM_MIN_THREADS 32			/* Provision for minimum threads */
-#define GTM_MAX_THREADS 1024		/* Max threads allowed in the GTM */
+/*
+ * Max threads allowed in the GTM. If you change this, consider changing
+ * GTM_MAX_SIMUL_RWLOCKS too.
+ */
+#define GTM_MAX_THREADS 1024
+/* Provision for minimum threads */
+#define GTM_MIN_THREADS 32
 #define GTMThreadsFull	(GTMThreads->gt_thread_count == GTMThreads->gt_array_size)
 
 /*
@@ -173,7 +178,7 @@ GTM_ThreadRemove(GTM_ThreadInfo *thrinfo)
 	GTMThreads->gt_thread_count--;
 	GTM_RWLockRelease(&GTMThreads->gt_lock);
 
-	pfree(thrinfo);
+	free(thrinfo);
 
 	return 0;
 }
@@ -195,11 +200,18 @@ GTM_ThreadCreate(GTM_ConnectionInfo *conninfo,
 	int err;
 
 	/*
-	 * We are still running in the context of the main thread. So the
-	 * allocation below would last as long as the main thread exists or the
-	 * memory is explicitely freed.
+	 * Allocate outside the memory context.
+	 *
+	 * We also track locks held by various threads in their thread-specific
+	 * info. One such lock is also used by the memory manager and it gets
+	 * acquired/released when the thrinfo is freed. We don't want the lock
+	 * information to be lost during that process.
+	 *
+	 * The thread-cleanup routine should ensure that this allocation is freed,
+	 * avoiding any memory leak.
 	 */
-	thrinfo = (GTM_ThreadInfo *)palloc0(sizeof (GTM_ThreadInfo));
+	thrinfo = (GTM_ThreadInfo *)malloc(sizeof (GTM_ThreadInfo));
+	memset(thrinfo, 0, sizeof (GTM_ThreadInfo));
 
 	thrinfo->thr_conn = conninfo;
 	GTM_RWLockInit(&thrinfo->thr_lock);
@@ -217,7 +229,7 @@ GTM_ThreadCreate(GTM_ConnectionInfo *conninfo,
 	if (GTM_ThreadAdd(thrinfo) == -1)
 	{
 		GTM_RWLockDestroy(&thrinfo->thr_lock);
-		pfree(thrinfo);
+		free(thrinfo);
 		return NULL;
 	}
 
@@ -318,6 +330,10 @@ GTM_ThreadCleanup(void *argp)
 				GTM_RWLockRelease(&GTMThreads->gt_threads[ii]->thr_lock);
 		}
 	}
+
+	/* Release any currently held mutex and rwlocks */
+	GTM_MutexLockReleaseAll();
+	GTM_RWLockReleaseAll();
 
 	/*
 	 * Close a connection to GTM standby.

@@ -17,6 +17,7 @@
 #include "postgres.h"
 
 #include "access/printtup.h"
+#include "catalog/namespace.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "tcop/pquery.h"

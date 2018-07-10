@@ -15,6 +15,16 @@
 #ifndef _GTM_COMMON_H
 #define _GTM_COMMON_H
 
+/*
+ * We expect a very small number of concurrent locks, except for some cases
+ * where a thread may try to acquire thr_lock of all other threads. So keep the
+ * value relatively high.
+ *
+ * If you change GTM_MAX_THREADS, consider changing this too.
+ */
+#define GTM_MAX_SIMUL_RWLOCKS	(1024 + 32)
+#define GTM_MAX_SIMUL_MUTEX		(32)
+
 #define GTM_COMMON_THREAD_INFO \
 	GTM_ThreadID			thr_id; \
 	uint32					thr_localid; \
@@ -29,7 +39,11 @@
 	ErrorData		thr_error_data[ERRORDATA_STACK_SIZE]; \
 	int				thr_error_stack_depth; \
 	int				thr_error_recursion_depth; \
-	int				thr_criticalsec_count;
+	int				thr_criticalsec_count;	\
+	int				thr_num_rwlocks_held;	\
+	GTM_RWLock		*thr_rwlocks_held[GTM_MAX_SIMUL_RWLOCKS];	\
+	int				thr_num_mutexlocks_held;	\
+	GTM_MutexLock	*thr_mutexlocks_held[GTM_MAX_SIMUL_MUTEX];
 
 
 #endif

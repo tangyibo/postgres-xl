@@ -1152,6 +1152,10 @@ GTMProxy_ThreadMain(void *argp)
 
 	if (sigsetjmp(local_sigjmp_buf, 1) != 0)
 	{
+		/* Release all mutex and rwlocks */
+		GTM_MutexLockReleaseAll();
+		GTM_RWLockReleaseAll();
+
 		/*
 		 * NOTE: if you are tempted to add more code in this if-block,
 		 * consider the high probability that it should be in
@@ -1235,6 +1239,9 @@ GTMProxy_ThreadMain(void *argp)
 		 */
 		if (!first_turn)
 		{
+			GTMProxy_ConnectionInfo	*auth_required[GTM_PROXY_MAX_CONNECTIONS];
+			int						auth_required_count = 0;
+
 			/*
 			 * Check if there are any changes to the connection array assigned to
 			 * this thread. If so, we need to rebuild the fd array.
@@ -1258,6 +1265,16 @@ GTMProxy_ThreadMain(void *argp)
 					}
 					else
 					{
+						/* Release all mutex and rwlocks */
+						GTM_MutexLockReleaseAll();
+						GTM_RWLockReleaseAll();
+
+						/*
+						 * and re-acquire the only mutex lock we are supposed
+						 * to hold after the long jump.
+						 */
+						GTM_MutexLockAcquire(&thrinfo->thr_lock);
+
 						/* SIGUSR2 here */
 						workerThreadReconnectToGTM();
 					}
@@ -1288,7 +1305,9 @@ GTMProxy_ThreadMain(void *argp)
 					 * If this is a newly added connection, complete the handshake
 					 */
 					if (!conninfo->con_authenticated)
-						GTMProxy_HandshakeConnection(conninfo);
+					{
+						auth_required[auth_required_count++] = conninfo;
+					}
 
 					thrinfo->thr_poll_fds[ii].fd = conninfo->con_port->sock;
 					thrinfo->thr_poll_fds[ii].events = POLLIN;
@@ -1296,6 +1315,16 @@ GTMProxy_ThreadMain(void *argp)
 				}
 			}
 			GTM_MutexLockRelease(&thrinfo->thr_lock);
+
+			for (ii = 0; ii < auth_required_count; ii++)
+			{
+				/*
+				 * Complete handshake with the remote node. In case we
+				 * don't get the expected handshake message, the
+				 * connection is dropped.
+				 */
+				GTMProxy_HandshakeConnection(auth_required[ii]);
+			}
 
 			while (true)
 			{
@@ -2298,10 +2327,15 @@ GTMProxy_HandshakeConnection(GTMProxy_ConnectionInfo *conninfo)
 	startup_type = pq_getbyte(conninfo->con_port);
 
 	if (startup_type != 'A')
+	{
+		conninfo->con_disconnected = true;
+		if (conninfo->con_port->sock > 0)
+			StreamClose(conninfo->con_port->sock);
 		ereport(ERROR,
 				(EPROTO,
 				 errmsg("Expecting a startup message, but received %c",
 					 startup_type)));
+	}
 
 	initStringInfo(&inBuf);
 
@@ -2311,9 +2345,14 @@ GTMProxy_HandshakeConnection(GTMProxy_ConnectionInfo *conninfo)
 	 * the type.
 	 */
 	if (pq_getmessage(conninfo->con_port, &inBuf, 0))
+	{
+		conninfo->con_disconnected = true;
+		if (conninfo->con_port->sock > 0)
+			StreamClose(conninfo->con_port->sock);
 		ereport(ERROR,
 				(EPROTO,
 				 errmsg("Expecting PGXC Node ID, but received EOF")));
+	}
 
 	memcpy(&sp,
 		   pq_getmsgbytes(&inBuf, sizeof (GTM_StartupPacket)),

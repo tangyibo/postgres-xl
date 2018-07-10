@@ -207,6 +207,10 @@ extern GTM_ThreadID						TopMostThreadID;
 #define recursion_depth			(GetMyThreadInfo->thr_error_recursion_depth)
 #define errordata_stack_depth	(GetMyThreadInfo->thr_error_stack_depth)
 #define CritSectionCount		(GetMyThreadInfo->thr_criticalsec_count)
+#define NumRWLocksHeld			(GetMyThreadInfo->thr_num_rwlocks_held)
+#define RWLocksHeld				(GetMyThreadInfo->thr_rwlocks_held)
+#define NumMutexLocksHeld		(GetMyThreadInfo->thr_num_mutexlocks_held)
+#define MutexLocksHeld			(GetMyThreadInfo->thr_mutexlocks_held)
 
 #define PG_exception_stack		(GetMyThreadInfo->thr_sigjmp_buf)
 #define MyConnection			(GetMyThreadInfo->thr_conn)

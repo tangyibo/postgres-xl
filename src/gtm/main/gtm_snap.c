@@ -298,7 +298,10 @@ GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[], int txn_count, int *s
 		if (GTM_IsTransSerializable(mygtm_txninfo))
 		{
 			if ((mygtm_txninfo->gti_snapshot_set) && (txn_count > 1))
+			{
+				GTM_RWLockRelease(&GTMTransactions.gt_TransArrayLock);
 				elog(ERROR, "Grouped snapshot can only include first snapshot in Serializable transaction");
+			}
 
 			if (!mygtm_txninfo->gti_snapshot_set)
 			{
@@ -337,7 +340,10 @@ GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[], int txn_count, int *s
 				mysnap->sn_xip = (GlobalTransactionId *)
 					palloc(GTM_MAX_GLOBAL_TRANSACTIONS * sizeof(GlobalTransactionId));
 				if (mysnap->sn_xip == NULL)
+				{
+					GTM_RWLockRelease(&GTMTransactions.gt_TransArrayLock);
 					ereport(ERROR, (ENOMEM, errmsg("out of memory")));
+				}
 			}
 			mysnap->sn_xmin = snapshot->sn_xmin;
 			mysnap->sn_xmax = snapshot->sn_xmax;

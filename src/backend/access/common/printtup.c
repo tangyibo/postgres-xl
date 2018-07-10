@@ -217,8 +217,16 @@ SendRowDescriptionMessage(TupleDesc typeinfo, List *targetlist, int16 *formats)
 		 */
 		if (IsConnFromCoord())
 		{
-			char	   *typename;
+			char	   *typename, *typeschema_name;
+			Oid			typeschema_oid;
+
 			typename = get_typename(atttypid);
+			typeschema_oid = get_typ_namespace(atttypid);
+			typeschema_name = isTempNamespace(typeschema_oid) ?
+								"pg_temp" :
+								get_namespace_name(typeschema_oid);
+
+			pq_sendstring(&buf, typeschema_name);
 			pq_sendstring(&buf, typename);
 		}
 #endif

@@ -1,0 +1,164 @@
+-- try a special column name 
+create table xltest_type ("primary" integer, b integer);
+insert into xltest_type values(1, 11);
+insert into xltest_type values(2, 12);
+insert into xltest_type values(3, 13);
+select count(*) from xltest_type;
+ count 
+-------
+     3
+(1 row)
+
+set enable_fast_query_shipping to false;
+select count(*) from xltest_type;
+ count 
+-------
+     3
+(1 row)
+
+select * from xltest_type order by "primary";
+ primary | b  
+---------+----
+       1 | 11
+       2 | 12
+       3 | 13
+(3 rows)
+
+drop table xltest_type;
+-- repeat with a temp table
+set enable_fast_query_shipping to default;
+create temp table xltest_type ("primary" integer, b integer);
+insert into xltest_type values(1, 11);
+insert into xltest_type values(2, 12);
+insert into xltest_type values(3, 13);
+select count(*) from xltest_type;
+ count 
+-------
+     3
+(1 row)
+
+set enable_fast_query_shipping to false;
+select count(*) from xltest_type;
+ count 
+-------
+     3
+(1 row)
+
+select * from xltest_type order by "primary";
+ primary | b  
+---------+----
+       1 | 11
+       2 | 12
+       3 | 13
+(3 rows)
+
+drop table xltest_type;
+-- try a special table name
+set enable_fast_query_shipping to default;
+create table "XLTEST_type" ("primary" integer, b integer);
+-- fail
+insert into xltest_type values(1, 11);
+ERROR:  relation "xltest_type" does not exist
+LINE 1: insert into xltest_type values(1, 11);
+                    ^
+-- fail
+insert into XLTEST_type values(1, 11);
+ERROR:  relation "xltest_type" does not exist
+LINE 1: insert into XLTEST_type values(1, 11);
+                    ^
+-- ok
+insert into "XLTEST_type" values(1, 11);
+insert into "XLTEST_type" values(2, 12);
+insert into "XLTEST_type" values(3, 13);
+-- fail
+select count(*) from XLTEST_type;
+ERROR:  relation "xltest_type" does not exist
+LINE 1: select count(*) from XLTEST_type;
+                             ^
+-- ok
+select count(*) from "XLTEST_type";
+ count 
+-------
+     3
+(1 row)
+
+select array_agg(c.*) from "XLTEST_type" c where c.primary = 1;
+ array_agg  
+------------
+ {"(1,11)"}
+(1 row)
+
+set enable_fast_query_shipping to false;
+-- fail
+select count(*) from XLTEST_type;
+ERROR:  relation "xltest_type" does not exist
+LINE 1: select count(*) from XLTEST_type;
+                             ^
+-- ok
+select count(*) from "XLTEST_type";
+ count 
+-------
+     3
+(1 row)
+
+select array_agg(c.*) from "XLTEST_type" c where c.primary = 1;
+ array_agg  
+------------
+ {"(1,11)"}
+(1 row)
+
+-- fail
+drop table xltest_type;
+ERROR:  table "xltest_type" does not exist
+-- fail
+drop table XLTEST_type;
+ERROR:  table "xltest_type" does not exist
+-- fail
+drop table "XLTEST_TYPE";
+ERROR:  table "XLTEST_TYPE" does not exist
+-- ok
+drop table "XLTEST_type";
+-- try schema qualification for simple schema name
+set enable_fast_query_shipping to default;
+create schema xltypeschema;
+create table xltypeschema."XLTEST_type" ("primary" integer, b integer);
+insert into xltypeschema."XLTEST_type" values(1, 11);
+insert into xltypeschema."XLTEST_type" values(2, 12);
+insert into xltypeschema."XLTEST_type" values(3, 13);
+select array_agg(c.*) from "XLTEST_type" c where c.primary = 1;
+ERROR:  relation "XLTEST_type" does not exist
+LINE 1: select array_agg(c.*) from "XLTEST_type" c where c.primary =...
+                                   ^
+select array_agg(c.*) from xltypeschema."XLTEST_type" c where c.primary = 1;
+ array_agg  
+------------
+ {"(1,11)"}
+(1 row)
+
+drop table xltypeschema."XLTEST_type";
+-- try schema qualification for special schema name
+create schema "XL.Schema";
+create table "XL.Schema"."XLTEST_type" ("primary" integer, b integer);
+insert into "XL.Schema"."XLTEST_type" values(1, 11);
+insert into "XL.Schema"."XLTEST_type" values(2, 12);
+insert into "XL.Schema"."XLTEST_type" values(3, 13);
+select array_agg(c.*) from "XL.Schema"."XLTEST_type" c where c.primary = 1;
+ array_agg  
+------------
+ {"(1,11)"}
+(1 row)
+
+-- without schema, fail
+select array_agg(c.*) from "XLTEST_type" c;
+ERROR:  relation "XLTEST_type" does not exist
+LINE 1: select array_agg(c.*) from "XLTEST_type" c;
+                                   ^
+set search_path = "XL.Schema";
+-- should work
+select array_agg(c.*) from "XLTEST_type" c where c.primary = 1;
+ array_agg  
+------------
+ {"(1,11)"}
+(1 row)
+
+drop table "XL.Schema"."XLTEST_type";

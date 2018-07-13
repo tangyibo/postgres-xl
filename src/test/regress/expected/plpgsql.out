@@ -5916,9 +5916,6 @@ ERROR:  Postgres-XL does not support TRIGGER yet
 DETAIL:  The feature is not currently supported
 DELETE FROM transition_table_level2
   WHERE level2_no BETWEEN 301 AND 305;
-ERROR:  relation "dx" cannot be the target of a modifying statement
-CONTEXT:  SQL statement "INSERT INTO dx VALUES (1000000, 1000000, 'x')"
-PL/pgSQL function transition_table_level2_bad_usage_func() line 3 at SQL statement
 DROP TRIGGER transition_table_level2_bad_usage_trigger
   ON transition_table_level2;
 ERROR:  trigger "transition_table_level2_bad_usage_trigger" for table "transition_table_level2" does not exist

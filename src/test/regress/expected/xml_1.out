@@ -611,6 +611,8 @@ EXCEPTION
     RAISE LOG 'skip: %', SQLERRM;
 END
 $$;
+ERROR:  Internal subtransactions not supported in Postgres-XL
+CONTEXT:  PL/pgSQL function inline_code_block line 6 during statement block entry
 -- Test xmlexists and xpath_exists
 SELECT xmlexists('//town[text() = ''Toronto'']' PASSING BY REF '<towns><town>Bidford-on-Avon</town><town>Cwmbran</town><town>Bristol</town></towns>');
 ERROR:  unsupported XML feature

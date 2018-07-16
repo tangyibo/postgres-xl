@@ -58,6 +58,7 @@ test: create_function_1
 test: create_type
 test: create_table
 test: create_function_2
+test: xc_create_function
 test: copy
 test: copyselect
 test: copydml
@@ -179,7 +180,6 @@ test: with
 test: xml
 test: event_trigger
 test: stats
-test: xc_create_function
 test: xc_groupby
 test: xc_distkey
 test: xc_having

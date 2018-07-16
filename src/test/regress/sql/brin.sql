@@ -447,11 +447,41 @@ END;
 $$;
 
 -- summarize one range
-SELECT brin_summarize_range('brin_summarize_idx', 0);
+DO $D$
+DECLARE
+	str varchar;
+	node_name varchar;
+	result integer;
+BEGIN
+    node_name = get_xc_node_name(1);
+	str = 'execute direct on (' || node_name || ') $$ ' || 'SELECT brin_summarize_range(''brin_summarize_idx'', 0)' || ' $$'  ;
+	execute str into result;
+	raise notice '%', result;
+END $D$ language plpgsql;
 -- nothing: already summarized
-SELECT brin_summarize_range('brin_summarize_idx', 1);
+DO $D$
+DECLARE
+	str varchar;
+	node_name varchar;
+	result integer;
+BEGIN
+    node_name = get_xc_node_name(1);
+	str = 'execute direct on (' || node_name || ') $$ ' || 'SELECT brin_summarize_range(''brin_summarize_idx'', 1)' || ' $$'  ;
+	execute str into result;
+	raise notice '%', result;
+END $D$ language plpgsql;
 -- summarize one range
-SELECT brin_summarize_range('brin_summarize_idx', 2);
+DO $D$
+DECLARE
+	str varchar;
+	node_name varchar;
+	result integer;
+BEGIN
+    node_name = get_xc_node_name(1);
+	str = 'execute direct on (' || node_name || ') $$ ' || 'SELECT brin_summarize_range(''brin_summarize_idx'', 2)' || ' $$'  ;
+	execute str into result;
+	raise notice '%', result;
+END $D$ language plpgsql;
 -- nothing: page doesn't exist in table
 SELECT brin_summarize_range('brin_summarize_idx', 4294967295);
 -- invalid block number values

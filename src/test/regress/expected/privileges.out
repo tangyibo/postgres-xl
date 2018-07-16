@@ -693,12 +693,10 @@ SELECT testfunc1(5); -- fail
 ERROR:  permission denied for function testfunc1
 SELECT col1 FROM atest2 WHERE col2 = true; -- fail
 ERROR:  permission denied for relation atest2
+-- fails also in XL 9.5
 SELECT testfunc4(true); -- ok
- testfunc4 
------------
- bar
-(1 row)
-
+ERROR:  permission denied for relation atest2
+CONTEXT:  SQL function "testfunc4" statement 1
 SET SESSION AUTHORIZATION regress_user4;
 SELECT testfunc1(5); -- ok
  testfunc1 
@@ -1166,13 +1164,11 @@ ERROR:  must have admin option on role "regress_group2"
 SET SESSION AUTHORIZATION regress_user1;
 GRANT regress_group2 TO regress_user5; -- fails: no ADMIN OPTION
 ERROR:  must have admin option on role "regress_group2"
+-- fails also in XL 9.5
 SELECT dogrant_ok();			-- ok: SECURITY DEFINER conveys ADMIN
 NOTICE:  role "regress_user5" is already a member of role "regress_group2"
- dogrant_ok 
-------------
- 
-(1 row)
-
+ERROR:  must have admin option on role "regress_group2"
+CONTEXT:  SQL function "dogrant_ok" statement 1
 SET ROLE regress_group2;
 GRANT regress_group2 TO regress_user5; -- fails: SET ROLE did not help
 ERROR:  must have admin option on role "regress_group2"

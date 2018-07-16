@@ -463,6 +463,8 @@ CREATE FUNCTION testfunc3(int) RETURNS int AS 'select 2 * $1;' LANGUAGE sql; -- 
 SET SESSION AUTHORIZATION regress_user3;
 SELECT testfunc1(5); -- fail
 SELECT col1 FROM atest2 WHERE col2 = true; -- fail
+
+-- fails also in XL 9.5
 SELECT testfunc4(true); -- ok
 
 SET SESSION AUTHORIZATION regress_user4;
@@ -739,6 +741,8 @@ GRANT regress_group2 TO regress_user5; -- fails: SET ROLE suspended privilege
 
 SET SESSION AUTHORIZATION regress_user1;
 GRANT regress_group2 TO regress_user5; -- fails: no ADMIN OPTION
+
+-- fails also in XL 9.5
 SELECT dogrant_ok();			-- ok: SECURITY DEFINER conveys ADMIN
 SET ROLE regress_group2;
 GRANT regress_group2 TO regress_user5; -- fails: SET ROLE did not help

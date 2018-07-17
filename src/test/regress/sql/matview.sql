@@ -59,7 +59,7 @@ INSERT INTO mvtest_t VALUES (6, 'z', 13);
 -- confirm pre- and post-refresh contents of fairly simple materialized views
 SELECT * FROM mvtest_tm ORDER BY type;
 SELECT * FROM mvtest_tvm ORDER BY type;
-REFRESH MATERIALIZED VIEW mvtest_tm;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_tm;
 REFRESH MATERIALIZED VIEW mvtest_tvm;
 SELECT * FROM mvtest_tm ORDER BY type;
 SELECT * FROM mvtest_tvm ORDER BY type;
@@ -140,7 +140,7 @@ CREATE UNIQUE INDEX on mvtest_mv (c);
 INSERT INTO mvtest_foo VALUES(2, 3, 4);
 INSERT INTO mvtest_foo VALUES(3, 4, 5);
 REFRESH MATERIALIZED VIEW mvtest_mv;
-REFRESH MATERIALIZED VIEW mvtest_mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv;
 DROP TABLE mvtest_foo CASCADE;
 
 -- allow subquery to reference unpopulated matview if WITH NO DATA is specified
@@ -158,7 +158,7 @@ INSERT INTO mvtest_boxes (b) VALUES
 CREATE MATERIALIZED VIEW mvtest_boxmv AS SELECT * FROM mvtest_boxes;
 CREATE UNIQUE INDEX mvtest_boxmv_id ON mvtest_boxmv (id);
 UPDATE mvtest_boxes SET b = '(2,2),(1,1)' WHERE id = 2;
-REFRESH MATERIALIZED VIEW mvtest_boxmv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_boxmv;
 SELECT * FROM mvtest_boxmv ORDER BY id;
 DROP TABLE mvtest_boxes CASCADE;
 
@@ -175,7 +175,7 @@ INSERT INTO mvtest_v values (1, 2);
 CREATE UNIQUE INDEX mvtest_mv_v_ii ON mvtest_mv_v (ii);
 REFRESH MATERIALIZED VIEW mvtest_mv_v;
 UPDATE mvtest_v SET j = 3 WHERE x = 1;
-REFRESH MATERIALIZED VIEW mvtest_mv_v;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv_v;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_2;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_3;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_4;
@@ -219,7 +219,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS mvtest_mv_foo AS SELECT * FROM mvtest_foo
 CREATE UNIQUE INDEX ON mvtest_mv_foo (i);
 RESET ROLE;
 REFRESH MATERIALIZED VIEW mvtest_mv_foo;
-REFRESH MATERIALIZED VIEW mvtest_mv_foo;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv_foo;
 DROP OWNED BY regress_user_mvtest CASCADE;
 DROP ROLE regress_user_mvtest;
 

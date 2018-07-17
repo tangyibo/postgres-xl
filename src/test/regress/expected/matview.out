@@ -192,7 +192,7 @@ SELECT * FROM mvtest_tvm ORDER BY type;
  z    |     11
 (3 rows)
 
-REFRESH MATERIALIZED VIEW mvtest_tm;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_tm;
 REFRESH MATERIALIZED VIEW mvtest_tvm;
 SELECT * FROM mvtest_tm ORDER BY type;
  type | totamt 

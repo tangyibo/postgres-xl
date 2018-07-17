@@ -411,7 +411,7 @@ CREATE UNIQUE INDEX on mvtest_mv (c);
 INSERT INTO mvtest_foo VALUES(2, 3, 4);
 INSERT INTO mvtest_foo VALUES(3, 4, 5);
 REFRESH MATERIALIZED VIEW mvtest_mv;
-REFRESH MATERIALIZED VIEW mvtest_mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv;
 DROP TABLE mvtest_foo CASCADE;
 NOTICE:  drop cascades to materialized view mvtest_mv
 -- allow subquery to reference unpopulated matview if WITH NO DATA is specified
@@ -429,7 +429,7 @@ INSERT INTO mvtest_boxes (b) VALUES
 CREATE MATERIALIZED VIEW mvtest_boxmv AS SELECT * FROM mvtest_boxes;
 CREATE UNIQUE INDEX mvtest_boxmv_id ON mvtest_boxmv (id);
 UPDATE mvtest_boxes SET b = '(2,2),(1,1)' WHERE id = 2;
-REFRESH MATERIALIZED VIEW mvtest_boxmv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_boxmv;
 SELECT * FROM mvtest_boxmv ORDER BY id;
  id |              b              
 ----+-----------------------------
@@ -455,7 +455,7 @@ INSERT INTO mvtest_v values (1, 2);
 CREATE UNIQUE INDEX mvtest_mv_v_ii ON mvtest_mv_v (ii);
 REFRESH MATERIALIZED VIEW mvtest_mv_v;
 UPDATE mvtest_v SET j = 3 WHERE x = 1;
-REFRESH MATERIALIZED VIEW mvtest_mv_v;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv_v;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_2;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_3;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_4;
@@ -575,7 +575,7 @@ NOTICE:  relation "mvtest_mv_foo" already exists, skipping
 CREATE UNIQUE INDEX ON mvtest_mv_foo (i);
 RESET ROLE;
 REFRESH MATERIALIZED VIEW mvtest_mv_foo;
-REFRESH MATERIALIZED VIEW mvtest_mv_foo;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv_foo;
 DROP OWNED BY regress_user_mvtest CASCADE;
 DROP ROLE regress_user_mvtest;
 -- make sure that create WITH NO DATA works via SPI

@@ -59,6 +59,7 @@ INSERT INTO t VALUES (6, 'z', 13);
 -- confirm pre- and post-refresh contents of fairly simple materialized views
 SELECT * FROM tm ORDER BY type;
 SELECT * FROM tvm ORDER BY type;
+REFRESH MATERIALIZED VIEW CONCURRENTLY tm;
 REFRESH MATERIALIZED VIEW tvm;
 SELECT * FROM tm ORDER BY type;
 SELECT * FROM tvm ORDER BY type;
@@ -127,6 +128,7 @@ CREATE MATERIALIZED VIEW mv AS SELECT * FROM foo;
 CREATE UNIQUE INDEX ON mv(a);
 INSERT INTO foo SELECT * FROM foo;
 REFRESH MATERIALIZED VIEW mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv;
 DROP TABLE foo CASCADE;
 
 -- make sure that all columns covered by unique indexes works
@@ -138,6 +140,7 @@ CREATE UNIQUE INDEX on mv (c);
 INSERT INTO foo VALUES(2, 3, 4);
 INSERT INTO foo VALUES(3, 4, 5);
 REFRESH MATERIALIZED VIEW mv;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv;
 DROP TABLE foo CASCADE;
 
 -- allow subquery to reference unpopulated matview if WITH NO DATA is specified
@@ -155,10 +158,11 @@ INSERT INTO boxes (b) VALUES
 CREATE MATERIALIZED VIEW boxmv AS SELECT * FROM boxes;
 CREATE UNIQUE INDEX boxmv_id ON boxmv (id);
 UPDATE boxes SET b = '(2,2),(1,1)' WHERE id = 2;
+REFRESH MATERIALIZED VIEW CONCURRENTLY boxmv;
 SELECT * FROM boxmv ORDER BY id;
 DROP TABLE boxes CASCADE;
 
-
+-- make sure that column names are handled correctly
 CREATE TABLE mvtest_v (i int, j int);
 CREATE MATERIALIZED VIEW mvtest_mv_v (ii, jj, kk) AS SELECT i, j FROM mvtest_v; -- error
 CREATE MATERIALIZED VIEW mvtest_mv_v (ii, jj) AS SELECT i, j FROM mvtest_v; -- ok
@@ -171,7 +175,7 @@ INSERT INTO mvtest_v values (1, 2);
 CREATE UNIQUE INDEX mvtest_mv_v_ii ON mvtest_mv_v (ii);
 REFRESH MATERIALIZED VIEW mvtest_mv_v;
 UPDATE mvtest_v SET j = 3 WHERE x = 1;
--- REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv_v;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mvtest_mv_v;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_2;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_3;
 REFRESH MATERIALIZED VIEW mvtest_mv_v_4;
@@ -207,6 +211,7 @@ CREATE MATERIALIZED VIEW IF NOT EXISTS mv_foo AS SELECT * FROM foo_data;
 CREATE UNIQUE INDEX ON mv_foo (i);
 RESET ROLE;
 REFRESH MATERIALIZED VIEW mv_foo;
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv_foo;
 DROP OWNED BY user_dw CASCADE;
 DROP ROLE user_dw;
 

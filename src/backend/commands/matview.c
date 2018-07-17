@@ -557,6 +557,8 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	char	   *matviewname;
 	char	   *tempname;
 	char	   *diffname;
+	char	   *qualified_diffname;
+	char	   *tempschema;
 	TupleDesc	tupdesc;
 	bool		foundUniqueIndex;
 	List	   *indexoidlist;
@@ -569,9 +571,11 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	matviewname = quote_qualified_identifier(get_namespace_name(RelationGetNamespace(matviewRel)),
 										RelationGetRelationName(matviewRel));
 	tempRel = heap_open(tempOid, NoLock);
-	tempname = quote_qualified_identifier(get_namespace_name(RelationGetNamespace(tempRel)),
+	tempschema = get_namespace_name(RelationGetNamespace(tempRel));
+	tempname = quote_qualified_identifier(tempschema,
 										  RelationGetRelationName(tempRel));
-	diffname = make_temptable_name_n(tempname, 2);
+	diffname = make_temptable_name_n(RelationGetRelationName(tempRel), 2);
+	qualified_diffname = quote_qualified_identifier(tempschema, diffname);
 
 	relnatts = matviewRel->rd_rel->relnatts;
 	usedForQual = (bool *) palloc0(sizeof(bool) * relnatts);
@@ -661,7 +665,8 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 #endif					 
 					 "SELECT mv.ctid AS tid, newdata "
 					 "FROM %s mv FULL JOIN %s newdata ON (",
-					 diffname, matviewname, tempname);
+					 qualified_diffname,
+					 matviewname, tempname);
 
 	/*
 	 * Get the list of index OIDs for the table from the relcache, and look up
@@ -761,11 +766,25 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	 * must keep it around because its type is referenced from the diff table.
 	 */
 
+#ifndef PGXC
 	/* Analyze the diff table. */
 	resetStringInfo(&querybuf);
-	appendStringInfo(&querybuf, "ANALYZE %s", diffname);
+	appendStringInfo(&querybuf, "ANALYZE %s", qualified_diffname);
 	if (SPI_exec(querybuf.data, 0) != SPI_OK_UTILITY)
 		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
+#else
+	{
+		/*
+		 * Don't want to send down the ANALYZE on the remote nodes because the
+		 * temporary table was not created there to start with. See above.
+		 */
+		VacuumStmt *stmt = makeNode(VacuumStmt);
+		RangeVar *rv = makeRangeVar(tempschema, diffname, -1);
+		stmt->relation = rv;
+		stmt->options = VACOPT_ANALYZE;
+		ExecVacuum(stmt, true);
+	}
+#endif
 
 	OpenMatViewIncrementalMaintenance();
 
@@ -776,7 +795,8 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 					 "(SELECT diff.tid FROM %s diff "
 					 "WHERE diff.tid IS NOT NULL "
 					 "AND diff.newdata IS NULL)",
-					 matviewname, diffname);
+					 matviewname,
+					 qualified_diffname);
 	if (SPI_exec(querybuf.data, 0) != SPI_OK_DELETE)
 		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
 
@@ -785,7 +805,8 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 	appendStringInfo(&querybuf,
 					 "INSERT INTO %s SELECT (diff.newdata).* "
 					 "FROM %s diff WHERE tid IS NULL",
-					 matviewname, diffname);
+					 matviewname,
+					 qualified_diffname);
 	if (SPI_exec(querybuf.data, 0) != SPI_OK_INSERT)
 		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
 
@@ -796,7 +817,8 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 
 	/* Clean up temp tables. */
 	resetStringInfo(&querybuf);
-	appendStringInfo(&querybuf, "DROP TABLE %s, %s", diffname, tempname);
+	appendStringInfo(&querybuf, "DROP TABLE %s, %s",
+			qualified_diffname, tempname);
 	if (SPI_exec(querybuf.data, 0) != SPI_OK_UTILITY)
 		elog(ERROR, "SPI_exec failed: %s", querybuf.data);
 

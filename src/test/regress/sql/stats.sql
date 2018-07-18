@@ -79,7 +79,7 @@ $$ language plpgsql;
 
 -- test effects of TRUNCATE on n_live_tup/n_dead_tup counters
 CREATE TABLE trunc_stats_test(id serial);
-CREATE TABLE trunc_stats_test1(id serial);
+CREATE TABLE trunc_stats_test1(id serial, id2 serial);
 CREATE TABLE trunc_stats_test2(id serial);
 CREATE TABLE trunc_stats_test3(id serial);
 CREATE TABLE trunc_stats_test4(id serial);
@@ -94,28 +94,30 @@ TRUNCATE trunc_stats_test;
 INSERT INTO trunc_stats_test1 DEFAULT VALUES;
 INSERT INTO trunc_stats_test1 DEFAULT VALUES;
 INSERT INTO trunc_stats_test1 DEFAULT VALUES;
-UPDATE trunc_stats_test1 SET id = id + 10 WHERE id IN (1, 2);
-DELETE FROM trunc_stats_test1 WHERE id = 3;
+UPDATE trunc_stats_test1 SET id2 = id2 + 10 WHERE id2 IN (1, 2);
+DELETE FROM trunc_stats_test1 WHERE id2 = 3;
 
 BEGIN;
-UPDATE trunc_stats_test1 SET id = id + 100;
+UPDATE trunc_stats_test1 SET id2 = id2 + 100;
 TRUNCATE trunc_stats_test1;
 INSERT INTO trunc_stats_test1 DEFAULT VALUES;
 COMMIT;
 
 -- use a savepoint: 1 insert, 1 live
+-- XL does not support savepoints, so test without it
 BEGIN;
 INSERT INTO trunc_stats_test2 DEFAULT VALUES;
 INSERT INTO trunc_stats_test2 DEFAULT VALUES;
-SAVEPOINT p1;
+--SAVEPOINT p1;
 INSERT INTO trunc_stats_test2 DEFAULT VALUES;
 TRUNCATE trunc_stats_test2;
 INSERT INTO trunc_stats_test2 DEFAULT VALUES;
-RELEASE SAVEPOINT p1;
+--RELEASE SAVEPOINT p1;
 COMMIT;
 
 -- rollback a savepoint: this should count 4 inserts and have 2
 -- live tuples after commit (and 2 dead ones due to aborted subxact)
+-- XL does not support savepoint, so this test doesn't make much sense in XL
 BEGIN;
 INSERT INTO trunc_stats_test3 DEFAULT VALUES;
 INSERT INTO trunc_stats_test3 DEFAULT VALUES;

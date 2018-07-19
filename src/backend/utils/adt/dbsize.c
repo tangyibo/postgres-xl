@@ -1356,18 +1356,28 @@ pgxc_exec_sizefunc(Oid relOid, char *funcname, char *extra_arg)
 	char           *relname = NULL;
 	StringInfoData  buf;
 	Relation        rel;
+	bool			istemp;
 
 	rel = relation_open(relOid, AccessShareLock);
+	istemp = (rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP);
 
-	if (rel->rd_locator_info)
-	/* get relation name including any needed schema prefix and quoting */
-	relname = quote_qualified_identifier(get_namespace_name(rel->rd_rel->relnamespace),
-	                                     RelationGetRelationName(rel));
 	initStringInfo(&buf);
+	/* get relation name including any needed schema prefix and quoting */
 	if (!extra_arg)
-		appendStringInfo(&buf, "SELECT pg_catalog.%s('%s')", funcname, relname);
+		appendStringInfo(&buf, "SELECT pg_catalog.%s(c.oid) "
+				"FROM pg_class c JOIN pg_namespace nc "
+				"	ON c.oid = nc.oid ", funcname);
 	else
-		appendStringInfo(&buf, "SELECT pg_catalog.%s('%s', '%s')", funcname, relname, extra_arg);
+		appendStringInfo(&buf, "SELECT pg_catalog.%s(c.oid, '%s') "
+				"FROM pg_class c JOIN pg_namespace nc "
+				"	ON c.oid = nc.oid ", funcname, extra_arg);
+
+	if (!istemp)
+		appendStringInfo(&buf, "WHERE relname = '%s' AND nc.nspname = '%s'",
+				relname, get_namespace_name(rel->rd_rel->relnamespace));
+	else
+		appendStringInfo(&buf, "WHERE relname = '%s' AND "
+				"	nc.oid = pg_my_temp_schema()", relname);
 
 	numnodes = get_pgxc_classnodes(RelationGetRelid(rel), &nodelist);
 

@@ -15493,8 +15493,13 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 #ifdef PGXC
 		if (fout->isPostgresXL)
 		{
-			/* Add the grammar extension linked to PGXC depending on data got from pgxc_class */
-			if (tbinfo->pgxclocatortype != 'E')
+			/*
+			 * Add table distribution syntax, unless we're dealing with a
+			 * partiion table, in which case the information is derived from
+			 * the parent table.
+			 */
+			if (tbinfo->pgxclocatortype != 'E' && !tbinfo->ispartition &&
+				numParents == 0)
 			{
 				/* N: DISTRIBUTE BY ROUNDROBIN */
 				if (tbinfo->pgxclocatortype == 'N')

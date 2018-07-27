@@ -16466,18 +16466,15 @@ dumpSequenceData(Archive *fout, TableDataInfo *tdinfo)
 		 */
 		resetPQExpBuffer(query);
 		appendPQExpBufferStr(query, "SELECT pg_catalog.nextval(");
-		appendStringLiteralAH(query, fmtId(tbinfo->dobj.name), fout);
+		appendStringLiteralAH(query, fmtQualifiedDumpable(tbinfo), fout);
 		appendPQExpBuffer(query, ");\n");
 		res = ExecuteSqlQuery(fout, query->data, PGRES_TUPLES_OK);
 
 		if (PQntuples(res) != 1)
 		{
-			write_msg(NULL, ngettext("query to get nextval of sequence \"%s\" "
-									 "returned %d rows (expected 1)\n",
-										"query to get nextval of sequence \"%s\" "
-									 "returned %d rows (expected 1)\n",
-									 PQntuples(res)),
-					tbinfo->dobj.name, PQntuples(res));
+			write_msg(NULL, "query to get nextval of sequence \"%s\" "
+							"returned %d rows (expected 1)\n",
+							fmtQualifiedDumpable(tbinfo), PQntuples(res));
 			exit_nicely(1);
 		}
 

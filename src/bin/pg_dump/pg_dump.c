@@ -15498,39 +15498,42 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 			 * partiion table, in which case the information is derived from
 			 * the parent table.
 			 */
-			if (tbinfo->pgxclocatortype != 'E' && !tbinfo->ispartition &&
-				numParents == 0)
+			if (!tbinfo->ispartition && numParents == 0)
 			{
-				/* N: DISTRIBUTE BY ROUNDROBIN */
-				if (tbinfo->pgxclocatortype == 'N')
+				if (tbinfo->pgxclocatortype != 'E')
 				{
-					appendPQExpBuffer(q, "\nDISTRIBUTE BY ROUNDROBIN");
+					/* N: DISTRIBUTE BY ROUNDROBIN */
+					if (tbinfo->pgxclocatortype == 'N')
+					{
+						appendPQExpBuffer(q, "\nDISTRIBUTE BY ROUNDROBIN");
+					}
+					/* R: DISTRIBUTE BY REPLICATED */
+					else if (tbinfo->pgxclocatortype == 'R')
+					{
+						appendPQExpBuffer(q, "\nDISTRIBUTE BY REPLICATION");
+					}
+					/* H: DISTRIBUTE BY HASH  */
+					else if (tbinfo->pgxclocatortype == 'H')
+					{
+						int hashkey = tbinfo->pgxcattnum;
+						appendPQExpBuffer(q, "\nDISTRIBUTE BY HASH (%s)",
+										  fmtId(tbinfo->attnames[hashkey - 1]));
+					}
+					else if (tbinfo->pgxclocatortype == 'M')
+					{
+						int hashkey = tbinfo->pgxcattnum;
+						appendPQExpBuffer(q, "\nDISTRIBUTE BY MODULO (%s)",
+										  fmtId(tbinfo->attnames[hashkey - 1]));
+					}
 				}
-				/* R: DISTRIBUTE BY REPLICATED */
-				else if (tbinfo->pgxclocatortype == 'R')
+				if (include_nodes &&
+						tbinfo->pgxc_node_names != NULL &&
+						tbinfo->pgxc_node_names[0] != '\0')
 				{
-					appendPQExpBuffer(q, "\nDISTRIBUTE BY REPLICATION");
-				}
-				/* H: DISTRIBUTE BY HASH  */
-				else if (tbinfo->pgxclocatortype == 'H')
-				{
-					int hashkey = tbinfo->pgxcattnum;
-					appendPQExpBuffer(q, "\nDISTRIBUTE BY HASH (%s)",
-									  fmtId(tbinfo->attnames[hashkey - 1]));
-				}
-				else if (tbinfo->pgxclocatortype == 'M')
-				{
-					int hashkey = tbinfo->pgxcattnum;
-					appendPQExpBuffer(q, "\nDISTRIBUTE BY MODULO (%s)",
-									  fmtId(tbinfo->attnames[hashkey - 1]));
+					appendPQExpBuffer(q, "\nTO NODE (%s)", tbinfo->pgxc_node_names);
 				}
 			}
-			if (include_nodes &&
-				tbinfo->pgxc_node_names != NULL &&
-				tbinfo->pgxc_node_names[0] != '\0')
-			{
-				appendPQExpBuffer(q, "\nTO NODE (%s)", tbinfo->pgxc_node_names);
-			}
+
 		}
 #endif
 		/* Dump generic options if any */

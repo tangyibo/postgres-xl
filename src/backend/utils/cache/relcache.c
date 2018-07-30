@@ -1371,8 +1371,14 @@ RelationBuildDesc(Oid targetRelId, bool insertIt)
 		relation->trigdesc = NULL;
 
 #ifdef PGXC
-	if (IS_PGXC_COORDINATOR &&
-		relation->rd_id >= FirstNormalObjectId)
+	/*
+	 * We need the locator info while restoring from a dump while adding a new
+	 * node to the cluster and when there are partition tables. Distribution
+	 * information for partition tables is derived from the parent table and we
+	 * need the locator info for that.
+	 */
+	if ((IS_PGXC_COORDINATOR || isRestoreMode) &&
+		 relation->rd_id >= FirstNormalObjectId)
 		RelationBuildLocator(relation);
 #endif
 	if (relation->rd_rel->relrowsecurity)

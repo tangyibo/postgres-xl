@@ -371,7 +371,8 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	 * ERROR since Postgres-XL does not support inheriting from multiple
 	 * parents.
 	 */
-	if (stmt->inhRelations && IS_PGXC_COORDINATOR && autodistribute)
+	if (autodistribute && stmt->inhRelations &&
+		(IS_PGXC_COORDINATOR || isRestoreMode))
 	{
 		RangeVar   *inh = (RangeVar *) linitial(stmt->inhRelations);
 		Relation	rel;
@@ -472,6 +473,14 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	 */
 	if (IS_PGXC_COORDINATOR && autodistribute && !stmt->distributeby)
 	{
+		/*
+		 * In restore-mode, the distribution clause should either be derived
+		 * from the parent table or it must have been included in the table
+		 * schema dump. Otherwise we risk deriving a different distribution
+		 * strategy when dump is loaded on a new node.
+		 */
+		Assert(!isRestoreMode);
+
 		/* always apply suggested subcluster */
 		stmt->subcluster = copyObject(cxt.subcluster);
 		if (cxt.distributeby)

@@ -1109,8 +1109,8 @@ int add_coordinatorMaster(char *name, char *host, int port, int pooler,
 	/* Now add the master */
 
 	gtmPxyIdx = getEffectiveGtmProxyIdxFromServerName(host);
-	gtmHost = (gtmPxyIdx > 0) ? aval(VAR_gtmProxyServers)[gtmPxyIdx] : sval(VAR_gtmMasterServer);
-	gtmPort = (gtmPxyIdx > 0) ? aval(VAR_gtmProxyPorts)[gtmPxyIdx] : sval(VAR_gtmMasterPort);
+	gtmHost = (gtmPxyIdx >= 0) ? aval(VAR_gtmProxyServers)[gtmPxyIdx] : sval(VAR_gtmMasterServer);
+	gtmPort = (gtmPxyIdx >= 0) ? aval(VAR_gtmProxyPorts)[gtmPxyIdx] : sval(VAR_gtmMasterPort);
 
 	/* initdb */
 	doImmediate(host, NULL, "PGXC_CTL_SILENT=1 initdb -D %s --nodename %s", dir, name);

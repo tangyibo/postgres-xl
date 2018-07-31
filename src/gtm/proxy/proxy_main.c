@@ -1177,6 +1177,9 @@ GTMProxy_ThreadMain(void *argp)
 				 */
 				if (conninfo->con_disconnected)
 				{
+					EmitErrorReport(conninfo->con_port);
+					if (conninfo->con_port->sock > 0)
+						StreamClose(conninfo->con_port->sock);
 					GTMProxy_ThreadRemoveConnection(thrinfo, conninfo);
 					pfree(conninfo);
 					ii--;
@@ -2329,8 +2332,6 @@ GTMProxy_HandshakeConnection(GTMProxy_ConnectionInfo *conninfo)
 	if (startup_type != 'A')
 	{
 		conninfo->con_disconnected = true;
-		if (conninfo->con_port->sock > 0)
-			StreamClose(conninfo->con_port->sock);
 		ereport(ERROR,
 				(EPROTO,
 				 errmsg("Expecting a startup message, but received %c",
@@ -2347,8 +2348,6 @@ GTMProxy_HandshakeConnection(GTMProxy_ConnectionInfo *conninfo)
 	if (pq_getmessage(conninfo->con_port, &inBuf, 0))
 	{
 		conninfo->con_disconnected = true;
-		if (conninfo->con_port->sock > 0)
-			StreamClose(conninfo->con_port->sock);
 		ereport(ERROR,
 				(EPROTO,
 				 errmsg("Expecting PGXC Node ID, but received EOF")));

@@ -31,6 +31,7 @@ SUBDIRS = \
 	pgbench \
 	psql \
 	pgxc_ctl \
+	pgxc_clean \
 	scripts
 
 ifeq ($(PORTNAME), win32)

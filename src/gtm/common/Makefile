@@ -19,7 +19,6 @@ NAME=gtm
 SO_MAJOR_VERSION= 1
 SO_MINOR_VERSION= 0
 
-LDFLAGS=-L$(top_builddir)/common -L$(top_builddir)/libpq
 LIBS=-lpthread
 
 OBJS = gtm_opt_handler.o aset.o mcxt.o gtm_utils.o elog.o assert.o stringinfo.o gtm_lock.o \

@@ -25,44 +25,14 @@
   <title>Building and installing pgxc_ctl</title>
 
   <para>
-   You should build pgxc_ctl using your Postgres-XL build environment.
    <application>pgxc_ctl</application> source code comes with the Postgres-XL
-   source code tarball.  The latest version of the source code will be
-   available at its home repository,
+   source code tarball and when you install Postgres-XL, it should get compiled
+   and installed along side other binaries. Note that before Postgres-XL 10,
+   <application>pgxc_ctl</application> was supplied as an extension, but starting
+   Postgres-XL 10, the utility is built and installed with the main product.
 <programlisting>
 pgxc_ctl
 </programlisting>
-   If you would like to use the latest version from the pgxc_ctl home
-   repository, get the source code tarball and expand it in the source's
-   contrib directory of your Postgres-XL build environment.  If you are using
-   pgxc_ctl from the Postgres-XL tarball, you don't have to do this.
-  </para>
-
-  <para>
-   Before building pgxc_ctl, you should build Postgres-XL binary, like
-<programlisting>
-$ cd <replaceable>your Postgres-XL build directory</replaceable>
-$ ./configure <replaceable>your configuration option</replaceable>
-$ make
-</programlisting>
-
-   Please note that you dont'have to install the
-   <application>Postgres-XL</application> binary to build
-   <application>pgxc_ctl</application>.  
-   Also please note that <application>Postgres-XL</application> top
-   level make and make install command does not take care of pgxc_ctl.
-   You should build and install it separately.
-  </para>
-
-  <para>
-   Then you can build pgxc_ctl as follows:
-<programlisting>
-$ cd contrib/pgxc_ctl
-$ make
-$ make install
-</programlisting>
-   The <application>pgxc_ctl</application> binary will be installed in the same
-   directory as the <application>Postgres-XL</application> binaries. 
   </para>
 
   <para>

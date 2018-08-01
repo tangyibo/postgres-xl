@@ -237,7 +237,7 @@
   The <application>pgxc_ctl</application> utility should be present in your PATH. If it is
   not there, it can be compiled from source.
 <screen>
-<prompt>$</prompt> <userinput>cd $XLSRC/contrib/pgxc_ctl</userinput>
+<prompt>$</prompt> <userinput>cd $XLSRC/src/bin/pgxc_ctl</userinput>
 <prompt>$</prompt> <userinput>make install</userinput>
 </screen>
 

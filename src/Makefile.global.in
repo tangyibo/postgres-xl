@@ -523,7 +523,10 @@ submake-libpgfeutils:
 submake-generated-headers:
 	$(MAKE) -C $(top_builddir)/src/backend generated-headers
 
-.PHONY: submake-libpq submake-libpgport submake-libpgfeutils submake-generated-headers
+submake-gtmlib:
+	$(MAKE) -C $(top_builddir)/src/gtm all
+
+.PHONY: submake-libpq submake-libpgport submake-libpgfeutils submake-generated-headers submake-gtmlib
 
 
 ##########################################################################

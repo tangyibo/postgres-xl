@@ -30,6 +30,7 @@ SUBDIRS = \
 	pg_waldump \
 	pgbench \
 	psql \
+	pgxc_ctl \
 	scripts
 
 ifeq ($(PORTNAME), win32)

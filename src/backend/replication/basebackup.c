@@ -833,14 +833,17 @@ sendTablespace(char *path, bool sizeonly)
 {
 	int64		size;
 	char		pathbuf[MAXPGPATH];
+	char		subdirbuf[MAXPGPATH];
 	struct stat statbuf;
 
 	/*
 	 * 'path' points to the tablespace location, but we only want to include
 	 * the version directory in it that belongs to us.
 	 */
-	snprintf(pathbuf, sizeof(pathbuf), "%s/%s", path,
-			 TABLESPACE_VERSION_DIRECTORY);
+	snprintf(subdirbuf, sizeof(subdirbuf), "%s_%s",
+			TABLESPACE_VERSION_DIRECTORY, PGXCNodeName);
+	snprintf(pathbuf, sizeof(pathbuf), "%s/%s_%s", path,
+			TABLESPACE_VERSION_DIRECTORY, PGXCNodeName);
 
 	/*
 	 * Store a directory entry in the tar file so we get the permissions
@@ -858,7 +861,7 @@ sendTablespace(char *path, bool sizeonly)
 		return 0;
 	}
 	if (!sizeonly)
-		_tarWriteHeader(TABLESPACE_VERSION_DIRECTORY, NULL, &statbuf);
+		_tarWriteHeader(subdirbuf, NULL, &statbuf);
 	size = 512;					/* Size of the header just added */
 
 	/* Send all the files in the tablespace version directory */

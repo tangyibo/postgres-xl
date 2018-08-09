@@ -1693,7 +1693,9 @@ make_relation_tle(Oid reloid, const char *relname, const char *column)
 static int
 get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 				   int32 *pages, int32 *allvisiblepages,
-				   float4 *tuples, TransactionId *frozenXid)
+				   float4 *tuples,
+				   TransactionId *frozenXid,
+				   MultiXactId *multiXid)
 {
 	StringInfoData query;
 	EState 	   *estate;
@@ -1704,7 +1706,8 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 	int			validpages,
 				validtuples,
 				validfrozenxids,
-				validallvisiblepages;
+				validallvisiblepages,
+				validminmxids;
 
 	/* Make up query string */
 	initStringInfo(&query);
@@ -1719,7 +1722,8 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 		appendStringInfo(&query, "SELECT c.relpages, "
 				"c.reltuples, "
 				"c.relallvisible, "
-				"c.relfrozenxid "
+				"c.relfrozenxid, "
+				"c.relminmxid "
 				"FROM pg_class c "
 				"WHERE c.relnamespace = pg_my_temp_schema() "
 				"AND c.relname = '%s'",
@@ -1728,7 +1732,8 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 		appendStringInfo(&query, "SELECT c.relpages, "
 				"c.reltuples, "
 				"c.relallvisible, "
-				"c.relfrozenxid "
+				"c.relfrozenxid, "
+				"c.relminmxid "
 				"FROM pg_class c JOIN pg_namespace n "
 				"ON c.relnamespace = n.oid "
 				"WHERE n.nspname = '%s' "
@@ -1760,6 +1765,10 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 										 make_relation_tle(RelationRelationId,
 														   "pg_class",
 														   "relfrozenxid"));
+	step->scan.plan.targetlist = lappend(step->scan.plan.targetlist,
+										 make_relation_tle(RelationRelationId,
+														   "pg_class",
+														   "relminmxid"));
 
 	/* Execute query on the data nodes */
 	estate = CreateExecutorState();
@@ -1775,10 +1784,12 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 	*allvisiblepages = 0;
 	*tuples = 0.0;
 	*frozenXid = InvalidTransactionId;
+	*multiXid = InvalidMultiXactId;
 	validpages = 0;
 	validallvisiblepages = 0;
 	validtuples = 0;
 	validfrozenxids = 0;
+	validminmxids = 0;
 	result = ExecRemoteQuery((PlanState *) node);
 	while (result != NULL && !TupIsNull(result))
 	{
@@ -1814,13 +1825,26 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 			if (TransactionIdIsValid(xid))
 			{
 				validfrozenxids++;
-				if (!TransactionIdIsValid(*frozenXid) ||
-						TransactionIdPrecedes(xid, *frozenXid))
-				{
+				if (!TransactionIdIsValid(*frozenXid) || TransactionIdPrecedes(xid, *frozenXid))
 					*frozenXid = xid;
-				}
 			}
 		}
+		value = slot_getattr(result, 5, &isnull); /* relminmxid */
+		if (!isnull)
+		{
+			/*
+			 * relminmxid on coordinator should be the lowest one from the
+			 * datanodes.
+			 */
+			MultiXactId mxid = DatumGetTransactionId(value);
+			if (MultiXactIdIsValid(mxid))
+			{
+				validminmxids++;
+				if (!MultiXactIdIsValid(*multiXid) || MultiXactIdPrecedes(mxid, *multiXid))
+					*multiXid = mxid;
+			}
+		}
+
 		/* fetch next */
 		result = ExecRemoteQuery((PlanState *) node);
 	}
@@ -1843,22 +1867,20 @@ get_remote_relstat(char *nspname, char *relname, bool istemp, bool replicated,
 			*allvisiblepages /= validallvisiblepages;
 	}
 
+	/*
+	 * If some node returned invalid value for frozenxid we can not set
+	 * it on coordinator. There are other cases when returned value of
+	 * frozenXid should be ignored, these cases are checked by caller.
+	 * Basically, to be sure, there should be one value from each node,
+	 * where the table is partitioned.
+	 */
 	if (validfrozenxids < validpages || validfrozenxids < validtuples)
-	{
-		/*
-		 * If some node returned invalid value for frozenxid we can not set
-		 * it on coordinator. There are other cases when returned value of
-		 * frozenXid should be ignored, these cases are checked by caller.
-		 * Basically, to be sure, there should be one value from each node,
-		 * where the table is partitioned.
-		 */
 		*frozenXid = InvalidTransactionId;
-		return Max(validpages, validtuples);
-	}
-	else
-	{
-		return validfrozenxids;
-	}
+
+	if (validminmxids < validpages || validminmxids < validtuples)
+		*multiXid = InvalidMultiXactId;
+
+	return Max(validpages, validtuples);
 }
 
 
@@ -1877,6 +1899,7 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 	int32		num_allvisible_pages;
 	float4		num_tuples;
 	TransactionId min_frozenxid;
+	MultiXactId	min_mxid;
 	bool		hasindex;
 	bool 		replicated;
 	int 		rel_nodes;
@@ -1894,7 +1917,9 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 	 */
 	rel_nodes = get_remote_relstat(nspname, relname, istemp, replicated,
 								   &num_pages, &num_allvisible_pages,
-								   &num_tuples, &min_frozenxid);
+								   &num_tuples,
+								   &min_frozenxid,
+								   &min_mxid);
 	if (rel_nodes > 0)
 	{
 		int			nindexes;
@@ -1913,7 +1938,8 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 			{
 				int32	idx_pages, idx_allvisible_pages;
 				float4	idx_tuples;
-				TransactionId idx_frozenxid;
+				TransactionId	idx_frozenxid;
+				MultiXactId		idx_mxid;
 				int idx_nodes;
 
 				/* Get the index identifier */
@@ -1923,7 +1949,8 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 				idx_nodes = get_remote_relstat(nspname, relname, istemp,
 										replicated,
 										&idx_pages, &idx_allvisible_pages,
-										&idx_tuples, &idx_frozenxid);
+										&idx_tuples, &idx_frozenxid,
+										&idx_mxid);
 				if (idx_nodes > 0)
 				{
 					/*
@@ -1942,7 +1969,7 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 										0,
 										false,
 										idx_frozenxid,
-										InvalidMultiXactId,
+										idx_mxid,
 										is_outer);
 				}
 			}
@@ -1958,6 +1985,7 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 		if (rel_nodes < nodes)
 		{
 			min_frozenxid = InvalidTransactionId;
+			min_mxid = InvalidMultiXactId;
 		}
 
 		/* save changes */
@@ -1967,7 +1995,7 @@ vacuum_rel_coordinator(Relation onerel, bool is_outer)
 							num_allvisible_pages,
 							hasindex,
 							min_frozenxid,
-							InvalidMultiXactId,
+							min_mxid,
 							is_outer);
 	}
 }

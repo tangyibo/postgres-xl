@@ -506,6 +506,37 @@ GetAllCoordNodes(void)
 
 
 /*
+ * Return a list of all currently available Coordinators. This is used to send
+ * commands to only those coordinators which are currently reachable per the
+ * health map, thus avoiding possible connection errors. Non-critical functions
+ * may use this list.
+ */
+List *
+GetAvailableCoordNodes(void)
+{
+	int			i;
+	List	   *nodeList = NIL;
+	Oid			coOids[MaxCoords];
+	bool		coHealthMap[MaxCoords];
+	int			numCo;
+	
+	PgxcNodeGetHealthMap(coOids, NULL, &numCo, NULL, coHealthMap, NULL);
+
+	for (i = 0; i < numCo; i++)
+	{
+		/*
+		 * Do not put in list the Coordinator we are on,
+		 * it doesn't make sense to connect to the local Coordinator.
+		 */
+
+		if ((i != PGXCNodeId - 1) && coHealthMap[i])
+			nodeList = lappend_int(nodeList, i);
+	}
+
+	return nodeList;
+}
+
+/*
  * Build locator information associated with the specified relation.
  */
 void

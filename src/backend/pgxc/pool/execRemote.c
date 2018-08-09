@@ -3285,6 +3285,12 @@ get_exec_connections(RemoteQueryState *planstate,
 		coordlist = GetAllCoordNodes();
 		co_conn_count = list_length(coordlist);
 	}
+	else if (list_length(coordlist) == 0 &&
+			 exec_type == EXEC_ON_AVAILABLE_COORDS)
+	{
+		coordlist = GetAvailableCoordNodes();
+		co_conn_count = list_length(coordlist);
+	}
 	else
 	{
 		if (exec_type == EXEC_ON_COORDS)

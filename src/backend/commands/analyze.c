@@ -117,6 +117,7 @@ static Datum ind_fetch_func(VacAttrStatsP stats, int rownum, bool *isNull);
 static void analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 						VacAttrStats **vacattrstats, int nindexes,
 						Relation *indexes, AnlIndexData *indexdata);
+static void analyze_remote_coordinators(Relation onerel);
 #endif
 
 /*
@@ -511,6 +512,11 @@ do_analyze_rel(Relation onerel, int options, VacuumParams *params,
 		 */
 		analyze_rel_coordinator(onerel, inh, attr_cnt, vacattrstats,
 								nindexes, Irel, indexdata);
+
+		/*
+		 * Run ANALYZE on remote coordinators as well.
+		 */
+		analyze_remote_coordinators(onerel);
 
 		/*
 		 * Skip acquiring local stats. Coordinator does not store data of
@@ -3610,5 +3616,38 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 
 	/* extended statistics (pg_statistic) for the relation */
 	coord_collect_extended_stats(onerel, attr_cnt);
+}
+
+static void
+analyze_remote_coordinators(Relation onerel)
+{
+	RemoteQuery		*step;
+	StringInfoData	sql;
+
+	if (IsConnFromCoord())
+		return;
+
+	/*
+	 * Temporary tables are not available on remote coordinators.
+	 */
+	if (onerel->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
+		return;
+
+	initStringInfo(&sql);
+	appendStringInfo(&sql, "ANALYZE (COORDINATOR) %s",
+			quote_identifier(RelationGetRelationName(onerel)));
+
+	step = makeNode(RemoteQuery);
+	step->combine_type = COMBINE_TYPE_SAME;
+	step->exec_nodes = NULL;
+	step->exec_type = EXEC_ON_AVAILABLE_COORDS;
+	step->sql_statement = pstrdup(sql.data);
+
+	ExecRemoteUtility(step);
+	pfree(step->sql_statement);
+	pfree(step);
+
+	/* Be sure to advance the command counter after the last command */
+	CommandCounterIncrement();
 }
 #endif

@@ -200,6 +200,8 @@ BeginTranAutovacuumGTM(void)
 		if (conn)
 			xid =  begin_transaction_autovacuum(conn, GTM_ISOLATION_RC);
 	}
+	if (xid)
+		IsXidFromGTM = true;
 	currentGxid = xid;
 
 	elog(DEBUG3, "BeginTranGTM - %d", xid);

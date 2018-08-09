@@ -3001,9 +3001,6 @@ coord_collect_simple_stats(Relation onerel, bool inh, int attr_cnt,
 	initStringInfo(&query);
 	/* Generic statistic fields */
 	appendStringInfoString(&query, "SELECT s.staattnum, "
-// assume the number of tuples approximately the same on all nodes
-// to build more precise statistics get this number
-//										  "c.reltuples, "
 										  "s.stanullfrac, "
 										  "s.stawidth, "
 										  "s.stadistinct");
@@ -3069,10 +3066,6 @@ coord_collect_simple_stats(Relation onerel, bool inh, int attr_cnt,
 										 make_relation_tle(StatisticRelationId,
 														   "pg_statistic",
 														   "staattnum"));
-//	step->scan.plan.targetlist = lappend(step->scan.plan.targetlist,
-//										 make_relation_tle(RelationRelationId,
-//														   "pg_class",
-//														   "reltuples"));
 	step->scan.plan.targetlist = lappend(step->scan.plan.targetlist,
 										 make_relation_tle(StatisticRelationId,
 														   "pg_statistic",
@@ -3162,7 +3155,6 @@ coord_collect_simple_stats(Relation onerel, bool inh, int attr_cnt,
 		bool			isnull;
 		int 			colnum = 1;
 		int16			attnum;
-//		float4			reltuples;
 		float4			nullfrac;
 		int32 			width;
 		float4			distinct;
@@ -3180,9 +3172,6 @@ coord_collect_simple_stats(Relation onerel, bool inh, int attr_cnt,
 				numnodes[i]++;
 				break;
 			}
-
-//		value = slot_getattr(result, colnum++, &isnull); /* reltuples */
-//		reltuples = DatumGetFloat4(value);
 
 		if (stats)
 		{

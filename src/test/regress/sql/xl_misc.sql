@@ -93,3 +93,45 @@ select array_agg(c.*) from "XLTEST_type" c where c.primary = 1;
 
 drop table "XL.Schema"."XLTEST_type";
 
+-- test ANALYZE
+set search_path to default;
+create table test_a1 (a int, b int);
+insert into test_a1 values (1, 10);
+analyze test_a1;
+
+-- check temp table handling
+create temp table test_a2 (a int, b int);
+insert into test_a2 values (1, 10);
+analyze test_a2;
+
+-- check schema qualification
+create schema analyze_s1;
+create table analyze_s1.test_a1 (a int, b int);
+create table analyze_s1.test_a3 (a int, b int);
+insert into analyze_s1.test_a1 values (1, 10);
+insert into analyze_s1.test_a3 values (1, 10);
+analyze analyze_s1.test_a1;
+analyze test_a3;				-- error
+set search_path = 'analyze_s1';
+analyze test_a3;				-- ok
+
+-- schema names requiring quoating
+create schema "ANALYZE S2";
+set search_path = 'ANALYZE S2';
+create table "TEST A4" (a int, b int);
+insert into "TEST A4" values (1, 10);
+set search_path to default;
+analyze "TEST A4";				-- error
+analyze "ANALYZE S2"."TEST A4";
+set search_path = 'ANALYZE S2';
+analyze "TEST A4";
+
+-- check materialised view
+set search_path to default;
+create materialized view analyze_mv1 as select * from test_a1;
+analyze analyze_mv1;
+
+drop table test_a1 cascade;
+drop table test_a2;
+drop schema analyze_s1 cascade;
+drop schema "ANALYZE S2" cascade;

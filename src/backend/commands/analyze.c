@@ -3634,7 +3634,8 @@ analyze_remote_coordinators(Relation onerel)
 		return;
 
 	initStringInfo(&sql);
-	appendStringInfo(&sql, "ANALYZE (COORDINATOR) %s",
+	appendStringInfo(&sql, "ANALYZE (COORDINATOR) %s.%s",
+			quote_identifier(get_namespace_name(RelationGetNamespace(onerel))),
 			quote_identifier(RelationGetRelationName(onerel)));
 
 	step = makeNode(RemoteQuery);

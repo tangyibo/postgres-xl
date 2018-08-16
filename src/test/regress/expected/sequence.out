@@ -401,7 +401,7 @@ SELECT nextval('sequence_test2');
 (1 row)
 
 SELECT nextval('sequence_test2');  -- error
-ERROR:  nextval: reached maximum value of sequence "sequence_test2" (36)
+ERROR:  nextval: reached maximum value of sequence "regression.public.sequence_test2" (36)
 ALTER SEQUENCE sequence_test2 RESTART WITH -24 START WITH -24
   INCREMENT BY -4 MINVALUE -36 MAXVALUE -5 CYCLE;
 SELECT nextval('sequence_test2');
@@ -461,7 +461,7 @@ SELECT nextval('sequence_test2');
 (1 row)
 
 SELECT nextval('sequence_test2');  -- error
-ERROR:  nextval: reached minimum value of sequence "sequence_test2" (-36)
+ERROR:  nextval: reached minimum value of sequence "regression.public.sequence_test2" (-36)
 -- reset
 ALTER SEQUENCE IF EXISTS sequence_test2 RESTART WITH 32 START WITH 32
   INCREMENT BY 4 MAXVALUE 36 MINVALUE 5 CYCLE;
@@ -764,10 +764,10 @@ BEGIN;
 SET LOCAL SESSION AUTHORIZATION regress_seq_user;
 CREATE SEQUENCE seq3;
 REVOKE ALL ON seq3 FROM regress_seq_user;
-SAVEPOINT save;
-SELECT setval('seq3', 5);
-ERROR:  permission denied for sequence seq3
-ROLLBACK TO save;
+-- XL does not support SAVEPOINT
+-- SAVEPOINT save;
+-- SELECT setval('seq3', 5);
+-- ROLLBACK TO save;
 GRANT UPDATE ON seq3 TO regress_seq_user;
 SELECT setval('seq3', 5);
  setval 

@@ -709,14 +709,11 @@ nextval_internal(Oid relid, bool check_permissions)
 				maxv,
 				minv,
 				cache,
-				log,
-				fetch,
-				last;
-	int64		result,
-				next,
-				rescnt = 0;
+				result;
 	bool		cycle;
-	bool		logit = false;
+	int64		range;
+	int64		rangemax;
+	char	   *seqname;
 
 	/* open and lock sequence */
 	init_sequence(relid, &elm, &seqrel);
@@ -765,185 +762,93 @@ nextval_internal(Oid relid, bool check_permissions)
 	seq = read_seq_tuple(seqrel, &buf, &seqdatatuple);
 	page = BufferGetPage(buf);
 
-	{
-		int64 range = cache; /* how many values to ask from GTM? */
-		int64 rangemax; /* the max value returned from the GTM for our request */
-		char *seqname = GetGlobalSeqName(seqrel, NULL, NULL);
-
-		/*
-		 * Above, we still use the page as a locking mechanism to handle
-		 * concurrency
-		 *
-		 * If the user has set a CACHE parameter, we use that. Else we pass in
-		 * the SequenceRangeVal value
-		 */
-		if (range == DEFAULT_CACHEVAL && SequenceRangeVal > range)
-		{
-			TimestampTz curtime = GetCurrentTimestamp();
-
-			if (!TimestampDifferenceExceeds(elm->last_call_time,
-													curtime, 1000))
-			{
-				/*
-				 * The previous GetNextValGTM call was made just a while back.
-				 * Request double the range of what was requested in the
-				 * earlier call. Honor the SequenceRangeVal boundary
-				 * value to limit very large range requests!
-				 */
-				elm->range_multiplier *= 2;
-				if (elm->range_multiplier < SequenceRangeVal)
-					range = elm->range_multiplier;
-				else
-					elm->range_multiplier = range = SequenceRangeVal;
-
-				elog(DEBUG1, "increase sequence range %ld", range);
-			}
-			else if (TimestampDifferenceExceeds(elm->last_call_time,
-												curtime, 5000))
-			{
-				/* The previous GetNextValGTM call was pretty old */
-				range = elm->range_multiplier = DEFAULT_CACHEVAL;
-				elog(DEBUG1, "reset sequence range %ld", range);
-			}
-			else if (TimestampDifferenceExceeds(elm->last_call_time,
-												curtime, 3000))
-			{
-				/*
-				 * The previous GetNextValGTM call was made quite some time
-				 * ago. Try to reduce the range request to reduce the gap
-				 */
-				if (elm->range_multiplier != DEFAULT_CACHEVAL)
-				{
-					range = elm->range_multiplier =
-								rint(elm->range_multiplier/2);
-					elog(DEBUG1, "decrease sequence range %ld", range);
-				}
-			}
-			else
-			{
-				/*
-				 * Current range_multiplier alllows to cache sequence values
-				 * for 1-3 seconds of work. Keep that rate.
-				 */
-				range = elm->range_multiplier;
-			}
-			elm->last_call_time = curtime;
-		}
-
-		result = (int64) GetNextValGTM(seqname, range, &rangemax);
-		pfree(seqname);
-
-		/* Update the on-disk data */
-		seq->last_value = result; /* last fetched number */
-		seq->is_called = true;
-
-		/* save info in local cache */
-		elm->last = result;			/* last returned number */
-		elm->cached = rangemax;		/* last fetched range max limit */
-		elm->last_valid = true;
-
-		last_used_seq = elm;
-	}
-
-	elm->increment = incby;
-	last = next = result = seq->last_value;
-	fetch = cache;
-	log = seq->log_cnt;
-
-	if (!seq->is_called)
-	{
-		rescnt++;				/* return last_value if not is_called */
-		fetch--;
-	}
+	range = cache; /* how many values to ask from GTM? */
+	seqname = GetGlobalSeqName(seqrel, NULL, NULL);
 
 	/*
-	 * Decide whether we should emit a WAL log record.  If so, force up the
-	 * fetch count to grab SEQ_LOG_VALS more values than we actually need to
-	 * cache.  (These will then be usable without logging.)
+	 * Above, we still use the page as a locking mechanism to handle
+	 * concurrency
 	 *
-	 * If this is the first nextval after a checkpoint, we must force a new
-	 * WAL record to be written anyway, else replay starting from the
-	 * checkpoint would fail to advance the sequence past the logged values.
-	 * In this case we may as well fetch extra values.
+	 * If the user has set a CACHE parameter, we use that. Else we pass in
+	 * the SequenceRangeVal value
 	 */
-	if (log < fetch || !seq->is_called)
+	if (range == DEFAULT_CACHEVAL && SequenceRangeVal > range)
 	{
-		/* forced log to satisfy local demand for values */
-		fetch = log = fetch + SEQ_LOG_VALS;
-	}
-	else
-	{
-		XLogRecPtr	redoptr = GetRedoRecPtr();
+		TimestampTz curtime = GetCurrentTimestamp();
 
-		if (PageGetLSN(page) <= redoptr)
+		if (!TimestampDifferenceExceeds(elm->last_call_time,
+					curtime, 1000))
 		{
-			/* last update of seq was before checkpoint */
-			fetch = log = fetch + SEQ_LOG_VALS;
-		}
-	}
-
-	while (fetch)				/* try to fetch cache [+ log ] numbers */
-	{
-		/*
-		 * Check MAXVALUE for ascending sequences and MINVALUE for descending
-		 * sequences
-		 */
-		if (incby > 0)
-		{
-			/* ascending sequence */
-			if ((maxv >= 0 && next > maxv - incby) ||
-				(maxv < 0 && next + incby > maxv))
-			{
-				if (rescnt > 0)
-					break;		/* stop fetching */
-				if (!cycle)
-				{
-					char		buf[100];
-
-					snprintf(buf, sizeof(buf), INT64_FORMAT, maxv);
-					ereport(ERROR,
-							(errcode(ERRCODE_SEQUENCE_GENERATOR_LIMIT_EXCEEDED),
-							 errmsg("nextval: reached maximum value of sequence \"%s\" (%s)",
-									RelationGetRelationName(seqrel), buf)));
-				}
-				next = minv;
-			}
+			/*
+			 * The previous GetNextValGTM call was made just a while back.
+			 * Request double the range of what was requested in the
+			 * earlier call. Honor the SequenceRangeVal boundary
+			 * value to limit very large range requests!
+			 */
+			elm->range_multiplier *= 2;
+			if (elm->range_multiplier < SequenceRangeVal)
+				range = elm->range_multiplier;
 			else
-				next += incby;
+				elm->range_multiplier = range = SequenceRangeVal;
+
+			elog(DEBUG1, "increase sequence range %ld", range);
+		}
+		else if (TimestampDifferenceExceeds(elm->last_call_time,
+					curtime, 5000))
+		{
+			/* The previous GetNextValGTM call was pretty old */
+			range = elm->range_multiplier = DEFAULT_CACHEVAL;
+			elog(DEBUG1, "reset sequence range %ld", range);
+		}
+		else if (TimestampDifferenceExceeds(elm->last_call_time,
+					curtime, 3000))
+		{
+			/*
+			 * The previous GetNextValGTM call was made quite some time
+			 * ago. Try to reduce the range request to reduce the gap
+			 */
+			if (elm->range_multiplier != DEFAULT_CACHEVAL)
+			{
+				range = elm->range_multiplier =
+					rint(elm->range_multiplier/2);
+				elog(DEBUG1, "decrease sequence range %ld", range);
+			}
 		}
 		else
 		{
-			/* descending sequence */
-			if ((minv < 0 && next < minv - incby) ||
-				(minv >= 0 && next + incby < minv))
-			{
-				if (rescnt > 0)
-					break;		/* stop fetching */
-				if (!cycle)
-				{
-					char		buf[100];
-
-					snprintf(buf, sizeof(buf), INT64_FORMAT, minv);
-					ereport(ERROR,
-							(errcode(ERRCODE_SEQUENCE_GENERATOR_LIMIT_EXCEEDED),
-							 errmsg("nextval: reached minimum value of sequence \"%s\" (%s)",
-									RelationGetRelationName(seqrel), buf)));
-				}
-				next = maxv;
-			}
-			else
-				next += incby;
+			/*
+			 * Current range_multiplier alllows to cache sequence values
+			 * for 1-3 seconds of work. Keep that rate.
+			 */
+			range = elm->range_multiplier;
 		}
-		fetch--;
-		if (rescnt < cache)
-		{
-			log--;
-			rescnt++;
-		}
+		elm->last_call_time = curtime;
 	}
 
-	log -= fetch;				/* adjust for any unfetched numbers */
-	Assert(log >= 0);
+	result = (int64) GetNextValGTM(seqname, range, &rangemax);
+	pfree(seqname);
+
+	/* Update the on-disk data */
+	seq->last_value = result; /* last fetched number */
+	seq->is_called = true;
+
+	/* save info in local cache */
+	elm->last = result;			/* last returned number */
+	elm->cached = rangemax;		/* last fetched range max limit */
+	elm->last_valid = true;
+	elm->increment = incby;
+
+	last_used_seq = elm;
+
+	/*
+	 * In Postgres-XL, we always WAL log the sequence fetch if we had to go to
+	 * the GTM to fetch new set of values. This may seem a lot of overhead, but
+	 * since we cache a lot more values in XL, in practice, the amount of WAL
+	 * logging should be considerably less. Also, since sequence values are
+	 * managed at the GTM, WAL logging is not strictly required for
+	 * correctness, but it helps us to restore sequence state to a somewhat
+	 * credible value in case of a crash and recovery.
+	 */
 
 	/*
 	 * If something needs to be WAL logged, acquire an xid, so this
@@ -952,7 +857,7 @@ nextval_internal(Oid relid, bool check_permissions)
 	 * to assign xids subxacts, that'll already trigger an appropriate wait.
 	 * (Have to do that here, so we're outside the critical section)
 	 */
-	if (logit && RelationNeedsWAL(seqrel))
+	if (RelationNeedsWAL(seqrel))
 		GetTopTransactionId();
 
 	/* ready to change the on-disk (or really, in-buffer) tuple */
@@ -970,22 +875,21 @@ nextval_internal(Oid relid, bool check_permissions)
 	MarkBufferDirty(buf);
 
 	/* XLOG stuff */
-	if (logit && RelationNeedsWAL(seqrel))
+	if (RelationNeedsWAL(seqrel))
 	{
 		xl_seq_rec	xlrec;
 		XLogRecPtr	recptr;
 
 		/*
 		 * We don't log the current state of the tuple, but rather the state
-		 * as it would appear after "log" more fetches.  This lets us skip
-		 * that many future WAL records, at the cost that we lose those
-		 * sequence values if we crash.
+		 * as it would appear after all cached values are used. This is
+		 * different than what we do in vanilla PostgreSQL.
 		 */
 		XLogBeginInsert();
 		XLogRegisterBuffer(0, buf, REGBUF_WILL_INIT);
 
 		/* set values that will be saved in xlog */
-		seq->last_value = next;
+		seq->last_value = rangemax;
 		seq->is_called = true;
 		seq->log_cnt = 0;
 
@@ -1000,9 +904,9 @@ nextval_internal(Oid relid, bool check_permissions)
 	}
 
 	/* Now update sequence tuple to the intended final state */
-	seq->last_value = last;		/* last fetched number */
+	seq->last_value = rangemax;		/* last fetched number */
 	seq->is_called = true;
-	seq->log_cnt = log;			/* how much is logged */
+	seq->log_cnt = (rangemax - result) / incby;
 
 	END_CRIT_SECTION();
 

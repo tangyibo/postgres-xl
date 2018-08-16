@@ -943,12 +943,9 @@ GTM_SeqGetNext(GTM_SequenceKey seqkey, char *coord_name,
 	GTM_SeqInfo *seqinfo = seq_find_seqinfo(seqkey);
 
 	if (seqinfo == NULL)
-	{
-		ereport(LOG,
+		ereport(ERROR,
 				(EINVAL,
 				 errmsg("The sequence with the given key does not exist")));
-		return EINVAL;
-	}
 
 	GTM_RWLockAcquire(&seqinfo->gs_lock, GTM_LOCKMODE_WRITE);
 
@@ -980,12 +977,16 @@ GTM_SeqGetNext(GTM_SequenceKey seqkey, char *coord_name,
 				*result = seqinfo->gs_value = seqinfo->gs_min_value;
 			else
 			{
+				char        buf[100];
+
 				GTM_RWLockRelease(&seqinfo->gs_lock);
 				seq_release_seqinfo(seqinfo);
-				ereport(LOG,
+
+				snprintf(buf, sizeof(buf), INT64_FORMAT, seqinfo->gs_max_value);
+				ereport(ERROR,
 						(ERANGE,
-						 errmsg("Sequence reached maximum value")));
-				return ERANGE;
+						 errmsg("nextval: reached maximum value of sequence \"%s\" (%s)",
+							 seqinfo->gs_key->gsk_key, buf)));
 			}
 		}
 		else
@@ -1008,12 +1009,15 @@ GTM_SeqGetNext(GTM_SequenceKey seqkey, char *coord_name,
 				*result = seqinfo->gs_value = seqinfo->gs_max_value;
 			else
 			{
+				char        buf[100];
 				GTM_RWLockRelease(&seqinfo->gs_lock);
 				seq_release_seqinfo(seqinfo);
-				ereport(LOG,
+
+				snprintf(buf, sizeof(buf), INT64_FORMAT, seqinfo->gs_min_value);
+				ereport(ERROR,
 						(ERANGE,
-						 errmsg("Sequence reached maximum value")));
-				return ERANGE;
+						 errmsg("nextval: reached minimum value of sequence \"%s\" (%s)",
+							 seqinfo->gs_key->gsk_key, buf)));
 			}
 		}
 	}

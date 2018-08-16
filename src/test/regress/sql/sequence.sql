@@ -374,9 +374,10 @@ BEGIN;
 SET LOCAL SESSION AUTHORIZATION regress_seq_user;
 CREATE SEQUENCE seq3;
 REVOKE ALL ON seq3 FROM regress_seq_user;
-SAVEPOINT save;
-SELECT setval('seq3', 5);
-ROLLBACK TO save;
+-- XL does not support SAVEPOINT
+-- SAVEPOINT save;
+-- SELECT setval('seq3', 5);
+-- ROLLBACK TO save;
 GRANT UPDATE ON seq3 TO regress_seq_user;
 SELECT setval('seq3', 5);
 SELECT nextval('seq3');

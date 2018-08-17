@@ -138,6 +138,8 @@ SELECT nextval('foo_seq_new');
 SELECT nextval('foo_seq_new');
 -- log_cnt can be higher if there is a checkpoint just at the right
 -- time, so just test for the expected range
+-- In XL, since we WAL log the same count as received from the GTM, log_cnt is
+-- usually just 1 (unless it increases exponentially)
 SELECT last_value, log_cnt IN (31, 32) AS log_cnt_ok, is_called FROM foo_seq_new;
 DROP SEQUENCE foo_seq_new;
 
@@ -238,6 +240,8 @@ SELECT * FROM information_schema.sequences
   WHERE sequence_name ~ ANY(ARRAY['sequence_test', 'serialtest'])
   ORDER BY sequence_name ASC;
 
+-- In XL, columns such as last_value may not be set correctly on the
+-- coordinator if the nextval was pushed down to the datanode
 SELECT schemaname, sequencename, start_value, min_value, max_value, increment_by, cycle, cache_size, last_value
 FROM pg_sequences
 WHERE sequencename ~ ANY(ARRAY['sequence_test', 'serialtest'])

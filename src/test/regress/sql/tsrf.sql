@@ -90,8 +90,8 @@ reset enable_hashagg;
 
 -- data modification
 CREATE TABLE fewmore AS SELECT generate_series(1,3) AS data;
-INSERT INTO fewmore VALUES(generate_series(4,5));
-SELECT * FROM fewmore;
+INSERT INTO fewmore SELECT generate_series(4,5);
+SELECT * FROM fewmore ORDER BY 1;
 
 -- SRFs are not allowed in UPDATE (they once were, but it was nonsense)
 UPDATE fewmore SET data = generate_series(4,9);

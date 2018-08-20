@@ -162,3 +162,128 @@ select array_agg(c.*) from "XLTEST_type" c where c.primary = 1;
 (1 row)
 
 drop table "XL.Schema"."XLTEST_type";
+-- size functions
+create table tabsize (a int);
+insert into tabsize values (1);
+select pg_relation_size('tabsize');			-- only one node should have one heap page
+ pg_relation_size 
+------------------
+             8192
+(1 row)
+
+select pg_total_relation_size('tabsize');	-- no indexes or toast
+ pg_total_relation_size 
+------------------------
+                   8192
+(1 row)
+
+insert into tabsize values (2), (3);
+select pg_relation_size('tabsize');			-- both nodes should have one heap page each
+ pg_relation_size 
+------------------
+            16384
+(1 row)
+
+select pg_total_relation_size('tabsize');	-- no indexes or toast
+ pg_total_relation_size 
+------------------------
+                  16384
+(1 row)
+
+create index testindx ON tabsize(a);
+select pg_total_relation_size('tabsize');	-- index size gets added
+ pg_total_relation_size 
+------------------------
+                  49152
+(1 row)
+
+alter table tabsize add column b text default 'x';		-- toast table
+select pg_total_relation_size('tabsize');	-- toast table size gets added
+ pg_total_relation_size 
+------------------------
+                  65536
+(1 row)
+
+create index testindx_b ON tabsize(b);
+select pg_total_relation_size('tabsize');	-- another index on the table
+ pg_total_relation_size 
+------------------------
+                  98304
+(1 row)
+
+-- check materialized view
+create materialized view tabsize_mv1 as select a from tabsize;
+select pg_total_relation_size('tabsize_mv1');
+ pg_total_relation_size 
+------------------------
+                   8192
+(1 row)
+
+create materialized view tabsize_mv2 as select a, b from tabsize;
+select pg_total_relation_size('tabsize_mv2');
+ pg_total_relation_size 
+------------------------
+                  16384
+(1 row)
+
+drop table tabsize cascade;
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to materialized view tabsize_mv1
+drop cascades to materialized view tabsize_mv2
+-- check temp table
+create temp table tabsize (a int);
+insert into tabsize values (1), (2), (3);
+select pg_relation_size('tabsize');			-- both nodes should have one heap page each
+ pg_relation_size 
+------------------
+            16384
+(1 row)
+
+select pg_total_relation_size('tabsize');	-- no indexes or toast
+ pg_total_relation_size 
+------------------------
+                  16384
+(1 row)
+
+create index testindx ON tabsize(a);
+select pg_total_relation_size('tabsize');	-- index size gets added
+ pg_total_relation_size 
+------------------------
+                  49152
+(1 row)
+
+drop table tabsize;
+-- check replicated tables
+create table tabsize (a int) distribute by replication;
+insert into tabsize values (1), (2), (3);
+select pg_relation_size('tabsize');
+ pg_relation_size 
+------------------
+            16384
+(1 row)
+
+select pg_total_relation_size('tabsize');
+ pg_total_relation_size 
+------------------------
+                  16384
+(1 row)
+
+drop table tabsize;
+-- check schema qualified, special names etc
+create schema "schema_SIZE";
+create table "schema_SIZE"."tab_SIZE" (a int);
+insert into "schema_SIZE"."tab_SIZE" values (1), (2), (3);
+select pg_relation_size('"schema_SIZE"."tab_SIZE"');
+ pg_relation_size 
+------------------
+            16384
+(1 row)
+
+set search_path to "schema_SIZE";
+select pg_relation_size('"tab_SIZE"');
+ pg_relation_size 
+------------------
+            16384
+(1 row)
+
+drop table "schema_SIZE"."tab_SIZE";

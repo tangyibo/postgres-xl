@@ -337,6 +337,9 @@ calculate_relation_size(RelFileNode *rfn, BackendId backend, ForkNumber forknum)
 	char		pathname[MAXPGPATH];
 	unsigned int segcount = 0;
 
+	if (OidIsValid(MyCoordId))
+		backend = InvalidBackendId;
+
 	relationpath = relpathbackend(*rfn, backend, forknum);
 
 	for (segcount = 0;; segcount++)
@@ -1185,7 +1188,7 @@ pgxc_exec_sizefunc(Oid relOid, char *funcname, char *extra_arg)
 {
 	int             numnodes;
 	Oid            *nodelist;
-	char           *relname = NULL;
+	const char	   *relname = NULL;
 	StringInfoData  buf;
 	Relation        rel;
 	bool			istemp;
@@ -1193,20 +1196,25 @@ pgxc_exec_sizefunc(Oid relOid, char *funcname, char *extra_arg)
 	rel = relation_open(relOid, AccessShareLock);
 	istemp = (rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP);
 
+	/* get relation name including any needed schema prefix and quoting */
+	if (rel->rd_locator_info)
+		relname = RelationGetRelationName(rel);
+
 	initStringInfo(&buf);
 	/* get relation name including any needed schema prefix and quoting */
 	if (!extra_arg)
 		appendStringInfo(&buf, "SELECT pg_catalog.%s(c.oid) "
 				"FROM pg_class c JOIN pg_namespace nc "
-				"	ON c.oid = nc.oid ", funcname);
+				"	ON c.relnamespace = nc.oid ", funcname);
 	else
 		appendStringInfo(&buf, "SELECT pg_catalog.%s(c.oid, '%s') "
 				"FROM pg_class c JOIN pg_namespace nc "
-				"	ON c.oid = nc.oid ", funcname, extra_arg);
+				"	ON c.relnamespace = nc.oid ", funcname, extra_arg);
 
 	if (!istemp)
 		appendStringInfo(&buf, "WHERE relname = '%s' AND nc.nspname = '%s'",
-				relname, get_namespace_name(rel->rd_rel->relnamespace));
+				relname,
+				get_namespace_name(rel->rd_rel->relnamespace));
 	else
 		appendStringInfo(&buf, "WHERE relname = '%s' AND "
 				"	nc.oid = pg_my_temp_schema()", relname);

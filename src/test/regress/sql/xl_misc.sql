@@ -93,3 +93,53 @@ select array_agg(c.*) from "XLTEST_type" c where c.primary = 1;
 
 drop table "XL.Schema"."XLTEST_type";
 
+-- size functions
+create table tabsize (a int);
+insert into tabsize values (1);
+select pg_relation_size('tabsize');			-- only one node should have one heap page
+select pg_total_relation_size('tabsize');	-- no indexes or toast
+insert into tabsize values (2), (3);
+select pg_relation_size('tabsize');			-- both nodes should have one heap page each
+select pg_total_relation_size('tabsize');	-- no indexes or toast
+
+create index testindx ON tabsize(a);
+select pg_total_relation_size('tabsize');	-- index size gets added
+
+alter table tabsize add column b text default 'x';		-- toast table
+select pg_total_relation_size('tabsize');	-- toast table size gets added
+create index testindx_b ON tabsize(b);
+select pg_total_relation_size('tabsize');	-- another index on the table
+
+-- check materialized view
+create materialized view tabsize_mv1 as select a from tabsize;
+select pg_total_relation_size('tabsize_mv1');
+create materialized view tabsize_mv2 as select a, b from tabsize;
+select pg_total_relation_size('tabsize_mv2');
+
+drop table tabsize cascade;
+
+-- check temp table
+create temp table tabsize (a int);
+insert into tabsize values (1), (2), (3);
+select pg_relation_size('tabsize');			-- both nodes should have one heap page each
+select pg_total_relation_size('tabsize');	-- no indexes or toast
+
+create index testindx ON tabsize(a);
+select pg_total_relation_size('tabsize');	-- index size gets added
+drop table tabsize;
+
+-- check replicated tables
+create table tabsize (a int) distribute by replication;
+insert into tabsize values (1), (2), (3);
+select pg_relation_size('tabsize');
+select pg_total_relation_size('tabsize');
+drop table tabsize;
+
+-- check schema qualified, special names etc
+create schema "schema_SIZE";
+create table "schema_SIZE"."tab_SIZE" (a int);
+insert into "schema_SIZE"."tab_SIZE" values (1), (2), (3);
+select pg_relation_size('"schema_SIZE"."tab_SIZE"');
+set search_path to "schema_SIZE";
+select pg_relation_size('"tab_SIZE"');
+drop table "schema_SIZE"."tab_SIZE";

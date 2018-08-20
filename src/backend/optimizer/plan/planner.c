@@ -3987,6 +3987,10 @@ create_grouping_paths(PlannerInfo *root,
 		/* Insufficient support for partial mode. */
 		try_distributed_aggregation = false;
 	}
+	else if (parse->hasTargetSRFs)
+	{
+		try_distributed_aggregation = false;
+	}
 	else
 	{
 		/* Everything looks good. */

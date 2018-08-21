@@ -134,20 +134,17 @@ alter table tenk2 set (parallel_workers = 0);
 explain (costs off)
 	select count(*) from tenk1 where (two, four) not in
 	(select hundred, thousand from tenk2 where thousand > 100);
-                                     QUERY PLAN                                      
--------------------------------------------------------------------------------------
- Finalize Aggregate
+                               QUERY PLAN                                
+-------------------------------------------------------------------------
+ Aggregate
    ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-         ->  Gather
-               Workers Planned: 4
-               ->  Partial Aggregate
-                     ->  Parallel Seq Scan on tenk1
-                           Filter: (NOT (hashed SubPlan 1))
-                           SubPlan 1
-                             ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-                                   ->  Seq Scan on tenk2
-                                         Filter: (thousand > 100)
-(11 rows)
+         ->  Seq Scan on tenk1
+               Filter: (NOT (hashed SubPlan 1))
+               SubPlan 1
+                 ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                       ->  Seq Scan on tenk2
+                             Filter: (thousand > 100)
+(8 rows)
 
 select count(*) from tenk1 where (two, four) not in
 	(select hundred, thousand from tenk2 where thousand > 100);

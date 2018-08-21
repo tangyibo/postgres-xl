@@ -5890,6 +5890,9 @@ make_remotesubplan(PlannerInfo *root,
 	plan->righttree = NULL;
 	copy_plan_costsize(plan, lefttree);
 
+	/* RemoteSubplan is not parallel_safe */
+	plan->parallel_safe = false;
+
 	node->cursor = get_internal_cursor();
 	node->unique = 0;
 	return node;

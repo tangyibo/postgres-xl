@@ -323,7 +323,12 @@ apply_tlist_labeling(List *dest_tlist, List *src_tlist)
 	ListCell   *ld,
 			   *ls;
 
-	Assert(list_length(dest_tlist) == list_length(src_tlist));
+	/*
+	 * XL planner may add junk attributes to the RemoteSubplan, so the
+	 * dest_tlist may have more entries than the src_tlist. Doesn't matter
+	 * because the forboth loop ends when any of the lists finishes.
+	 */
+	Assert(list_length(dest_tlist) >= list_length(src_tlist));
 	forboth(ld, dest_tlist, ls, src_tlist)
 	{
 		TargetEntry *dest_tle = (TargetEntry *) lfirst(ld);

@@ -5589,8 +5589,11 @@ make_remotesubplan(PlannerInfo *root,
 			foreach(lc, lefttree->targetlist)
 			{
 				TargetEntry *tle = (TargetEntry *) lfirst(lc);
+				Expr		*tleExpr = tle->expr;
 
-				if (equal(tle->expr, expr))
+				if (IsA(tle->expr, RelabelType))
+					tleExpr = ((RelabelType *)tle->expr)->arg;
+				if (equal(tleExpr, expr))
 				{
 					node->distributionKey = tle->resno;
 					break;

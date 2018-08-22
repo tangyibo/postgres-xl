@@ -156,7 +156,8 @@ SELECT * FROM ONLY c ORDER BY c.aa;
 SELECT * from ONLY d ORDER BY d.aa;
 
 -- Confirm PRIMARY KEY adds NOT NULL constraint to child table
-CREATE TEMP TABLE z (b TEXT, PRIMARY KEY(aa, b)) inherits (a);
+CREATE TEMP TABLE z1 (aa TEXT) DISTRIBUTE BY HASH(aa);
+CREATE TEMP TABLE z (b TEXT, PRIMARY KEY(aa, b)) inherits (z1);
 INSERT INTO z VALUES (NULL, 'text'); -- should fail
 
 -- Check UPDATE with inherited target and an inherited source table

@@ -761,7 +761,8 @@ SELECT * from ONLY d ORDER BY d.aa;
 (0 rows)
 
 -- Confirm PRIMARY KEY adds NOT NULL constraint to child table
-CREATE TEMP TABLE z (b TEXT, PRIMARY KEY(aa, b)) inherits (a);
+CREATE TEMP TABLE z1 (aa TEXT) DISTRIBUTE BY HASH(aa);
+CREATE TEMP TABLE z (b TEXT, PRIMARY KEY(aa, b)) inherits (z1);
 INSERT INTO z VALUES (NULL, 'text'); -- should fail
 ERROR:  null value in column "aa" violates not-null constraint
 DETAIL:  Failing row contains (null, text).
@@ -1802,13 +1803,15 @@ SELECT 42, 42, hundred FROM tenk1
 ORDER BY thousand, tenthous;
                                QUERY PLAN                               
 ------------------------------------------------------------------------
- Remote Subquery Scan on all
-   ->  Sort
-         Sort Key: tenk1.thousand, tenk1.tenthous
-         ->  Append
-               ->  Index Only Scan using tenk1_thous_tenthous on tenk1
+ Merge Append
+   Sort Key: tenk1.thousand, tenk1.tenthous
+   ->  Remote Subquery Scan on all
+         ->  Index Only Scan using tenk1_thous_tenthous on tenk1
+   ->  Remote Subquery Scan on all
+         ->  Sort
+               Sort Key: 42, 42
                ->  Index Only Scan using tenk1_hundred on tenk1 tenk1_1
-(6 rows)
+(8 rows)
 
 explain (costs off, num_nodes off, nodes off)
 SELECT thousand, tenthous FROM tenk1

@@ -2062,6 +2062,7 @@ SetRemoteSubplan(CachedPlanSource *plansource, const char *plan_string)
 	stmt->distributionKey = rstmt->distributionKey;
 	stmt->distributionNodes = rstmt->distributionNodes;
 	stmt->distributionRestrict = rstmt->distributionRestrict;
+	stmt->parallelModeNeeded = rstmt->parallelModeNeeded;
 
 	/*
 	 * Set up SharedQueue if intermediate results need to be distributed

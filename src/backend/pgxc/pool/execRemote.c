@@ -5479,6 +5479,7 @@ ExecInitRemoteSubplan(RemoteSubplan *node, EState *estate, int eflags)
 			 */
 			RemoteSubplanMakeUnique((Node *) outerPlan(node), PGXCNodeId);
 		}
+		rstmt.parallelModeNeeded = estate->es_plannedstmt->parallelModeNeeded;
 		rstmt.planTree = outerPlan(node);
 		/*
 		 * If datanode launch further execution of a command it should tell

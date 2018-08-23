@@ -198,6 +198,8 @@ typedef struct RemoteStmt
 
 	bool		hasReturning;	/* is it insert|update|delete RETURNING? */
 
+	bool		parallelModeNeeded;
+
 	struct Plan *planTree;				/* tree of Plan nodes */
 
 	List	   *rtable;					/* list of RangeTblEntry nodes */

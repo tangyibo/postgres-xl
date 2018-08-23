@@ -3649,6 +3649,7 @@ _readRemoteStmt(void)
 
 	READ_ENUM_FIELD(commandType, CmdType);
 	READ_BOOL_FIELD(hasReturning);
+	READ_BOOL_FIELD(parallelModeNeeded);
 	READ_NODE_FIELD(planTree);
 	READ_NODE_FIELD(rtable);
 	READ_NODE_FIELD(resultRelations);

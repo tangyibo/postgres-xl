@@ -1571,6 +1571,7 @@ _outRemoteStmt(StringInfo str, const RemoteStmt *node)
 
 	WRITE_ENUM_FIELD(commandType, CmdType);
 	WRITE_BOOL_FIELD(hasReturning);
+	WRITE_BOOL_FIELD(parallelModeNeeded);
 	WRITE_NODE_FIELD(planTree);
 	WRITE_NODE_FIELD(rtable);
 	WRITE_NODE_FIELD(resultRelations);

@@ -3167,12 +3167,13 @@ static struct config_int ConfigureNamesInt[] =
 
 	{
 		{"pgxl_remote_fetch_size", PGC_USERSET, UNGROUPED,
-			gettext_noop("Number of maximum tuples to fetch in one remote iteration"),
+			gettext_noop("Number of maximum tuples to fetch in one remote "
+					"iteration. 0 fetches all rows at once."),
 			NULL,
 			0
 		},
 		&PGXLRemoteFetchSize,
-		1000, 1, INT_MAX,
+		1000, 0, INT_MAX,
 		NULL, NULL, NULL
 	},
 

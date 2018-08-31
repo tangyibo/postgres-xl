@@ -277,6 +277,17 @@ ClusterMonitorInit(void)
 					continue;
 				}
 			}
+			else if (status == GTM_ERRCODE_NODE_NOT_REGISTERED)
+			{
+				/*
+				 * If we're not registered on the GTM, it could be because the
+				 * GTM is restarted. Just exit and let the cluster monitor be
+				 * restarted again.
+				 */
+				elog(WARNING, "ClusterMonitor process exiting - node not "
+						"registered on the GTM");
+				proc_exit(0);
+			}
 		}
 		else
 		{

@@ -22,8 +22,6 @@
 #include "gtm/stringinfo.h"
 
 
-typedef int XidStatus;
-
 #define TRANSACTION_STATUS_IN_PROGRESS      0x00
 #define TRANSACTION_STATUS_COMMITTED        0x01
 #define TRANSACTION_STATUS_ABORTED          0x02

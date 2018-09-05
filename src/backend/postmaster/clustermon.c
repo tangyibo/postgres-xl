@@ -246,8 +246,8 @@ ClusterMonitorInit(void)
 						&latestCompletedXid)))
 		{
 			elog(DEBUG1, "Failed (status %d) to report RecentGlobalXmin "
-					"- reported RecentGlobalXmin %d, received "
-					"RecentGlobalXmin %d, " "received latestCompletedXid %d",
+					"- reported RecentGlobalXmin %u, received "
+					"RecentGlobalXmin %u, " "received latestCompletedXid %u",
 					status, oldestXmin, newOldestXmin,
 					latestCompletedXid);
 			if (status == GTM_ERRCODE_TOO_OLD_XMIN ||
@@ -289,9 +289,9 @@ ClusterMonitorInit(void)
 		}
 		else
 		{
-			elog(DEBUG1, "Successfully reported xmin to GTM - reported_xmin %d,"
-					"received RecentGlobalXmin %d, "
-					"received latestCompletedXid %d", oldestXmin,
+			elog(DEBUG1, "Successfully reported xmin to GTM - reported_xmin %u,"
+					"received RecentGlobalXmin %u, "
+					"received latestCompletedXid %u", oldestXmin,
 					newOldestXmin, latestCompletedXid);
 
 			SetLatestCompletedXid(latestCompletedXid);
@@ -416,7 +416,7 @@ ClusterMonitorSetGlobalXmin(GlobalTransactionId xmin)
 static void
 ClusterMonitorSetReportedGlobalXmin(GlobalTransactionId xmin)
 {
-	elog(DEBUG2, "ClusterMonitorSetReportedGlobalXmin - old %d, new %d",
+	elog(DEBUG2, "ClusterMonitorSetReportedGlobalXmin - old %u, new %u",
 			ClusterMonitorCtl->reported_recent_global_xmin,
 			xmin);
 	SpinLockAcquire(&ClusterMonitorCtl->mutex);
@@ -427,7 +427,7 @@ ClusterMonitorSetReportedGlobalXmin(GlobalTransactionId xmin)
 static void
 ClusterMonitorSetReportingGlobalXmin(GlobalTransactionId xmin)
 {
-	elog(DEBUG2, "ClusterMonitorSetReportingGlobalXmin - old %d, new %d",
+	elog(DEBUG2, "ClusterMonitorSetReportingGlobalXmin - old %u, new %u",
 			ClusterMonitorCtl->reporting_recent_global_xmin,
 			xmin);
 	SpinLockAcquire(&ClusterMonitorCtl->mutex);

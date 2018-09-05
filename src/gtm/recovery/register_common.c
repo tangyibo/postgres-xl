@@ -959,7 +959,7 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 
 	*errcode = 0;
 
-	elog(DEBUG1, "node_name: %s, reported_xmin: %d, global_xmin: %d",
+	elog(DEBUG1, "node_name: %s, reported_xmin: %u, global_xmin: %u",
 			node_name, reported_xmin,
 			GTM_GlobalXmin);
 	
@@ -1010,8 +1010,8 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 		mynodeinfo->reported_xmin = GTM_GlobalXmin;
 
 		GTM_RWLockRelease(&mynodeinfo->node_lock);
-		elog(LOG, "GTM_ERRCODE_NODE_EXCLUDED - node_name %s, reported_xmin %d "
-				"previously reported_xmin %d, GTM_GlobalXmin %d", node_name,
+		elog(LOG, "GTM_ERRCODE_NODE_EXCLUDED - node_name %s, reported_xmin %u "
+				"previously reported_xmin %u, GTM_GlobalXmin %u", node_name,
 				reported_xmin,
 				mynodeinfo->reported_xmin,
 				GTM_GlobalXmin);
@@ -1038,8 +1038,8 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 		 * confusing log message.
 		 */
 		if (mynodeinfo->reported_xmin_time)
-			elog(LOG, "GTM_ERRCODE_TOO_OLD_XMIN - node_name %s, reported_xmin %d, "
-					"previously reported_xmin %d, GTM_GlobalXmin %d", node_name,
+			elog(LOG, "GTM_ERRCODE_TOO_OLD_XMIN - node_name %s, reported_xmin %u, "
+					"previously reported_xmin %u, GTM_GlobalXmin %u", node_name,
 					reported_xmin, mynodeinfo->reported_xmin, GTM_GlobalXmin);
 
 		mynodeinfo->reported_xmin_time = GTM_TimestampGetCurrent();
@@ -1049,7 +1049,7 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 		return InvalidGlobalTransactionId;
 	}
 
-	elog(DEBUG1, "node_name: %s, reported_xmin: %d, nodeinfo->reported_xmin: %d",
+	elog(DEBUG1, "node_name: %s, reported_xmin: %u, nodeinfo->reported_xmin: %u",
 			mynodeinfo->nodename, reported_xmin,
 			mynodeinfo->reported_xmin);
 
@@ -1084,7 +1084,7 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 	{
 		GTM_PGXCNodeInfo *nodeinfo = all_nodes[ii];
 
-		elog(DEBUG1, "nodeinfo %p, type: %d, exclude %c, xmin %d, time %ld",
+		elog(DEBUG1, "nodeinfo %p, type: %d, exclude %c, xmin %u, time %ld",
 				nodeinfo, nodeinfo->type, nodeinfo->excluded ? 'T' : 'F',
 				nodeinfo->reported_xmin, nodeinfo->reported_xmin_time);
 
@@ -1109,7 +1109,7 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 					current_time, GTM_REPORT_XMIN_DELAY_THRESHOLD))
 		{
 			elog(LOG, "Timediff exceeds threshold - last reporting time %ld, "
-					"current time %ld, last reported_xmin %d, reported_xmin %d,"
+					"current time %ld, last reported_xmin %u, reported_xmin %u,"
 					" - excluding the node %s from GlobalXmin calculation",
 					nodeinfo->reported_xmin_time, current_time,
 					reported_xmin, nodeinfo->reported_xmin,
@@ -1191,7 +1191,7 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 		if (nodeinfo->excluded)
 		{
 			elog(DEBUG1, "Node %s is excluded (last reported time %ld, current"
-				" time %ld, last reported_xmin %d. This node won't be included in "
+				" time %ld, last reported_xmin %u. This node won't be included in "
 				"GTM_GlobalXmin computation",
 				nodeinfo->nodename, nodeinfo->reported_xmin_time,
 				GTM_TimestampGetCurrent(), nodeinfo->reported_xmin);
@@ -1222,21 +1222,20 @@ GTM_HandleGlobalXmin(GTM_PGXCNodeType type, char *node_name,
 		GTM_RWLockAcquire(&PGXCNodesLock, GTM_LOCKMODE_WRITE);
 		if (GlobalTransactionIdPrecedes(GTM_GlobalXmin, global_xmin))
 		{
-			elog(DEBUG1, "Computed new GTM_GlobalXmin %d, old value was %d",
+			elog(DEBUG1, "Computed new GTM_GlobalXmin %u, old value was %u",
 					global_xmin, GTM_GlobalXmin);
 			GTM_GlobalXmin = global_xmin;
 			GTM_GlobalXminComputedTime = current_time;
 		}
 		else if (GlobalTransactionIdFollows(GTM_GlobalXmin, global_xmin))
 		{
-			elog(LOG, "The current (old) GTM_GlobalXmin %d is newer than what "
-					"we just computed %d - keeping the current value",
+			elog(LOG, "The current (old) GTM_GlobalXmin %u is newer than what "
+					"we just computed %u - keeping the current value",
 					GTM_GlobalXmin, global_xmin);
 			global_xmin = GTM_GlobalXmin;
 		}
 		GTM_RWLockRelease(&PGXCNodesLock);
 	}
-
 
 	return global_xmin;
 }

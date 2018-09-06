@@ -79,7 +79,9 @@ ClusterMonitorInit(void)
 	GlobalTransactionId newOldestXmin;
 	GlobalTransactionId lastGlobalXmin;
 	GlobalTransactionId latestCompletedXid;
-	int status;
+	int					status;
+	bool				bootingUp = true;
+	int					aggreesiveReportingCount = 0;
 
 	am_clustermon = true;
 
@@ -198,21 +200,33 @@ ClusterMonitorInit(void)
 		int			rc;
 
 		/*
-		 * Repeat at CLUSTER_MONITOR_NAPTIME seconds interval
+		 * While booting up, aggressively try to report Xmin and fetch global
+		 * state from the GTM. This allows up to be set the shared memory state
+		 * before regular processing starts up. While there is no guarantee
+		 * that the regular backends won't start before we get chance to setup
+		 * the shared memory state, being aggressive reduces that window.
 		 */
-		nap.tv_sec = CLUSTER_MONITOR_NAPTIME;
-		nap.tv_usec = 0;
+		if (!bootingUp)
+		{
+			/*
+			 * Repeat at CLUSTER_MONITOR_NAPTIME seconds interval
+			 */
+			nap.tv_sec = CLUSTER_MONITOR_NAPTIME;
+			nap.tv_usec = 0;
 
-		/*
-		 * Wait until naptime expires or we get some type of signal (all the
-		 * signal handlers will wake us by calling SetLatch).
-		 */
-		rc = WaitLatch(MyLatch,
-					   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
-					   (nap.tv_sec * 1000L) + (nap.tv_usec / 1000L),
-					   WAIT_EVENT_CLUSTER_MONITOR_MAIN);
+			/*
+			 * Wait until naptime expires or we get some type of signal (all the
+			 * signal handlers will wake us by calling SetLatch).
+			 */
+			rc = WaitLatch(MyLatch,
+						   WL_LATCH_SET | WL_TIMEOUT | WL_POSTMASTER_DEATH,
+						   (nap.tv_sec * 1000L) + (nap.tv_usec / 1000L),
+						   WAIT_EVENT_CLUSTER_MONITOR_MAIN);
 
-		ResetLatch(MyLatch);
+			ResetLatch(MyLatch);
+		}
+		else if (aggreesiveReportingCount++ > 5)
+			bootingUp = false;
 
 		/* Process sinval catchup interrupts that happened while sleeping */
 		ProcessCatchupInterrupt();
@@ -238,7 +252,7 @@ ClusterMonitorInit(void)
 		 * Compute RecentGlobalXmin, report it to the GTM and sleep for the set
 		 * interval. Keep doing this forever
 		 */
-		lastGlobalXmin = ClusterMonitorGetGlobalXmin();
+		lastGlobalXmin = ClusterMonitorGetGlobalXmin(true);
  		LWLockAcquire(ClusterMonitorLock, LW_EXCLUSIVE);
 		oldestXmin = GetOldestXminInternal(NULL, 0, true, lastGlobalXmin);
 		ClusterMonitorSetReportingGlobalXmin(oldestXmin);
@@ -374,14 +388,33 @@ ClusterMonitorShmemInit(void)
 	}
 }
 
+/*
+ * Get GlobalXmin from the shared memory state. If invalid_ok is true, then the
+ * caller is ready to accept an InvalidGlobalTransactionId if the value is not
+ * yet set in the shared memory. This can typically only happen when the
+ * ClusterMonitor process is starting up and hasn't yet got chance to report
+ * local state and fetch global state. Or this can happen when the server is
+ * boot-strapping and not using GTM for XID management (initdb).
+ *
+ * If invalid_ok is false and shared memory state is not yet set, then just
+ * compute the GlobalXmin using regular means and return that.
+ */
 GlobalTransactionId
-ClusterMonitorGetGlobalXmin(void)
+ClusterMonitorGetGlobalXmin(bool invalid_ok)
 {
-	GlobalTransactionId xmin;
+	GlobalTransactionId xmin = InvalidGlobalTransactionId;
+	int					retries = 0;
 
 	SpinLockAcquire(&ClusterMonitorCtl->mutex);
 	xmin = ClusterMonitorCtl->gtm_recent_global_xmin;
 	SpinLockRelease(&ClusterMonitorCtl->mutex);
+
+	/*
+	 * If caller can't accept invalid value, then compute local GlobalXmin and
+	 * return that.
+	 */
+	if (!GlobalTransactionIdIsValid(xmin) && !invalid_ok)
+		xmin = GetOldestXminInternal(NULL, 0, true, InvalidTransactionId);
 
 	return xmin;
 }

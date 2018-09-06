@@ -1432,9 +1432,8 @@ GetOldestXminInternal(Relation rel, int flags, bool computeLocal,
 #ifdef XCP
 	if (!computeLocal)
 	{
-		xmin = (TransactionId) ClusterMonitorGetGlobalXmin();
-		if (!TransactionIdIsValid(xmin))
-			xmin = FirstNormalTransactionId;
+		xmin = (TransactionId) ClusterMonitorGetGlobalXmin(false);
+		Assert(TransactionIdIsValid(xmin));
 		return xmin;
 	}
 #endif
@@ -1909,7 +1908,7 @@ GetSnapshotData(Snapshot snapshot, bool latest)
 		globalxmin = xmin;
 
 #ifdef XCP
-	clustermon_xmin = ClusterMonitorGetGlobalXmin();
+	clustermon_xmin = ClusterMonitorGetGlobalXmin(false);
 	if (TransactionIdPrecedes(clustermon_xmin, globalxmin))
 		globalxmin = clustermon_xmin;
 #endif
@@ -3500,9 +3499,8 @@ retry:
 		 * Set RecentGlobalXmin by copying from the shared memory state
 		 * maintained by the Clutser Monitor
 		 */
-		RecentGlobalXmin = ClusterMonitorGetGlobalXmin();
-		if (!TransactionIdIsValid(RecentGlobalXmin))
-			RecentGlobalXmin = FirstNormalTransactionId;
+		RecentGlobalXmin = ClusterMonitorGetGlobalXmin(false);
+		Assert(TransactionIdIsValid(RecentGlobalXmin));
 		/*
 		 * XXX Is it ok to set RecentGlobalDataXmin same as RecentGlobalXmin ?
 		 */
@@ -3601,9 +3599,8 @@ GetSnapshotFromGlobalSnapshot(Snapshot snapshot)
 		 * and rejoin the cluster, but if at all it sends a snapshot to us, we
 		 * should protect ourselves from using it
 		 */
-		global_xmin = ClusterMonitorGetGlobalXmin();
-		if (!TransactionIdIsValid(global_xmin))
-			global_xmin = FirstNormalTransactionId;
+		global_xmin = ClusterMonitorGetGlobalXmin(false);
+		Assert(TransactionIdIsValid(global_xmin));
 
 		if (TransactionIdPrecedes(globalSnapshot.gxmin, global_xmin))
 			elog(ERROR, "Snapshot too old - RecentGlobalXmin (%d) has already "

@@ -77,11 +77,7 @@ SELECT txid_status(:rolledback) AS rolledback;
 SELECT txid_status(:inprogress) AS inprogress;
 SELECT txid_status(1); -- BootstrapTransactionId is always committed
 SELECT txid_status(2); -- FrozenTransactionId is always committed
--- in regress testing FirstNormalTransactionId will always be behind oldestXmin
--- XXX in XL, the oldestXmin is advanced lazily and depends on the global
--- state. So the clog for FirstNormalTransactionId may very well exist and
--- txid_status gives us a correct answer
-SELECT txid_status(3);
+SELECT txid_status(3); -- in regress testing FirstNormalTransactionId will always be behind oldestXmin
 
 COMMIT;
 

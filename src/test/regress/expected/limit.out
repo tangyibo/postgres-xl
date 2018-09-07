@@ -313,24 +313,31 @@ SELECT
 -- with ORDER BY and LIMIT.
 --
 create temp sequence testseq;
+-- XL: The query has been slightly modified to suit XL's execution mechanism
+-- when nextval is pushed down to the remote node. Using a subquery gives
+-- consistent results and also ensures currval() returns correct value (since
+-- nextval gets executed on the coordinator). The original two tests are
+-- copied to xl_known_bugs test case
 explain (verbose, costs off)
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by unique2 limit 10;
-                                 QUERY PLAN                                 
-----------------------------------------------------------------------------
- Limit
-   Output: unique1, unique2, (nextval('testseq'::regclass))
-   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-         Output: unique1, unique2, nextval('testseq'::regclass)
-         Sort Key: tenk1.unique2
-         ->  Limit
-               Output: unique1, unique2, (nextval('testseq'::regclass))
-               ->  Index Scan using tenk1_unique2 on public.tenk1
-                     Output: unique1, unique2, nextval('testseq'::regclass)
-(9 rows)
+select  *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by unique2 limit 10) x;
+                               QUERY PLAN                               
+------------------------------------------------------------------------
+ Subquery Scan on x
+   Output: x.unique1, x.unique2, nextval('testseq'::regclass)
+   ->  Limit
+         Output: tenk1.unique1, tenk1.unique2
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Output: tenk1.unique1, tenk1.unique2
+               Sort Key: tenk1.unique2
+               ->  Limit
+                     Output: tenk1.unique1, tenk1.unique2
+                     ->  Index Scan using tenk1_unique2 on public.tenk1
+                           Output: tenk1.unique1, tenk1.unique2
+(11 rows)
 
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by unique2 limit 10;
+select  *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by unique2 limit 10) x;
  unique1 | unique2 | nextval 
 ---------+---------+---------
     8800 |       0 |       1
@@ -352,28 +359,28 @@ select currval('testseq');
 (1 row)
 
 explain (verbose, costs off)
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by tenthous limit 10;
+select *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by tenthous limit 10) x;
                                       QUERY PLAN                                      
 --------------------------------------------------------------------------------------
- Limit
-   Output: unique1, unique2, (nextval('testseq'::regclass)), tenthous
-   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
-         Output: unique1, unique2, nextval('testseq'::regclass), tenthous
-         Sort Key: tenk1.tenthous
-         ->  Limit
-               Output: unique1, unique2, (nextval('testseq'::regclass)), tenthous
-               ->  Result
-                     Output: unique1, unique2, nextval('testseq'::regclass), tenthous
+ Subquery Scan on x
+   Output: x.unique1, x.unique2, nextval('testseq'::regclass)
+   ->  Limit
+         Output: tenk1.unique1, tenk1.unique2, tenk1.tenthous
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Output: tenk1.unique1, tenk1.unique2, tenk1.tenthous
+               Sort Key: tenk1.tenthous
+               ->  Limit
+                     Output: tenk1.unique1, tenk1.unique2, tenk1.tenthous
                      ->  Sort
-                           Output: unique1, unique2, tenthous
+                           Output: tenk1.unique1, tenk1.unique2, tenk1.tenthous
                            Sort Key: tenk1.tenthous
                            ->  Seq Scan on public.tenk1
-                                 Output: unique1, unique2, tenthous
+                                 Output: tenk1.unique1, tenk1.unique2, tenk1.tenthous
 (14 rows)
 
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by tenthous limit 10;
+select *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by tenthous limit 10) x;
  unique1 | unique2 | nextval 
 ---------+---------+---------
        0 |    9998 |      11

@@ -88,22 +88,26 @@ SELECT
 --
 
 create temp sequence testseq;
-
+-- XL: The query has been slightly modified to suit XL's execution mechanism
+-- when nextval is pushed down to the remote node. Using a subquery gives
+-- consistent results and also ensures currval() returns correct value (since
+-- nextval gets executed on the coordinator). The original two tests are
+-- copied to xl_known_bugs test case
 explain (verbose, costs off)
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by unique2 limit 10;
+select  *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by unique2 limit 10) x;
 
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by unique2 limit 10;
+select  *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by unique2 limit 10) x;
 
 select currval('testseq');
 
 explain (verbose, costs off)
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by tenthous limit 10;
+select *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by tenthous limit 10) x;
 
-select unique1, unique2, nextval('testseq')
-  from tenk1 order by tenthous limit 10;
+select *, nextval('testseq') from
+	(select unique1, unique2 from tenk1 order by tenthous limit 10) x;
 
 select currval('testseq');
 

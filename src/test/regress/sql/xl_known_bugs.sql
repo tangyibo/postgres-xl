@@ -336,3 +336,24 @@ drop table xl_tmp;
 drop table xl_onek;
 
 ------------------------------------------
+
+-- When nextval is pushed down the datanode, currval may not be set on the
+-- coordinator (or can be stale). This case is picked up from 'limit' test case,
+-- which is modified to suit XL's current behaviour
+create temp sequence testseq;
+
+explain (verbose, costs off)
+select unique1, unique2, nextval('testseq')
+  from tenk1 order by unique2 limit 10;
+
+select unique1, unique2, nextval('testseq')
+  from tenk1 order by unique2 limit 10;
+
+select currval('testseq');
+
+explain (verbose, costs off)
+select unique1, unique2, nextval('testseq')
+  from tenk1 order by tenthous limit 10;
+
+select unique1, unique2, nextval('testseq')
+  from tenk1 order by tenthous limit 10;

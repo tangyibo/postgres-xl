@@ -379,6 +379,7 @@ ProcessGetSnapshotCommand(Port *myport, StringInfo message, bool get_gxid)
 	int status;
 	int txn_count;
 	const char *data = NULL;
+	int sn_xcnt;
 
 	txn_count = pq_getmsgint(message, sizeof (int));
 	Assert(txn_count == 1);
@@ -428,9 +429,12 @@ ProcessGetSnapshotCommand(Port *myport, StringInfo message, bool get_gxid)
 	pq_sendbytes(&buf, (char *)&status, sizeof(int) * txn_count);
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmin, sizeof (GlobalTransactionId));
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmax, sizeof (GlobalTransactionId));
-	pq_sendint(&buf, snapshot->sn_xcnt, sizeof (int));
+
+	/* Read once */
+	sn_xcnt = snapshot->sn_xcnt;
+	pq_sendint(&buf, sn_xcnt, sizeof (int));
 	pq_sendbytes(&buf, (char *)snapshot->sn_xip,
-				 sizeof(GlobalTransactionId) * snapshot->sn_xcnt);
+				 sizeof(GlobalTransactionId) * sn_xcnt);
 	pq_endmessage(myport, &buf);
 
 	if (myport->remote_type != GTM_NODE_GTM_PROXY)
@@ -453,6 +457,7 @@ ProcessGetSnapshotCommandMulti(Port *myport, StringInfo message)
 	int txn_count;
 	int ii;
 	int status[GTM_MAX_GLOBAL_TRANSACTIONS];
+	int sn_xcnt;
 
 	txn_count = pq_getmsgint(message, sizeof (int));
 
@@ -493,9 +498,11 @@ ProcessGetSnapshotCommandMulti(Port *myport, StringInfo message)
 	pq_sendbytes(&buf, (char *)status, sizeof(int) * txn_count);
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmin, sizeof (GlobalTransactionId));
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmax, sizeof (GlobalTransactionId));
-	pq_sendint(&buf, snapshot->sn_xcnt, sizeof (int));
+	/* Read once */
+	sn_xcnt = snapshot->sn_xcnt;
+	pq_sendint(&buf, sn_xcnt, sizeof (int));
 	pq_sendbytes(&buf, (char *)snapshot->sn_xip,
-				 sizeof(GlobalTransactionId) * snapshot->sn_xcnt);
+				 sizeof(GlobalTransactionId) * sn_xcnt);
 	pq_endmessage(myport, &buf);
 
 	if (myport->remote_type != GTM_NODE_GTM_PROXY)

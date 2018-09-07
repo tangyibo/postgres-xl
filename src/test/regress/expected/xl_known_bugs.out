@@ -856,3 +856,45 @@ select currval('testseq');
 ---------
       20
 (1 row)
+-- Bugs in WITH query handling
+CREATE TEMP TABLE department (
+    id INTEGER PRIMARY KEY,  -- department ID
+    parent_department INTEGER REFERENCES department, -- upper department ID
+    name TEXT -- department name
+);
+with recursive q as (
+      select * from department
+    union all
+      (with recursive x as (
+           select * from department
+         union all
+           (select * from q union all select * from x)
+        )
+       select * from x)
+    )
+select * from q order by 1, 2, 3 limit 32;
+ id | parent_department | name
+----+-------------------+------
+(0 rows)
+
+-- This fails to INSERT and RETURN the rows
+CREATE TEMPORARY TABLE y (a INTEGER);
+INSERT INTO y SELECT generate_series(1, 10);
+WITH t AS (
+    SELECT a FROM y
+)
+INSERT INTO y
+SELECT a+20 FROM t RETURNING *;
+ a
+----
+ 21
+ 22
+ 23
+ 24
+ 25
+ 26
+ 27
+ 28
+ 29
+ 30
+(10 rows)

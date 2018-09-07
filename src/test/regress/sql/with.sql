@@ -222,17 +222,19 @@ with recursive q as (
     )
 select * from q limit 24;
 
-with recursive q as (
-      select * from department
-    union all
-      (with recursive x as (
-           select * from department
-         union all
-           (select * from q union all select * from x)
-        )
-       select * from x)
-    )
-select * from q order by 1, 2, 3 limit 32;
+-- XL: This is known failure in XL and the test case is moved to xl_known_bugs
+
+--with recursive q as (
+--      select * from department
+--    union all
+--      (with recursive x as (
+--           select * from department
+--         union all
+--           (select * from q union all select * from x)
+--        )
+--       select * from x)
+--    )
+--select * from q order by 1, 2, 3 limit 32;
 
 -- recursive term has sub-UNION
 WITH RECURSIVE t(i,j) AS (
@@ -380,6 +382,8 @@ WITH RECURSIVE
 CREATE TEMPORARY TABLE y (a INTEGER) DISTRIBUTE BY REPLICATION;
 INSERT INTO y SELECT generate_series(1, 10);
 
+-- XL: this is known failure in XL where the following INSERT fails to
+-- insert the necessary rows.
 WITH t AS (
 	SELECT a FROM y
 )

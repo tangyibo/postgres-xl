@@ -357,3 +357,31 @@ select unique1, unique2, nextval('testseq')
 
 select unique1, unique2, nextval('testseq')
   from tenk1 order by tenthous limit 10;
+
+-- Bugs in WITH query handling
+CREATE TEMP TABLE department (
+	id INTEGER PRIMARY KEY,  -- department ID
+	parent_department INTEGER REFERENCES department, -- upper department ID
+	name TEXT -- department name
+) DISTRIBUTE BY REPLICATION;
+
+with recursive q as (
+      select * from department
+    union all
+      (with recursive x as (
+           select * from department
+         union all
+           (select * from q union all select * from x)
+        )
+       select * from x)
+    )
+select * from q order by 1, 2, 3 limit 32;
+
+-- This fails to INSERT and RETURN the rows
+CREATE TEMPORARY TABLE y (a INTEGER) DISTRIBUTE BY REPLICATION;
+INSERT INTO y SELECT generate_series(1, 10);
+WITH t AS (
+	SELECT a FROM y
+)
+INSERT INTO y
+SELECT a+20 FROM t RETURNING *;

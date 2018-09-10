@@ -366,3 +366,65 @@ SELECT * FROM t1_tmp ORDER BY empno;
  develop   |    11 |   5200 | 25100
 (10 rows)
 
+CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');
+CREATE TABLE enumtest_parent (id rainbow PRIMARY KEY);
+CREATE TABLE enumtest_child (parent rainbow REFERENCES enumtest_parent);
+INSERT INTO enumtest_parent VALUES ('red');
+INSERT INTO enumtest_child VALUES ('red');
+SELECT id FROM enumtest_parent;
+ id  
+-----
+ red
+(1 row)
+
+SELECT * FROM enumtest_child;
+ parent 
+--------
+ red
+(1 row)
+
+               
+-- check renaming a value
+ALTER TYPE rainbow RENAME VALUE 'red' TO 'crimson';
+-- check that renaming a non-existent value fails
+ALTER TYPE rainbow RENAME VALUE 'red' TO 'white';
+ERROR:  "red" is not an existing enum label
+-- check that renaming to an existent value fails
+ALTER TYPE rainbow RENAME VALUE 'blue' TO 'green';
+ERROR:  enum label "green" already exists
+-- check that RENAMED value is refected in tables
+SELECT id FROM enumtest_parent;
+   id    
+---------
+ crimson
+(1 row)
+
+SELECT id FROM enumtest_child;
+ERROR:  column "id" does not exist
+LINE 1: SELECT id FROM enumtest_child;
+               ^
+-- Try inserting old and new values
+INSERT INTO enumtest_parent VALUES ('green');
+INSERT INTO enumtest_child VALUES ('crimson');
+-- try inserting non existing value after renaming
+INSERT INTO enumtest_parent VALUES ('red');
+ERROR:  invalid input value for enum rainbow: "red"
+LINE 1: INSERT INTO enumtest_parent VALUES ('red');
+                                            ^
+SELECT id FROM enumtest_parent;
+   id    
+---------
+ crimson
+ green
+(2 rows)
+
+SELECT * FROM enumtest_child;
+ parent  
+---------
+ crimson
+ crimson
+(2 rows)
+
+DROP TABLE enumtest_child;
+DROP TABLE enumtest_parent;
+DROP TYPE rainbow;

@@ -210,3 +210,33 @@ INSERT INTO empsalary VALUES
 CREATE TEMPORARY TABLE t1_tmp (depname text, empno int, salary int, sum int);
 INSERT INTO t1_tmp SELECT depname, empno, salary, sum(salary) OVER (PARTITION BY depname) FROM empsalary;
 SELECT * FROM t1_tmp ORDER BY empno;
+
+CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');
+CREATE TABLE enumtest_parent (id rainbow PRIMARY KEY);
+CREATE TABLE enumtest_child (parent rainbow REFERENCES enumtest_parent);
+INSERT INTO enumtest_parent VALUES ('red');
+INSERT INTO enumtest_child VALUES ('red');
+SELECT id FROM enumtest_parent;
+SELECT * FROM enumtest_child;
+               
+-- check renaming a value
+ALTER TYPE rainbow RENAME VALUE 'red' TO 'crimson';
+-- check that renaming a non-existent value fails
+ALTER TYPE rainbow RENAME VALUE 'red' TO 'white';
+-- check that renaming to an existent value fails
+ALTER TYPE rainbow RENAME VALUE 'blue' TO 'green';
+-- check that RENAMED value is refected in tables
+SELECT id FROM enumtest_parent;
+SELECT id FROM enumtest_child;
+
+-- Try inserting old and new values
+INSERT INTO enumtest_parent VALUES ('green');
+INSERT INTO enumtest_child VALUES ('crimson');
+-- try inserting non existing value after renaming
+INSERT INTO enumtest_parent VALUES ('red');
+SELECT id FROM enumtest_parent;
+SELECT * FROM enumtest_child;
+
+DROP TABLE enumtest_child;
+DROP TABLE enumtest_parent;
+DROP TYPE rainbow;

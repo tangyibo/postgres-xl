@@ -211,6 +211,7 @@ CREATE TEMPORARY TABLE t1_tmp (depname text, empno int, salary int, sum int);
 INSERT INTO t1_tmp SELECT depname, empno, salary, sum(salary) OVER (PARTITION BY depname) FROM empsalary;
 SELECT * FROM t1_tmp ORDER BY empno;
 
+-- Test ALTER TYPE .. RENAME VALUE #211
 CREATE TYPE rainbow AS ENUM ('red', 'orange', 'yellow', 'green', 'blue', 'purple');
 CREATE TABLE enumtest_parent (id rainbow PRIMARY KEY);
 CREATE TABLE enumtest_child (parent rainbow REFERENCES enumtest_parent);
@@ -240,3 +241,27 @@ SELECT * FROM enumtest_child;
 DROP TABLE enumtest_child;
 DROP TABLE enumtest_parent;
 DROP TYPE rainbow;
+
+-- Check if ALTER TABLE .. ADD PRIMARY KEY sets columns 
+-- NOT NULL on all child tables on all nodes #203
+CREATE TABLE test_add_primary(id int,a int);
+CREATE TABLE test_add_primary_child(b int) INHERITS (test_add_primary);
+ALTER TABLE test_add_primary ADD PRIMARY KEY (id);
+
+EXECUTE DIRECT ON (datanode_1) $$ SELECT COLUMN_NAME, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE table_name = 'test_add_primary' $$;
+
+EXECUTE DIRECT ON (datanode_2) $$ SELECT column_name, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE table_name = 'test_add_primary' $$;
+
+EXECUTE DIRECT ON (datanode_1) $$ SELECT COLUMN_NAME, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE table_name = 'test_add_primary_child' $$;
+
+EXECUTE DIRECT ON (datanode_2) $$ SELECT column_name, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE table_name = 'test_add_primary_child' $$;
+
+DROP TABLE test_add_primary CASCADE;

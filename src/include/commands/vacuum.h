@@ -199,8 +199,11 @@ extern void lazy_vacuum_rel(Relation onerel, int options,
 /* in commands/analyze.c */
 extern void analyze_rel(Oid relid, RangeVar *relation, int options,
 			VacuumParams *params, List *va_cols, bool in_outer_xact,
+			bool *need_remote_analyze,
 			BufferAccessStrategy bstrategy);
 extern bool std_typanalyze(VacAttrStats *stats);
+extern void analyze_remote_coordinators(Oid relid, RangeVar *relation,
+			int options, VacuumParams *params);
 
 /* in utils/misc/sampling.c --- duplicate of declarations in utils/sampling.h */
 extern double anl_random_fract(void);

@@ -169,6 +169,7 @@ vacuum(int options, RangeVar *relation, Oid relid, VacuumParams *params,
 				use_own_xacts;
 	List	   *relations;
 	static bool in_vacuum = false;
+	bool		need_remote_analyze = false;
 
 	Assert(params != NULL);
 
@@ -334,12 +335,42 @@ vacuum(int options, RangeVar *relation, Oid relid, VacuumParams *params,
 				}
 
 				analyze_rel(relid, relation, options, params,
-							va_cols, in_outer_xact, vac_strategy);
+							va_cols, in_outer_xact, &need_remote_analyze,
+							vac_strategy);
 
 				if (use_own_xacts)
 				{
 					PopActiveSnapshot();
 					CommitTransactionCommand();
+
+					if (IS_PGXC_COORDINATOR && need_remote_analyze)
+					{
+						StartTransactionCommand();
+						PushActiveSnapshot(GetTransactionSnapshot());
+
+						/*
+						 * Run ANALYZE on remote coordinators as well, if we're
+						 * running in our own transaction. We have this
+						 * restriction because the remote coordinator will
+						 * connect to the datanodes, which may have the current
+						 * transaction open originating from us and not
+						 * prepared to handle a auxilliary connection from
+						 * other coordinators.
+						 *
+						 * This implies that ANALYZE executed inside a user
+						 * transaction block won't be sent down other
+						 * coordinators and the stats may remain stale on those
+						 * coordinators. But at the least, this takes care of
+						 * cases of auto-analyzing and explicit ANALYZE outside
+						 * a transaction block.
+						 */
+						analyze_remote_coordinators(relid, relation, options,
+								params);
+
+						PopActiveSnapshot();
+						CommitTransactionCommand();
+
+					}
 				}
 			}
 		}

@@ -117,7 +117,6 @@ static Datum ind_fetch_func(VacAttrStatsP stats, int rownum, bool *isNull);
 static void analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 						VacAttrStats **vacattrstats, int nindexes,
 						Relation *indexes, AnlIndexData *indexdata);
-static void analyze_remote_coordinators(Relation onerel);
 #endif
 
 /*
@@ -130,6 +129,7 @@ static void analyze_remote_coordinators(Relation onerel);
 void
 analyze_rel(Oid relid, RangeVar *relation, int options,
 			VacuumParams *params, List *va_cols, bool in_outer_xact,
+			bool *need_remote_analyze,
 			BufferAccessStrategy bstrategy)
 {
 	Relation	onerel;
@@ -283,6 +283,13 @@ analyze_rel(Oid relid, RangeVar *relation, int options,
 	LWLockAcquire(ProcArrayLock, LW_EXCLUSIVE);
 	MyPgXact->vacuumFlags |= PROC_IN_ANALYZE;
 	LWLockRelease(ProcArrayLock);
+
+	/*
+	 * If distribited relation, then ANALYZE (COORDINATOR) on the other
+	 * coordinators is required.
+	 */
+	if (onerel->rd_locator_info)
+		*need_remote_analyze = true;
 
 	/*
 	 * Do the normal non-recursive ANALYZE.  We can skip this for partitioned
@@ -512,11 +519,6 @@ do_analyze_rel(Relation onerel, int options, VacuumParams *params,
 		 */
 		analyze_rel_coordinator(onerel, inh, attr_cnt, vacattrstats,
 								nindexes, Irel, indexdata);
-
-		/*
-		 * Run ANALYZE on remote coordinators as well.
-		 */
-		analyze_remote_coordinators(onerel);
 
 		/*
 		 * Skip acquiring local stats. Coordinator does not store data of
@@ -3618,20 +3620,37 @@ analyze_rel_coordinator(Relation onerel, bool inh, int attr_cnt,
 	coord_collect_extended_stats(onerel, attr_cnt);
 }
 
-static void
-analyze_remote_coordinators(Relation onerel)
+void
+analyze_remote_coordinators(Oid relid, RangeVar *relation, int options,
+		VacuumParams *params)
 {
 	RemoteQuery		*step;
 	StringInfoData	sql;
+	Relation		onerel;
 
 	if (IsConnFromCoord())
 		return;
 
+	if (!(options & VACOPT_NOWAIT))
+		onerel = try_relation_open(relid, ShareUpdateExclusiveLock);
+	else if (ConditionalLockRelationOid(relid, ShareUpdateExclusiveLock))
+		onerel = try_relation_open(relid, NoLock);
+	else
+	{
+		onerel = NULL;
+		if (relation &&
+				IsAutoVacuumWorkerProcess() && params->log_min_duration >= 0)
+			ereport(LOG,
+					(errcode(ERRCODE_LOCK_NOT_AVAILABLE),
+					 errmsg("skipping remote analyze of \"%s\" --- lock not available",
+						 relation->relname)));
+		return;
+	}
 	/*
 	 * Temporary tables are not available on remote coordinators.
 	 */
 	if (onerel->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
-		return;
+		goto cleanup;
 
 	initStringInfo(&sql);
 	appendStringInfo(&sql, "ANALYZE (COORDINATOR) %s.%s",
@@ -3650,5 +3669,8 @@ analyze_remote_coordinators(Relation onerel)
 
 	/* Be sure to advance the command counter after the last command */
 	CommandCounterIncrement();
+
+cleanup:
+	relation_close(onerel, NoLock);
 }
 #endif

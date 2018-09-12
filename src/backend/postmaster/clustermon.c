@@ -197,7 +197,7 @@ ClusterMonitorInit(void)
 	while (!got_SIGTERM)
 	{
 		struct timeval nap;
-		int			rc;
+		int			rc = 0;
 
 		/*
 		 * While booting up, aggressively try to report Xmin and fetch global

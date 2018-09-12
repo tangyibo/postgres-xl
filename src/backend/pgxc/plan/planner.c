@@ -287,6 +287,10 @@ pgxc_FQS_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
 	if (cursorOptions & CURSOR_OPT_SCROLL)
 		return NULL;
 
+	/* Do not FQS cursor statements at all */
+	if (cursorOptions & CURSOR_OPT_NO_FQS)
+		return NULL;
+
 	/* Do not FQS EXEC DIRECT statements */
 	if (query->utilityStmt && IsA(query->utilityStmt, RemoteQuery))
 	{

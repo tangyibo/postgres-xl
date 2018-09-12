@@ -2452,6 +2452,9 @@ transformDeclareCursorStmt(ParseState *pstate, DeclareCursorStmt *stmt)
 				(errcode(ERRCODE_INVALID_CURSOR_DEFINITION),
 				 errmsg("cannot specify both SCROLL and NO SCROLL")));
 
+	/* Always disable FQS on cursors */
+	stmt->options |= CURSOR_OPT_NO_FQS;
+
 	/* Transform contained query, not allowing SELECT INTO */
 	query = transformStmt(pstate, stmt->query);
 	stmt->query = (Node *) query;

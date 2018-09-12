@@ -2390,12 +2390,7 @@ create_tidscan_path(PlannerInfo *root, RelOptInfo *rel, List *tidquals,
 
 	pathnode->tidquals = tidquals;
 
-#ifdef XCP
 	set_scanpath_distribution(root, rel, (Path *) pathnode);
-	/* We may need to pass info about target node to support */
-	if (pathnode->path.distribution)
-		elog(ERROR, "could not perform TID scan on remote relation");
-#endif
 
 	cost_tidscan(&pathnode->path, root, rel, tidquals,
 				 pathnode->path.param_info);

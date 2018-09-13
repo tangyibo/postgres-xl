@@ -1,0 +1,447 @@
+<!-- doc/src/sgml/release-xl-10r1.sgml -->
+<!-- See header comment in release.sgml about typical markup -->
+ <sect1 id="release-xl-10r1beta1">
+  <title>Postgres-XL Release 10r1beta1</title>
+
+  <note>
+   <title>Release Date</title>
+   <simpara>2018-09-14</simpara>
+   <simpara>Current as of 2016-09-14</simpara>
+  </note>
+
+  <sect2>
+   <title>Overview</title>
+   <para>
+    This major release of <productname>Postgres-XL</productname> comes
+almost 2 years after <productname>Postgres-XL</productname> 9.5 was released,
+which was based on
+<productname>PostgreSQL</productname> 9.5. This release includes most of the
+new features added in <productname>PostgreSQL</productname> 9.6 and 10
+releases. This also includes almost all significant performance enhancements
+that were made to <productname>PostgreSQL</productname> in the last few years.
+   </para>
+
+   <para>
+    Apart from this, a lot of work has gone into fixing outstanding bugs,
+improving stability of the product and significantly improving performance for OLTP
+workloads. The following sections describe the major enhancements in
+<productname>PostgreSQL</productname> that are now available in
+<productname>Postgres-XL</productname>. A short list of features that are
+currently not supported or have limited support is also mentioned in
+<xref linkend="major-unsupported-enhancements">.
+   </para>
+  </sect2>
+
+  <sect2>
+  <title>Migration to Postgres-XL 10r1beta1 </title>
+   <sect3>
+   <title>Migration to Postgres-XL 10r1beta1 from PostgreSQL 10 </title>
+    <para>
+     A dump/restore using <xref linkend="app-pg-dumpall">
+     is required for those wishing to migrate
+     data from PostgreSQL 10 release. We don't currently support <xref
+linkend="pgupgrade">, as a mechanism to upgrade from PostgreSQL 10.
+    </para>
+ 
+    <para>
+    </para>
+   </sect3>
+   <sect3>
+   <title>Migration to Postgres-XL 10r1beta1 from Postgres-XL 9.5r1.x </title>
+    <para>
+     Version 10r1beta1 contains a number of changes that may affect compatibility
+     with previous releases. Since Postgres-XL 10r1beta1 release includes all changes
+from PostgreSQL 9.6 and PostgreSQL 10 releases, it is
+recommended that you review respective release notes of those releases to find
+the exact incompatibilities.
+    </para>
+   </sect3>
+  </sect2>
+
+  <sect2>
+   <title>Major Enhancements in Postgres-XL 10r1beta1 </title>
+   <para>
+    <productname>Postgres-XL</productname> 10r1beta1 is the first major release
+after <productname>Postgres-XL</productname> 9.5r1 release. So this release
+contains most of the major enhancements that went into
+<productname>PostgreSQL</productname> releases 9.6 and 10. This is a very
+short list of such enhancements, but all other enhancements also apply, unless
+otherwise stated.
+   </para>
+   <sect3>
+    <title>Major Enhancements from PostgreSQL 10 </title>
+    <itemizedlist>
+     <listitem><para>Declarative table partitioning</para></listitem>
+     <listitem><para>Improved query parallelism</para></listitem>
+     <listitem><para>Significant general performance improvements</para></listitem>
+     <listitem><para>Improved monitoring and control</para></listitem>
+    </itemizedlist>
+   </sect3>
+   <sect3>
+    <title>Major Enhancements from PostgreSQL 9.6 </title>
+    <itemizedlist>
+     <listitem><para>Parallel execution of sequential scans, joins and aggregates</para></listitem>
+     <listitem><para> Avoid scanning pages unnecessarily during vacuum freeze operations</para></listitem>
+     <listitem><para>Substantial performance improvements, especially in the area of scalability on multi-<acronym>CPU</acronym>-socket servers</para></listitem>
+     <listitem><para>Full-text search can now search for phrases (multiple adjacent words)</para></listitem>
+    </itemizedlist>
+   </sect3>
+  </sect2>
+
+  <sect2>
+   <title>Changes</title>
+
+   <para>
+    Below you will find a detailed account of the changes between
+    <productname>Postgres-XL</productname> 10r1beta1 and the previous major
+    release.
+   </para>
+
+    <sect3>
+     <title>Performance</title>
+     <itemizedlist>
+      <listitem>
+       <para>
+        Allow minimum value of pgxl_remote_fetch_size to zero
+       </para>
+       <para>
+        This is an experimental work. By setting pgxl_remote_fetch_size to 0, user can
+        fetch all rows at once from the remote side (instead of fetching a small number
+        at a time, thus giving the node to produce more rows as the previous set is
+        consumed). While fetching all rows at once is not very useful, it allows us to
+        circumvent PostgreSQL's limitation of not supporting parallel queries unless a
+        Portal is run once and to the end.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Automatically trigger ANALYZE (COORDINATOR) on remote coordinators
+       </para>
+       <para>
+        When a table is manually or automcatically analyzed, the coordiantor
+        will an ANALYZE (COORDINATOR) command to all other coordinators for them to
+        update their planner stats. This ensures that the planner stats remain up to date on all
+        coordinators in the cluster. The feature works when a table is analyzed
+        outside a transaction block.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Collect index statistics during ANALYZE on coordinator.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Randomize the choice of the initial ROUNDROBIN node.
+       </para>
+      </listitem>
+     </itemizedlist>
+    </sect3>
+    <sect3>
+     <title>Additional Features</title>
+     <itemizedlist>
+      <listitem>
+       <para>
+        <command>pgxc_ctl</command> is now a built-in command and gets
+automatically compiled and installed along with other binaries.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Enable Hot Standby on the replicas.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Add support for MODULO distribution on BIGINT.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Support an additional syntax ANALYZE (COORDINATOR) to allow users to rebuild
+        coordinator side statistics without running ANALYZE again on the datanodes.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Support GROUPING SETS, ROLLUP and CUBE.
+       </para>
+      </listitem>
+     </itemizedlist>
+    </sect3>
+    <sect3>
+     <title>Improvements to pgxc_ctl</title>
+     <itemizedlist>
+      <listitem>
+       <para>
+        <command>pgxc_ctl</command> is now a built-in command and gets
+automatically compiled and installed along with other binaries.
+       </para>
+      </listitem>
+     </itemizedlist>
+    </sect3>
+    <sect3> 
+     <title>Misc Improvements</title>
+     <itemizedlist>
+      <listitem>
+       <para>
+        <command>pgxc_ctl</command> is now a built-in command and gets
+automatically compiled and installed along with other binaries.
+       </para>
+      </listitem>
+     </itemizedlist> 
+    </sect3>
+ </sect2>
+ <sect2>
+  <title>Important Bug Fixes</title>
+  <itemizedlist> 
+      <listitem>
+       <para>
+        Make improvements to cluster monitor process and global state
+reporting.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Correctly select the GTM proxy for a new node being added.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Fixes related to handling of schema qualification of temporary tables on remote nodes.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Fix handling of REFRESH MATERIALIZED VIEW CONCURRENTLY.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Improve locking semantics in GTM and GTM Proxy.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Ensure pooler process follows consistent model for SIGQUIT handling.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Fix broken implementation of recovery to barrier.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Track clearly whether to run a remote transaction in autocommit or a block.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Disable FQS for cursors defined with SCROLL.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Ensure that database objects are created consistently.
+       </para>
+
+       <para>
+        We now create views/materialised views on all nodes, unless they are temporary
+        objects in which case they are created only on the local coordinator and the
+        datanodes. Similarly, temporary sequences are created on the local coordinator
+        and the datanodes.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Prevent dropping distribution keys for MODULO.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Use thread-specific storage for computing a snapshot.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Add a user configurable parameter <xref linkend="guc-pgxl-remote-fetch-size"> to control the number of rows fetched from
+    the remote side during RemoteSubplan execution. Switch connections after processing pgxl_remote_fetch_size rows.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Allow COPY (INSERT RETURNING).
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Handle temp sequences so that duplicate values are not produced.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Ensure that the config parameters specified in the gtmPxyExtraConfig file take
+        precendence over the defaults.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Handle sequence's transactional behaviour on GTM.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Handle multi-command queries correctly inside SQL as well as plpgsql functions.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        Do not silently skip FK constraints if loose_constraints are ON.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+         Ensure that the statistics about all-visible pages in fetched from remote
+    datanodes and updated at the coordinator for better planning.
+       </para>
+      </listitem>
+  </itemizedlist> 
+ </sect2>
+ <sect2>
+  <title>Known Limitation</title>
+  <para>
+   While <productname>Postgres-XL</productname> strives hard to stay compatible
+with <productname>PostgreSQL</productname> so that applications running on
+<productname>PostgreSQL</productname> can be easily ported to
+<productname>Postgres-XL</productname>, there are certain known limitations of
+the product. Many of these can be addressed as and when sufficient development
+funding and resources become available.
+  <itemizedlist>
+   <listitem>
+    <para>
+    Distributed deadlock detection is not supported yet. Deadlock detection exists
+    on each node, just not across nodes.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    Materialised views are currently maintained only on the coordinator.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    EXCLUSION CONSTRAINTS are enforced when both rows map to the same datanode.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    User defined functions have several limitations.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    There are restrictions on complex UPDATE/DELETE queries and updating
+distribution column values.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    TRIGGERs are not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    EVENT TRIGGERs are not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    SERIALIZABLE TRANSACTIONs are not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    CREATE INDEX CONCURRENTLY is not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    SAVEPOINTs are not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    Large objects are not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    Recursive queries work only in certain conditions.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    Foreign Data Wrappers are not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    INSENSITIVE/SCROLL/WITH HOLD cursors are not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+    LISTEN/NOTIFY is not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+     Remote Subplan nodes are marked parallel unsafe. This implies that
+     parallel workers can only be used for bottom most Remote Subplan node(s) in a
+     plan tree.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+     CREATE PUBLICATION/SUBSCRIBER is not supported.
+    </para>
+   </listitem>
+   <listitem>
+    <para>
+     All partitions of a partitioned table must have consistent column ordering
+and column positioning.
+    </para>
+   </listitem>
+  </itemizedlist>
+  </para>
+ </sect2>
+ <sect2>
+  <title>Contributing to Postgres-XL</title>
+  <para>
+   Contributions to <productname>Postgres-XL</productname> are welcome. The
+code will be accepted under the same open source license that governs this
+released version of <productname>Postgres-XL</productname>. The authors of the
+patches will be credited appropriately in the release notes of the future
+releases.   
+  </para>
+ </sect2>
+ <sect2>
+  <title>Credits</title>
+  <para>
+   <productname>Postgres-XL</productname> has been evolving over many years,
+originating with the <productname>GridSQL</productname>
+project and <productname>Postgres-XC</productname>, later combined as TransLattice Storm (StormDB).
+TransLattice open sourced the project, resulting in Postgres-XL 9.2. More
+recently, the EU-funded Big Data project AXLE funded the main work to bring the
+code up to date as <productname>Postgres-XL</productname> 9.5, allowing
+<productname>Postgres-XL</productname> to take advantage of the
+rapidly increasing BI features plugged into the core of
+<productname>PostgreSQL</productname>.  
+  </para>
+ </sect2>
+</sect1>

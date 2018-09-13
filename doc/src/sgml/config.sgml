@@ -8888,6 +8888,29 @@ LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
        </para>
       </listitem>
      </varlistentry>
+
+     <varlistentry id="guc-pgxl-remote-fetch-size" xreflabel="pgxl_remote_fetch_size">
+      <term><varname>pgxl_remote_fetch_size</varname> (<type>integer</type>)
+      <indexterm>
+       <primary><varname>pgxl_remote_fetch_size</> configuration parameter</primary>
+      </indexterm>
+      </term>
+      <listitem>
+       <para>
+        This parameter sets the number of rows processed and fetched from the
+        datanode in one execution round. Once those many rows are fetched, coordinator
+        then switches connection and fetches rows from another node, giving the
+        previous node a chance to produce more rows.
+       </para>
+       <para>
+        This value must not be set too large or too small, because either might
+        affect the cluster-wide parallelism. But user may set it to
+        <literal>0</literal> to fetch all rows from the remote node in a single
+        execution. This is an experimental way to utilise parallel query processing on
+        the datanodes. 
+       </para>
+      </listitem>
+     </varlistentry>
     </variablelist>
 
   </sect1>

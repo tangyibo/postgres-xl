@@ -1077,7 +1077,7 @@ get_snapshot(GTM_Conn *conn, GlobalTransactionId gxid, bool canbe_grouped)
 {
 	GTM_Result *res = NULL;
 	time_t finish_time;
-	GTM_ResultType res_type;
+	GTM_ResultType res_type PG_USED_FOR_ASSERTS_ONLY;
 
 	res_type = canbe_grouped ? SNAPSHOT_GET_MULTI_RESULT : SNAPSHOT_GET_RESULT;
 

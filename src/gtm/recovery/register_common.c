@@ -478,20 +478,11 @@ Recovery_SaveRegisterInfo(void)
 	GTM_PGXCNodeInfo *nodeinfo = NULL;
 	int hash, ctlfd;
 	char filebkp[GTM_NODE_FILE_MAX_PATH];
+	StringInfoData	buf;
+
+	initStringInfo(&buf);
 
 	GTM_RWLockAcquire(&RegisterFileLock, GTM_LOCKMODE_WRITE);
-
-	/* Create a backup file in case their is a problem during file writing */
-	sprintf(filebkp, "%s.bkp", GTMPGXCNodeFile);
-
-	ctlfd = open(filebkp, O_WRONLY | O_CREAT | O_TRUNC,
-				 S_IRUSR | S_IWUSR);
-
-	if (ctlfd < 0)
-	{
-		GTM_RWLockRelease(&RegisterFileLock);
-		return;
-	}
 
 	GTM_RWLockAcquire(&PGXCNodesLock, GTM_LOCKMODE_READ);
 	for (hash = 0; hash < NODE_HASH_TABLE_SIZE; hash++)
@@ -509,67 +500,90 @@ Recovery_SaveRegisterInfo(void)
 
 			GTM_RWLockAcquire(&nodeinfo->node_lock, GTM_LOCKMODE_READ);
 
-			write(ctlfd, &NodeRegisterMagic, sizeof (NodeRegisterMagic));
+			appendBinaryStringInfo(&buf, (const char *) &NodeRegisterMagic, sizeof (NodeRegisterMagic));
+			appendBinaryStringInfo(&buf, (const char *) &nodeinfo->type, sizeof (GTM_PGXCNodeType));
 
-			write(ctlfd, &nodeinfo->type, sizeof (GTM_PGXCNodeType));
 			if (nodeinfo->nodename)
 			{
 				len = strlen(nodeinfo->nodename);
-				write(ctlfd, &len, sizeof(uint32));
-				write(ctlfd, nodeinfo->nodename, len);
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) nodeinfo->nodename, len);
 			}
 			else
 			{
 				len = 0;
-				write(ctlfd, &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
 			}
 
-			write(ctlfd, &nodeinfo->port, sizeof (GTM_PGXCNodePort));
+			appendBinaryStringInfo(&buf, (const char *) &nodeinfo->port, sizeof (GTM_PGXCNodePort));
 
 			if (nodeinfo->proxyname)
 			{
 				len = strlen(nodeinfo->proxyname);
-				write(ctlfd, &len, sizeof(uint32));
-				write(ctlfd, nodeinfo->proxyname, len);
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) nodeinfo->proxyname, len);
 			}
 			else
 			{
 				len = 0;
-				write(ctlfd, &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
 			}
 
-			write(ctlfd, &nodeinfo->status, sizeof (GTM_PGXCNodeStatus));
+			appendBinaryStringInfo(&buf, (const char *) &nodeinfo->status, sizeof (GTM_PGXCNodeStatus));
 
 			if (nodeinfo->ipaddress)
 			{
 				len = strlen(nodeinfo->ipaddress);
-				write(ctlfd, &len, sizeof(uint32));
-				write(ctlfd, nodeinfo->ipaddress, len);
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) nodeinfo->ipaddress, len);
 			}
 			else
 			{
 				len = 0;
-				write(ctlfd, &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
 			}
 
 			if (nodeinfo->datafolder)
 			{
 				len = strlen(nodeinfo->datafolder);
-				write(ctlfd, &len, sizeof(uint32));
-				write(ctlfd, nodeinfo->datafolder, len);
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) nodeinfo->datafolder, len);
 			}
 			else
 			{
 				len = 0;
-				write(ctlfd, &len, sizeof(uint32));
+				appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
 			}
 
-			write(ctlfd, &NodeEndMagic, sizeof(NodeEndMagic));
+			appendBinaryStringInfo(&buf, (const char *) &NodeEndMagic, sizeof(NodeEndMagic));
 
 			GTM_RWLockRelease(&nodeinfo->node_lock);
 		}
 	}
 	GTM_RWLockRelease(&PGXCNodesLock);
+
+	/* Create a backup file in case their is a problem during file writing */
+	sprintf(filebkp, "%s.bkp", GTMPGXCNodeFile);
+
+	ctlfd = open(filebkp, O_WRONLY | O_CREAT | O_TRUNC,
+				 S_IRUSR | S_IWUSR);
+
+	if (ctlfd < 0)
+	{
+		GTM_RWLockRelease(&RegisterFileLock);
+		elog(ERROR, "could not open registration backup file \"%s\"",
+				filebkp);
+		return;
+	}
+	if (write(ctlfd, buf.data, buf.len) != buf.len)
+	{
+		GTM_RWLockRelease(&RegisterFileLock);
+		elog(ERROR, "could not write to registration backup file \"%s\"",
+				filebkp);
+		return;
+	}
+
+	pfree(buf.data);
 
 	close(ctlfd);
 
@@ -588,10 +602,80 @@ Recovery_SaveRegisterInfo(void)
 static void
 Recovery_RecordRegisterInfo(GTM_PGXCNodeInfo *nodeinfo, bool is_register)
 {
-	int ctlfd;
-	int len;
+	int				ctlfd;
+	int				len;
+	StringInfoData	buf;
+
+	initStringInfo(&buf);
 
 	GTM_RWLockAcquire(&RegisterFileLock, GTM_LOCKMODE_WRITE);
+	GTM_RWLockAcquire(&nodeinfo->node_lock, GTM_LOCKMODE_READ);
+
+	if (is_register)
+		appendBinaryStringInfo(&buf, (const char *) &NodeRegisterMagic, sizeof (NodeRegisterMagic));
+	else
+		appendBinaryStringInfo(&buf, (const char *) &NodeUnregisterMagic, sizeof (NodeUnregisterMagic));
+
+	appendBinaryStringInfo(&buf, (const char *) &nodeinfo->type, sizeof (GTM_PGXCNodeType));
+
+	if (nodeinfo->nodename)
+	{
+		len = strlen(nodeinfo->nodename);
+		appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+		appendBinaryStringInfo(&buf, (const char *) nodeinfo->nodename, len);
+	}
+	else
+	{
+		len = 0;
+		appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+	}
+
+	if (is_register)
+	{
+		int len;
+
+		appendBinaryStringInfo(&buf, (const char *) &nodeinfo->port, sizeof (GTM_PGXCNodePort));
+
+		if (nodeinfo->proxyname)
+		{
+			len = strlen(nodeinfo->proxyname);
+			appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+			appendBinaryStringInfo(&buf, (const char *) nodeinfo->proxyname, len);
+		}
+		else
+		{
+			len = 0;
+			appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+		}
+
+		appendBinaryStringInfo(&buf, (const char *) &nodeinfo->status, sizeof (GTM_PGXCNodeStatus));
+
+		if (nodeinfo->ipaddress)
+		{
+			len = strlen(nodeinfo->ipaddress);
+			appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+			appendBinaryStringInfo(&buf, (const char *) nodeinfo->ipaddress, len);
+		}
+		else
+		{
+			len = 0;
+			appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+		}
+
+		if (nodeinfo->datafolder)
+		{
+			len = strlen(nodeinfo->datafolder);
+			appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+			appendBinaryStringInfo(&buf, (const char *) nodeinfo->datafolder, len);
+		}
+		else
+		{
+			len = 0;
+			appendBinaryStringInfo(&buf, (const char *) &len, sizeof(uint32));
+		}
+	}
+
+	appendBinaryStringInfo(&buf, (const char *) &NodeEndMagic, sizeof(NodeEndMagic));
 
 	ctlfd = open(GTMPGXCNodeFile, O_WRONLY | O_CREAT | O_APPEND,
 				 S_IRUSR | S_IWUSR);
@@ -602,77 +686,17 @@ Recovery_RecordRegisterInfo(GTM_PGXCNodeInfo *nodeinfo, bool is_register)
 		return;
 	}
 
-	GTM_RWLockAcquire(&nodeinfo->node_lock, GTM_LOCKMODE_READ);
-
-	if (is_register)
-		write(ctlfd, &NodeRegisterMagic, sizeof (NodeRegisterMagic));
-	else
-		write(ctlfd, &NodeUnregisterMagic, sizeof (NodeUnregisterMagic));
-
-	write(ctlfd, &nodeinfo->type, sizeof (GTM_PGXCNodeType));
-
-	if (nodeinfo->nodename)
+	if (write(ctlfd, buf.data, buf.len) != buf.len)
 	{
-		len = strlen(nodeinfo->nodename);
-		write(ctlfd, &len, sizeof(uint32));
-		write(ctlfd, nodeinfo->nodename, len);
-	}
-	else
-	{
-		len = 0;
-		write(ctlfd, &len, sizeof(uint32));
+		GTM_RWLockRelease(&RegisterFileLock);
+		return;
 	}
 
-	if (is_register)
-	{
-		int len;
-
-		write(ctlfd, &nodeinfo->port, sizeof (GTM_PGXCNodePort));
-
-		if (nodeinfo->proxyname)
-		{
-			len = strlen(nodeinfo->proxyname);
-			write(ctlfd, &len, sizeof(uint32));
-			write(ctlfd, nodeinfo->proxyname, len);
-		}
-		else
-		{
-			len = 0;
-			write(ctlfd, &len, sizeof(uint32));
-		}
-
-		write(ctlfd, &nodeinfo->status, sizeof (GTM_PGXCNodeStatus));
-
-		if (nodeinfo->ipaddress)
-		{
-			len = strlen(nodeinfo->ipaddress);
-			write(ctlfd, &len, sizeof(uint32));
-			write(ctlfd, nodeinfo->ipaddress, len);
-		}
-		else
-		{
-			len = 0;
-			write(ctlfd, &len, sizeof(uint32));
-		}
-
-		if (nodeinfo->datafolder)
-		{
-			len = strlen(nodeinfo->datafolder);
-			write(ctlfd, &len, sizeof(uint32));
-			write(ctlfd, nodeinfo->datafolder, len);
-		}
-		else
-		{
-			len = 0;
-			write(ctlfd, &len, sizeof(uint32));
-		}
-	}
-
-	write(ctlfd, &NodeEndMagic, sizeof(NodeEndMagic));
-
-	GTM_RWLockRelease(&nodeinfo->node_lock);
+	pfree(buf.data);
 
 	close(ctlfd);
+
+	GTM_RWLockRelease(&nodeinfo->node_lock);
 	GTM_RWLockRelease(&RegisterFileLock);
 }
 

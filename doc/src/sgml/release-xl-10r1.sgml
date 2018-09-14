@@ -5,30 +5,44 @@
 
   <note>
    <title>Release Date</title>
-   <simpara>2018-09-14</simpara>
-   <simpara>Current as of 2016-09-14</simpara>
+   <simpara>2018-09-17</simpara>
+   <simpara>Current as of 2016-09-17</simpara>
   </note>
 
   <sect2>
    <title>Overview</title>
    <para>
     This major release of <productname>Postgres-XL</productname> comes
-almost 2 years after <productname>Postgres-XL</productname> 9.5 was released,
-which was based on
-<productname>PostgreSQL</productname> 9.5. This release includes most of the
-new features added in <productname>PostgreSQL</productname> 9.6 and 10
-releases. This also includes almost all significant performance enhancements
-that were made to <productname>PostgreSQL</productname> in the last few years.
+    after <productname>Postgres-XL</productname> 9.5r1, which was based on
+    <productname>PostgreSQL</productname> 9.5. This release includes most of the
+    new features added in <productname>PostgreSQL</productname> 9.6 and 10
+    releases. This also includes almost all significant performance enhancements
+    that were made to <productname>PostgreSQL</productname> in the last few years.
+   </para>
+
+   <para>
+    PostgreSQL 9.6 added query parallelism and PostgreSQL 10 added declarative
+    partitioning. Both these features are now available in Postgres-XL 10r1beta1.
+    Both these features come with certain limitations and hence users are advised
+    to test these new features thoroughly before deploying applications.
+   </para>
+
+   <para>
+    A lot of work has gone into improving the code quality of the distributed
+    query planner. The query planner now uses several features available in
+    core PostgreSQL such as partial aggregates and upper planner pathification.
+    This has resulted in fixing several corner bug cases, simplified the code and
+    allowed us to enable some features such as GROUPING SETS, ROLLUP and CUBE.
    </para>
 
    <para>
     Apart from this, a lot of work has gone into fixing outstanding bugs,
-improving stability of the product and significantly improving performance for OLTP
-workloads. The following sections describe the major enhancements in
-<productname>PostgreSQL</productname> that are now available in
-<productname>Postgres-XL</productname>. A short list of features that are
-currently not supported or have limited support is also mentioned in
-<xref linkend="major-unsupported-enhancements">.
+    improving stability of the product and significantly improving performance for OLTP
+    workloads. The following sections describe the major enhancements in
+    <productname>PostgreSQL</productname> that are now available in
+    <productname>Postgres-XL</productname>. A short list of features that are
+    currently not supported or have limited support is also mentioned in
+    <xref linkend="major-unsupported-enhancements">.
    </para>
   </sect2>
 
@@ -119,7 +133,7 @@ otherwise stated.
        </para>
        <para>
         When a table is manually or automcatically analyzed, the coordiantor
-        will an ANALYZE (COORDINATOR) command to all other coordinators for them to
+        will run ANALYZE (COORDINATOR) command to all other coordinators for them to
         update their planner stats. This ensures that the planner stats remain up to date on all
         coordinators in the cluster. The feature works when a table is analyzed
         outside a transaction block.
@@ -133,6 +147,15 @@ otherwise stated.
       <listitem>
        <para>
         Randomize the choice of the initial ROUNDROBIN node.
+       </para>
+       <para>
+        With roundrobin node, the initial node was always set to the first node
+        in the list. That works fine when inserting many rows at once (e.g. with
+        INSERT SELECT), but with single-row inserts this puts all data on the
+        first node, resulting in unbalanced distribution.
+
+        This randomizes the choice of the initial node, so that with single-row
+        inserts the ROUNDROBIN behaves a bit like RANDOM distribution.
        </para>
       </listitem>
      </itemizedlist>
@@ -161,6 +184,21 @@ automatically compiled and installed along with other binaries.
         Support an additional syntax ANALYZE (COORDINATOR) to allow users to rebuild
         coordinator side statistics without running ANALYZE again on the datanodes.
        </para>
+       <para>
+        One of the long standing problems in multi-coordinator setup is that when a
+        table is either manually ANALYZEd or auto-analyzed on a coordinator, the other
+        coordinators don't update their planner statistics automatically. This is even
+        a bigger problem with auto-analyze because a coordinator which is not involved
+        in any DMLs, may not be even aware about the changes to the table and hence it
+        will not pick up the table for auto-analyze, thus often generating very poor
+        query plans.
+
+        We now fix that by automatically running ANALYZE (COORDINATOR) command on the
+        remote coordinators when a table is either manually or automatically analyzed
+        on one coordinator. ANALYZE (COORDINATOR) does not force a ANALYZE on the
+        datanodes, but only rebuilts coordinator side stats using the current stats
+        available on the datanodes.
+       </para>
       </listitem>
       <listitem>
        <para>
@@ -168,28 +206,6 @@ automatically compiled and installed along with other binaries.
        </para>
       </listitem>
      </itemizedlist>
-    </sect3>
-    <sect3>
-     <title>Improvements to pgxc_ctl</title>
-     <itemizedlist>
-      <listitem>
-       <para>
-        <command>pgxc_ctl</command> is now a built-in command and gets
-automatically compiled and installed along with other binaries.
-       </para>
-      </listitem>
-     </itemizedlist>
-    </sect3>
-    <sect3> 
-     <title>Misc Improvements</title>
-     <itemizedlist>
-      <listitem>
-       <para>
-        <command>pgxc_ctl</command> is now a built-in command and gets
-automatically compiled and installed along with other binaries.
-       </para>
-      </listitem>
-     </itemizedlist> 
     </sect3>
  </sect2>
  <sect2>
@@ -382,10 +398,6 @@ distribution column values.
    </listitem>
    <listitem>
     <para>
-    </para>
-   </listitem>
-   <listitem>
-    <para>
     Foreign Data Wrappers are not supported.
     </para>
    </listitem>
@@ -408,7 +420,7 @@ distribution column values.
    </listitem>
    <listitem>
     <para>
-     CREATE PUBLICATION/SUBSCRIBER is not supported.
+     CREATE PUBLICATION/SUBSCRIPTION is not supported.
     </para>
    </listitem>
    <listitem>
@@ -442,6 +454,12 @@ code up to date as <productname>Postgres-XL</productname> 9.5, allowing
 <productname>Postgres-XL</productname> to take advantage of the
 rapidly increasing BI features plugged into the core of
 <productname>PostgreSQL</productname>.  
+  </para>
+  <para>
+   2ndQuadrant has been actively developing and managing
+<productname>Postgres-XL</productname> since then. This new release of the
+product is a result of efforts by various 2ndQuadrant engineers, with
+collaboration of other members of the <productname>Postgres-XL</productname> community.
   </para>
  </sect2>
 </sect1>

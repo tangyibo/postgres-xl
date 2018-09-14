@@ -157,3 +157,5 @@ test: xl_misc xl_primary_key xl_foreign_key xl_distribution_column_types xl_alte
 # results. So it should not run parallel to other tests.
 # ----------
 test: xl_sanity_check
+
+test: xl_set_returning_functions

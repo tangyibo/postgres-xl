@@ -706,11 +706,8 @@ nextval_internal(Oid relid, bool check_permissions)
 	HeapTupleData seqdatatuple;
 	Form_pg_sequence_data seq;
 	int64		incby,
-				maxv,
-				minv,
 				cache,
 				result;
-	bool		cycle;
 	int64		range;
 	int64		rangemax;
 	char	   *seqname;
@@ -752,10 +749,7 @@ nextval_internal(Oid relid, bool check_permissions)
 		elog(ERROR, "cache lookup failed for sequence %u", relid);
 	pgsform = (Form_pg_sequence) GETSTRUCT(pgstuple);
 	incby = pgsform->seqincrement;
-	maxv = pgsform->seqmax;
-	minv = pgsform->seqmin;
 	cache = pgsform->seqcache;
-	cycle = pgsform->seqcycle;
 	ReleaseSysCache(pgstuple);
 
 	/* lock page' buffer and read tuple */

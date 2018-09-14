@@ -29,6 +29,7 @@ void install_pgxc_ctl_bash(char *path, int read_prototype)
 	char cmd[1024];
 	FILE *pgxc_ctl_bash = fopen(path, "w");
 	int i;
+	int rc;
 
 	elog(NOTICE, "Installing pgxc_ctl_bash script as %s.\n", path);
 	if (!pgxc_ctl_bash)
@@ -44,7 +45,9 @@ void install_pgxc_ctl_bash(char *path, int read_prototype)
 		fprintf(pgxc_ctl_bash, "%s\n", pgxc_ctl_bash_script[i]);
 	fclose(pgxc_ctl_bash);
 	sprintf(cmd, "chmod +x %s", path);
-	system(cmd);
+	rc = system(cmd);
+	if (WEXITSTATUS(rc) != 0)
+		elog(ERROR, "failed to execute system command \"%s\"", cmd);
 }
 
 /*

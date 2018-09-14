@@ -397,8 +397,15 @@ char *getIpAddress(char *hostName)
 		elog(ERROR, "ERROR: could not open the command, \"%s\", %s\n", command, strerror(errno));
 		return NULL;
 	}
+
 	ipAddr = Malloc(MAXTOKEN+1);
-	fgets(ipAddr, MAXTOKEN, f);
+	if (fgets(ipAddr, MAXTOKEN, f) == NULL)
+	{
+		elog(ERROR, "could not get IP address from the command \"%s\"",
+				command);
+		return NULL;
+	}
+
 	pclose(f);
 	trimNl(ipAddr);
 	return ipAddr;

@@ -469,6 +469,7 @@ int doCmdList(cmdList_t *cmds)
 				{
 					int pid;
 					pid = waitpid(cmds->cmds[ii]->pid, &status, 0);
+					(void ) pid;	/* keep compiler quiet */
 					rc = WEXITSTATUS(status);
 				}
 			}
@@ -522,9 +523,9 @@ int doCmdList(cmdList_t *cmds)
 
 void appendCmdEl(cmd_t *src, cmd_t *new)
 {
-	cmd_t *curr;
+	/* go to the end of the list */
+	for(; src->next; src = src->next);
 
-	for(curr = src; src->next; src = src->next);
 	src->next = new;
 }
 

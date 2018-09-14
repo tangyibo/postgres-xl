@@ -151,6 +151,7 @@ set_bash:
 	{
 		struct stat buf;
 		char	cmd[MAXLINE+1];
+		int		rc;
 		
 		if (stat(pgxc_ctl_home, &buf) ==0)
 		{
@@ -166,7 +167,14 @@ set_bash:
 			}
 		}
 		snprintf(cmd, MAXLINE, "mkdir -p %s", pgxc_ctl_home);
-		system(cmd);
+
+		rc = system(cmd);
+		if (WEXITSTATUS(rc) != 0)
+		{
+			fprintf(stderr, "failed to execute system command \"%s\"", cmd);
+			exit(1);
+		}
+
 		if (stat(pgxc_ctl_home, &buf) ==0)
 		{
 			if (S_ISDIR(buf.st_mode))
@@ -289,10 +297,16 @@ static void prepare_pgxc_ctl_bash(char *path)
 
 static void pgxcCtlMkdir(char *path)
 {
-	char cmd[MAXPATH+1];
+	char 	cmd[MAXPATH+1];
+	int		rc;
 
 	snprintf(cmd, MAXPATH, "mkdir -p %s", path);
-	system(cmd);
+	rc = system(cmd);
+	if (WEXITSTATUS(rc) != 0)
+	{
+		fprintf(stderr, "failed to execute system command \"%s\"", cmd);
+		exit(1);
+	}
 }
 
 static void startLog(char *path, char *logFileNam)

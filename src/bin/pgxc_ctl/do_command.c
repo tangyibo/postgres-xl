@@ -2090,14 +2090,13 @@ static void do_clean_command(char *line)
 					continue;
 			} 
 		} while(GetToken());
+
 		if (cmdList)
 		{
-			int rc;
-			rc = doCmdList(cmdList);
+			if (doCmdList(cmdList) != 0)
+				elog(ERROR, "failed to execute command list");
 			cleanCmdList(cmdList);
-			elog(INFO, "Done.\n");
 		}
-	return;
 	}
 }
 

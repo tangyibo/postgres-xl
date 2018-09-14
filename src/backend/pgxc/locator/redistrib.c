@@ -377,6 +377,7 @@ distrib_execute_command(RedistribState *distribState, RedistribCommand *command)
 			break;
 		case DISTRIB_NONE:
 		default:
+			command_str = "";	/* keep compiler quiet */
 			Assert(0); /* Should not happen */
 	}
 

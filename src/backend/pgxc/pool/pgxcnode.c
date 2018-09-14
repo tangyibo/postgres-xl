@@ -2567,9 +2567,7 @@ Datum
 pgxc_node_str(PG_FUNCTION_ARGS)
 {
 	Name		result;
-	int			len;
 
-	len = strlen(PGXCNodeName);
 	/* We use palloc0 here to ensure result is zero-padded */
 	result = (Name) palloc0(NAMEDATALEN);
 	memcpy(NameStr(*result), PGXCNodeName, NAMEDATALEN - 1);

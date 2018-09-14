@@ -901,7 +901,7 @@ SharedQueueWrite(SharedQueue squeue, int consumerIdx,
 		/* Create tuplestore if does not exist */
 		if (*tuplestore == NULL)
 		{
-			int			ptrno;
+			int			ptrno PG_USED_FOR_ASSERTS_ONLY;
 			char 		storename[64];
 
 #ifdef SQUEUE_STAT

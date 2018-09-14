@@ -2300,7 +2300,7 @@ AdvanceProducingPortal(Portal portal, bool can_wait)
 		 */
 		if (portal->holdStore == NULL && portal->status != PORTAL_FAILED)
 		{
-			int idx;
+			int idx PG_USED_FOR_ASSERTS_ONLY;
 			char storename[64];
 
 			PortalCreateProducerStore(portal);

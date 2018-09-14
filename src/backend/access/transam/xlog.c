@@ -5639,7 +5639,6 @@ recoveryStopsBefore(XLogReaderState *record)
 #ifdef PGXC
 	bool		stopsAtThisBarrier = false;
 	char		*recordBarrierId = NULL;
-	uint8		record_info;
 #endif
 	bool		stopsHere = false;
 	uint8		xact_info;
@@ -5730,8 +5729,7 @@ recoveryStopsBefore(XLogReaderState *record)
 	} /* end if (XLogRecGetRmid(record) == RM_XACT_ID) */
 	else if (XLogRecGetRmid(record) == RM_BARRIER_ID)
 	{
-		record_info = XLogRecGetInfo(record);
-		if (record_info == XLOG_BARRIER_CREATE)
+		if (XLogRecGetInfo(record) == XLOG_BARRIER_CREATE)
 		{
 			recordBarrierId = (char *) XLogRecGetData(record);
 			ereport(DEBUG2,
@@ -5758,8 +5756,11 @@ recoveryStopsBefore(XLogReaderState *record)
 	if (recoveryTarget == RECOVERY_TARGET_BARRIER)
 	{
 		stopsHere = false;
+		recordXid = InvalidTransactionId;	/* keep compiler quiet */
+		isCommit = false;					/* keep compiler quiet */
+
 		if ((XLogRecGetRmid(record) == RM_BARRIER_ID) &&
-			(record_info == XLOG_BARRIER_CREATE))
+			(XLogRecGetInfo(record) == XLOG_BARRIER_CREATE))
 		{
 			ereport(DEBUG2,
 					(errmsg("checking if barrier record (%s) matches the target "

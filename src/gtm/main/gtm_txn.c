@@ -1435,7 +1435,7 @@ GTM_CommitTransaction(GTM_TransactionHandle txn, int waited_xid_count,
 static int
 GTM_PrepareTransaction(GTM_TransactionHandle txn)
 {
-	int	state;
+	int	state PG_USED_FOR_ASSERTS_ONLY;
 	GTM_TransactionInfo *gtm_txninfo = NULL;
 
 	gtm_txninfo = GTM_HandleToTransactionInfo(txn);

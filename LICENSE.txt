@@ -3,7 +3,7 @@ license, similar to the BSD or MIT licenses.
 
 Postgres-XL Database Management System
 
-Portions Copyright (c) 2015-2016, 2ndQuadrant Ltd
+Portions Copyright (c) 2015-2018, 2ndQuadrant Ltd
 Portions Copyright (c) 2012-2015, TransLattice, Inc.
 Portions Copyright (c) 2010-2015, Postgres-XC Development Group
 Portions Copyright (c) 1996-2015, The PostgreSQL Global Development Group

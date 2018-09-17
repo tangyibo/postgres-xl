@@ -132,7 +132,7 @@ otherwise stated.
         Automatically trigger ANALYZE (COORDINATOR) on remote coordinators
        </para>
        <para>
-        When a table is manually or automcatically analyzed, the coordiantor
+        When a table is manually or automatically analyzed, the coordiantor
         will run ANALYZE (COORDINATOR) command to all other coordinators for them to
         update their planner stats. This ensures that the planner stats remain up to date on all
         coordinators in the cluster. The feature works when a table is analyzed
@@ -196,7 +196,7 @@ automatically compiled and installed along with other binaries.
         We now fix that by automatically running ANALYZE (COORDINATOR) command on the
         remote coordinators when a table is either manually or automatically analyzed
         on one coordinator. ANALYZE (COORDINATOR) does not force a ANALYZE on the
-        datanodes, but only rebuilts coordinator side stats using the current stats
+        datanodes, but only rebuilds coordinator side stats using the current stats
         available on the datanodes.
        </para>
       </listitem>
@@ -298,7 +298,7 @@ reporting.
       <listitem>
        <para>
         Ensure that the config parameters specified in the gtmPxyExtraConfig file take
-        precendence over the defaults.
+        precedence over the defaults.
        </para>
       </listitem>
       <listitem>

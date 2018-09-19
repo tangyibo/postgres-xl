@@ -2418,12 +2418,12 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 			if (loose_constraints && cxt->isalter && index->unique)
 				ereport(WARNING,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("Unique index of partitioned table must contain the"
+					 errmsg("Unique index of distributed table must contain the"
 							" hash distribution column.")));
 			else
 				ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					 errmsg("Unique index of partitioned table must contain the"
+					 errmsg("Unique index of distributed table must contain the"
 							" hash distribution column.")));
 		}
 		else

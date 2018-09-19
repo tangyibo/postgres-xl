@@ -591,7 +591,7 @@ DefineIndex(Oid relationId,
 			{
 				ereport(WARNING,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					errmsg("Unique index of partitioned table must contain the hash/modulo distribution column.")));
+					errmsg("Unique index of distributed table must contain the hash/modulo distribution column.")));
 				/* create index still, just that it won't be unique */
 				stmt->unique = false;
 				stmt->isconstraint = false;
@@ -599,7 +599,7 @@ DefineIndex(Oid relationId,
 			else
 				ereport(ERROR,
 					(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-					errmsg("Unique index of partitioned table must contain the hash/modulo distribution column.")));
+					errmsg("Unique index of distributed table must contain the hash/modulo distribution column.")));
 		}
 	}
 #endif

@@ -1060,6 +1060,11 @@ do_setval(Oid relid, int64 next, bool iscalled)
 						bufm, bufx)));
 	}
 
+	/*
+	 * During adding a new node, don't update the GTM state since it may have
+	 * already advanced.
+	 */
+	if (!isRestoreMode)
 	{
 		char *seqname = GetGlobalSeqName(seqrel, NULL, NULL);
 

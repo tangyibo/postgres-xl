@@ -11544,8 +11544,10 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel)
 			 * In common cases of partitioning, the parent table and the
 			 * partition tables will be created at the very beginning and if
 			 * altered, they will be altered together.
+			 *
+			 * Make exception while restoring a schema during node addition.
 			 */
-			if (attribute->attnum != childatt->attnum)
+			if (!isRestoreMode && attribute->attnum != childatt->attnum)
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("table \"%s\" contains column \"%s\" at "

@@ -1183,14 +1183,24 @@ int add_coordinatorMaster(char *name, char *host, int port, int pooler,
 	fprintf(lockf, "select pgxc_lock_for_backup();\n");	/* Keep open until the end of the addition. */
 	fflush(lockf);
 
-	/* pg_dumpall */
+	/*
+	 * pg_dumpall
+	 *
+	 * We leverage facilities provides by binary-upgrade to ensure a consistent
+	 * column ordering between other nodes in the cluster. Essentially, it will
+	 * mimic dropped columns by adding dummy columns and later dropping those
+	 * to arrive at a final consistent ordering.
+	 *
+	 * The server must then be started in binary-upgrade mode (-b option) while
+	 * restoring the dump.
+	 */
 	createLocalFileName(GENERAL, pgdumpall_out, MAXPATH);
-	doImmediateRaw("pg_dumpall -p %s -h %s -s --include-nodes --dump-nodes --file=%s",
+	doImmediateRaw("pg_dumpall -p %s -h %s -s --include-nodes --dump-nodes --binary-upgrade --file=%s",
 				   aval(VAR_coordPorts)[connCordIndx],
 				   aval(VAR_coordMasterServers)[connCordIndx], pgdumpall_out);
 
-	/* Start the new coordinator */
-	doImmediate(host, NULL, "pg_ctl start -w -Z restoremode -D %s -o -i", dir);
+	/* Start the new coordinator, in binary upgrade mode */
+	doImmediate(host, NULL, "pg_ctl start -w -Z restoremode -D %s -o '-i -b'", dir);
 
 	/* Allow the new coordinator to start up by sleeping for a couple of seconds */
 	pg_usleep(2000000L);

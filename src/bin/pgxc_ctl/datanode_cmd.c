@@ -1222,15 +1222,25 @@ int add_datanodeMaster(char *name, char *host, int port, int pooler, char *dir,
 	fprintf(lockf, "select pgxc_lock_for_backup();\n");	/* Keep open until the end of the addition. */
 	fflush(lockf);
 
-	/* pg_dumpall */
+	/*
+	 * pg_dumpall
+	 *
+	 * We leverage facilities provides by binary-upgrade to ensure a consistent
+	 * column ordering between other nodes in the cluster. Essentially, it will
+	 * mimic dropped columns by adding dummy columns and later dropping those
+	 * to arrive at a final consistent ordering.
+	 *
+	 * The server must then be started in binary-upgrade mode (-b option) while
+	 * restoring the dump.
+	 */
 	createLocalFileName(GENERAL, pgdumpall_out, MAXPATH);
  	if (restore_dnode_idx != -1)
- 		doImmediateRaw("pg_dumpall -p %s -h %s -s --include-nodes --dump-nodes >%s",
+		doImmediateRaw("pg_dumpall -p %s -h %s -s --include-nodes --binary-upgrade --dump-nodes >%s",
 				   aval(VAR_datanodePorts)[restore_dnode_idx],
 				   aval(VAR_datanodeMasterServers)[restore_dnode_idx],
 				   pgdumpall_out);
  	else if (restore_coord_idx != -1)
- 		doImmediateRaw("pg_dumpall -p %s -h %s -s --include-nodes --dump-nodes >%s",
+		doImmediateRaw("pg_dumpall -p %s -h %s -s --include-nodes --binary-upgrade --dump-nodes >%s",
  					   aval(VAR_coordPorts)[restore_coord_idx],
  					   aval(VAR_coordMasterServers)[restore_coord_idx],
  					   pgdumpall_out);
@@ -1240,8 +1250,8 @@ int add_datanodeMaster(char *name, char *host, int port, int pooler, char *dir,
  		return 1;
  	}
 
-	/* Start the new datanode */
-	doImmediate(host, NULL, "pg_ctl start -w -Z restoremode -D %s -o -i", dir);
+	/* Start the new datanode, in binary upgrade mode */
+	doImmediate(host, NULL, "pg_ctl start -w -Z restoremode -D %s -o '-i -b'", dir);
 
 	/* Allow the new datanode to start up by sleeping for a couple of seconds */
 	pg_usleep(2000000L);

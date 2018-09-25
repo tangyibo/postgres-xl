@@ -305,11 +305,6 @@ CREATE TABLE partitioned (
 ERROR:  exclusion constraints are not supported on partitioned tables
 LINE 3:  EXCLUDE USING gist (a WITH &&)
          ^
--- prevent column from being used twice in the partition key
-CREATE TABLE partitioned (
-	a int
-) PARTITION BY RANGE (a, a);
-ERROR:  column "a" appears more than once in partition key
 -- prevent using prohibited expressions in the key
 CREATE FUNCTION retset (a int) RETURNS SETOF int AS $$ SELECT 1; $$ LANGUAGE SQL IMMUTABLE;
 CREATE TABLE partitioned (
@@ -784,8 +779,22 @@ Distribute By: HASH(a)
 Location Nodes: ALL DATANODES
 
 DROP TABLE range_parted4;
+-- user-defined operator class in partition key
+CREATE FUNCTION my_int4_sort(int4,int4) RETURNS int LANGUAGE sql
+  AS $$ SELECT case WHEN $1 = $2 THEN 0 WHEN $1 > $2 THEN 1 ELSE -1 END; $$;
+CREATE OPERATOR CLASS test_int4_ops FOR TYPE int4 USING btree AS
+  OPERATOR 1 < (int4,int4), OPERATOR 2 <= (int4,int4),
+  OPERATOR 3 = (int4,int4), OPERATOR 4 >= (int4,int4),
+  OPERATOR 5 > (int4,int4), FUNCTION 1 my_int4_sort(int4,int4);
+CREATE TABLE partkey_t (a int4) PARTITION BY RANGE (a test_int4_ops);
+CREATE TABLE partkey_t_1 PARTITION OF partkey_t FOR VALUES FROM (0) TO (1000);
+INSERT INTO partkey_t VALUES (100);
+INSERT INTO partkey_t VALUES (200);
 -- cleanup
 DROP TABLE parted, list_parted, range_parted, list_parted2, range_parted2, range_parted3;
+DROP TABLE partkey_t;
+DROP OPERATOR CLASS test_int4_ops USING btree;
+DROP FUNCTION my_int4_sort(int4,int4);
 -- comments on partitioned tables columns
 CREATE TABLE parted_col_comment (a int, b text) PARTITION BY LIST (a);
 COMMENT ON TABLE parted_col_comment IS 'Am partitioned table';
@@ -816,8 +825,32 @@ CREATE TABLE arrlp12 PARTITION OF arrlp FOR VALUES IN ('{1}', '{2}');
 --------+-----------+-----------+----------+---------+----------+--------------+-------------
  a      | integer[] |           |          |         | extended |              | 
 Partition of: arrlp FOR VALUES IN ('{1}', '{2}')
-Partition constraint: ((a IS NOT NULL) AND (((a)::anyarray OPERATOR(pg_catalog.=) '{1}'::integer[]) OR ((a)::anyarray OPERATOR(pg_catalog.=) '{2}'::integer[])))
+Partition constraint: ((a IS NOT NULL) AND ((a = '{1}'::integer[]) OR (a = '{2}'::integer[])))
 Distribute By: ROUND ROBIN
 Location Nodes: ALL DATANODES
 
 DROP TABLE arrlp;
+-- partition on boolean column
+create table boolspart (a bool) partition by list (a);
+create table boolspart_t partition of boolspart for values in (true);
+create table boolspart_f partition of boolspart for values in (false);
+\d+ boolspart
+                                 Table "public.boolspart"
+ Column |  Type   | Collation | Nullable | Default | Storage | Stats target | Description 
+--------+---------+-----------+----------+---------+---------+--------------+-------------
+ a      | boolean |           |          |         | plain   |              | 
+Partition key: LIST (a)
+Partitions: boolspart_f FOR VALUES IN (false),
+            boolspart_t FOR VALUES IN (true)
+
+drop table boolspart;
+-- partitions mixing temporary and permanent relations
+create table perm_parted (a int) partition by list (a);
+create temporary table temp_parted (a int) partition by list (a);
+create table perm_part partition of temp_parted for values in (1, 2); -- error
+ERROR:  cannot create a permanent relation as partition of temporary relation "temp_parted"
+create temp table temp_part partition of perm_parted for values in (1, 2); -- error
+ERROR:  cannot create a temporary relation as partition of permanent relation "perm_parted"
+create temp table temp_part partition of temp_parted for values in (1, 2); -- ok
+drop table perm_parted cascade;
+drop table temp_parted cascade;

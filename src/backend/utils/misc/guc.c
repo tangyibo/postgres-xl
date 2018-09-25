@@ -870,8 +870,8 @@ static const unit_conversion time_unit_conversion_table[] =
  *
  * 6. Don't forget to document the option (at least in config.sgml).
  *
- * 7. If it's a new GUC_LIST option you must edit pg_dumpall.c to ensure
- *	  it is not single quoted at dump time.
+ * 7. If it's a new GUC_LIST_QUOTE option, you must add it to
+ *	  variable_is_guc_list_quote() in src/bin/pg_dump/dumputils.c.
  */
 
 
@@ -2879,7 +2879,7 @@ static struct config_int ConfigureNamesInt[] =
 
 	{
 		{"max_parallel_workers", PGC_USERSET, RESOURCES_ASYNCHRONOUS,
-			gettext_noop("Sets the maximum number of parallel workers than can be active at one time."),
+			gettext_noop("Sets the maximum number of parallel workers that can be active at one time."),
 			NULL
 		},
 		&max_parallel_workers,
@@ -7511,15 +7511,15 @@ SetConfigOption(const char *name, const char *value,
  * this cannot be distinguished from a string variable with a NULL value!),
  * otherwise throw an ereport and don't return.
  *
- * If restrict_superuser is true, we also enforce that only superusers can
- * see GUC_SUPERUSER_ONLY variables.  This should only be passed as true
- * in user-driven calls.
+ * If restrict_privileged is true, we also enforce that only superusers and
+ * members of the pg_read_all_settings role can see GUC_SUPERUSER_ONLY
+ * variables.  This should only be passed as true in user-driven calls.
  *
  * The string is *not* allocated for modification and is really only
  * valid until the next call to configuration related functions.
  */
 const char *
-GetConfigOption(const char *name, bool missing_ok, bool restrict_superuser)
+GetConfigOption(const char *name, bool missing_ok, bool restrict_privileged)
 {
 	struct config_generic *record;
 	static char buffer[256];
@@ -7534,7 +7534,7 @@ GetConfigOption(const char *name, bool missing_ok, bool restrict_superuser)
 				 errmsg("unrecognized configuration parameter \"%s\"",
 						name)));
 	}
-	if (restrict_superuser &&
+	if (restrict_privileged &&
 		(record->flags & GUC_SUPERUSER_ONLY) &&
 		!is_member_of_role(GetUserId(), DEFAULT_ROLE_READ_ALL_SETTINGS))
 		ereport(ERROR,
@@ -7625,6 +7625,30 @@ GetConfigOptionResetString(const char *name)
 											   ((struct config_enum *) record)->reset_val);
 	}
 	return NULL;
+}
+
+/*
+ * Get the GUC flags associated with the given option.
+ *
+ * If the option doesn't exist, return 0 if missing_ok is true,
+ * otherwise throw an ereport and don't return.
+ */
+int
+GetConfigOptionFlags(const char *name, bool missing_ok)
+{
+	struct config_generic *record;
+
+	record = find_option(name, false, WARNING);
+	if (record == NULL)
+	{
+		if (missing_ok)
+			return 0;
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("unrecognized configuration parameter \"%s\"",
+						name)));
+	}
+	return record->flags;
 }
 
 
@@ -8840,7 +8864,6 @@ ShowGUCConfigOption(const char *name, DestReceiver *dest)
 static void
 ShowAllGUCConfig(DestReceiver *dest)
 {
-	bool		am_superuser = superuser();
 	int			i;
 	TupOutputState *tstate;
 	TupleDesc	tupdesc;
@@ -8865,7 +8888,8 @@ ShowAllGUCConfig(DestReceiver *dest)
 		char	   *setting;
 
 		if ((conf->flags & GUC_NO_SHOW_ALL) ||
-			((conf->flags & GUC_SUPERUSER_ONLY) && !am_superuser))
+			((conf->flags & GUC_SUPERUSER_ONLY) &&
+			 !is_member_of_role(GetUserId(), DEFAULT_ROLE_READ_ALL_SETTINGS)))
 			continue;
 
 		/* assign to the values array */
@@ -9213,9 +9237,10 @@ GetConfigOptionByNum(int varnum, const char **values, bool *noshow)
 	/*
 	 * If the setting came from a config file, set the source location. For
 	 * security reasons, we don't show source file/line number for
-	 * non-superusers.
+	 * insufficiently-privileged users.
 	 */
-	if (conf->source == PGC_S_FILE && superuser())
+	if (conf->source == PGC_S_FILE &&
+		is_member_of_role(GetUserId(), DEFAULT_ROLE_READ_ALL_SETTINGS))
 	{
 		values[14] = conf->sourcefile;
 		snprintf(buffer, sizeof(buffer), "%d", conf->sourceline);

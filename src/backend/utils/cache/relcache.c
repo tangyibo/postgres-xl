@@ -254,6 +254,7 @@ static void RelationDestroyRelation(Relation relation, bool remember_tupdesc);
 static void RelationClearRelation(Relation relation, bool rebuild);
 
 static void RelationReloadIndexInfo(Relation relation);
+static void RelationReloadNailed(Relation relation);
 static void RelationFlushRelation(Relation relation);
 static void RememberToFreeTupleDescAtEOX(TupleDesc td);
 static void AtEOXact_cleanup(Relation relation, bool isCommit);
@@ -272,7 +273,6 @@ static Relation AllocateRelationDesc(Form_pg_class relp);
 static void RelationParseRelOptions(Relation relation, HeapTuple tuple);
 static void RelationBuildTupleDesc(Relation relation);
 static void RelationBuildPartitionKey(Relation relation);
-static PartitionKey copy_partition_key(PartitionKey fromkey);
 static Relation RelationBuildDesc(Oid targetRelId, bool insertIt);
 static void RelationInitPhysicalAddr(Relation relation);
 static void load_critical_index(Oid indexoid, Oid heapoid);
@@ -292,7 +292,7 @@ static void IndexSupportInitialize(oidvector *indclass,
 static OpClassCacheEnt *LookupOpclassInfo(Oid operatorClassOid,
 				  StrategyNumber numSupport);
 static void RelationCacheInitFileRemoveInDir(const char *tblspcpath);
-static void unlink_initfile(const char *initfilename);
+static void unlink_initfile(const char *initfilename, int elevel);
 static bool equalPartitionDescs(PartitionKey key, PartitionDesc partdesc1,
 					PartitionDesc partdesc2);
 
@@ -817,17 +817,16 @@ RelationBuildRuleLock(Relation relation)
  * RelationBuildPartitionKey
  *		Build and attach to relcache partition key data of relation
  *
- * Partitioning key data is stored in CacheMemoryContext to ensure it survives
- * as long as the relcache.  To avoid leaking memory in that context in case
- * of an error partway through this function, we build the structure in the
- * working context (which must be short-lived) and copy the completed
- * structure into the cache memory.
- *
- * Also, since the structure being created here is sufficiently complex, we
- * make a private child context of CacheMemoryContext for each relation that
- * has associated partition key information.  That means no complicated logic
- * to free individual elements whenever the relcache entry is flushed - just
- * delete the context.
+ * Partitioning key data is a complex structure; to avoid complicated logic to
+ * free individual elements whenever the relcache entry is flushed, we give it
+ * its own memory context, child of CacheMemoryContext, which can easily be
+ * deleted on its own.  To avoid leaking memory in that context in case of an
+ * error partway through this function, the context is initially created as a
+ * child of CurTransactionContext and only re-parented to CacheMemoryContext
+ * at the end, when no further errors are possible.  Also, we don't make this
+ * context the current context except in very brief code sections, out of fear
+ * that some of our callees allocate memory on their own which would be leaked
+ * permanently.
  */
 static void
 RelationBuildPartitionKey(Relation relation)
@@ -855,7 +854,12 @@ RelationBuildPartitionKey(Relation relation)
 	if (!HeapTupleIsValid(tuple))
 		return;
 
-	key = (PartitionKey) palloc0(sizeof(PartitionKeyData));
+	partkeycxt = AllocSetContextCreate(CurTransactionContext,
+									   RelationGetRelationName(relation),
+									   ALLOCSET_SMALL_SIZES);
+
+	key = (PartitionKey) MemoryContextAllocZero(partkeycxt,
+												sizeof(PartitionKeyData));
 
 	/* Fixed-length attributes */
 	form = (Form_pg_partitioned_table) GETSTRUCT(tuple);
@@ -899,15 +903,18 @@ RelationBuildPartitionKey(Relation relation)
 		 * will be comparing them to similarly-processed qual clause operands,
 		 * and may fail to detect valid matches without this step.  We don't
 		 * need to bother with canonicalize_qual() though, because partition
-		 * expressions are not full-fledged qualification clauses.
+		 * expressions should be in canonical form already (ie, no need for
+		 * OR-merging or constant elimination).
 		 */
-		expr = eval_const_expressions(NULL, (Node *) expr);
+		expr = eval_const_expressions(NULL, expr);
+		fix_opfuncids(expr);
 
-		/* May as well fix opfuncids too */
-		fix_opfuncids((Node *) expr);
-		key->partexprs = (List *) expr;
+		oldcxt = MemoryContextSwitchTo(partkeycxt);
+		key->partexprs = (List *) copyObject(expr);
+		MemoryContextSwitchTo(oldcxt);
 	}
 
+	oldcxt = MemoryContextSwitchTo(partkeycxt);
 	key->partattrs = (AttrNumber *) palloc0(key->partnatts * sizeof(AttrNumber));
 	key->partopfamily = (Oid *) palloc0(key->partnatts * sizeof(Oid));
 	key->partopcintype = (Oid *) palloc0(key->partnatts * sizeof(Oid));
@@ -922,6 +929,7 @@ RelationBuildPartitionKey(Relation relation)
 	key->parttypbyval = (bool *) palloc0(key->partnatts * sizeof(bool));
 	key->parttypalign = (char *) palloc0(key->partnatts * sizeof(char));
 	key->parttypcoll = (Oid *) palloc0(key->partnatts * sizeof(Oid));
+	MemoryContextSwitchTo(oldcxt);
 
 	/* Copy partattrs and fill other per-attribute info */
 	memcpy(key->partattrs, attrs, key->partnatts * sizeof(int16));
@@ -956,7 +964,7 @@ RelationBuildPartitionKey(Relation relation)
 				 BTORDER_PROC, opclassform->opcintype, opclassform->opcintype,
 				 opclassform->opcfamily);
 
-		fmgr_info(funcid, &key->partsupfunc[i]);
+		fmgr_info_cxt(funcid, &key->partsupfunc[i], partkeycxt);
 
 		/* Collation */
 		key->partcollation[i] = collation->values[i];
@@ -989,68 +997,13 @@ RelationBuildPartitionKey(Relation relation)
 
 	ReleaseSysCache(tuple);
 
-	/* Success --- now copy to the cache memory */
-	partkeycxt = AllocSetContextCreate(CacheMemoryContext,
-									   RelationGetRelationName(relation),
-									   ALLOCSET_SMALL_SIZES);
+	/*
+	 * Success --- reparent our context and make the relcache point to the
+	 * newly constructed key
+	 */
+	MemoryContextSetParent(partkeycxt, CacheMemoryContext);
 	relation->rd_partkeycxt = partkeycxt;
-	oldcxt = MemoryContextSwitchTo(relation->rd_partkeycxt);
-	relation->rd_partkey = copy_partition_key(key);
-	MemoryContextSwitchTo(oldcxt);
-}
-
-/*
- * copy_partition_key
- *
- * The copy is allocated in the current memory context.
- */
-static PartitionKey
-copy_partition_key(PartitionKey fromkey)
-{
-	PartitionKey newkey;
-	int			n;
-
-	newkey = (PartitionKey) palloc(sizeof(PartitionKeyData));
-
-	newkey->strategy = fromkey->strategy;
-	newkey->partnatts = n = fromkey->partnatts;
-
-	newkey->partattrs = (AttrNumber *) palloc(n * sizeof(AttrNumber));
-	memcpy(newkey->partattrs, fromkey->partattrs, n * sizeof(AttrNumber));
-
-	newkey->partexprs = copyObject(fromkey->partexprs);
-
-	newkey->partopfamily = (Oid *) palloc(n * sizeof(Oid));
-	memcpy(newkey->partopfamily, fromkey->partopfamily, n * sizeof(Oid));
-
-	newkey->partopcintype = (Oid *) palloc(n * sizeof(Oid));
-	memcpy(newkey->partopcintype, fromkey->partopcintype, n * sizeof(Oid));
-
-	newkey->partsupfunc = (FmgrInfo *) palloc(n * sizeof(FmgrInfo));
-	memcpy(newkey->partsupfunc, fromkey->partsupfunc, n * sizeof(FmgrInfo));
-
-	newkey->partcollation = (Oid *) palloc(n * sizeof(Oid));
-	memcpy(newkey->partcollation, fromkey->partcollation, n * sizeof(Oid));
-
-	newkey->parttypid = (Oid *) palloc(n * sizeof(Oid));
-	memcpy(newkey->parttypid, fromkey->parttypid, n * sizeof(Oid));
-
-	newkey->parttypmod = (int32 *) palloc(n * sizeof(int32));
-	memcpy(newkey->parttypmod, fromkey->parttypmod, n * sizeof(int32));
-
-	newkey->parttyplen = (int16 *) palloc(n * sizeof(int16));
-	memcpy(newkey->parttyplen, fromkey->parttyplen, n * sizeof(int16));
-
-	newkey->parttypbyval = (bool *) palloc(n * sizeof(bool));
-	memcpy(newkey->parttypbyval, fromkey->parttypbyval, n * sizeof(bool));
-
-	newkey->parttypalign = (char *) palloc(n * sizeof(bool));
-	memcpy(newkey->parttypalign, fromkey->parttypalign, n * sizeof(char));
-
-	newkey->parttypcoll = (Oid *) palloc(n * sizeof(Oid));
-	memcpy(newkey->parttypcoll, fromkey->parttypcoll, n * sizeof(Oid));
-
-	return newkey;
+	relation->rd_partkey = key;
 }
 
 /*
@@ -2141,7 +2094,16 @@ RelationIdGetRelation(Oid relationId)
 				RelationReloadIndexInfo(rd);
 			else
 				RelationClearRelation(rd, true);
-			Assert(rd->rd_isvalid);
+
+			/*
+			 * Normally entries need to be valid here, but before the relcache
+			 * has been initialized, not enough infrastructure exists to
+			 * perform pg_class lookups. The structure of such entries doesn't
+			 * change, but we still want to update the rd_rel entry. So
+			 * rd_isvalid = false is left in place for a later lookup.
+			 */
+			Assert(rd->rd_isvalid ||
+				   (rd->rd_isnailed && !criticalRelcachesBuilt));
 		}
 		return rd;
 	}
@@ -2345,6 +2307,81 @@ RelationReloadIndexInfo(Relation relation)
 }
 
 /*
+ * RelationReloadNailed - reload minimal information for nailed relations.
+ *
+ * The structure of a nailed relation can never change (which is good, because
+ * we rely on knowing their structure to be able to read catalog content). But
+ * some parts, e.g. pg_class.relfrozenxid, are still important to have
+ * accurate content for. Therefore those need to be reloaded after the arrival
+ * of invalidations.
+ */
+static void
+RelationReloadNailed(Relation relation)
+{
+	Assert(relation->rd_isnailed);
+
+	/*
+	 * Redo RelationInitPhysicalAddr in case it is a mapped relation whose
+	 * mapping changed.
+	 */
+	RelationInitPhysicalAddr(relation);
+
+	/* flag as needing to be revalidated */
+	relation->rd_isvalid = false;
+
+	/*
+	 * Can only reread catalog contents if in a transaction.  If the relation
+	 * is currently open (not counting the nailed refcount), do so
+	 * immediately. Otherwise we've already marked the entry as possibly
+	 * invalid, and it'll be fixed when next opened.
+	 */
+	if (!IsTransactionState() || relation->rd_refcnt <= 1)
+		return;
+
+	if (relation->rd_rel->relkind == RELKIND_INDEX)
+	{
+		/*
+		 * If it's a nailed-but-not-mapped index, then we need to re-read the
+		 * pg_class row to see if its relfilenode changed.
+		 */
+		RelationReloadIndexInfo(relation);
+	}
+	else
+	{
+		/*
+		 * Reload a non-index entry.  We can't easily do so if relcaches
+		 * aren't yet built, but that's fine because at that stage the
+		 * attributes that need to be current (like relfrozenxid) aren't yet
+		 * accessed.  To ensure the entry will later be revalidated, we leave
+		 * it in invalid state, but allow use (cf. RelationIdGetRelation()).
+		 */
+		if (criticalRelcachesBuilt)
+		{
+			HeapTuple	pg_class_tuple;
+			Form_pg_class relp;
+
+			/*
+			 * NB: Mark the entry as valid before starting to scan, to avoid
+			 * self-recursion when re-building pg_class.
+			 */
+			relation->rd_isvalid = true;
+
+			pg_class_tuple = ScanPgRelation(RelationGetRelid(relation),
+											true, false);
+			relp = (Form_pg_class) GETSTRUCT(pg_class_tuple);
+			memcpy(relation->rd_rel, relp, CLASS_TUPLE_SIZE);
+			heap_freetuple(pg_class_tuple);
+
+			/*
+			 * Again mark as valid, to protect against concurrently arriving
+			 * invalidations.
+			 */
+			relation->rd_isvalid = true;
+		}
+	}
+}
+
+/*
  * RelationDestroyRelation
  *
  *	Physically delete a relation cache entry and all subsidiary data.
@@ -2457,26 +2494,12 @@ RelationClearRelation(Relation relation, bool rebuild)
 	RelationCloseSmgr(relation);
 
 	/*
-	 * Never, never ever blow away a nailed-in system relation, because we'd
-	 * be unable to recover.  However, we must redo RelationInitPhysicalAddr
-	 * in case it is a mapped relation whose mapping changed.
-	 *
-	 * If it's a nailed-but-not-mapped index, then we need to re-read the
-	 * pg_class row to see if its relfilenode changed. We do that immediately
-	 * if we're inside a valid transaction and the relation is open (not
-	 * counting the nailed refcount).  Otherwise just mark the entry as
-	 * possibly invalid, and it'll be fixed when next opened.
+	 * Treat nailed-in system relations separately, they always need to be
+	 * accessible, so we can't blow them away.
 	 */
 	if (relation->rd_isnailed)
 	{
-		RelationInitPhysicalAddr(relation);
-
-		if (relation->rd_rel->relkind == RELKIND_INDEX)
-		{
-			relation->rd_isvalid = false;	/* needs to be revalidated */
-			if (relation->rd_refcnt > 1 && IsTransactionState())
-				RelationReloadIndexInfo(relation);
-		}
+		RelationReloadNailed(relation);
 		return;
 	}
 
@@ -4788,11 +4811,10 @@ RelationGetIndexExpressions(Relation relation)
 	 * Run the expressions through eval_const_expressions. This is not just an
 	 * optimization, but is necessary, because the planner will be comparing
 	 * them to similarly-processed qual clauses, and may fail to detect valid
-	 * matches without this.  We don't bother with canonicalize_qual, however.
+	 * matches without this.  We must not use canonicalize_qual, however,
+	 * since these aren't qual expressions.
 	 */
 	result = (List *) eval_const_expressions(NULL, (Node *) result);
-
-	result = (List *) canonicalize_qual((Expr *) result);
 
 	/* May as well fix opfuncids too */
 	fix_opfuncids((Node *) result);
@@ -4858,7 +4880,7 @@ RelationGetIndexPredicate(Relation relation)
 	 */
 	result = (List *) eval_const_expressions(NULL, (Node *) result);
 
-	result = (List *) canonicalize_qual((Expr *) result);
+	result = (List *) canonicalize_qual_ext((Expr *) result, false);
 
 	/* Also convert to implicit-AND format */
 	result = make_ands_implicit((Expr *) result);
@@ -5999,24 +6021,26 @@ write_item(const void *data, Size len, FILE *fp)
 
 /*
  * Determine whether a given relation (identified by OID) is one of the ones
- * we should store in the local relcache init file.
+ * we should store in a relcache init file.
  *
  * We must cache all nailed rels, and for efficiency we should cache every rel
  * that supports a syscache.  The former set is almost but not quite a subset
- * of the latter.  Currently, we must special-case TriggerRelidNameIndexId,
- * which RelationCacheInitializePhase3 chooses to nail for efficiency reasons,
- * but which does not support any syscache.
- *
- * Note: this function is currently never called for shared rels.  If it were,
- * we'd probably also need a special case for DatabaseNameIndexId, which is
- * critical but does not support a syscache.
+ * of the latter. The special cases are relations where
+ * RelationCacheInitializePhase2/3 chooses to nail for efficiency reasons, but
+ * which do not support any syscache.
  */
 bool
 RelationIdIsInInitFile(Oid relationId)
 {
-	if (relationId == TriggerRelidNameIndexId)
+	if (relationId == SharedSecLabelRelationId ||
+		relationId == TriggerRelidNameIndexId ||
+		relationId == DatabaseNameIndexId ||
+		relationId == SharedSecLabelObjectIndexId)
 	{
-		/* If this Assert fails, we don't need this special case anymore. */
+		/*
+		 * If this Assert fails, we don't need the applicable special case
+		 * anymore.
+		 */
 		Assert(!RelationSupportsSysCache(relationId));
 		return true;
 	}
@@ -6086,38 +6110,30 @@ RelationHasUnloggedIndex(Relation rel)
  * We take the lock and do the unlink in RelationCacheInitFilePreInvalidate,
  * then release the lock in RelationCacheInitFilePostInvalidate.  Caller must
  * send any pending SI messages between those calls.
- *
- * Notice this deals only with the local init file, not the shared init file.
- * The reason is that there can never be a "significant" change to the
- * relcache entry of a shared relation; the most that could happen is
- * updates of noncritical fields such as relpages/reltuples.  So, while
- * it's worth updating the shared init file from time to time, it can never
- * be invalid enough to make it necessary to remove it.
  */
 void
 RelationCacheInitFilePreInvalidate(void)
 {
-	char		initfilename[MAXPGPATH];
+	char		localinitfname[MAXPGPATH];
+	char		sharedinitfname[MAXPGPATH];
 
-	snprintf(initfilename, sizeof(initfilename), "%s/%s",
-			 DatabasePath, RELCACHE_INIT_FILENAME);
+	if (DatabasePath)
+		snprintf(localinitfname, sizeof(localinitfname), "%s/%s",
+				 DatabasePath, RELCACHE_INIT_FILENAME);
+	snprintf(sharedinitfname, sizeof(sharedinitfname), "global/%s",
+			 RELCACHE_INIT_FILENAME);
 
 	LWLockAcquire(RelCacheInitLock, LW_EXCLUSIVE);
 
-	if (unlink(initfilename) < 0)
-	{
-		/*
-		 * The file might not be there if no backend has been started since
-		 * the last removal.  But complain about failures other than ENOENT.
-		 * Fortunately, it's not too late to abort the transaction if we can't
-		 * get rid of the would-be-obsolete init file.
-		 */
-		if (errno != ENOENT)
-			ereport(ERROR,
-					(errcode_for_file_access(),
-					 errmsg("could not remove cache file \"%s\": %m",
-							initfilename)));
-	}
+	/*
+	 * The files might not be there if no backend has been started since the
+	 * last removal.  But complain about failures other than ENOENT with
+	 * ERROR.  Fortunately, it's not too late to abort the transaction if we
+	 * can't get rid of the would-be-obsolete init file.
+	 */
+	if (DatabasePath)
+		unlink_initfile(localinitfname, ERROR);
+	unlink_initfile(sharedinitfname, ERROR);
 }
 
 void
@@ -6143,13 +6159,9 @@ RelationCacheInitFileRemove(void)
 	struct dirent *de;
 	char		path[MAXPGPATH + 10 + sizeof(TABLESPACE_VERSION_DIRECTORY)];
 
-	/*
-	 * We zap the shared cache file too.  In theory it can't get out of sync
-	 * enough to be a problem, but in data-corruption cases, who knows ...
-	 */
 	snprintf(path, sizeof(path), "global/%s",
 			 RELCACHE_INIT_FILENAME);
-	unlink_initfile(path);
+	unlink_initfile(path, LOG);
 
 	/* Scan everything in the default tablespace */
 	RelationCacheInitFileRemoveInDir("base");
@@ -6207,7 +6219,7 @@ RelationCacheInitFileRemoveInDir(const char *tblspcpath)
 			/* Try to remove the init file in each database */
 			snprintf(initfilename, sizeof(initfilename), "%s/%s/%s",
 					 tblspcpath, de->d_name, RELCACHE_INIT_FILENAME);
-			unlink_initfile(initfilename);
+			unlink_initfile(initfilename, LOG);
 		}
 	}
 
@@ -6215,12 +6227,15 @@ RelationCacheInitFileRemoveInDir(const char *tblspcpath)
 }
 
 static void
-unlink_initfile(const char *initfilename)
+unlink_initfile(const char *initfilename, int elevel)
 {
 	if (unlink(initfilename) < 0)
 	{
 		/* It might not be there, but log any error other than ENOENT */
 		if (errno != ENOENT)
-			elog(LOG, "could not remove cache file \"%s\": %m", initfilename);
+			ereport(elevel,
+					(errcode_for_file_access(),
+					 errmsg("could not remove cache file \"%s\": %m",
+							initfilename)));
 	}
 }

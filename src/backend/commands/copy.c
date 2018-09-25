@@ -158,7 +158,7 @@ typedef struct CopyStateData
 
 	/* these are just for error messages, see CopyFromErrorCallback */
 	const char *cur_relname;	/* table name for error messages */
-	int			cur_lineno;		/* line number for error messages */
+	uint64		cur_lineno;		/* line number for error messages */
 	const char *cur_attname;	/* current att for error messages */
 	const char *cur_attval;		/* current att value for error messages */
 
@@ -335,7 +335,7 @@ static void CopyFromInsertBatch(CopyState cstate, EState *estate,
 					ResultRelInfo *resultRelInfo, TupleTableSlot *myslot,
 					BulkInsertState bistate,
 					int nBufferedTuples, HeapTuple *bufferedTuples,
-					int firstBufferedLineNo);
+					uint64 firstBufferedLineNo);
 static bool CopyReadLine(CopyState cstate);
 static bool CopyReadLineText(CopyState cstate);
 static int	CopyReadAttributesText(CopyState cstate);
@@ -2330,17 +2330,21 @@ void
 CopyFromErrorCallback(void *arg)
 {
 	CopyState	cstate = (CopyState) arg;
+	char		curlineno_str[32];
+
+	snprintf(curlineno_str, sizeof(curlineno_str), UINT64_FORMAT,
+			 cstate->cur_lineno);
 
 	if (cstate->binary)
 	{
 		/* can't usefully display the data */
 		if (cstate->cur_attname)
-			errcontext("COPY %s, line %d, column %s",
-					   cstate->cur_relname, cstate->cur_lineno,
+			errcontext("COPY %s, line %s, column %s",
+					   cstate->cur_relname, curlineno_str,
 					   cstate->cur_attname);
 		else
-			errcontext("COPY %s, line %d",
-					   cstate->cur_relname, cstate->cur_lineno);
+			errcontext("COPY %s, line %s",
+					   cstate->cur_relname, curlineno_str);
 	}
 	else
 	{
@@ -2350,16 +2354,16 @@ CopyFromErrorCallback(void *arg)
 			char	   *attval;
 
 			attval = limit_printout_length(cstate->cur_attval);
-			errcontext("COPY %s, line %d, column %s: \"%s\"",
-					   cstate->cur_relname, cstate->cur_lineno,
+			errcontext("COPY %s, line %s, column %s: \"%s\"",
+					   cstate->cur_relname, curlineno_str,
 					   cstate->cur_attname, attval);
 			pfree(attval);
 		}
 		else if (cstate->cur_attname)
 		{
 			/* error is relevant to a particular column, value is NULL */
-			errcontext("COPY %s, line %d, column %s: null input",
-					   cstate->cur_relname, cstate->cur_lineno,
+			errcontext("COPY %s, line %s, column %s: null input",
+					   cstate->cur_relname, curlineno_str,
 					   cstate->cur_attname);
 		}
 		else
@@ -2380,14 +2384,14 @@ CopyFromErrorCallback(void *arg)
 				char	   *lineval;
 
 				lineval = limit_printout_length(cstate->line_buf.data);
-				errcontext("COPY %s, line %d: \"%s\"",
-						   cstate->cur_relname, cstate->cur_lineno, lineval);
+				errcontext("COPY %s, line %s: \"%s\"",
+						   cstate->cur_relname, curlineno_str, lineval);
 				pfree(lineval);
 			}
 			else
 			{
-				errcontext("COPY %s, line %d",
-						   cstate->cur_relname, cstate->cur_lineno);
+				errcontext("COPY %s, line %s",
+						   cstate->cur_relname, curlineno_str);
 			}
 		}
 	}
@@ -2457,7 +2461,7 @@ CopyFrom(CopyState cstate)
 #define MAX_BUFFERED_TUPLES 1000
 	HeapTuple  *bufferedTuples = NULL;	/* initialize to silence warning */
 	Size		bufferedTuplesSize = 0;
-	int			firstBufferedLineNo = 0;
+	uint64		firstBufferedLineNo = 0;
 
 	Assert(cstate->rel);
 
@@ -2843,13 +2847,12 @@ CopyFrom(CopyState cstate)
 			if (cstate->transition_capture != NULL)
 			{
 				if (resultRelInfo->ri_TrigDesc &&
-					(resultRelInfo->ri_TrigDesc->trig_insert_before_row ||
-					 resultRelInfo->ri_TrigDesc->trig_insert_instead_row))
+					resultRelInfo->ri_TrigDesc->trig_insert_before_row)
 				{
 					/*
-					 * If there are any BEFORE or INSTEAD triggers on the
-					 * partition, we'll have to be ready to convert their
-					 * result back to tuplestore format.
+					 * If there are any BEFORE triggers on the partition,
+					 * we'll have to be ready to convert their result back to
+					 * tuplestore format.
 					 */
 					cstate->transition_capture->tcs_original_insert_tuple = NULL;
 					cstate->transition_capture->tcs_map =
@@ -2932,7 +2935,8 @@ CopyFrom(CopyState cstate)
 					check_partition_constr = false;
 
 				/* Check the constraints of the tuple */
-				if (cstate->rel->rd_att->constr || check_partition_constr)
+				if (resultRelInfo->ri_RelationDesc->rd_att->constr ||
+					check_partition_constr)
 					ExecConstraints(resultRelInfo, slot, estate);
 
 				if (useHeapMultiInsert)
@@ -2990,12 +2994,13 @@ CopyFrom(CopyState cstate)
 			 * tuples inserted by an INSERT command.
 			 */
 			processed++;
+		}
 
-			if (saved_resultRelInfo)
-			{
-				resultRelInfo = saved_resultRelInfo;
-				estate->es_result_relation_info = resultRelInfo;
-			}
+		/* Restore the saved ResultRelInfo */
+		if (saved_resultRelInfo)
+		{
+			resultRelInfo = saved_resultRelInfo;
+			estate->es_result_relation_info = resultRelInfo;
 		}
 #ifdef PGXC
 		}
@@ -3111,11 +3116,11 @@ CopyFromInsertBatch(CopyState cstate, EState *estate, CommandId mycid,
 					int hi_options, ResultRelInfo *resultRelInfo,
 					TupleTableSlot *myslot, BulkInsertState bistate,
 					int nBufferedTuples, HeapTuple *bufferedTuples,
-					int firstBufferedLineNo)
+					uint64 firstBufferedLineNo)
 {
 	MemoryContext oldcontext;
 	int			i;
-	int			save_cur_lineno;
+	uint64		save_cur_lineno;
 
 	/*
 	 * Print error context information correctly, if one of the operations

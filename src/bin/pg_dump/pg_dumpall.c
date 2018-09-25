@@ -1736,11 +1736,37 @@ makeAlterConfigCommand(PGconn *conn, const char *arrayitem,
 	appendPQExpBuffer(buf, "SET %s TO ", fmtId(mine));
 
 	/*
-	 * Some GUC variable names are 'LIST' type and hence must not be quoted.
+	 * Variables that are marked GUC_LIST_QUOTE were already fully quoted by
+	 * flatten_set_variable_args() before they were put into the setconfig
+	 * array.  However, because the quoting rules used there aren't exactly
+	 * like SQL's, we have to break the list value apart and then quote the
+	 * elements as string literals.  (The elements may be double-quoted as-is,
+	 * but we can't just feed them to the SQL parser; it would do the wrong
+	 * thing with elements that are zero-length or longer than NAMEDATALEN.)
+	 *
+	 * Variables that are not so marked should just be emitted as simple
+	 * string literals.  If the variable is not known to
+	 * variable_is_guc_list_quote(), we'll do that; this makes it unsafe to
+	 * use GUC_LIST_QUOTE for extension variables.
 	 */
-	if (pg_strcasecmp(mine, "DateStyle") == 0
-		|| pg_strcasecmp(mine, "search_path") == 0)
-		appendPQExpBufferStr(buf, pos + 1);
+	if (variable_is_guc_list_quote(mine))
+	{
+		char	  **namelist;
+		char	  **nameptr;
+
+		/* Parse string into list of identifiers */
+		/* this shouldn't fail really */
+		if (SplitGUCList(pos + 1, ',', &namelist))
+		{
+			for (nameptr = namelist; *nameptr; nameptr++)
+			{
+				if (nameptr != namelist)
+					appendPQExpBufferStr(buf, ", ");
+				appendStringLiteralConn(buf, *nameptr, conn);
+			}
+		}
+		pg_free(namelist);
+	}
 	else
 		appendStringLiteralConn(buf, pos + 1, conn);
 	appendPQExpBufferStr(buf, ";\n");
@@ -2042,7 +2068,7 @@ connectDatabase(const char *dbname, const char *connection_string,
 		if (fail_on_error)
 		{
 			fprintf(stderr,
-					_("%s: could not connect to database \"%s\": %s\n"),
+					_("%s: could not connect to database \"%s\": %s"),
 					progname, dbname, PQerrorMessage(conn));
 			exit_nicely(1);
 		}

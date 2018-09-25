@@ -2204,13 +2204,13 @@ exec_stmt_fori(PLpgSQL_execstate *estate, PLpgSQL_stmt_fori *stmt)
 		 */
 		if (stmt->reverse)
 		{
-			if ((int32) (loop_value - step_value) > loop_value)
+			if (loop_value < (PG_INT32_MIN + step_value))
 				break;
 			loop_value -= step_value;
 		}
 		else
 		{
-			if ((int32) (loop_value + step_value) < loop_value)
+			if (loop_value > (PG_INT32_MAX - step_value))
 				break;
 			loop_value += step_value;
 		}
@@ -3729,12 +3729,12 @@ exec_stmt_execsql(PLpgSQL_execstate *estate,
 			break;
 
 		case SPI_OK_REWRITTEN:
-			Assert(!stmt->mod_stmt);
 
 			/*
 			 * The command was rewritten into another kind of command. It's
 			 * not clear what FOUND would mean in that case (and SPI doesn't
-			 * return the row count either), so just set it to false.
+			 * return the row count either), so just set it to false.  Note
+			 * that we can't assert anything about mod_stmt here.
 			 */
 			exec_set_found(estate, false);
 			break;

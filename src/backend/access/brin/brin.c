@@ -187,9 +187,19 @@ brininsert(Relation idxRel, Datum *values, bool *nulls,
 				brinGetTupleForHeapBlock(revmap, lastPageRange, &buf, &off,
 										 NULL, BUFFER_LOCK_SHARE, NULL);
 			if (!lastPageTuple)
-				AutoVacuumRequestWork(AVW_BRINSummarizeRange,
-									  RelationGetRelid(idxRel),
-									  lastPageRange);
+			{
+				bool	recorded;
+
+				recorded = AutoVacuumRequestWork(AVW_BRINSummarizeRange,
+												 RelationGetRelid(idxRel),
+												 lastPageRange);
+				if (!recorded)
+					ereport(LOG,
+							(errcode(ERRCODE_PROGRAM_LIMIT_EXCEEDED),
+							 errmsg("request for BRIN range summarization for index \"%s\" page %u was not recorded",
+									RelationGetRelationName(idxRel),
+									lastPageRange)));
+			}
 			else
 				LockBuffer(buf, BUFFER_LOCK_UNLOCK);
 		}
@@ -858,6 +868,12 @@ brin_summarize_range(PG_FUNCTION_ARGS)
 	Relation	heapRel;
 	double		numSummarized = 0;
 
+	if (RecoveryInProgress())
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("recovery is in progress"),
+				 errhint("BRIN control functions cannot be executed during recovery.")));
+
 	if (heapBlk64 > BRIN_ALL_BLOCKRANGES || heapBlk64 < 0)
 	{
 		char	   *blk = psprintf(INT64_FORMAT, heapBlk64);
@@ -928,6 +944,12 @@ brin_desummarize_range(PG_FUNCTION_ARGS)
 	Relation	heapRel;
 	Relation	indexRel;
 	bool		done;
+
+	if (RecoveryInProgress())
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("recovery is in progress"),
+				 errhint("BRIN control functions cannot be executed during recovery.")));
 
 	if (heapBlk64 > MaxBlockNumber || heapBlk64 < 0)
 	{

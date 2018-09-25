@@ -1854,6 +1854,19 @@ MergeAttributes(List *schema, List *supers, char relpersistence,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("inherited relation \"%s\" is not a table or foreign table",
 							parent->relname)));
+
+		/*
+		 * If the parent is permanent, so must be all of its partitions.  Note
+		 * that inheritance allows that case.
+		 */
+		if (is_partition &&
+			relation->rd_rel->relpersistence != RELPERSISTENCE_TEMP &&
+			relpersistence == RELPERSISTENCE_TEMP)
+			ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("cannot create a temporary relation as partition of permanent relation \"%s\"",
+							RelationGetRelationName(relation))));
+
 		/* Permanent rels cannot inherit from temporary ones */
 		if (relpersistence != RELPERSISTENCE_TEMP &&
 			relation->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
@@ -11881,11 +11894,11 @@ ATExecDropInherit(Relation rel, RangeVar *parent, LOCKMODE lockmode)
 	/* Off to RemoveInheritance() where most of the work happens */
 	RemoveInheritance(rel, parent_rel);
 
-	/* keep our lock on the parent relation until commit */
-	heap_close(parent_rel, NoLock);
-
 	ObjectAddressSet(address, RelationRelationId,
 					 RelationGetRelid(parent_rel));
+
+	/* keep our lock on the parent relation until commit */
+	heap_close(parent_rel, NoLock);
 
 	return address;
 }
@@ -14179,21 +14192,6 @@ transformPartitionSpec(Relation rel, PartitionSpec *partspec, char *strategy)
 	foreach(l, partspec->partParams)
 	{
 		PartitionElem *pelem = castNode(PartitionElem, lfirst(l));
-		ListCell   *lc;
-
-		/* Check for PARTITION BY ... (foo, foo) */
-		foreach(lc, newspec->partParams)
-		{
-			PartitionElem *pparam = castNode(PartitionElem, lfirst(lc));
-
-			if (pelem->name && pparam->name &&
-				strcmp(pelem->name, pparam->name) == 0)
-				ereport(ERROR,
-						(errcode(ERRCODE_DUPLICATE_COLUMN),
-						 errmsg("column \"%s\" appears more than once in partition key",
-								pelem->name),
-						 parser_errposition(pstate, pelem->location)));
-		}
 
 		if (pelem->expr)
 		{
@@ -14508,6 +14506,14 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 						   RelationGetRelationName(rel),
 						   RelationGetRelationName(attachrel))));
 
+	/* If the parent is permanent, so must be all of its partitions. */
+	if (rel->rd_rel->relpersistence != RELPERSISTENCE_TEMP &&
+		attachrel->rd_rel->relpersistence == RELPERSISTENCE_TEMP)
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("cannot attach a temporary relation as partition of permanent relation \"%s\"",
+						RelationGetRelationName(rel))));
+
 	/* Temp parent cannot have a partition that is itself not a temp */
 	if (rel->rd_rel->relpersistence == RELPERSISTENCE_TEMP &&
 		attachrel->rd_rel->relpersistence != RELPERSISTENCE_TEMP)
@@ -14605,9 +14611,17 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 	partConstraint = list_concat(get_qual_from_partbound(attachrel, rel,
 														 cmd->bound),
 								 RelationGetPartitionQual(rel));
+
+	/*
+	 * Run the partition quals through const-simplification similar to check
+	 * constraints.  We skip canonicalize_qual, though, because partition
+	 * quals should be in canonical form already; also, since the qual is in
+	 * implicit-AND format, we'd have to explicitly convert it to explicit-AND
+	 * format and back again.
+	 */
 	partConstraint = (List *) eval_const_expressions(NULL,
 													 (Node *) partConstraint);
-	partConstraint = (List *) canonicalize_qual((Expr *) partConstraint);
+
 	partConstraint = list_make1(make_ands_explicit(partConstraint));
 
 	/*
@@ -14689,13 +14703,11 @@ ATExecAttachPartition(List **wqueue, Relation rel, PartitionCmd *cmd)
 			 * to detect valid matches without this.
 			 */
 			cexpr = eval_const_expressions(NULL, cexpr);
-			cexpr = (Node *) canonicalize_qual((Expr *) cexpr);
+			cexpr = (Node *) canonicalize_qual_ext((Expr *) cexpr, true);
 
 			existConstraint = list_concat(existConstraint,
 										  make_ands_implicit((Expr *) cexpr));
 		}
-
-		existConstraint = list_make1(make_ands_explicit(existConstraint));
 
 		/* And away we go ... */
 		if (predicate_implied_by(partConstraint, existConstraint, true))

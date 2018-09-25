@@ -919,6 +919,12 @@ index_create(Relation heapRelation,
 						!concurrent);
 
 	/*
+	 * Register relcache invalidation on the indexes' heap relation, to
+	 * maintain consistency of its index list
+	 */
+	CacheInvalidateRelcache(heapRelation);
+
+	/*
 	 * Register constraint and dependencies for the index.
 	 *
 	 * If the index is from a CONSTRAINT clause, construct a pg_constraint
@@ -2604,9 +2610,12 @@ IndexBuildHeapRangeScan(Relation heapRelation,
 			offnum = ItemPointerGetOffsetNumber(&heapTuple->t_self);
 
 			if (!OffsetNumberIsValid(root_offsets[offnum - 1]))
-				elog(ERROR, "failed to find parent tuple for heap-only tuple at (%u,%u) in table \"%s\"",
-					 ItemPointerGetBlockNumber(&heapTuple->t_self),
-					 offnum, RelationGetRelationName(heapRelation));
+				ereport(ERROR,
+						(errcode(ERRCODE_DATA_CORRUPTED),
+						 errmsg_internal("failed to find parent tuple for heap-only tuple at (%u,%u) in table \"%s\"",
+										 ItemPointerGetBlockNumber(&heapTuple->t_self),
+										 offnum,
+										 RelationGetRelationName(heapRelation))));
 
 			ItemPointerSetOffsetNumber(&rootTuple.t_self,
 									   root_offsets[offnum - 1]);
@@ -3069,10 +3078,12 @@ validate_index_heapscan(Relation heapRelation,
 		{
 			root_offnum = root_offsets[root_offnum - 1];
 			if (!OffsetNumberIsValid(root_offnum))
-				elog(ERROR, "failed to find parent tuple for heap-only tuple at (%u,%u) in table \"%s\"",
-					 ItemPointerGetBlockNumber(heapcursor),
-					 ItemPointerGetOffsetNumber(heapcursor),
-					 RelationGetRelationName(heapRelation));
+				ereport(ERROR,
+						(errcode(ERRCODE_DATA_CORRUPTED),
+						 errmsg_internal("failed to find parent tuple for heap-only tuple at (%u,%u) in table \"%s\"",
+										 ItemPointerGetBlockNumber(heapcursor),
+										 ItemPointerGetOffsetNumber(heapcursor),
+										 RelationGetRelationName(heapRelation))));
 			ItemPointerSetOffsetNumber(&rootTuple, root_offnum);
 		}
 

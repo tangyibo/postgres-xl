@@ -707,6 +707,26 @@ select * from a left join b on i = x and i = y and x = i;
 rollback;
 
 --
+-- test handling of merge clauses using record_ops
+--
+begin;
+
+create type mycomptype as (id int, v bigint);
+
+create temp table tidv (idv mycomptype);
+create index on tidv (idv);
+
+explain (costs off)
+select a.idv, b.idv from tidv a, tidv b where a.idv = b.idv;
+
+set enable_mergejoin = 0;
+
+explain (costs off)
+select a.idv, b.idv from tidv a, tidv b where a.idv = b.idv;
+
+rollback;
+
+--
 -- test NULL behavior of whole-row Vars, per bug #5025
 --
 select t1.q2, count(t2.*)
@@ -1058,6 +1078,17 @@ select * from
 ) ss
 where fault = 122
 order by fault;
+
+explain (costs off)
+select * from
+(values (1, array[10,20]), (2, array[20,30])) as v1(v1x,v1ys)
+left join (values (1, 10), (2, 20)) as v2(v2x,v2y) on v2x = v1x
+left join unnest(v1ys) as u1(u1y) on u1y = v2y;
+
+select * from
+(values (1, array[10,20]), (2, array[20,30])) as v1(v1x,v1ys)
+left join (values (1, 10), (2, 20)) as v2(v2x,v2y) on v2x = v1x
+left join unnest(v1ys) as u1(u1y) on u1y = v2y;
 
 --
 -- test handling of potential equivalence clauses above outer joins

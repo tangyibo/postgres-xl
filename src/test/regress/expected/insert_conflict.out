@@ -155,7 +155,7 @@ drop index both_index_expr_key;
 -- In XL, table is distributed by HASH( key ) by default.
 -- unique index contains fruit and not key, so this fails.
 create unique index cross_match on insertconflicttest(lower(fruit) collate "C", upper(fruit) text_pattern_ops);
-ERROR:  Unique index of partitioned table must contain the hash/modulo distribution column.
+ERROR:  Unique index of distributed table must contain the hash/modulo distribution column.
 -- fails:
 explain (costs off) insert into insertconflicttest values(0, 'Crowberry') on conflict (lower(fruit) text_pattern_ops, upper(fruit) collate "C") do nothing;
 ERROR:  there is no unique or exclusion constraint matching the ON CONFLICT specification
@@ -332,7 +332,7 @@ drop index expr_part_comp_key_index;
 -- Expression index tests
 --
 create unique index expr_key_index on insertconflicttest(lower(fruit));
-ERROR:  Unique index of partitioned table must contain the hash/modulo distribution column.
+ERROR:  Unique index of distributed table must contain the hash/modulo distribution column.
 -- inference succeeds:
 insert into insertconflicttest values (20, 'Quince') on conflict (lower(fruit)) do update set fruit = excluded.fruit;
 ERROR:  there is no unique or exclusion constraint matching the ON CONFLICT specification
@@ -378,7 +378,7 @@ drop index tricky_expr_comp_key_index;
 --
 create unique index key_index on insertconflicttest(key);
 create unique index fruit_index on insertconflicttest(fruit);
-ERROR:  Unique index of partitioned table must contain the hash/modulo distribution column.
+ERROR:  Unique index of distributed table must contain the hash/modulo distribution column.
 -- succeeds, since UPDATE happens to update "fruit" to existing value:
 insert into insertconflicttest values (26, 'Fig') on conflict (key) do update set fruit = excluded.fruit;
 -- fails, since UPDATE is to row with key value 26, and we're updating "fruit"

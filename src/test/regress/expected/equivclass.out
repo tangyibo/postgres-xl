@@ -217,13 +217,13 @@ explain (costs off)
 (8 rows)
 
 create unique index ec1_expr1 on ec1((ff + 1));
-ERROR:  Unique index of partitioned table must contain the hash/modulo distribution column.
+ERROR:  Unique index of distributed table must contain the hash/modulo distribution column.
 create unique index ec1_expr2 on ec1((ff + 2 + 1));
-ERROR:  Unique index of partitioned table must contain the hash/modulo distribution column.
+ERROR:  Unique index of distributed table must contain the hash/modulo distribution column.
 create unique index ec1_expr3 on ec1((ff + 3 + 1));
-ERROR:  Unique index of partitioned table must contain the hash/modulo distribution column.
+ERROR:  Unique index of distributed table must contain the hash/modulo distribution column.
 create unique index ec1_expr4 on ec1((ff + 4));
-ERROR:  Unique index of partitioned table must contain the hash/modulo distribution column.
+ERROR:  Unique index of distributed table must contain the hash/modulo distribution column.
 explain (costs off)
   select * from ec1,
     (select ff + 1 as x from

@@ -2735,25 +2735,30 @@ create temp table tidv (idv mycomptype);
 create index on tidv (idv);
 explain (costs off)
 select a.idv, b.idv from tidv a, tidv b where a.idv = b.idv;
-                        QUERY PLAN                        
-----------------------------------------------------------
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  Merge Join
    Merge Cond: (a.idv = b.idv)
-   ->  Index Only Scan using tidv_idv_idx on tidv a
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Index Only Scan using tidv_idv_idx on tidv a
    ->  Materialize
-         ->  Index Only Scan using tidv_idv_idx on tidv b
-(5 rows)
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               ->  Index Only Scan using tidv_idv_idx on tidv b
+(7 rows)
 
 set enable_mergejoin = 0;
 explain (costs off)
 select a.idv, b.idv from tidv a, tidv b where a.idv = b.idv;
-                     QUERY PLAN                     
-----------------------------------------------------
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  Nested Loop
-   ->  Seq Scan on tidv a
-   ->  Index Only Scan using tidv_idv_idx on tidv b
-         Index Cond: (idv = a.idv)
-(4 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Seq Scan on tidv a
+   ->  Materialize
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               ->  Index Only Scan using tidv_idv_idx on tidv b
+                     Index Cond: (idv = a.idv)
+(7 rows)
 
 rollback;
 --

@@ -410,19 +410,20 @@ select count(*) from tenk1 group by twenty;
 -- test handling of SRFs in targetlist (bug in 10.0)
 explain (costs off)
    select count(*), generate_series(1,2) from tenk1 group by twenty;
-                        QUERY PLAN                        
-----------------------------------------------------------
+                           QUERY PLAN                            
+-----------------------------------------------------------------
  ProjectSet
    ->  Finalize GroupAggregate
          Group Key: twenty
-         ->  Gather Merge
-               Workers Planned: 4
-               ->  Partial GroupAggregate
-                     Group Key: twenty
-                     ->  Sort
-                           Sort Key: twenty
-                           ->  Parallel Seq Scan on tenk1
-(10 rows)
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               ->  Gather Merge
+                     Workers Planned: 4
+                     ->  Partial GroupAggregate
+                           Group Key: twenty
+                           ->  Sort
+                                 Sort Key: twenty
+                                 ->  Parallel Seq Scan on tenk1
+(11 rows)
 
 select count(*), generate_series(1,2) from tenk1 group by twenty;
  count | generate_series 

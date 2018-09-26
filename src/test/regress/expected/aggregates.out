@@ -2130,14 +2130,15 @@ SET enable_indexonlyscan = off;
 -- sum(int8) covers int8_avg_combine
 EXPLAIN (COSTS OFF)
   SELECT variance(unique1::int4), sum(unique1::int8) FROM tenk1;
-                  QUERY PLAN                  
-----------------------------------------------
+                        QUERY PLAN                         
+-----------------------------------------------------------
  Finalize Aggregate
-   ->  Gather
-         Workers Planned: 4
-         ->  Partial Aggregate
-               ->  Parallel Seq Scan on tenk1
-(5 rows)
+   ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+         ->  Gather
+               Workers Planned: 4
+               ->  Partial Aggregate
+                     ->  Parallel Seq Scan on tenk1
+(6 rows)
 
 SELECT variance(unique1::int4), sum(unique1::int8) FROM tenk1;
        variance       |   sum    

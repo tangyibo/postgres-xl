@@ -831,6 +831,8 @@ static int failover_oneDatanode(int datanodeIdx)
 	var_assign(&(aval(VAR_datanodeSlaveServers)[datanodeIdx]), Strdup("none"));
 	var_assign(&(aval(VAR_datanodeMasterDirs)[datanodeIdx]), Strdup(aval(VAR_datanodeSlaveDirs)[datanodeIdx]));
 	var_assign(&(aval(VAR_datanodeSlaveDirs)[datanodeIdx]), Strdup("none"));
+	var_assign(&(aval(VAR_datanodeMasterWALDirs)[datanodeIdx]), Strdup(aval(VAR_datanodeSlaveWALDirs)[datanodeIdx]));
+	var_assign(&(aval(VAR_datanodeSlaveWALDirs)[datanodeIdx]), Strdup("none"));
 	var_assign(&(aval(VAR_datanodePorts)[datanodeIdx]), Strdup(aval(VAR_datanodeSlavePorts)[datanodeIdx]));
 	var_assign(&(aval(VAR_datanodePoolerPorts)[datanodeIdx]), Strdup(aval(VAR_datanodeSlavePoolerPorts)[datanodeIdx]));
 	var_assign(&(aval(VAR_datanodeSlavePorts)[datanodeIdx]), Strdup("none"));
@@ -850,19 +852,23 @@ static int failover_oneDatanode(int datanodeIdx)
 			"datanodePorts=( %s )\n"
 			"datanodePoolerPorts=( %s )\n"
 			"datanodeMasterDirs=( %s )\n"
+			"datanodeMasterWALDirs=( %s )\n"
 			"datanodeSlaveServers=( %s )\n"
 			"datanodeSlavePorts=( %s )\n"
 			"datanodeSlavePoolerPorts=( %s )\n"
 			"datanodeSlaveDirs=( %s )\n"
+			"datanodeSlaveWALDirs=( %s )\n"
 			"# End of the update\n",
 			aval(VAR_datanodeNames)[datanodeIdx], timeStampString(timestamp, MAXTOKEN),
 			listValue(VAR_datanodeMasterServers),
 			listValue(VAR_datanodePorts),
 			listValue(VAR_datanodePoolerPorts),
 			listValue(VAR_datanodeMasterDirs),
+			listValue(VAR_datanodeMasterWALDirs),
 			listValue(VAR_datanodeSlaveServers),
 			listValue(VAR_datanodeSlavePorts),
 			listValue(VAR_datanodeSlavePoolerPorts),
+			listValue(VAR_datanodeSlaveWALDirs),
 			listValue(VAR_datanodeSlaveDirs));
 	fclose(f);
 

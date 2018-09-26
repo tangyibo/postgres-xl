@@ -138,6 +138,8 @@ create table trigtest (f1 int, f2 text);
 create trigger trigger_return_old
 	before insert or delete or update on trigtest
 	for each row execute procedure trigger_return_old();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 insert into trigtest values(1, 'foo');
 select * from trigtest;
  f1 | f2  
@@ -147,9 +149,9 @@ select * from trigtest;
 
 update trigtest set f2 = f2 || 'bar';
 select * from trigtest;
- f1 | f2  
-----+-----
-  1 | foo
+ f1 |   f2   
+----+--------
+  1 | foobar
 (1 row)
 
 delete from trigtest;

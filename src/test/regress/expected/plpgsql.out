@@ -6013,9 +6013,9 @@ END$$;
 CREATE TRIGGER my_trigger AFTER UPDATE ON multi_test
   REFERENCING NEW TABLE AS new_test OLD TABLE as old_test
   FOR EACH STATEMENT EXECUTE PROCEDURE multi_test_trig();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 UPDATE multi_test SET i = i;
-NOTICE:  count = 1
-NOTICE:  count union = 2
 DROP TABLE multi_test;
 DROP FUNCTION multi_test_trig();
 --

@@ -1625,10 +1625,12 @@ CREATE FOREIGN TABLE foreign_part PARTITION OF temp_parted
   FOR VALUES IN (1, 2) SERVER s0;  -- ERROR
 ERROR:  cannot create a permanent relation as partition of temporary relation "temp_parted"
 CREATE FOREIGN TABLE foreign_part (a int) SERVER s0;
+ERROR:  server "s0" does not exist
 ALTER TABLE temp_parted ATTACH PARTITION foreign_part
   FOR VALUES IN (1, 2);  -- ERROR
-ERROR:  cannot attach a permanent relation as partition of temporary relation "temp_parted"
+ERROR:  relation "foreign_part" does not exist
 DROP FOREIGN TABLE foreign_part;
+ERROR:  foreign table "foreign_part" does not exist
 DROP TABLE temp_parted;
 -- Cleanup
 DROP SCHEMA foreign_schema CASCADE;

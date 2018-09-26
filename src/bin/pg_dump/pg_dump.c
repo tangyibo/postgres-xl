@@ -1120,17 +1120,13 @@ setup_connection(Archive *AH, const char *dumpencoding,
 			ExecuteSqlStatement(AH,
 								"SET TRANSACTION ISOLATION LEVEL "
 								"SERIALIZABLE, "
-#ifndef XCP
-								"READ ONLY, "
-#endif
+								"READ WRITE, "
 								"DEFERRABLE");
 		else
 			ExecuteSqlStatement(AH,
 								"SET TRANSACTION ISOLATION LEVEL "
-								"REPEATABLE READ"
-#ifndef XCP
-								", READ ONLY"
-#endif
+								"REPEATABLE READ,"
+								"READ WRITE"
 								);
 	}
 	else

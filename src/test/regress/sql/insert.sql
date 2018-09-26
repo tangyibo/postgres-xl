@@ -376,9 +376,9 @@ drop function brtrigpartcon1trigf();
 -- check that "do nothing" BR triggers work with tuple-routing (this checks
 -- that estate->es_result_relation_info is appropriately set/reset for each
 -- routed tuple)
-create table donothingbrtrig_test (a int, b text) partition by list (a);
-create table donothingbrtrig_test1 (b text, a int);
-create table donothingbrtrig_test2 (c text, b text, a int);
+create table donothingbrtrig_test (a int, b text) partition by list (a) distributed by (a);
+create table donothingbrtrig_test1 (a int, b text) distributed by (a);
+create table donothingbrtrig_test2 (a int, b text, c text) distributed by (a);
 alter table donothingbrtrig_test2 drop column c;
 create or replace function donothingbrtrig_func() returns trigger as $$begin raise notice 'b: %', new.b; return NULL; end$$ language plpgsql;
 create trigger donothingbrtrig1 before insert on donothingbrtrig_test1 for each row execute procedure donothingbrtrig_func();

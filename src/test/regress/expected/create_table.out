@@ -842,6 +842,8 @@ create table boolspart_f partition of boolspart for values in (false);
 Partition key: LIST (a)
 Partitions: boolspart_f FOR VALUES IN (false),
             boolspart_t FOR VALUES IN (true)
+Distribute By: HASH(a)
+Location Nodes: ALL DATANODES
 
 drop table boolspart;
 -- partitions mixing temporary and permanent relations

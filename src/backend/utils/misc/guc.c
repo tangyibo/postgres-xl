@@ -227,6 +227,8 @@ static ConfigVariable *ProcessConfigFileInternal(GucContext context,
 
 #ifdef XCP
 static void strreplace_all(char *str, char *needle, char *replacement);
+static void set_remote_config_option(const char *name, const char *value,
+						  bool local);
 #endif
 
 
@@ -6530,6 +6532,64 @@ parse_and_validate_value(struct config_generic *record,
 	return true;
 }
 
+static void
+set_remote_config_option(const char *name, const char *value, bool local)
+{
+	RemoteQuery    *step;
+	StringInfoData 	poolcmd;
+	struct config_generic *record;
+
+	record = find_option(name, false, 0);
+
+	initStringInfo(&poolcmd);
+
+	/*
+	 * Save new parameter value with the node manager.
+	 * XXX here we may check: if value equals to configuration default
+	 * just reset parameter instead. Minus one table entry, shorter SET
+	 * command sent downn... Sounds like optimization.
+	 */
+
+	if (local)
+	{
+		if (IsTransactionBlock())
+			PGXCNodeSetParam(true, name, value, record->flags);
+		value = quote_guc_value(value, record->flags);
+		appendStringInfo(&poolcmd, "SET LOCAL %s TO %s", name,
+				(value ? value : "DEFAULT"));
+	}
+	else
+	{
+		PGXCNodeSetParam(false, name, value, record->flags);
+		value = quote_guc_value(value, record->flags);
+		appendStringInfo(&poolcmd, "SET %s TO %s", name,
+				(value ? value : "DEFAULT"));
+	}
+
+	/*
+	 * Send new value down to remote nodes if any is connected
+	 * XXX here we are creatig a node and invoke a function that is trying
+	 * to send some. That introduces some overhead, which may seem to be
+	 * significant if application sets a bunch of parameters before doing
+	 * anything useful - waste work for for each set statement.
+	 * We may want to avoid that, by resetting the remote parameters and
+	 * flagging that parameters needs to be updated before sending down next
+	 * statement.
+	 * On the other hand if session runs with a number of customized
+	 * parameters and switching one, that would cause all values are resent.
+	 * So let's go with "send immediately" approach: parameters are not set
+	 * too often to care about overhead here.
+	 */
+	step = makeNode(RemoteQuery);
+	step->combine_type = COMBINE_TYPE_SAME;
+	step->exec_nodes = NULL;
+	step->sql_statement = poolcmd.data;
+	/* force_autocommit is actually does not start transaction on nodes */
+	step->exec_type = EXEC_ON_CURRENT;
+	ExecRemoteUtility(step);
+	pfree(step);
+	pfree(poolcmd.data);
+}
 
 /*
  * Sets option `name' to given value.
@@ -7396,62 +7456,8 @@ set_config_option(const char *name, const char *value,
 	if (changeVal && (record->flags & GUC_REPORT))
 		ReportGUCOption(record);
 
-#ifdef XCP
 	if (send_to_nodes)
-	{
-		RemoteQuery    *step;
-		StringInfoData 	poolcmd;
-
-		initStringInfo(&poolcmd);
-
-		/*
-		 * Save new parameter value with the node manager.
-		 * XXX here we may check: if value equals to configuration default
-		 * just reset parameter instead. Minus one table entry, shorter SET
-		 * command sent downn... Sounds like optimization.
-		 */
-
-		if (action == GUC_ACTION_LOCAL)
-		{
-			if (IsTransactionBlock())
-				PGXCNodeSetParam(true, name, value, record->flags);
-			value = quote_guc_value(value, record->flags);
-			appendStringInfo(&poolcmd, "SET LOCAL %s TO %s", name,
-					(value ? value : "DEFAULT"));
-		}
-		else
-		{
-			PGXCNodeSetParam(false, name, value, record->flags);
-			value = quote_guc_value(value, record->flags);
-			appendStringInfo(&poolcmd, "SET %s TO %s", name,
-					(value ? value : "DEFAULT"));
-		}
-
-		/*
-		 * Send new value down to remote nodes if any is connected
-		 * XXX here we are creatig a node and invoke a function that is trying
-		 * to send some. That introduces some overhead, which may seem to be
-		 * significant if application sets a bunch of parameters before doing
-		 * anything useful - waste work for for each set statement.
-		 * We may want to avoid that, by resetting the remote parameters and
-		 * flagging that parameters needs to be updated before sending down next
-		 * statement.
-		 * On the other hand if session runs with a number of customized
-		 * parameters and switching one, that would cause all values are resent.
-		 * So let's go with "send immediately" approach: parameters are not set
-		 * too often to care about overhead here.
-		 */
-		step = makeNode(RemoteQuery);
-		step->combine_type = COMBINE_TYPE_SAME;
-		step->exec_nodes = NULL;
-		step->sql_statement = poolcmd.data;
-		/* force_autocommit is actually does not start transaction on nodes */
-		step->exec_type = EXEC_ON_CURRENT;
-		ExecRemoteUtility(step);
-		pfree(step);
-		pfree(poolcmd.data);
-	}
-#endif
+		set_remote_config_option(name, value, (action == GUC_ACTION_LOCAL));
 
 	return changeVal ? 1 : -1;
 }

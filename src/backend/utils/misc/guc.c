@@ -5835,8 +5835,20 @@ AtEOXact_GUC(bool isCommit, int nestLevel)
 				newvalStr = GetConfigOptionByName(gconf->name, NULL, true);
 
 				if (newvalStr)
-					PGXCNodeSetParam((stack->state == GUC_LOCAL), gconf->name,
-							newvalStr, gconf->flags);
+				{
+					/*
+					 * If we're unwinding changes caused by SET clauses
+					 * attached to a function, reset those changes at the
+					 * remote nodes immediately. Otherwise, we just remember
+					 * the changes locally and send them to the remote nodes at
+					 * next transaction/session.
+					 */
+					if (stack->state == GUC_SAVE)
+						set_remote_config_option(gconf->name, newvalStr, false);
+					else
+						PGXCNodeSetParam((stack->state == GUC_LOCAL), gconf->name,
+								newvalStr, gconf->flags);
+				}
 			}
 
 			/* Finish popping the state stack */

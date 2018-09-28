@@ -3,9 +3,10 @@ use warnings;
 use Cwd;
 use Config;
 use TestLib;
-use Test::More tests => 6;
+use Test::More tests => 13;
 
-my $dataDirRoot="~/DATA/pgxl/nodes/";
+my $home=$ENV{'HOME'};
+my $dataDirRoot="$home/DATA/pgxl/nodes/";
 $ENV{'PGXC_CTL_HOME'} = '/tmp/pgxc_ctl';
 my $PGXC_CTL_HOME=$ENV{'PGXC_CTL_HOME'};
 
@@ -32,13 +33,13 @@ system_or_bail 'pgxc_ctl', 'add', 'coordinator', 'master', 'coord1', "$COORD1_HO
 
 system_or_bail 'pgxc_ctl', 'add', 'coordinator', 'master', 'coord2', "$COORD2_HOST", '30002', '30012', "$dataDirRoot/coord_master.2", 'none', 'none';
 
-system_or_bail 'pgxc_ctl', 'add', 'datanode', 'master', 'dn1', "$DN1_HOST", '40001', '40011', "$dataDirRoot/dn_master.1", 'none', 'none', 'none' ;
+system_or_bail 'pgxc_ctl', 'add', 'datanode', 'master', 'dn1', "$DN1_HOST", '40001', '40011', "$dataDirRoot/dn_master.1", "$dataDirRoot/dn_master_wal.1", 'none', 'none' ;
 
-system_or_bail 'pgxc_ctl', 'add', 'datanode', 'master', 'dn2', "$DN2_HOST", '40002', '40012', "$dataDirRoot/dn_master.2", 'none', 'none', 'none' ;
+system_or_bail 'pgxc_ctl', 'add', 'datanode', 'master', 'dn2', "$DN2_HOST", '40002', '40012', "$dataDirRoot/dn_master.2", "$dataDirRoot/dn_master_wal.2", 'none', 'none' ;
 
 system_or_bail 'pgxc_ctl', 'monitor', 'all' ;
 
-system_or_bail 'pgxc_ctl', 'add', 'datanode', 'master', 'dn3', "$DN3_HOST", '40003', '40013', "$dataDirRoot/dn_master.3", 'none', 'none', 'none' ;
+system_or_bail 'pgxc_ctl', 'add', 'datanode', 'master', 'dn3', "$DN3_HOST", '40003', '40013', "$dataDirRoot/dn_master.3", "$dataDirRoot/dn_master_wal.3", 'none', 'none' ;
 
 system_or_bail 'pgxc_ctl', 'monitor', 'all' ;
 
@@ -53,7 +54,7 @@ system_or_bail 'pgxc_ctl', 'monitor', 'all' ;
 
 #Datanode slave test
 
-system_or_bail 'pgxc_ctl', 'add', 'datanode', 'slave', 'dn1', "$DN1_HOST", '40101', '40111', "$dataDirRoot/dn_slave.1", 'none', "$dataDirRoot/datanode_archlog.1" ;
+system_or_bail 'pgxc_ctl', 'add', 'datanode', 'slave', 'dn1', "$DN1_HOST", '40101', '40111', "$dataDirRoot/dn_slave.1", "$dataDirRoot/dn_slave_wal.1", "$dataDirRoot/datanode_archlog.1" ;
 system_or_bail 'pgxc_ctl', 'monitor', 'all' ;
 
 system_or_bail 'pgxc_ctl', 'stop', "-m", 'immediate', 'datanode', 'master', 'dn1' ;
@@ -77,6 +78,19 @@ system_or_bail 'pgxc_ctl', 'monitor', 'all' ;
 #add cleanup
 system_or_bail 'pgxc_ctl', 'clean', 'all' ;
 
+# ensure that the conf file is consistent at the end
+system_or_bail 'pgxc_ctl', 'init', 'all' ;
+
+command_ok(['pg_controldata', "$dataDirRoot/dn_master.1"]);
+command_ok(['pg_controldata', "$dataDirRoot/dn_master.2"]);
+command_fails(['pg_controldata', "$dataDirRoot/dn_master.3"]);
+command_ok(['pg_controldata', "$dataDirRoot/dn_slave.1"]);
+command_ok(['pg_controldata', "$dataDirRoot/coord_master.1"]);
+command_ok(['pg_controldata', "$dataDirRoot/coord_master.2"]);
+command_fails(['pg_controldata', "$dataDirRoot/coord_master.3"]);
+
+
+system_or_bail 'pgxc_ctl', 'clean', 'all' ;
 
 #delete related dirs for cleanup
 system("rm -rf $dataDirRoot");

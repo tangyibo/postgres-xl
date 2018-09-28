@@ -868,8 +868,8 @@ static int failover_oneDatanode(int datanodeIdx)
 			listValue(VAR_datanodeSlaveServers),
 			listValue(VAR_datanodeSlavePorts),
 			listValue(VAR_datanodeSlavePoolerPorts),
-			listValue(VAR_datanodeSlaveWALDirs),
-			listValue(VAR_datanodeSlaveDirs));
+			listValue(VAR_datanodeSlaveDirs),
+			listValue(VAR_datanodeSlaveWALDirs));
 	fclose(f);
 
 	/* Backup the configuration file */

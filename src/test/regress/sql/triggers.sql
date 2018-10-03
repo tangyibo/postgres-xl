@@ -1608,7 +1608,7 @@ create table child1 () inherits (parent);
 
 -- a child with a different column order
 -- XXX this fails in XL because we don't allow different column ordering
-create table child2 (b int, a text);
+create table child2 (b int, a text) distribute by hash(a);
 alter table child2 inherit parent;
 
 -- a child with an extra column

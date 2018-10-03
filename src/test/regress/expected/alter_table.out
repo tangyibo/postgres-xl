@@ -772,30 +772,26 @@ update atacc3 set test2 = 4 where test2 is null;
 alter table atacc3 add constraint foo check (test2>0);
 -- XXX fails in XL because of column position mismatch
 alter table atacc3 inherit atacc2;
-ERROR:  table "atacc3" contains column "test2" at position 5, but parent "atacc2" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
 -- fail due to duplicates and circular inheritance
 alter table atacc3 inherit atacc2;
-ERROR:  table "atacc3" contains column "test2" at position 5, but parent "atacc2" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  relation "atacc2" would be inherited from more than once
 alter table atacc2 inherit atacc3;
-ERROR:  child table is missing column "test"
+ERROR:  circular inheritance not allowed
+DETAIL:  "atacc3" is already a child of "atacc2".
 alter table atacc2 inherit atacc2;
 ERROR:  circular inheritance not allowed
 DETAIL:  "atacc2" is already a child of "atacc2".
 -- test that we really are a child now (should see 4 not 3 and cascade should go through)
--- XXX fails in XL because the previous alter table failed
 select test2 from atacc2;
  test2 
 -------
-(0 rows)
+     4
+(1 row)
 
 drop table atacc2 cascade;
+NOTICE:  drop cascades to table atacc3
 -- XXX needs a cascade drop in XL because atacc3 is still a child of atacc1
 drop table atacc1 cascade;
-NOTICE:  drop cascades to table atacc3
 -- adding only to a parent is allowed as of 9.2
 create table atacc1 (test int);
 create table atacc2 (test2 int) inherits (atacc1);
@@ -2154,17 +2150,15 @@ ALTER TABLE test_type_diff ADD COLUMN f2 int;
 INSERT INTO test_type_diff_c VALUES (1, 2, 3);
 ALTER TABLE test_type_diff ALTER COLUMN f2 TYPE bigint USING f2::bigint;
 CREATE TABLE test_type_diff2 (int_two int2, int_four int4, int_eight int8);
-CREATE TABLE test_type_diff2_c1 (int_four int4, int_eight int8, int_two int2);
+CREATE TABLE test_type_diff2_c1 (int_four int4, int_eight int8, int_two int2) distribute by hash (int_two);
 CREATE TABLE test_type_diff2_c2 (int_eight int8, int_two int2, int_four int4);
 CREATE TABLE test_type_diff2_c3 (int_two int2, int_four int4, int_eight int8);
 ALTER TABLE test_type_diff2_c1 INHERIT test_type_diff2;
-ERROR:  table "test_type_diff2_c1" contains column "int_two" at position 3, but parent "test_type_diff2" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  table "test_type_diff2_c1" is distributed on column "int_two" at position 1, but the parent table "test_type_diff2" is distributed on column "int_two" at position 3
+DETAIL:  Distribution column for the child must be same as the parent
 ALTER TABLE test_type_diff2_c2 INHERIT test_type_diff2;
-ERROR:  table "test_type_diff2_c2" contains column "int_two" at position 2, but parent "test_type_diff2" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  table "test_type_diff2_c2" is distributed on column "int_eight", but the parent table "test_type_diff2" is distributed on column "int_two"
+DETAIL:  Distribution column for the child must be same as the parent
 ALTER TABLE test_type_diff2_c3 INHERIT test_type_diff2;
 INSERT INTO test_type_diff2_c1 VALUES (1, 2, 3);
 INSERT INTO test_type_diff2_c2 VALUES (4, 5, 6);
@@ -3360,14 +3354,10 @@ CREATE TABLE fail_part (
 	a int NOT NULL
 );
 ALTER TABLE list_parted ATTACH PARTITION fail_part FOR VALUES IN (1);
-ERROR:  table "fail_part" contains column "a" at position 2, but parent "list_parted" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  child table "fail_part" has different type for column "b"
 ALTER TABLE fail_part ALTER b TYPE char (2) COLLATE "POSIX";
 ALTER TABLE list_parted ATTACH PARTITION fail_part FOR VALUES IN (1);
-ERROR:  table "fail_part" contains column "a" at position 2, but parent "list_parted" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  child table "fail_part" has different collation for column "b"
 DROP TABLE fail_part;
 -- check that the table being attached has all constraints of the parent
 CREATE TABLE fail_part (
@@ -3375,15 +3365,11 @@ CREATE TABLE fail_part (
 	a int NOT NULL
 );
 ALTER TABLE list_parted ATTACH PARTITION fail_part FOR VALUES IN (1);
-ERROR:  table "fail_part" contains column "a" at position 2, but parent "list_parted" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  child table is missing constraint "check_a"
 -- check that the constraint matches in definition with parent's constraint
 ALTER TABLE fail_part ADD CONSTRAINT check_a CHECK (a >= 0);
 ALTER TABLE list_parted ATTACH PARTITION fail_part FOR VALUES IN (1);
-ERROR:  table "fail_part" contains column "a" at position 2, but parent "list_parted" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  child table "fail_part" has different definition for check constraint "check_a"
 DROP TABLE fail_part;
 -- check the attributes and constraints after partition is attached
 CREATE TABLE part_1 (
@@ -3677,17 +3663,11 @@ order by attrelid::regclass::text;
 (3 rows)
 
 alter table p1 attach partition p11 for values from (2) to (5);
-ERROR:  table "p11" contains column "a" at position 4, but parent "p1" has it at position 2
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
 insert into p1 (a, b) values (2, 3);
-ERROR:  no partition of relation "p1" found for row
-DETAIL:  Partition key of the failing row contains (b) = (3).
 -- check that partition validation scan correctly detects violating rows
 alter table p attach partition p1 for values from (1, 2) to (1, 10);
-ERROR:  table "p1" contains column "a" at position 2, but parent "p" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  table "p1" is distributed on column "b", but the parent table "p" is distributed on column "a"
+DETAIL:  Distribution column for the child must be same as the parent
 -- cleanup
 drop table p;
 drop table p1;
@@ -3713,3 +3693,119 @@ alter table temp_part_parent attach partition temp_part_child
   for values in (1, 2); -- ok
 drop table perm_part_parent cascade;
 drop table temp_part_parent cascade;
+-- xl tests
+create table xl_parent (a int, b int, c text) partition by list (a);
+-- create a partition
+create table xl_child1 partition of xl_parent for values in (1, 2, 3);
+-- attach a partition
+create table xl_child2 (a int, b int, c text);
+alter table xl_parent attach partition xl_child2 for values in (4, 5, 6);
+-- attach a partition, distribution column position does not match
+create table xl_child3 (b int, a int, c text) distribute by hash (a);
+alter table xl_parent attach partition xl_child3 for values in (7, 8, 9);
+ERROR:  table "xl_child3" is distributed on column "a" at position 1, but the parent table "xl_parent" is distributed on column "a" at position 2
+DETAIL:  Distribution column for the child must be same as the parent
+-- attach a partition, distribution column position matches, others do not
+create table xl_child4 (a int, c text, b int) distribute by hash (a);
+alter table xl_parent attach partition xl_child4 for values in (10, 11, 12);
+create table xl_child5 (a int) distribute by hash (a);
+alter table xl_child5 add column c text;
+alter table xl_child5 add column b int;
+alter table xl_parent attach partition xl_child5 for values in (13, 14, 15);
+create table xl_child6 (a int, b int) distribute by hash (b);
+alter table xl_child6 distribute by hash (a);
+alter table xl_child6 add column c text;
+alter table xl_parent attach partition xl_child6 for values in (16, 17, 18);
+create table xl_child7 (a int, b int);
+alter table xl_child7 drop column b;
+alter table xl_child7 add column b int;
+alter table xl_child7 add column c text;
+alter table xl_parent attach partition xl_child7 for values in (19, 20, 21);
+insert into xl_parent values (1, 100, 'us');
+insert into xl_parent values (4, 200, 'they');
+insert into xl_parent values (6, 300, 'me');
+insert into xl_parent values (11, 400, 'mine');
+insert into xl_parent values (12, 500, 'theirs');
+insert into xl_parent values (9, 600, 'ours');
+ERROR:  no partition of relation "xl_parent" found for row
+DETAIL:  Partition key of the failing row contains (a) = (9).
+insert into xl_parent values (13, 700, 'yours');
+insert into xl_parent values (16, 800, 'my');
+insert into xl_parent values (19, 900, 'his');
+select * from xl_parent order by a;
+ a  |  b  |   c    
+----+-----+--------
+  1 | 100 | us
+  4 | 200 | they
+  6 | 300 | me
+ 11 | 400 | mine
+ 12 | 500 | theirs
+ 13 | 700 | yours
+ 16 | 800 | my
+ 19 | 900 | his
+(8 rows)
+
+select * from xl_parent where a = 1;
+ a |  b  | c  
+---+-----+----
+ 1 | 100 | us
+(1 row)
+
+select * from xl_parent where a = 10;
+ a | b | c 
+---+---+---
+(0 rows)
+
+select * from xl_parent where a = 4;
+ a |  b  |  c   
+---+-----+------
+ 4 | 200 | they
+(1 row)
+
+select * from xl_parent where a = 13;
+ a  |  b  |   c   
+----+-----+-------
+ 13 | 700 | yours
+(1 row)
+
+drop table xl_parent;
+create table xl_parted (a int, b int, c text) partition by list (b) distribute by hash (b);
+create table xl_c1 (a int, b int, c text);
+alter table xl_parted attach partition xl_c1 for values in (1, 2, 3);
+ERROR:  table "xl_c1" is distributed on column "a" at position 2, but the parent table "xl_parted" is distributed on column "b" at position 1
+DETAIL:  Distribution column for the child must be same as the parent
+drop table xl_c1;
+create table xl_c1 (a int, b int, c text) distribute by hash (b);
+alter table xl_parted attach partition xl_c1 for values in (1, 2, 3);
+insert into xl_parted values (100, 1, 'foo');
+insert into xl_parted values (200, 3, 'bar');
+alter table xl_parted drop column a;
+create table xl_c2 (b int, c text);
+-- fails
+alter table xl_parted attach partition xl_c2 for values in (4, 5, 6);
+ERROR:  table "xl_c2" is distributed on column "b" at position 2, but the parent table "xl_parted" is distributed on column "b" at position 1
+DETAIL:  Distribution column for the child must be same as the parent
+insert into xl_parted values (5, 'baz');
+ERROR:  no partition of relation "xl_parted" found for row
+DETAIL:  Partition key of the failing row contains (b) = (5).
+-- since attach failed above
+drop table xl_c2;
+create table xl_c2 (a int, b text, c text) distribute by hash (b);
+alter table xl_c2 drop column a;
+alter table xl_parted attach partition xl_c2 for values in (4, 5, 6);
+ERROR:  child table "xl_c2" has different type for column "b"
+-- since attach failed above
+drop table xl_c2;
+create table xl_c2 (a int, b int, c text) distribute by hash (b);
+alter table xl_c2 drop column a;
+alter table xl_parted attach partition xl_c2 for values in (4, 5, 6);
+insert into xl_parted values (5, 'baz');
+select * from xl_parted;
+ b |  c  
+---+-----
+ 1 | foo
+ 5 | baz
+ 3 | bar
+(3 rows)
+
+drop table xl_parted;

@@ -11546,32 +11546,6 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel)
 								attributeName)));
 
 			/*
-			 * In Postgres-XL, we demand that the attribute positions of the
-			 * child and the parent table must match too. This seems overly
-			 * restrictive and may have other side-effects when one of the
-			 * tables have dropped columns, thus impacting the attribute
-			 * numbering. But having this restriction helps us generate far
-			 * more efficient plans without worrying too much about attribute
-			 * number mismatch.
-			 *
-			 * In common cases of partitioning, the parent table and the
-			 * partition tables will be created at the very beginning and if
-			 * altered, they will be altered together.
-			 *
-			 * Make exception while restoring a schema during node addition.
-			 */
-			if (!isRestoreMode && attribute->attnum != childatt->attnum)
-				ereport(ERROR,
-						(errcode(ERRCODE_DATATYPE_MISMATCH),
-						 errmsg("table \"%s\" contains column \"%s\" at "
-							 "position %d, but parent \"%s\" has it at position %d",
-								RelationGetRelationName(child_rel),
-								attributeName, childatt->attnum,
-								RelationGetRelationName(parent_rel),
-								attribute->attnum),
-						 errhint("Check for column ordering and dropped columns, if any"),
-						 errdetail("Postgres-XL requires attribute positions to match")));
-			/*
 			 * OK, bump the child column's inheritance count.  (If we fail
 			 * later on, this change will just roll back.)
 			 */
@@ -11825,12 +11799,16 @@ MergeDistributionIntoExisting(Relation child_rel, Relation parent_rel)
 	if (parent_locinfo->partAttrNum != child_locinfo->partAttrNum)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				errmsg("table \"%s\" is distributed on column \"%s\", but the "
-					"parent table \"%s\" is distributed on column \"%s\"",
+				errmsg("table \"%s\" is distributed on column \"%s\" "
+					"at position %u, but the "
+					"parent table \"%s\" is distributed on column \"%s\" "
+					"at position %u",
 					RelationGetRelationName(child_rel),
 					child_locinfo->partAttrName,
+					parent_locinfo->partAttrNum,
 					RelationGetRelationName(parent_rel),
-					parent_locinfo->partAttrName),
+					parent_locinfo->partAttrName,
+					child_locinfo->partAttrNum),
 				errdetail("Distribution column for the child must be same as the parent")));
 
 	/*

@@ -1955,11 +1955,10 @@ create table parent (a text, b int);
 create table child1 () inherits (parent);
 -- a child with a different column order
 -- XXX this fails in XL because we don't allow different column ordering
-create table child2 (b int, a text);
+create table child2 (b int, a text) distribute by hash(a);
 alter table child2 inherit parent;
-ERROR:  table "child2" contains column "a" at position 2, but parent "parent" has it at position 1
-DETAIL:  Postgres-XL requires attribute positions to match
-HINT:  Check for column ordering and dropped columns, if any
+ERROR:  table "child2" is distributed on column "a" at position 1, but the parent table "parent" is distributed on column "a" at position 2
+DETAIL:  Distribution column for the child must be same as the parent
 -- a child with an extra column
 create table child3 (c text) inherits (parent);
 create trigger parent_insert_trig

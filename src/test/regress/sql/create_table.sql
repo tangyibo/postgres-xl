@@ -678,3 +678,17 @@ create temp table temp_part partition of perm_parted for values in (1, 2); -- er
 create temp table temp_part partition of temp_parted for values in (1, 2); -- ok
 drop table perm_parted cascade;
 drop table temp_parted cascade;
+
+-- xl tests
+create table xl_parted (a int, b int, c text) partition by list (b) distribute by hash (b);
+create table xl_c1 partition of xl_parted for values in (1, 2, 3);
+insert into xl_parted values (100, 1, 'foo');
+insert into xl_parted values (200, 3, 'bar');
+alter table xl_parted drop column a;
+create table xl_c2 partition of xl_parted for values in (4, 5, 6);
+insert into xl_parted values (1, 'foo');
+insert into xl_parted values (3, 'bar');
+insert into xl_parted values (5, 'baz');
+-- syntax error
+create table xl_c3 partition of xl_parted for values in (4, 5, 6) distribute by hash (b);
+drop table xl_parted;

@@ -578,7 +578,6 @@ alter table atacc3 inherit atacc2;
 alter table atacc2 inherit atacc3;
 alter table atacc2 inherit atacc2;
 -- test that we really are a child now (should see 4 not 3 and cascade should go through)
--- XXX fails in XL because the previous alter table failed
 select test2 from atacc2;
 drop table atacc2 cascade;
 -- XXX needs a cascade drop in XL because atacc3 is still a child of atacc1
@@ -1393,7 +1392,7 @@ INSERT INTO test_type_diff_c VALUES (1, 2, 3);
 ALTER TABLE test_type_diff ALTER COLUMN f2 TYPE bigint USING f2::bigint;
 
 CREATE TABLE test_type_diff2 (int_two int2, int_four int4, int_eight int8);
-CREATE TABLE test_type_diff2_c1 (int_four int4, int_eight int8, int_two int2);
+CREATE TABLE test_type_diff2_c1 (int_four int4, int_eight int8, int_two int2) distribute by hash (int_two);
 CREATE TABLE test_type_diff2_c2 (int_eight int8, int_two int2, int_four int4);
 CREATE TABLE test_type_diff2_c3 (int_two int2, int_four int4, int_eight int8);
 ALTER TABLE test_type_diff2_c1 INHERIT test_type_diff2;
@@ -2407,3 +2406,80 @@ alter table temp_part_parent attach partition temp_part_child
   for values in (1, 2); -- ok
 drop table perm_part_parent cascade;
 drop table temp_part_parent cascade;
+
+-- xl tests
+create table xl_parent (a int, b int, c text) partition by list (a);
+-- create a partition
+create table xl_child1 partition of xl_parent for values in (1, 2, 3);
+
+-- attach a partition
+create table xl_child2 (a int, b int, c text);
+alter table xl_parent attach partition xl_child2 for values in (4, 5, 6);
+
+-- attach a partition, distribution column position does not match
+create table xl_child3 (b int, a int, c text) distribute by hash (a);
+alter table xl_parent attach partition xl_child3 for values in (7, 8, 9);
+
+-- attach a partition, distribution column position matches, others do not
+create table xl_child4 (a int, c text, b int) distribute by hash (a);
+alter table xl_parent attach partition xl_child4 for values in (10, 11, 12);
+
+create table xl_child5 (a int) distribute by hash (a);
+alter table xl_child5 add column c text;
+alter table xl_child5 add column b int;
+alter table xl_parent attach partition xl_child5 for values in (13, 14, 15);
+
+create table xl_child6 (a int, b int) distribute by hash (b);
+alter table xl_child6 distribute by hash (a);
+alter table xl_child6 add column c text;
+alter table xl_parent attach partition xl_child6 for values in (16, 17, 18);
+
+create table xl_child7 (a int, b int);
+alter table xl_child7 drop column b;
+alter table xl_child7 add column b int;
+alter table xl_child7 add column c text;
+alter table xl_parent attach partition xl_child7 for values in (19, 20, 21);
+
+insert into xl_parent values (1, 100, 'us');
+insert into xl_parent values (4, 200, 'they');
+insert into xl_parent values (6, 300, 'me');
+insert into xl_parent values (11, 400, 'mine');
+insert into xl_parent values (12, 500, 'theirs');
+insert into xl_parent values (9, 600, 'ours');
+insert into xl_parent values (13, 700, 'yours');
+insert into xl_parent values (16, 800, 'my');
+insert into xl_parent values (19, 900, 'his');
+
+select * from xl_parent order by a;
+select * from xl_parent where a = 1;
+select * from xl_parent where a = 10;
+select * from xl_parent where a = 4;
+select * from xl_parent where a = 13;
+drop table xl_parent;
+
+create table xl_parted (a int, b int, c text) partition by list (b) distribute by hash (b);
+create table xl_c1 (a int, b int, c text);
+alter table xl_parted attach partition xl_c1 for values in (1, 2, 3);
+drop table xl_c1;
+create table xl_c1 (a int, b int, c text) distribute by hash (b);
+alter table xl_parted attach partition xl_c1 for values in (1, 2, 3);
+insert into xl_parted values (100, 1, 'foo');
+insert into xl_parted values (200, 3, 'bar');
+alter table xl_parted drop column a;
+create table xl_c2 (b int, c text);
+-- fails
+alter table xl_parted attach partition xl_c2 for values in (4, 5, 6);
+insert into xl_parted values (5, 'baz');
+-- since attach failed above
+drop table xl_c2;
+create table xl_c2 (a int, b text, c text) distribute by hash (b);
+alter table xl_c2 drop column a;
+alter table xl_parted attach partition xl_c2 for values in (4, 5, 6);
+-- since attach failed above
+drop table xl_c2;
+create table xl_c2 (a int, b int, c text) distribute by hash (b);
+alter table xl_c2 drop column a;
+alter table xl_parted attach partition xl_c2 for values in (4, 5, 6);
+insert into xl_parted values (5, 'baz');
+select * from xl_parted;
+drop table xl_parted;

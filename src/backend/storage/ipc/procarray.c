@@ -1042,33 +1042,12 @@ ProcArrayApplyXidAssignment(TransactionId topxid,
 }
 
 /*
- * TransactionIdIsInProgress -- is given transaction running in some backend
- *
- * Aside from some shortcuts such as checking RecentXmin and our own Xid,
- * there are four possibilities for finding a running transaction:
- *
- * 1. The given Xid is a main transaction Id.  We will find this out cheaply
- * by looking at the PGXACT struct for each backend.
- *
- * 2. The given Xid is one of the cached subxact Xids in the PGPROC array.
- * We can find this out cheaply too.
- *
- * 3. In Hot Standby mode, we must search the KnownAssignedXids list to see
- * if the Xid is running on the master.
- *
- * 4. Search the SubTrans tree to find the Xid's topmost parent, and then see
- * if that is running according to PGXACT or KnownAssignedXids.  This is the
- * slowest way, but sadly it has to be done always if the others failed,
- * unless we see that the cached subxact sets are complete (none have
- * overflowed).
- *
- * ProcArrayLock has to be held while we do 1, 2, 3.  If we save the top Xids
- * while doing 1 and 3, we can release the ProcArrayLock while we do 4.
- * This buys back some concurrency (and we can't retrieve the main Xids from
- * PGXACT again anyway; see GetNewTransactionId).
+ * Real workhouse for TransactionIdIsInProgress. If check_gtm is true, then
+ * also check cluster monitor's global state to see if the transaction is
+ * complete on the GTM too.
  */
 bool
-TransactionIdIsInProgress(TransactionId xid)
+TransactionIdIsInProgressExtended(TransactionId xid, bool check_gtm)
 {
 	static TransactionId *xids = NULL;
 	int			nxids = 0;
@@ -1205,6 +1184,13 @@ TransactionIdIsInProgress(TransactionId xid)
 			xids[nxids++] = pxid;
 	}
 
+	if (check_gtm && ClusterMonitorTransactionIsInProgress(xid))
+	{
+		elog(LOG, "ClusterMonitor reports xid %u as in-progress", xid);
+		LWLockRelease(ProcArrayLock);
+		return true;
+	}
+
 	/*
 	 * Step 3: in hot standby mode, check the known-assigned-xids list.  XIDs
 	 * in the list must be treated as running.
@@ -1274,6 +1260,38 @@ TransactionIdIsInProgress(TransactionId xid)
 	}
 
 	return false;
+}
+
+/*
+ * TransactionIdIsInProgress -- is given transaction running in some backend
+ *
+ * Aside from some shortcuts such as checking RecentXmin and our own Xid,
+ * there are four possibilities for finding a running transaction:
+ *
+ * 1. The given Xid is a main transaction Id.  We will find this out cheaply
+ * by looking at the PGXACT struct for each backend.
+ *
+ * 2. The given Xid is one of the cached subxact Xids in the PGPROC array.
+ * We can find this out cheaply too.
+ *
+ * 3. In Hot Standby mode, we must search the KnownAssignedXids list to see
+ * if the Xid is running on the master.
+ *
+ * 4. Search the SubTrans tree to find the Xid's topmost parent, and then see
+ * if that is running according to PGXACT or KnownAssignedXids.  This is the
+ * slowest way, but sadly it has to be done always if the others failed,
+ * unless we see that the cached subxact sets are complete (none have
+ * overflowed).
+ *
+ * ProcArrayLock has to be held while we do 1, 2, 3.  If we save the top Xids
+ * while doing 1 and 3, we can release the ProcArrayLock while we do 4.
+ * This buys back some concurrency (and we can't retrieve the main Xids from
+ * PGXACT again anyway; see GetNewTransactionId).
+ */
+bool
+TransactionIdIsInProgress(TransactionId xid)
+{
+	return TransactionIdIsInProgressExtended(xid, true);
 }
 
 /*
@@ -3508,6 +3526,8 @@ retry:
 		SetGlobalSnapshotData(gtm_snapshot->sn_xmin, gtm_snapshot->sn_xmax,
 				gtm_snapshot->sn_xcnt, gtm_snapshot->sn_xip, SNAPSHOT_DIRECT);
 		GetSnapshotFromGlobalSnapshot(snapshot);
+
+		ClusterMonitorSyncGlobalStateUsingSnapshot(gtm_snapshot);
 	}
 	LWLockRelease(ClusterMonitorLock);
 }

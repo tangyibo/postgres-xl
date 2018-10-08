@@ -17,14 +17,22 @@
 #define CLUSTERMON_H
 
 #include "storage/s_lock.h"
+#include "storage/condition_variable.h"
 #include "gtm/gtm_c.h"
 
 typedef struct
 {
 	slock_t				mutex;
+	ConditionVariable	cv;
 	GlobalTransactionId	reported_recent_global_xmin;
 	GlobalTransactionId	reporting_recent_global_xmin;
 	GlobalTransactionId	gtm_recent_global_xmin;
+	pid_t				clustermonitor_pid;
+	uint64				gtm_snapid;
+	GlobalTransactionId	gtm_xmin;
+	GlobalTransactionId	gtm_xmax;
+	int					gtm_xcnt;
+	GlobalTransactionId	gtm_xip[GTM_MAX_GLOBAL_TRANSACTIONS];
 } ClusterMonitorCtlData;
 
 extern void ClusterMonitorShmemInit(void);
@@ -39,6 +47,10 @@ extern int	StartClusterMonitor(void);
 extern GlobalTransactionId ClusterMonitorGetGlobalXmin(bool invalid_ok);
 extern void ClusterMonitorSetGlobalXmin(GlobalTransactionId xmin);
 extern GlobalTransactionId ClusterMonitorGetReportingGlobalXmin(void);
+extern void ClusterMonitorWakeUp(void);
+extern bool ClusterMonitorTransactionIsInProgress(GlobalTransactionId gxid);
+extern void ClusterMonitorWaitForEOFTransaction(GlobalTransactionId gxid);
+extern void ClusterMonitorSyncGlobalStateUsingSnapshot(GTM_Snapshot snapshot);
 
 #ifdef EXEC_BACKEND
 extern void ClusterMonitorIAm(void);

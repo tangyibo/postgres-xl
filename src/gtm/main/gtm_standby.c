@@ -127,6 +127,7 @@ gtm_standby_restore_gxid(void)
 	GTMTransactions.gt_xidStopLimit = txn.gt_xidStopLimit;
 	GTMTransactions.gt_xidWrapLimit = txn.gt_xidWrapLimit;
 	GTMTransactions.gt_latestCompletedXid = txn.gt_latestCompletedXid;
+	GTMTransactions.gt_snapid = txn.gt_snapid;
 	GTMTransactions.gt_recent_global_xmin = txn.gt_recent_global_xmin;
 	GTMTransactions.gt_lastslot = txn.gt_lastslot;
 

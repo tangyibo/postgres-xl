@@ -20,6 +20,7 @@
 #include "access/xact.h"
 #include "catalog/catalog.h"
 #include "miscadmin.h"
+#include "postmaster/clustermon.h"
 #include "storage/lmgr.h"
 #include "storage/proc.h"
 #include "storage/procarray.h"
@@ -604,8 +605,12 @@ XactLockTableWait(TransactionId xid, Relation rel, ItemPointer ctid,
 
 		LockRelease(&tag, ShareLock, false);
 
-		if (!TransactionIdIsInProgress(xid))
+		if (!TransactionIdIsInProgressExtended(xid, false))
+		{
+			if (ClusterMonitorTransactionIsInProgress(xid))
+				ClusterMonitorWaitForEOFTransaction(xid);
 			break;
+		}
 
 		/*
 		 * If the Xid belonged to a subtransaction, then the lock would have
@@ -656,8 +661,13 @@ ConditionalXactLockTableWait(TransactionId xid)
 
 		LockRelease(&tag, ShareLock, false);
 
-		if (!TransactionIdIsInProgress(xid))
-			break;
+		if (!TransactionIdIsInProgressExtended(xid, false))
+		{
+			if (ClusterMonitorTransactionIsInProgress(xid) && !first)
+				return false;
+			else
+				break;
+		}
 
 		/* See XactLockTableWait about this case */
 		if (!first)

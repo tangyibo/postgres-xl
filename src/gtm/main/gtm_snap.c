@@ -95,6 +95,12 @@
 #include "gtm/libpq-int.h"
 #include "gtm/pqformat.h"
 
+void
+GTM_AdvanceSnapshotCounter(void)
+{
+	GTMTransactions.gt_snapid++;
+}
+
 /*
  * GTM_GetTransactionSnapshot
  *		Compute and store snapshot(s) for specified transactions.
@@ -209,6 +215,9 @@ GTM_GetTransactionSnapshot(GTM_TransactionHandle handle[], int txn_count, int *s
 	xmax = GTMTransactions.gt_latestCompletedXid;
 	Assert(GlobalTransactionIdIsNormal(xmax));
 	GlobalTransactionIdAdvance(xmax);
+
+	/* Get the snapshot id */
+	snapshot->sn_snapid = GTMTransactions.gt_snapid;
 
 	/* initialize xmin calculation with xmax */
 	globalxmin = xmin = xmax;
@@ -427,6 +436,7 @@ ProcessGetSnapshotCommand(Port *myport, StringInfo message, bool get_gxid)
 	pq_sendbytes(&buf, (char *)&gxid, sizeof (GlobalTransactionId));
 	pq_sendbytes(&buf, (char *)&txn_count, sizeof(txn_count));
 	pq_sendbytes(&buf, (char *)&status, sizeof(int) * txn_count);
+	pq_sendbytes(&buf, (char *)&snapshot->sn_snapid, sizeof (uint64));
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmin, sizeof (GlobalTransactionId));
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmax, sizeof (GlobalTransactionId));
 
@@ -496,6 +506,7 @@ ProcessGetSnapshotCommandMulti(Port *myport, StringInfo message)
 	}
 	pq_sendbytes(&buf, (char *)&txn_count, sizeof(txn_count));
 	pq_sendbytes(&buf, (char *)status, sizeof(int) * txn_count);
+	pq_sendbytes(&buf, (char *)&snapshot->sn_snapid, sizeof (uint64));
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmin, sizeof (GlobalTransactionId));
 	pq_sendbytes(&buf, (char *)&snapshot->sn_xmax, sizeof (GlobalTransactionId));
 	/* Read once */

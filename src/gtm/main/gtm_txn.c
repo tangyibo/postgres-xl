@@ -214,6 +214,7 @@ GTM_InitTxnManager(void)
 	 * XXX Newest XID that is committed or aborted
 	 */
 	GTMTransactions.gt_latestCompletedXid = FirstNormalGlobalTransactionId;
+	GTMTransactions.gt_snapid = 1;
 
 	/* Initialise gt_recent_global_xmin */
 	GTMTransactions.gt_recent_global_xmin = FirstNormalGlobalTransactionId;
@@ -441,6 +442,9 @@ GTM_RemoveTransInfoMulti(GTM_TransactionInfo *gtm_txninfo[], int txn_count)
 	 */
 	GTM_RWLockAcquire(&GTMTransactions.gt_TransArrayLock, GTM_LOCKMODE_WRITE);
 
+	/* Next snapshot will yield a different result. */
+	GTM_AdvanceSnapshotCounter();
+
 	for (ii = 0; ii < txn_count; ii++)
 	{
 		if (gtm_txninfo[ii] == NULL)
@@ -497,6 +501,9 @@ GTM_RemoveAllTransInfos(uint32 client_id, int backend_id)
 	 * Scan the global list of open transactions
 	 */
 	GTM_RWLockAcquire(&GTMTransactions.gt_TransArrayLock, GTM_LOCKMODE_WRITE);
+
+	/* Next snapshot will yield a different result. */
+	GTM_AdvanceSnapshotCounter();
 
 	prev = NULL;
 	cell = gtm_list_head(GTMTransactions.gt_open_transactions);

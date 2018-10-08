@@ -2321,6 +2321,7 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 {
 	GlobalTransactionId saved_gxid = InvalidGlobalTransactionId;
 	GlobalTransactionId saved_global_xmin = InvalidGlobalTransactionId;
+	uint64				saved_snapid = 1;
 
 	if (ctlf)
 	{
@@ -2336,6 +2337,19 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 
 			if (fscanf(ctlf, "global_xmin: %u\n", &saved_global_xmin) != 1)
 				saved_global_xmin = InvalidGlobalTransactionId;
+
+			saved_snapid = 1;
+		}
+		else if (context && context->version == 20181008)
+		{
+			if (fscanf(ctlf, "next_xid: %u\n", &saved_gxid) != 1)
+				saved_gxid = InvalidGlobalTransactionId;
+
+			if (fscanf(ctlf, "global_xmin: %u\n", &saved_global_xmin) != 1)
+				saved_global_xmin = InvalidGlobalTransactionId;
+
+			if (fscanf(ctlf, "snapid: %lu\n", &saved_snapid) != 1)
+				saved_snapid = 1;
 		}
 		else
 		{
@@ -2399,7 +2413,7 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 						 " use -f option")));
 		GTMTransactions.gt_recent_global_xmin = next_gxid;
 	}
-
+	GTMTransactions.gt_snapid = saved_snapid;
 	GTM_SetNextGlobalTransactionId(next_gxid);
 	elog(LOG, "Restoring last GXID to %u\n", next_gxid);
 	elog(LOG, "Restoring global xmin to %u\n",
@@ -2429,6 +2443,7 @@ GTM_SaveTxnInfo(FILE *ctlf)
 
 	fprintf(ctlf, "next_xid: %u\n", next_gxid);
 	fprintf(ctlf, "global_xmin: %u\n", global_xmin);
+	fprintf(ctlf, "snapid: %lu\n", GTMTransactions.gt_snapid);
 }
 
 void
@@ -2442,6 +2457,7 @@ GTM_WriteRestorePointXid(FILE *f)
 	elog(DEBUG1, "Saving transaction restoration info, backed-up gxid: %u", GTMTransactions.gt_backedUpXid);
 	fprintf(f, "next_xid: %u\n", GTMTransactions.gt_backedUpXid);
 	fprintf(f, "global_xmin: %u\n", GTMTransactions.gt_backedUpXid);
+	fprintf(f, "snapid: %lu\n", GTMTransactions.gt_snapid);
 }
 
 void

@@ -108,9 +108,10 @@ typedef enum GTM_IsolationLevel
 
 typedef struct GTM_SnapshotData
 {
+	uint64					sn_snapid;
 	GlobalTransactionId		sn_xmin;
 	GlobalTransactionId		sn_xmax;
-	uint32				sn_xcnt;
+	uint32					sn_xcnt;
 	GlobalTransactionId		*sn_xip;
 } GTM_SnapshotData;
 

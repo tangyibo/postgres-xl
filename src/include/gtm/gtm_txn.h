@@ -124,6 +124,7 @@ typedef struct GTM_Transactions
 	 */
 	GlobalTransactionId gt_latestCompletedXid;	/* newest XID that has committed or
 										 		 * aborted */
+	uint64				gt_snapid;		/* next snapshot id to assign */
 
 	GlobalTransactionId	gt_recent_global_xmin;
 
@@ -182,6 +183,7 @@ void ProcessBkupBeginTransactionGetGXIDCommandMulti(Port *myport, StringInfo mes
 /*
  * In gtm_snap.c
  */
+void GTM_AdvanceSnapshotCounter(void);
 void ProcessGetSnapshotCommand(Port *myport, StringInfo message, bool get_gxid);
 void ProcessGetSnapshotCommandMulti(Port *myport, StringInfo message);
 void GTM_RememberDroppedSequence(GlobalTransactionId gxid, void *seq);

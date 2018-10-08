@@ -115,6 +115,8 @@ extern void SetLatestCompletedXid(TransactionId latestCompletedXid);
 extern RunningTransactions GetRunningTransactionData(void);
 
 extern bool TransactionIdIsInProgress(TransactionId xid);
+extern bool TransactionIdIsInProgressExtended(TransactionId xid,
+		bool check_gtm);
 extern bool TransactionIdIsActive(TransactionId xid);
 extern TransactionId GetOldestXmin(Relation rel, int flags);
 extern TransactionId GetOldestXminInternal(Relation rel, int flags,

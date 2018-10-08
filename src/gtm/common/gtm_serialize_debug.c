@@ -77,6 +77,7 @@ dump_transactions_elog(GTM_Transactions *txn, int num_txn)
 	elog(LOG, "  gt_xidStopLimit: %d", txn->gt_xidStopLimit);
 	elog(LOG, "  gt_xidWrapLimit: %d", txn->gt_xidWrapLimit);
 	elog(LOG, "  gt_latestCompletedXid: %d", txn->gt_latestCompletedXid);
+	elog(LOG, "  gt_snapid: %lu", txn->gt_snapid);
 	elog(LOG, "  gt_recent_global_xmin: %d", txn->gt_recent_global_xmin);
 	elog(LOG, "  gt_lastslot: %d", txn->gt_lastslot);
 

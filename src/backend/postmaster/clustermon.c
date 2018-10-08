@@ -57,6 +57,7 @@ static ClusterMonitorCtlData *ClusterMonitorCtl = NULL;
 
 static void cm_sighup_handler(SIGNAL_ARGS);
 static void cm_sigterm_handler(SIGNAL_ARGS);
+static void cm_sigint_handler(SIGNAL_ARGS);
 static void ClusterMonitorSetReportedGlobalXmin(GlobalTransactionId xmin);
 static void ClusterMonitorSetReportingGlobalXmin(GlobalTransactionId xmin);
 
@@ -66,24 +67,145 @@ int			ClusterMonitorPid = 0;
 #define CLUSTER_MONITOR_NAPTIME	5
 
 /*
- * Main loop for the cluster monitor process.
+ * Report xmin to the GTM and fetch the global xmin information in the
+ * response.
  */
-int
-ClusterMonitorInit(void)
+static void
+ClusterMonitorReportXmin(void)
 {
-	sigjmp_buf	local_sigjmp_buf;
-	GTM_PGXCNodeType nodetype = IS_PGXC_DATANODE ?
-									GTM_NODE_DATANODE :
-									GTM_NODE_COORDINATOR;
 	GlobalTransactionId oldestXmin;
 	GlobalTransactionId newOldestXmin;
 	GlobalTransactionId lastGlobalXmin;
 	GlobalTransactionId latestCompletedXid;
 	int					status;
+
+	/*
+	 * Compute RecentGlobalXmin, report it to the GTM and sleep for the set
+	 * interval. Keep doing this forever
+	 */
+	lastGlobalXmin = ClusterMonitorGetGlobalXmin(true);
+	LWLockAcquire(ClusterMonitorLock, LW_EXCLUSIVE);
+	oldestXmin = GetOldestXminInternal(NULL, 0, true, lastGlobalXmin);
+	ClusterMonitorSetReportingGlobalXmin(oldestXmin);
+	LWLockRelease(ClusterMonitorLock);
+
+	if ((status = ReportGlobalXmin(oldestXmin, &newOldestXmin,
+					&latestCompletedXid)))
+	{
+		elog(DEBUG1, "Failed (status %d) to report RecentGlobalXmin "
+				"- reported RecentGlobalXmin %u, received "
+				"RecentGlobalXmin %u, " "received latestCompletedXid %u",
+				status, oldestXmin, newOldestXmin,
+				latestCompletedXid);
+		if (status == GTM_ERRCODE_TOO_OLD_XMIN ||
+				status == GTM_ERRCODE_NODE_EXCLUDED)
+		{
+			/*
+			 * If we haven't seen a new transaction for a very long time or
+			 * were disconncted for a while or excluded from the xmin
+			 * computation for any reason, our xmin calculation could be
+			 * well in the past, especially because its capped by the
+			 * latestCompletedXid which may not advance on an idle server.
+			 * In such cases, use the value of latestCompletedXid as
+			 * returned by GTM and then recompute local xmin.
+			 *
+			 * If the GTM's global xmin advances even further while we are
+			 * ready with a new xmin, just repeat the entire exercise as
+			 * long as GTM keeps returning us a more current value of
+			 * latestCompletedXid and thus pushing forward our local xmin
+			 * calculation
+			 */
+			if (GlobalTransactionIdIsValid(latestCompletedXid) &&
+					TransactionIdPrecedes(oldestXmin, latestCompletedXid))
+			{
+				SetLatestCompletedXid(latestCompletedXid);
+				return;
+			}
+		}
+		else if (status == GTM_ERRCODE_NODE_NOT_REGISTERED)
+		{
+			/*
+			 * If we're not registered on the GTM, it could be because the
+			 * GTM is restarted. Just exit and let the cluster monitor be
+			 * restarted again.
+			 */
+			elog(WARNING, "ClusterMonitor process exiting - node not "
+					"registered on the GTM");
+			proc_exit(0);
+		}
+	}
+	else
+	{
+		elog(DEBUG1, "Successfully reported xmin to GTM - reported_xmin %u,"
+				"received RecentGlobalXmin %u, "
+				"received latestCompletedXid %u", oldestXmin,
+				newOldestXmin, latestCompletedXid);
+
+		SetLatestCompletedXid(latestCompletedXid);
+		ClusterMonitorSetReportedGlobalXmin(oldestXmin);
+		if (GlobalTransactionIdIsValid(newOldestXmin))
+			ClusterMonitorSetGlobalXmin(newOldestXmin);
+	}
+
+	ClusterMonitorSetReportingGlobalXmin(InvalidGlobalTransactionId);
+}
+
+/*
+ * Update our local view of the global transactions using a recently fetched
+ * snapshot from the GTM. The snapshot contains the information about the
+ * currently running transactions and that's what we care about.
+ *
+ * We don't want to overwrite a future state with a past state just because a
+ * backend received an older snapshot. Checking snapshot->sn_snapid serves that
+ * purpose.
+ */
+void
+ClusterMonitorSyncGlobalStateUsingSnapshot(GTM_Snapshot snapshot)
+{
+	if (snapshot == NULL ||
+		snapshot->sn_snapid < ClusterMonitorCtl->gtm_snapid)
+		return;
+
+	/* Populate shared memory state */
+	SpinLockAcquire(&ClusterMonitorCtl->mutex);
+	ClusterMonitorCtl->gtm_xmin = snapshot->sn_xmin;
+	ClusterMonitorCtl->gtm_xmax = snapshot->sn_xmax;
+	ClusterMonitorCtl->gtm_xcnt = snapshot->sn_xcnt;
+	ClusterMonitorCtl->gtm_snapid = snapshot->sn_snapid;
+	memcpy((char *) ClusterMonitorCtl->gtm_xip, (char *) snapshot->sn_xip,
+			sizeof (GlobalTransactionId) * snapshot->sn_xcnt);
+	SpinLockRelease(&ClusterMonitorCtl->mutex);
+
+	/* Wake up all processes waiting on our CV. */
+	ConditionVariableBroadcast(&ClusterMonitorCtl->cv);
+}
+
+/*
+ * Sync global state.
+ */
+static void
+ClusterMonitorSyncGlobalState(void)
+{
+	GTM_Snapshot snapshot = GetSnapshotGTM(InvalidGlobalTransactionId, true);
+	ClusterMonitorSyncGlobalStateUsingSnapshot(snapshot);
+}
+
+/*
+ * Main loop for the cluster monitor process.
+ */
+int
+ClusterMonitorInit(void)
+{
+	GTM_PGXCNodeType nodetype = IS_PGXC_DATANODE ?
+									GTM_NODE_DATANODE :
+									GTM_NODE_COORDINATOR;
+	sigjmp_buf	local_sigjmp_buf;
 	bool				bootingUp = true;
 	int					aggreesiveReportingCount = 0;
 
 	am_clustermon = true;
+
+	ClusterMonitorCtl->clustermonitor_pid = MyProcPid;
 
 	/* Identify myself via ps */
 	init_ps_display("cluster monitor process", "", "", "");
@@ -100,7 +222,7 @@ ClusterMonitorInit(void)
 	 * tcop/postgres.c.
 	 */
 	pqsignal(SIGHUP, cm_sighup_handler);
-	pqsignal(SIGINT, StatementCancelHandler);
+	pqsignal(SIGINT, cm_sigint_handler);
 	pqsignal(SIGTERM, cm_sigterm_handler);
 
 	pqsignal(SIGQUIT, quickdie);
@@ -248,76 +370,8 @@ ClusterMonitorInit(void)
 			ProcessConfigFile(PGC_SIGHUP);
 		}
 
-		/*
-		 * Compute RecentGlobalXmin, report it to the GTM and sleep for the set
-		 * interval. Keep doing this forever
-		 */
-		lastGlobalXmin = ClusterMonitorGetGlobalXmin(true);
- 		LWLockAcquire(ClusterMonitorLock, LW_EXCLUSIVE);
-		oldestXmin = GetOldestXminInternal(NULL, 0, true, lastGlobalXmin);
-		ClusterMonitorSetReportingGlobalXmin(oldestXmin);
-		LWLockRelease(ClusterMonitorLock);
-
-		if ((status = ReportGlobalXmin(oldestXmin, &newOldestXmin,
-						&latestCompletedXid)))
-		{
-			elog(DEBUG1, "Failed (status %d) to report RecentGlobalXmin "
-					"- reported RecentGlobalXmin %u, received "
-					"RecentGlobalXmin %u, " "received latestCompletedXid %u",
-					status, oldestXmin, newOldestXmin,
-					latestCompletedXid);
-			if (status == GTM_ERRCODE_TOO_OLD_XMIN ||
-				status == GTM_ERRCODE_NODE_EXCLUDED)
-			{
-				/*
-				 * If we haven't seen a new transaction for a very long time or
-				 * were disconncted for a while or excluded from the xmin
-				 * computation for any reason, our xmin calculation could be
-				 * well in the past, especially because its capped by the
-				 * latestCompletedXid which may not advance on an idle server.
-				 * In such cases, use the value of latestCompletedXid as
-				 * returned by GTM and then recompute local xmin.
-				 *
-				 * If the GTM's global xmin advances even further while we are
-				 * ready with a new xmin, just repeat the entire exercise as
-				 * long as GTM keeps returning us a more current value of
-				 * latestCompletedXid and thus pushing forward our local xmin
-				 * calculation
-				 */
-				if (GlobalTransactionIdIsValid(latestCompletedXid) &&
-						TransactionIdPrecedes(oldestXmin, latestCompletedXid))
-				{
-					SetLatestCompletedXid(latestCompletedXid);
-					continue;
-				}
-			}
-			else if (status == GTM_ERRCODE_NODE_NOT_REGISTERED)
-			{
-				/*
-				 * If we're not registered on the GTM, it could be because the
-				 * GTM is restarted. Just exit and let the cluster monitor be
-				 * restarted again.
-				 */
-				elog(WARNING, "ClusterMonitor process exiting - node not "
-						"registered on the GTM");
-				proc_exit(0);
-			}
-		}
-		else
-		{
-			elog(DEBUG1, "Successfully reported xmin to GTM - reported_xmin %u,"
-					"received RecentGlobalXmin %u, "
-					"received latestCompletedXid %u", oldestXmin,
-					newOldestXmin, latestCompletedXid);
-
-			SetLatestCompletedXid(latestCompletedXid);
-			ClusterMonitorSetReportedGlobalXmin(oldestXmin);
-			if (GlobalTransactionIdIsValid(newOldestXmin))
-				ClusterMonitorSetGlobalXmin(newOldestXmin);
-		}
-
-		ClusterMonitorSetReportingGlobalXmin(InvalidGlobalTransactionId);
-
+		ClusterMonitorReportXmin();
+		ClusterMonitorSyncGlobalState();
 	}
 
 	/* Normal exit from the cluster monitor is here */
@@ -354,6 +408,17 @@ cm_sigterm_handler(SIGNAL_ARGS)
 }
 
 
+/* SIGINT: time to report */
+static void
+cm_sigint_handler(SIGNAL_ARGS)
+{
+	int			save_errno = errno;
+
+	SetLatch(MyLatch);
+
+	errno = save_errno;
+}
+
 /*
  * IsClusterMonitor functions
  *		Return whether this is either a cluster monitor process or a worker
@@ -385,6 +450,7 @@ ClusterMonitorShmemInit(void)
 		/* First time through, so initialize */
 		MemSet(ClusterMonitorCtl, 0, ClusterMonitorShmemSize());
 		SpinLockInit(&ClusterMonitorCtl->mutex);
+		ConditionVariableInit(&ClusterMonitorCtl->cv);
 	}
 }
 
@@ -479,4 +545,62 @@ ClusterMonitorGetReportingGlobalXmin(void)
 	SpinLockRelease(&ClusterMonitorCtl->mutex);
 
 	return reporting_xmin;
+}
+
+/*
+ * Wake up cluster monitor process.
+ */
+void
+ClusterMonitorWakeUp(void)
+{
+	(void ) kill(ClusterMonitorCtl->clustermonitor_pid, SIGINT);
+}
+
+/*
+ * ClusterMonitorTransactionIsInProgress
+ *
+ * Check if the given transaction is in-progress anywhere in the cluster. Our
+ * local copy of the global state may not be accurate and hence this might
+ * return a slightly stale result. But the callers should be prepared to deal
+ * with that.
+ */
+bool
+ClusterMonitorTransactionIsInProgress(GlobalTransactionId gxid)
+{
+	int		i;
+	bool	status = false;
+
+	SpinLockAcquire(&ClusterMonitorCtl->mutex);
+	if (GlobalTransactionIdPrecedes(gxid, ClusterMonitorCtl->gtm_xmin))
+		status = false;
+
+	if (GlobalTransactionIdFollowsOrEquals(gxid, ClusterMonitorCtl->gtm_xmax))
+		status = true;
+
+	for (i = 0; i < ClusterMonitorCtl->gtm_xcnt; i++)
+	{
+		if (GlobalTransactionIdEquals(ClusterMonitorCtl->gtm_xip[i], gxid))
+		{
+			status = true;
+			break;
+		}
+	}
+	SpinLockRelease(&ClusterMonitorCtl->mutex);
+
+	return status;
+}
+
+/*
+ * ClusterMonitorWaitForEOFTransaction
+ *
+ * Wait for the given transaction to complete cluster-wide.
+ */
+void
+ClusterMonitorWaitForEOFTransaction(GlobalTransactionId gxid)
+{
+	ConditionVariablePrepareToSleep(&ClusterMonitorCtl->cv);
+	while (ClusterMonitorTransactionIsInProgress(gxid))
+		ConditionVariableSleep(&ClusterMonitorCtl->cv,
+				WAIT_EVENT_CLUSTER_MONITOR_MAIN);
+	ConditionVariableCancelSleep();
 }

@@ -495,6 +495,13 @@ gtmpqParseSuccess(GTM_Conn *conn, GTM_Result *result)
 				break;
 			}
 
+			if (gtmpqGetnchar((char *)&result->gr_snapshot.sn_snapid,
+						   sizeof (uint64), conn))
+			{
+				result->gr_status = GTM_RESULT_ERROR;
+				break;
+			}
+
 			if (gtmpqGetnchar((char *)&result->gr_snapshot.sn_xmin,
 						   sizeof (GlobalTransactionId), conn))
 			{

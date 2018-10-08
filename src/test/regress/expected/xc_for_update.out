@@ -685,11 +685,13 @@ set statement_timeout to 1000;
 
 --  3. update a row (Should fail)
        update mytab1 set val2=33 where val = 1;
+ERROR:  canceling statement due to statement timeout
 --  4. delete a row
 --     Newly Inserted (Should pass)
        delete from mytab1 where val2=456;
 --     Previously Inserted (Should fail)
        delete from mytab1 where val=1;
+ERROR:  canceling statement due to statement timeout
 --  5. inherit form it (Should pass)
        create table chld_mytab1(d int, e int) inherits (mytab1);
 --  6. create a view on it (Should pass)
@@ -745,7 +747,7 @@ ERROR:  could not obtain lock on relation "mytab1"
          fetch 1 from c1;
  val | val2 | val3 
 -----+------+------
-   2 |   11 | 3344
+   1 |   11 | 1122
 (1 row)
 
        end;
@@ -755,7 +757,7 @@ ERROR:  could not obtain lock on relation "mytab1"
          fetch 1 from c1;
  val | val2 | val3 
 -----+------+------
-   2 |   11 | 3344
+   1 |   11 | 1122
 (1 row)
 
        end;
@@ -796,14 +798,14 @@ declare c1 cursor for select * from mytab1 for share;
 fetch 1 from c1;
  val | val2 | val3 
 -----+------+------
-   2 |   11 | 3344
+   1 |   11 | 1122
 (1 row)
 
 declare c2 cursor for select * from mytab1 for update;
 fetch 1 from c2;
  val | val2 | val3 
 -----+------+------
-   2 |   11 | 3344
+   1 |   11 | 1122
 (1 row)
 
 end;
@@ -813,7 +815,7 @@ declare c1 cursor for select * from mytab1 for share;
 fetch 1 from c1;
  val | val2 | val3 
 -----+------+------
-   2 |   11 | 3344
+   1 |   11 | 1122
 (1 row)
 
 prepare transaction 'tbl_mytab1_locked';
@@ -824,8 +826,9 @@ set statement_timeout to 1000;
        select * from mytab1 order by 1 ;
  val | val2 | val3 
 -----+------+------
+   1 |   11 | 1122
    2 |   11 | 3344
-(1 row)
+(2 rows)
 
 --  2. insert a row (Should pass)
        insert into mytab1 values(123,456);
@@ -835,11 +838,13 @@ set statement_timeout to 1000;
 
 --  3. update a row (Should fail)
        update mytab1 set val2=33 where val = 1;
+ERROR:  canceling statement due to statement timeout
 --  4. delete a row
 --     Newly Inserted (Should pass)
        delete from mytab1 where val2=456;
 --     Previously Inserted (Should fail)
        delete from mytab1 where val=1;
+ERROR:  canceling statement due to statement timeout
 --  5. inherit form it (Should pass)
        create table chld_mytab1(d int, e int) inherits (mytab1);
 --  6. create a view on it (Should pass)
@@ -896,7 +901,7 @@ ERROR:  could not obtain lock on relation "mytab1"
          fetch 1 from c1;
  val | val2 | val3 
 -----+------+------
-   2 |   11 | 3344
+   1 |   11 | 1122
 (1 row)
 
        end;
@@ -906,7 +911,7 @@ ERROR:  could not obtain lock on relation "mytab1"
          fetch 1 from c1;
  val | val2 | val3 
 -----+------+------
-   2 |   11 | 3344
+   1 |   11 | 1122
 (1 row)
 
        end;

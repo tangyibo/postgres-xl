@@ -1931,6 +1931,7 @@ ProcessResponse(GTMProxy_ThreadInfo *thrinfo, GTMProxy_CommandInfo *cmdinfo,
 				pq_sendint(&buf, SNAPSHOT_GET_MULTI_RESULT, 4);
 				pq_sendbytes(&buf, (char *)&txn_count, sizeof (txn_count));
 				pq_sendbytes(&buf, (char *)&status, sizeof (status));
+				pq_sendbytes(&buf, (char *)&res->gr_snapshot.sn_snapid, sizeof (uint64));
 				pq_sendbytes(&buf, (char *)&res->gr_snapshot.sn_xmin, sizeof (GlobalTransactionId));
 				pq_sendbytes(&buf, (char *)&res->gr_snapshot.sn_xmax, sizeof (GlobalTransactionId));
 				pq_sendint(&buf, res->gr_snapshot.sn_xcnt, sizeof (int));

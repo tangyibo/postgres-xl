@@ -147,6 +147,6 @@ extern GTM_ThreadID						TopMostThreadID;
 	((((a) + 1) == UINT32_MAX) ? 1 : ((a) + 1))
 
 #define GTM_CONTROL_FILE		"gtm.control"
-#define GTM_CONTROL_VERSION		20160302
+#define GTM_CONTROL_VERSION		20181008
 
 #endif

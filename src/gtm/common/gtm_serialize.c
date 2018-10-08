@@ -486,6 +486,10 @@ gtm_serialize_transactions(GTM_Transactions *data, char *buf, size_t buflen)
 	memcpy(buf + len, &(data->gt_latestCompletedXid), sizeof(GlobalTransactionId));
 	len += sizeof(GlobalTransactionId);
 
+	/* GTM_Transactions.gt_snapid */
+	memcpy(buf + len, &(data->gt_snapid), sizeof(uint64));
+	len += sizeof(uint64);
+
 	/* GTM_Transactions.gt_recent_global_xmin */
 	memcpy(buf + len, &(data->gt_recent_global_xmin), sizeof(GlobalTransactionId));
 	len += sizeof(GlobalTransactionId);
@@ -592,6 +596,10 @@ gtm_deserialize_transactions(GTM_Transactions *data, const char *buf, size_t max
 	/* GTM_Transactions.gt_latestCompletedXid */
 	memcpy(&(data->gt_latestCompletedXid), buf + len, sizeof(GlobalTransactionId));
 	len += sizeof(GlobalTransactionId);
+
+	/* GTM_Transactions.gt_snapid */
+	memcpy(&(data->gt_snapid), buf + len, sizeof(uint64));
+	len += sizeof(uint64);
 
 	/* GTM_Transactions.gt_recent_global_xmin */
 	memcpy(&(data->gt_recent_global_xmin), buf + len, sizeof(GlobalTransactionId));

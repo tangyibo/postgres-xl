@@ -556,16 +556,26 @@ static void
 setup_control(void)
 {
 	char		path[MAXPGPATH];
-	char		*controlline = NULL;
+	char		controlline_bufs[3][MAXNAMLEN];
+	char	    *controllines[4];
 
 	if (!is_gtm)
 		return;
+
+	snprintf(controlline_bufs[0], MAXNAMLEN, "version: %u", GTM_CONTROL_VERSION);
+	snprintf(controlline_bufs[1], MAXNAMLEN, "next_xid: %u", InitialGXIDValue_Default);
+	snprintf(controlline_bufs[2], MAXNAMLEN, "global_xmin: %u", InitialGXIDValue_Default);
+
+	controllines[0] = strdup(controlline_bufs[0]);
+	controllines[1] = strdup(controlline_bufs[1]);
+	controllines[2] = strdup(controlline_bufs[2]);
+	controllines[3] = NULL;
 
 	fputs(_("creating control file ... "), stdout);
 	fflush(stdout);
 
 	snprintf(path, sizeof(path), "%s/gtm.control", pg_data);
-	writefile(path, &controlline);
+	writefile(path, controllines);
 	chmod(path, S_IRUSR | S_IWUSR);
 
 	check_ok();

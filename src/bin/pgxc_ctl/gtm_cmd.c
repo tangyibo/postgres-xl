@@ -49,7 +49,7 @@ static char date[MAXTOKEN+1];
  */
 cmd_t *prepare_initGtmMaster(bool stop)
 {
-	cmd_t *cmdInitGtmMaster, *cmdGtmConf, *cmdGxid;
+	cmd_t *cmdInitGtmMaster, *cmdGtmConf;
 	char date[MAXTOKEN+1];
 	FILE *f;
 	char **fileList = NULL;
@@ -110,18 +110,6 @@ cmd_t *prepare_initGtmMaster(bool stop)
 	snprintf(newCommand(cmdGtmConf), MAXLINE,
 			 "cat >> %s/gtm.conf",
 			 sval(VAR_gtmMasterDir));
-
-	/* Setup GTM with appropriate GXID value */
-	
-	appendCmdEl(cmdGtmConf, (cmdGxid = initCmd(sval(VAR_gtmMasterServer))));
- 	if (stop)
-		snprintf(newCommand(cmdGxid), MAXLINE,
-			 "(gtm -x 2000 -D %s &); sleep 1; gtm_ctl stop -Z gtm -D %s",
-			 sval(VAR_gtmMasterDir), sval(VAR_gtmMasterDir));
- 	else
- 		snprintf(newCommand(cmdGxid), MAXLINE,
- 			 "(gtm -x 2000 -D %s &); sleep 1;",
- 			 sval(VAR_gtmMasterDir));
 
 	return cmdInitGtmMaster;
 }

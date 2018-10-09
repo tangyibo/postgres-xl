@@ -2339,10 +2339,21 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 		}
 		else
 		{
-			if (fscanf(ctlf, "%u\n", &saved_gxid) != 1)
-				saved_gxid = InvalidGlobalTransactionId;
-			saved_global_xmin = InvalidGlobalTransactionId;
+			ereport(FATAL,
+					(EINVAL,
+					 errmsg("Unsupported format of \"%s\" file", GTMControlFile),
+					 errhint("If you're migrating from a very old XL release,"
+						 "then try to first start with an intermediate "
+						 "version. Else check your \"%s\" contents",
+						 GTMControlFile)));
 		}
+	}
+	else
+	{
+		ereport(FATAL,
+				(EINVAL,
+				 errmsg("GTM control file \"%s\" is missing -- aborting startup",
+					 GTMControlFile)));
 	}
 
 	/*
@@ -2359,21 +2370,21 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 	 */
 	if (!GlobalTransactionIdIsValid(next_gxid))
 	{
-		if (GlobalTransactionIdIsValid(saved_gxid))
+		if (GlobalTransactionIdIsValid(saved_gxid) &&
+			GlobalTransactionIdIsValid(saved_global_xmin))
 		{
 			/* 
 			 * Add in extra amount in case we had not gracefully stopped
 			 */
 			next_gxid = saved_gxid + CONTROL_INTERVAL;
 			GTM_SetControlXid(next_gxid);
+			GTMTransactions.gt_recent_global_xmin = saved_global_xmin;
 		}
 		else
-			saved_gxid = next_gxid = InitialGXIDValue_Default;
-
-		if (GlobalTransactionIdIsValid(saved_global_xmin))
-			GTMTransactions.gt_recent_global_xmin = saved_global_xmin;
-		else
-			GTMTransactions.gt_recent_global_xmin = saved_gxid;
+			ereport(FATAL,
+					(EINVAL,
+					 errmsg("GTM control file \"%s\" has invalid data -- aborting startup",
+						 GTMControlFile)));
 	}
 	else
 	{

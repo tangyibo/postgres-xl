@@ -116,11 +116,15 @@ typedef struct
 	List	   *alist;			/* "after list" of things to do after creating
 								 * the table */
 	IndexStmt  *pkey;			/* PRIMARY KEY index, if any */
+
 #ifdef PGXC
 	FallbackSrc fallback_source;
 	List	   *fallback_dist_cols;
-	DistributeBy	*distributeby;		/* original distribute by column of CREATE TABLE */
-	PGXCSubCluster	*subcluster;		/* original subcluster option of CREATE TABLE */
+
+	/* original or derived distribute by column of CREATE TABLE */
+	DistributeBy	*distributeby;
+	/* original or derived subcluster option of CREATE TABLE */
+	PGXCSubCluster	*subcluster;
 #endif
 	bool		ispartitioned;	/* true if table is partitioned */
 	PartitionBoundSpec *partbound;	/* transformed FOR VALUES */
@@ -472,6 +476,11 @@ transformCreateStmt(CreateStmt *stmt, const char *queryString)
 	 */
 	stmt->tableElts = cxt.columns;
 	stmt->constraints = cxt.ckconstraints;
+
+	if (stmt->distributeby == NULL)
+		stmt->distributeby = cxt.distributeby;
+	if (stmt->subcluster == NULL)
+		stmt->subcluster = cxt.subcluster;
 
 	result = lappend(cxt.blist, stmt);
 	result = list_concat(result, cxt.alist);
@@ -1111,6 +1120,7 @@ transformTableLikeClause(CreateStmtContext *cxt, TableLikeClause *table_like_cla
 	AclResult	aclresult;
 	char	   *comment;
 	ParseCallbackState pcbstate;
+	RelationLocInfo *rel_loc_info;
 
 	setup_parser_errposition_callback(&pcbstate, cxt->pstate,
 									  table_like_clause->relation->location);
@@ -1172,6 +1182,40 @@ transformTableLikeClause(CreateStmtContext *cxt, TableLikeClause *table_like_cla
 		if (aclresult != ACLCHECK_OK)
 			aclcheck_error(aclresult, ACL_KIND_CLASS,
 						   RelationGetRelationName(relation));
+	}
+
+	rel_loc_info = RelationGetLocInfo(relation);
+
+	if ((table_like_clause->options & CREATE_TABLE_LIKE_DISTRIBUTE) &&
+		(cxt->distributeby == NULL) &&
+		(rel_loc_info != NULL))
+	{
+		cxt->distributeby = makeNode(DistributeBy);
+		switch (rel_loc_info->locatorType)
+		{
+			case LOCATOR_TYPE_HASH:
+				cxt->distributeby->disttype = DISTTYPE_HASH;
+				cxt->distributeby->colname = pstrdup(rel_loc_info->partAttrName);
+				break;
+			case LOCATOR_TYPE_MODULO:
+				cxt->distributeby->disttype = DISTTYPE_MODULO;
+				cxt->distributeby->colname = pstrdup(rel_loc_info->partAttrName);
+				break;
+			case LOCATOR_TYPE_RROBIN:
+				cxt->distributeby->disttype = DISTTYPE_ROUNDROBIN;
+				break;
+			case LOCATOR_TYPE_REPLICATED:
+				cxt->distributeby->disttype = DISTTYPE_REPLICATION;
+				break;
+		}
+	}
+
+	if ((table_like_clause->options & CREATE_TABLE_LIKE_NODE) &&
+		(cxt->subcluster == NULL) &&
+		(rel_loc_info != NULL))
+	{
+		if (rel_loc_info->rl_nodeList)
+			cxt->subcluster = makeSubCluster(rel_loc_info->rl_nodeList);
 	}
 
 	tupleDesc = RelationGetDescr(relation);

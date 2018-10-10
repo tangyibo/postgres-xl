@@ -152,3 +152,26 @@ CREATE TABLE like_test5 (z INTEGER, LIKE no_oid) WITH OIDS;
 SELECT oid FROM like_test5;
 DROP TABLE has_oid, no_oid, like_test, like_test2, like_test3,
   like_test4, like_test5;
+
+-- xl tests
+CREATE TABLE like_test6 (a INT, b INT, c TEXT) DISTRIBUTE BY HASH(b);
+CREATE TABLE like_test7 (LIKE like_test6 INCLUDING ALL);
+\d+ like_test7
+DROP TABLE like_test7;
+CREATE TABLE like_test7 (LIKE like_test6 INCLUDING DISTRIBUTE);
+\d+ like_test7
+DROP TABLE like_test7;
+-- explicit distribution clause overwrites like clause
+CREATE TABLE like_test7 (LIKE like_test6 INCLUDING DISTRIBUTE) DISTRIBUTE BY REPLICATION;
+\d+ like_test7
+DROP TABLE like_test7;
+DROP TABLE like_test6;
+CREATE TABLE like_test6 (a INT, b INT, c TEXT) DISTRIBUTE BY HASH(b) TO NODE (datanode_1);
+CREATE TABLE like_test7 (LIKE like_test6 INCLUDING DISTRIBUTE INCLUDING NODE);
+\d+ like_test7
+DROP TABLE like_test7;
+-- check if excluding works ok
+CREATE TABLE like_test7 (LIKE like_test6 INCLUDING DISTRIBUTE EXCLUDING NODE);
+\d+ like_test7
+DROP TABLE like_test7;
+DROP TABLE like_test6;

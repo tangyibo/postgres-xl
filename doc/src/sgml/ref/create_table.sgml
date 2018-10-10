@@ -557,6 +557,14 @@ FROM ( { <replaceable class="PARAMETER">numeric_literal</replaceable> | <replace
       <literal>INCLUDING STATISTICS</literal> is specified.
      </para>
      <para>
+      Distribution strategy is copied to the new table if
+      <literal>INCLUDING DISTRIBUTE</literal> is specified.
+     </para>
+     <para>
+      Distribution nodes are copied to the new table if
+      <literal>INCLUDING NODE</literal> is specified.
+     </para>
+     <para>
       Indexes, <literal>PRIMARY KEY</>, <literal>UNIQUE</>,
       and <literal>EXCLUDE</> constraints on the original table will be
       created on the new table only if <literal>INCLUDING INDEXES</literal>
@@ -581,7 +589,7 @@ FROM ( { <replaceable class="PARAMETER">numeric_literal</replaceable> | <replace
      </para>
      <para>
       <literal>INCLUDING ALL</literal> is an abbreviated form of
-      <literal>INCLUDING COMMENTS INCLUDING CONSTRAINTS INCLUDING DEFAULTS INCLUDING IDENTITY INCLUDING INDEXES INCLUDING STATISTICS INCLUDING STORAGE</literal>.
+      <literal>INCLUDING COMMENTS INCLUDING CONSTRAINTS INCLUDING DEFAULTS INCLUDING IDENTITY INCLUDING INDEXES INCLUDING STATISTICS INCLUDING STORAGE INCLUDING DISTRIBUTE INCLUDING NODE</literal>.
      </para>
      <para>
       Note that unlike <literal>INHERITS</literal>, columns and

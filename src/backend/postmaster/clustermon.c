@@ -64,7 +64,9 @@ static void ClusterMonitorSetReportingGlobalXmin(GlobalTransactionId xmin);
 /* PID of clustser monitoring process */
 int			ClusterMonitorPid = 0;
 
-#define CLUSTER_MONITOR_NAPTIME	5
+#define CLUSTER_MONITOR_NAPTIME	5000
+
+long		ClusterMonitorNapTime = CLUSTER_MONITOR_NAPTIME;
 
 /*
  * Report xmin to the GTM and fetch the global xmin information in the
@@ -331,10 +333,10 @@ ClusterMonitorInit(void)
 		if (!bootingUp)
 		{
 			/*
-			 * Repeat at CLUSTER_MONITOR_NAPTIME seconds interval
+			 * Repeat at ClusterMonitorNapTime interval
 			 */
-			nap.tv_sec = CLUSTER_MONITOR_NAPTIME;
-			nap.tv_usec = 0;
+			nap.tv_sec = ClusterMonitorNapTime / 1000;
+			nap.tv_usec = (ClusterMonitorNapTime % 1000) * 1000;
 
 			/*
 			 * Wait until naptime expires or we get some type of signal (all the
@@ -600,7 +602,20 @@ ClusterMonitorWaitForEOFTransaction(GlobalTransactionId gxid)
 {
 	ConditionVariablePrepareToSleep(&ClusterMonitorCtl->cv);
 	while (ClusterMonitorTransactionIsInProgress(gxid))
+	{
+		/*
+		 * Wake up the cluster monitor process before going to sleep. If the
+		 * transaction is finishing soon, the cluster monitor will see it
+		 * immediately that way.
+		 *
+		 * This is not very optimal and we might end up triggering cluster
+		 * monitor too often. But this is not too bad either because most often
+		 * transactions would wait on other transactions using the transaction
+		 * locks and this path will be taken only in some corner cases.
+		 */
+		ClusterMonitorWakeUp();
 		ConditionVariableSleep(&ClusterMonitorCtl->cv,
 				WAIT_EVENT_CLUSTER_MONITOR_MAIN);
+	}
 	ConditionVariableCancelSleep();
 }

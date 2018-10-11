@@ -744,34 +744,50 @@ gtmpqParseSuccess(GTM_Conn *conn, GTM_Result *result)
 			for (i = 0 ; i < result->gr_resdata.grd_node_list.num_node; i++)
 			{
 				int size;
-				char buf[8092];
+				char *buf;
 				GTM_PGXCNodeInfo *data = (GTM_PGXCNodeInfo *)malloc(sizeof(GTM_PGXCNodeInfo));
+
+				if (data == NULL)
+				{
+					result->gr_status = GTM_RESULT_ERROR;
+					printfGTMPQExpBuffer(&conn->errorMessage, "Out of memory");
+					break;
+				}
 
 				if (gtmpqGetInt(&size, sizeof(int32), conn))
 				{
 					result->gr_status = GTM_RESULT_ERROR;
+					free(data);
 					break;
 				}
-				if (size > 8092)
+
+				buf = (char *) malloc(size);
+				if (buf == NULL)
 				{
 					result->gr_status = GTM_RESULT_ERROR;
-					printfGTMPQExpBuffer(&conn->errorMessage, "buffer size not large enough for node list data");
-					result->gr_status = GTM_RESULT_ERROR;
+					printfGTMPQExpBuffer(&conn->errorMessage, "Out of memory");
+					free(data);
+					break;
 				}
 
-				if (gtmpqGetnchar((char *)&buf, size, conn))
+				if (gtmpqGetnchar(buf, size, conn))
 				{
 					result->gr_status = GTM_RESULT_ERROR;
+					free(buf);
+					free(data);
 					break;
 				}
 				if (!gtm_deserialize_pgxcnodeinfo(data, buf, size, &conn->errorMessage))
 				{
 					result->gr_status = GTM_RESULT_ERROR;
+					free(buf);
+					free(data);
 					break;
 				} 
 				else 
 				{
 					result->gr_resdata.grd_node_list.nodeinfo[i] = data;
+					free(buf);
 				} 
 			}
 

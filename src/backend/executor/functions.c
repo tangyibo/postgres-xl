@@ -490,7 +490,7 @@ init_execution_state(List *queryTree_list,
 		char	   *querysource = (char *) lfirst(lc3);
 		execution_state *firstes = NULL;
 		execution_state *preves = NULL;
-		ListCell   *lc2, *lc4;
+		ListCell   *lc2;
 
 		foreach(lc2, qtlist)
 		{

@@ -401,7 +401,6 @@ GlobalTransactionId
 ClusterMonitorGetGlobalXmin(bool invalid_ok)
 {
 	GlobalTransactionId xmin = InvalidGlobalTransactionId;
-	int					retries = 0;
 
 	SpinLockAcquire(&ClusterMonitorCtl->mutex);
 	xmin = ClusterMonitorCtl->gtm_recent_global_xmin;

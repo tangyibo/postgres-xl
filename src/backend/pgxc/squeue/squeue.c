@@ -902,15 +902,15 @@ SharedQueueWrite(SharedQueue squeue, int consumerIdx,
 		if (*tuplestore == NULL)
 		{
 			int			ptrno;
-			char 		storename[64];
+			char 		storename[128];
 
 #ifdef SQUEUE_STAT
 			elog(DEBUG1, "Start buffering %s node %d, %d tuples in queue, %ld writes and %ld reads so far",
 				 squeue->sq_key, cstate->cs_node, cstate->cs_ntuples, cstate->stat_writes, cstate->stat_reads);
 #endif
 			*tuplestore = tuplestore_begin_datarow(false, work_mem, tmpcxt);
-			/* We need is to be able to remember/restore the read position */
-			snprintf(storename, 64, "%s node %d", squeue->sq_key, cstate->cs_node);
+			/* We need to be able to remember/restore the read position. */
+			snprintf(storename, 128, "%s node %d", squeue->sq_key, cstate->cs_node);
 			tuplestore_collect_stat(*tuplestore, storename);
 			/*
 			 * Allocate a second read pointer to read from the store. We know

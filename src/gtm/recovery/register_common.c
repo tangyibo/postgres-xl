@@ -174,7 +174,7 @@ pgxcnode_find_info(GTM_PGXCNodeType type, char *node_name)
 
 /*
  * Get the Hash Key depending on the node name
- * We do not except to have hundreds of nodes yet,
+ * We do not expect to have hundreds of nodes yet,
  * This function could be replaced by a better one
  * such as a double hash function indexed on type and Node Name
  */
@@ -186,7 +186,7 @@ pgxcnode_gethash(char *nodename)
 	int			value;
 	uint32			hash = 0;
 
-	if (nodename == NULL || nodename == '\0')
+	if (nodename == NULL || *nodename == '\0')
 	{
 		return 0;
 	}

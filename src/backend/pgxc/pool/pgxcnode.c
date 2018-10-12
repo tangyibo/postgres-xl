@@ -2672,7 +2672,7 @@ get_set_command(List *param_list, StringInfo command, bool local)
 	foreach (lc, param_list)
 	{
 		ParamEntry *entry = (ParamEntry *) lfirst(lc);
-		char *value = NameStr(entry->value);
+		const char *value = NameStr(entry->value);
 
 		if (strlen(value) == 0)
 			value = "''";

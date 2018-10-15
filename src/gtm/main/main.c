@@ -2362,7 +2362,11 @@ GTM_RestoreTxnInfo(FILE *ctlf, GlobalTransactionId next_gxid,
 						 GTMControlFile)));
 		}
 	}
-	else
+	/*
+	 * GTM control file handle is not passed during GTM standby initialization
+	 * mode. That's not an ERROR case.
+	 */
+	else if (!Recovery_IsStandby())
 	{
 		ereport(FATAL,
 				(EINVAL,

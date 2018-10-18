@@ -518,6 +518,8 @@ insert into patest2
 create index patest0i on patest0(id);
 create index patest1i on patest1(id);
 create index patest2i on patest2(id);
+
+select pg_sleep(5);			-- shame we need to do that
 vacuum analyze patest0;
 vacuum analyze patest1;
 vacuum analyze patest2;

@@ -1177,9 +1177,12 @@ GTMProxy_ThreadMain(void *argp)
 				 */
 				if (conninfo->con_disconnected)
 				{
-					EmitErrorReport(conninfo->con_port);
-					if (conninfo->con_port->sock > 0)
-						StreamClose(conninfo->con_port->sock);
+					if (conninfo->con_port)
+					{
+						EmitErrorReport(conninfo->con_port);
+						if (conninfo->con_port->sock > 0)
+							StreamClose(conninfo->con_port->sock);
+					}
 					GTMProxy_ThreadRemoveConnection(thrinfo, conninfo);
 					pfree(conninfo);
 					ii--;

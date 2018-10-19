@@ -183,7 +183,10 @@ typedef struct
 
 extern PlannedStmt *pgxc_direct_planner(Query *query, int cursorOptions,
 										ParamListInfo boundParams);
-extern List *AddRemoteQueryNode(List *stmts, const char *queryString,
+extern List *AddRemoteQueryNode(List *stmts,
+								const char *queryString,
+								int stmt_location,
+								int stmt_len,
 								RemoteQueryExecType remoteExecType);
 extern PlannedStmt *pgxc_planner(Query *query, int cursorOptions,
 		                                 ParamListInfo boundParams);

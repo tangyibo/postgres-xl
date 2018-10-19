@@ -79,7 +79,11 @@ static CombineType get_plan_combine_type(CmdType commandType, char baselocatorty
  * duplicated queries on Datanodes.
  */
 List *
-AddRemoteQueryNode(List *stmts, const char *queryString, RemoteQueryExecType remoteExecType)
+AddRemoteQueryNode(List *stmts,
+			const char *queryString,
+			int stmt_location,
+			int stmt_len,
+			RemoteQueryExecType remoteExecType)
 {
 	List *result = stmts;
 
@@ -93,7 +97,15 @@ AddRemoteQueryNode(List *stmts, const char *queryString, RemoteQueryExecType rem
 	{
 		RemoteQuery *step = makeNode(RemoteQuery);
 		step->combine_type = COMBINE_TYPE_SAME;
-		step->sql_statement = (char *) queryString;
+		if (stmt_location == -1)
+			step->sql_statement = (char *) queryString;
+		else
+		{
+			step->sql_statement = pnstrdup(queryString + stmt_location,
+									stmt_len == 0 ?
+									strlen(queryString) - stmt_location :
+									stmt_len);
+		}
 		step->exec_type = remoteExecType;
 		result = lappend(result, step);
 	}

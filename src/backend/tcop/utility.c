@@ -90,12 +90,17 @@
 #include "pgxc/pause.h"
 #endif
 
-static void ExecUtilityStmtOnNodes(const char *queryString, ExecNodes *nodes,
+static void ExecUtilityStmtOnNodes(const char *queryString,
+								   int stmt_location,
+								   int stmt_len,
+								   ExecNodes *nodes,
 								   bool sentToRemote,
 								   RemoteQueryExecType exec_type,
 								   bool is_temp,
 								   bool add_context);
 static void ExecUtilityStmtOnNodesInternal(const char *queryString,
+								   int stmt_location,
+								   int stmt_len,
 								   ExecNodes *nodes,
 								   bool sentToRemote,
 								   RemoteQueryExecType exec_type,
@@ -128,6 +133,8 @@ static void ProcessUtilitySlow(ParseState *pstate,
 #ifdef PGXC
 static void ExecDropStmt(DropStmt *stmt,
 					const char *queryString,
+					int stmt_location,
+					int stmt_len,
 					bool sentToRemote,
 					bool isTopLevel);
 #else
@@ -550,7 +557,7 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 				/* Clean also remote Coordinators */
 				sprintf(query, "CLEAN CONNECTION TO ALL FOR DATABASE %s;",
 						quote_identifier(stmt->dbname));
-				ExecUtilityStmtOnNodes(query, NULL, sentToRemote,
+				ExecUtilityStmtOnNodes(query, -1, 0, NULL, sentToRemote,
 						EXEC_ON_ALL_NODES, false, false);
 			}
 			break;
@@ -717,7 +724,7 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 			 * connections, then clean local pooler
 			 */
 			if (IS_PGXC_COORDINATOR)
-				ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+				ExecUtilityStmtOnNodes(queryString, -1, 0, NULL, sentToRemote,
 						EXEC_ON_ALL_NODES, false, false);
 			CleanConnection((CleanConnStmt *) parsetree);
 			break;
@@ -884,7 +891,8 @@ ProcessUtilityPre(PlannedStmt *pstmt,
 	 * Send queryString to remote nodes, if needed.
 	 */ 
 	if (IS_PGXC_LOCAL_COORDINATOR)
-		ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+		ExecUtilityStmtOnNodes(queryString, pstmt->stmt_location,
+				pstmt->stmt_len, NULL, sentToRemote,
 				exec_type, is_temp, add_context);
 
 
@@ -1319,7 +1327,8 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 	}
 
 	if (IS_PGXC_LOCAL_COORDINATOR)
-		ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+		ExecUtilityStmtOnNodes(queryString, pstmt->stmt_location,
+				pstmt->stmt_len, NULL, sentToRemote,
 				exec_type, is_temp, add_context);
 }
 /*
@@ -1860,7 +1869,8 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 									   sentToRemote,
 									   completionTag);
 				else
-					ExecDropStmt(stmt, queryString, sentToRemote, isTopLevel);
+					ExecDropStmt(stmt, queryString, pstmt->stmt_location,
+							pstmt->stmt_len, sentToRemote, isTopLevel);
 			}
 			break;
 
@@ -2107,8 +2117,10 @@ ProcessUtilitySlow(ParseState *pstate,
 					 * Coordinator, if not already done so
 					 */
 					if (!sentToRemote)
-						stmts = AddRemoteQueryNode(stmts, queryString, is_local
-								? EXEC_ON_NONE
+						stmts = AddRemoteQueryNode(stmts, queryString,
+								pstmt->stmt_location,
+								pstmt->stmt_len,
+								is_local ? EXEC_ON_NONE
 								: (is_temp ? EXEC_ON_DATANODES : EXEC_ON_ALL_NODES));
 
 					/* ... and do it */
@@ -2244,7 +2256,9 @@ ProcessUtilitySlow(ParseState *pstate,
 										relid,
 										&is_temp);
 
-								stmts = AddRemoteQueryNode(stmts, queryString, exec_type);
+								stmts = AddRemoteQueryNode(stmts, queryString,
+										pstmt->stmt_location, pstmt->stmt_len,
+										exec_type);
 							}
 						}
 
@@ -2681,7 +2695,9 @@ ProcessUtilitySlow(ParseState *pstate,
 				break;
 
 			case T_DropStmt:
-				ExecDropStmt((DropStmt *) parsetree, queryString, sentToRemote, isTopLevel);
+				ExecDropStmt((DropStmt *) parsetree, queryString,
+						pstmt->stmt_location, pstmt->stmt_len,
+						sentToRemote, isTopLevel);
 				/* no commands stashed for DROP */
 				commandCollected = true;
 				break;
@@ -2824,6 +2840,8 @@ static void
 #ifdef PGXC
 ExecDropStmt(DropStmt *stmt,
 		const char *queryString,
+		int stmt_location,
+		int stmt_len,
 		bool sentToRemote,
 		bool isTopLevel)
 #else
@@ -2864,7 +2882,8 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 				{
 					if (prevent_xact_chain)
 						SetRequireRemoteTransactionAutoCommit();
-					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+					ExecUtilityStmtOnNodes(queryString, stmt_location,
+							stmt_len, NULL, sentToRemote,
 							exec_type, is_temp, false);
 				}
 			}
@@ -2883,7 +2902,8 @@ ExecDropStmt(DropStmt *stmt, bool isTopLevel)
 				RemoveObjects(stmt);
 #ifdef PGXC
 				if (IS_PGXC_LOCAL_COORDINATOR)
-					ExecUtilityStmtOnNodes(queryString, NULL, sentToRemote,
+					ExecUtilityStmtOnNodes(queryString, stmt_location,
+							stmt_len, NULL, sentToRemote,
 							exec_type, is_temp, false);
 			}
 #endif
@@ -4622,8 +4642,13 @@ GetCommandLogLevel(Node *parsetree)
 
 #ifdef PGXC
 static void
-ExecUtilityStmtOnNodesInternal(const char *queryString, ExecNodes *nodes, bool sentToRemote,
-		RemoteQueryExecType exec_type, bool is_temp)
+ExecUtilityStmtOnNodesInternal(const char *queryString,
+		int stmt_location,
+		int stmt_len,
+		ExecNodes *nodes,
+		bool sentToRemote,
+		RemoteQueryExecType exec_type,
+		bool is_temp)
 {
 	/* Return if query is launched on no nodes */
 	if (exec_type == EXEC_ON_NONE)
@@ -4646,7 +4671,12 @@ ExecUtilityStmtOnNodesInternal(const char *queryString, ExecNodes *nodes, bool s
 		RemoteQuery *step = makeNode(RemoteQuery);
 		step->combine_type = COMBINE_TYPE_SAME;
 		step->exec_nodes = nodes;
-		step->sql_statement = pstrdup(queryString);
+		if (stmt_location == -1)
+			step->sql_statement = pstrdup(queryString);
+		else
+			step->sql_statement = pnstrdup(queryString + stmt_location,
+					stmt_len == 0 ?  strlen(queryString) - stmt_location :
+						stmt_len);
 		step->exec_type = exec_type;
 		ExecRemoteUtility(step);
 		pfree(step->sql_statement);
@@ -4669,13 +4699,19 @@ ExecUtilityStmtOnNodesInternal(const char *queryString, ExecNodes *nodes, bool s
  * 	  context message containing the failed node names.
  */
 static void
-ExecUtilityStmtOnNodes(const char *queryString, ExecNodes *nodes,
-		bool sentToRemote, RemoteQueryExecType exec_type,
-		bool is_temp, bool add_context)
+ExecUtilityStmtOnNodes(const char *queryString,
+		int stmt_location,
+		int stmt_len,
+		ExecNodes *nodes,
+		bool sentToRemote,
+		RemoteQueryExecType exec_type,
+		bool is_temp,
+		bool add_context)
 {
 	PG_TRY();
 	{
-		ExecUtilityStmtOnNodesInternal(queryString, nodes, sentToRemote,
+		ExecUtilityStmtOnNodesInternal(queryString, stmt_location, stmt_len,
+				nodes, sentToRemote,
 				exec_type, is_temp);
 	}
 	PG_CATCH();

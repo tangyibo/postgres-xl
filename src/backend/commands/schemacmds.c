@@ -183,6 +183,7 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString,
 	 */
 	if (!sentToRemote)
 		parsetree_list = AddRemoteQueryNode(parsetree_list, queryString,
+											stmt_location, stmt_len,
 											EXEC_ON_ALL_NODES);
 #endif
 

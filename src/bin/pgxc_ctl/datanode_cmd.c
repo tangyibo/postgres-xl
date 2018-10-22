@@ -178,7 +178,7 @@ cmd_t *prepare_initDatanodeMaster(char *nodeName)
 			return(NULL);
 		}
 		fprintf(f,
-				"wal_level = hot_standby\n"
+				"wal_level = replica\n"
 				"archive_mode = on\n"
 				"archive_command = 'rsync %%p %s@%s:%s/%%f'\n"
 				"max_wal_senders = %s\n"
@@ -1399,7 +1399,7 @@ int add_datanodeSlave(char *name, char *host, int port, int pooler, char *dir,
 	fprintf(f, 
 			"#========================================\n"
 			"# Addition for log shipping, %s\n"
-			"wal_level = hot_standby\n"
+			"wal_level = replica\n"
 			"archive_mode = on\n"
 			"archive_command = 'rsync %%p %s@%s:%s/%%f'\n"
 			"max_wal_senders = %d\n"
@@ -1517,7 +1517,7 @@ int add_datanodeSlave(char *name, char *host, int port, int pooler, char *dir,
 			"hot_standby = on\n"
 			"port = %s\n"
 			"pooler_port = %s\n"
-			"wal_level = hot_standby\n"
+			"wal_level = replica\n"
 			"archive_mode = off\n"		/* No archive mode */
 			"archive_command = ''\n"	/* No archive mode */
 			"max_wal_senders = 0\n"		/* Minimum WAL senders */
@@ -1534,8 +1534,7 @@ int add_datanodeSlave(char *name, char *host, int port, int pooler, char *dir,
 			"#==========================================\n"
 			"# Added to add the slave, %s\n"
 			"standby_mode = on\n"
-			"primary_conninfo = 'host = %s port = %s "
-			"user = %s application_name = %s'\n"
+			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n"
 			"restore_command = 'cp %s/%%f %%p'\n"
 			"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n"
 			"# End of addition\n",

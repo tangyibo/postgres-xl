@@ -137,6 +137,7 @@ pqParseInput(GTM_Conn *conn)
 							  "unexpected response from server; first received character was \"%c\"\n",
 							  id);
 			conn->inCursor += msgLength;
+			result->gr_status = GTM_RESULT_ERROR;
 			break;
 	}					/* switch on protocol character */
 	/* Successfully consumed this message */
@@ -148,6 +149,7 @@ pqParseInput(GTM_Conn *conn)
 	else
 	{
 		/* Trouble --- report it */
+		result->gr_status = GTM_RESULT_ERROR;
 		printfGTMPQExpBuffer(&conn->errorMessage,
 						  "message contents do not agree with length in message type \"%c\"\n",
 						  id);

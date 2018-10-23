@@ -60,6 +60,7 @@
 #define VAR_coordPorts		"coordPorts"
 #define VAR_poolerPorts		"poolerPorts"
 #define VAR_coordPgHbaEntries	"coordPgHbaEntries"
+#define VAR_coordUserDefinedBackupSettings		"coordUserDefinedBackupSettings"
 
 /* Coordinators master */
 #define VAR_coordMasterServers	"coordMasterServers"
@@ -94,6 +95,7 @@
 #define VAR_datanodePoolerPorts		"datanodePoolerPorts"
 #define VAR_datanodePgHbaEntries	"datanodePgHbaEntries"
 #define VAR_primaryDatanode			"primaryDatanode"
+#define VAR_datanodeUserDefinedBackupSettings		"datanodeUserDefinedBackupSettings"
 
 /* Datanode masters */
 #define VAR_datanodeMasterServers	"datanodeMasterServers"

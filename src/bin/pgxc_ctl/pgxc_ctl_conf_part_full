@@ -167,6 +167,10 @@ coordSlave=y			# Specify y if you configure at least one coordiantor slave.  Oth
 						# If no effective server names are found (that is, every servers are specified as none),
 						# then coordSlave value will be set to n and all the following values will be set to
 						# empty values.
+
+coordUserDefinedBackupSettings=n	# Specify whether to update backup/recovery
+									# settings during standby addition/removal.
+
 coordSlaveSync=y		# Specify to connect with synchronized mode.
 coordSlaveServers=(node07 node08 node09 node06)			# none means this slave is not available
 coordSlavePorts=(20004 20005 20004 20005)			# Master ports
@@ -266,6 +270,10 @@ datanodeSlave=y			# Specify y if you configure at least one coordiantor slave.  
 						# If no effective server names are found (that is, every servers are specified as none),
 						# then datanodeSlave value will be set to n and all the following values will be set to
 						# empty values.
+
+datanodeUserDefinedBackupSettings=n	# Specify whether to update backup/recovery
+									# settings during standby addition/removal.
+
 datanodeSlaveServers=(node07 node08 node09 node06)	# value none means this slave is not available
 datanodeSlavePorts=(20008 20009 20008 20009)	# value none means this slave is not available
 datanodeSlavePoolerPorts=(20012 20013 20012 20013)	# value none means this slave is not available

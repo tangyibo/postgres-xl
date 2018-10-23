@@ -140,13 +140,15 @@ cmd_t *prepare_initCoordinatorMaster(char *nodeName)
 
 	/* Log Shipping */
 
-	if (isVarYes(VAR_coordSlave) && !is_none(aval(VAR_coordSlaveServers)[jj]))
+	if (isVarYes(VAR_coordSlave) &&
+		!isVarYes(VAR_coordUserDefinedBackupSettings) &&
+		!is_none(aval(VAR_coordSlaveServers)[jj]))
 	{
 		/* Build WAL archive target directory */
 		appendCmdEl(cmdInitdb, (cmdWalArchDir = initCmd(aval(VAR_coordSlaveServers)[jj])));
 		snprintf(newCommand(cmdWalArchDir), MAXLINE,
 				 "rm -rf %s;mkdir -p %s; chmod 0700 %s",
-				 aval(VAR_coordArchLogDirs)[jj], aval(VAR_coordArchLogDirs)[jj], 
+				 aval(VAR_coordArchLogDirs)[jj], aval(VAR_coordArchLogDirs)[jj],
 				 aval(VAR_coordArchLogDirs)[jj]);
 		/* Build master's postgresql.conf */
 		appendCmdEl(cmdInitdb, (cmdWalArch = initCmd(aval(VAR_coordMasterServers)[jj])));
@@ -155,7 +157,7 @@ cmd_t *prepare_initCoordinatorMaster(char *nodeName)
 			cleanCmd(cmd);
 			return(NULL);
 		}
-		fprintf(f, 
+		fprintf(f,
 				"#========================================\n"
 				"# Addition for log shipping, %s\n"
 				"wal_level = replica\n"
@@ -181,7 +183,7 @@ cmd_t *prepare_initCoordinatorMaster(char *nodeName)
 		cleanCmd(cmd);
 		return(NULL);
 	}
-	fprintf(f, 
+	fprintf(f,
 			"#=================================================\n"
 			"# Addition at initialization, %s\n",
 			timeStampString(timestamp, MAXTOKEN));
@@ -318,14 +320,19 @@ cmd_t *prepare_initCoordinatorSlave(char *nodeName)
 			"#==========================================\n"
 			"# Added to initialize the slave, %s\n"
 			"standby_mode = on\n"
-			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n"
-			"restore_command = 'cp %s/%%f %%p'\n"
-			"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n"
-			"# End of addition\n",
+			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n",
 			timeStampString(timestamp, MAXTOKEN), aval(VAR_coordMasterServers)[idx], aval(VAR_coordPorts)[idx],
-			sval(VAR_pgxcOwner), aval(VAR_coordNames)[idx], 
-			aval(VAR_coordArchLogDirs)[idx], aval(VAR_coordArchLogDirs)[idx]);
+			sval(VAR_pgxcOwner), aval(VAR_coordNames)[idx]);
+	if (!isVarYes(VAR_coordUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"restore_command = 'cp %s/%%f %%p'\n"
+				"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n",
+				aval(VAR_coordArchLogDirs)[idx], aval(VAR_coordArchLogDirs)[idx]);
+	}
+	fprintf(f, "# End of addition\n");
 	fclose(f);
+
 	cmdRecoveryConf->localStdin = Strdup(localStdin);
 	snprintf(newCommand(cmdRecoveryConf), MAXLINE,
 			 "cat >> %s/recovery.conf\n", aval(VAR_coordSlaveDirs)[idx]);
@@ -342,16 +349,21 @@ cmd_t *prepare_initCoordinatorSlave(char *nodeName)
 			"# Added to initialize the slave, %s\n"
 			"hot_standby = on\n"
 			"port = %s\n"
-			"pooler_port = %s\n"
-			"wal_level = replica\n"
-			"archive_mode = off\n"
-			"archive_command = ''\n"
-			"max_wal_senders = 0\n"
-			"# End of Addition\n",
+			"pooler_port = %s\n",
 			timeStampString(timestamp, MAXTOKEN),
 			aval(VAR_coordSlavePorts)[idx],
 			aval(VAR_coordSlavePoolerPorts)[idx]);
+	if (!isVarYes(VAR_coordUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"wal_level = replica\n"
+				"archive_mode = off\n"
+				"archive_command = ''\n"
+				"max_wal_senders = 0\n");
+	}
+	fprintf(f, "# End of Addition\n");
 	fclose(f);
+
 	cmdPgConf->localStdin = Strdup(localStdin);
 	snprintf(newCommand(cmdPgConf), MAXLINE,
 			 "cat >> %s/postgresql.conf", aval(VAR_coordSlaveDirs)[idx]);
@@ -1319,29 +1331,33 @@ int add_coordinatorSlave(char *name, char *host, int port, int pooler_port, char
 	snprintf(port_s, MAXTOKEN, "%d", port);
 	snprintf(pooler_s, MAXTOKEN, "%d", pooler_port);
 	
-	/* Prepare the resources (directories) */
-	doImmediate(host, NULL, "mkdir -p %s;chmod 0700 %s", dir, dir);
-	doImmediate(host, NULL, "rm -rf %s; mkdir -p %s;chmod 0700 %s", archDir, archDir, archDir);
-	/* Reconfigure the master with WAL archive */
-	/* Update the configuration and backup the configuration file */
-	if ((f = pgxc_popen_w(aval(VAR_coordMasterServers)[idx], "cat >> %s/postgresql.conf", aval(VAR_coordMasterDirs)[idx])) == NULL)
+	if (!isVarYes(VAR_coordUserDefinedBackupSettings))
 	{
-		elog(ERROR, "ERROR: Cannot open coordinator master's configuration file, %s/postgresql.conf, %s\n",
-			 aval(VAR_coordMasterDirs)[idx], strerror(errno));
-		return 1;
+		/* Prepare the resources (directories) */
+		doImmediate(host, NULL, "mkdir -p %s;chmod 0700 %s", dir, dir);
+		doImmediate(host, NULL, "rm -rf %s; mkdir -p %s;chmod 0700 %s", archDir, archDir, archDir);
+		/* Reconfigure the master with WAL archive */
+		/* Update the configuration and backup the configuration file */
+		if ((f = pgxc_popen_w(aval(VAR_coordMasterServers)[idx], "cat >> %s/postgresql.conf", aval(VAR_coordMasterDirs)[idx])) == NULL)
+		{
+			elog(ERROR, "ERROR: Cannot open coordinator master's configuration file, %s/postgresql.conf, %s\n",
+				 aval(VAR_coordMasterDirs)[idx], strerror(errno));
+			return 1;
+		}
+		fprintf(f,
+				"#========================================\n"
+				"# Addition for log shipping, %s\n"
+				"wal_level = replica\n"
+				"archive_mode = on\n"
+				"archive_command = 'rsync %%p %s@%s:%s/%%f'\n"
+				"max_wal_senders = %d\n"
+				"# End of Addition\n",
+				timeStampString(date, MAXPATH),
+				sval(VAR_pgxcUser), host, archDir,
+				getDefaultWalSender(TRUE));
+		pclose(f);
 	}
-	fprintf(f, 
-			"#========================================\n"
-			"# Addition for log shipping, %s\n"
-			"wal_level = replica\n"
-			"archive_mode = on\n"
-			"archive_command = 'rsync %%p %s@%s:%s/%%f'\n"
-			"max_wal_senders = %d\n"
-			"# End of Addition\n",
-			timeStampString(date, MAXPATH),
-			sval(VAR_pgxcUser), host, archDir,
-			getDefaultWalSender(TRUE));
-	pclose(f);
+
 	/* pg_hba.conf for replication */
 	if ((f = pgxc_popen_w(aval(VAR_coordMasterServers)[idx], "cat >> %s/pg_hba.conf", aval(VAR_coordMasterDirs)[idx])) == NULL)
 	{
@@ -1436,15 +1452,21 @@ int add_coordinatorSlave(char *name, char *host, int port, int pooler_port, char
 			"# Added to initialize the slave, %s\n"
 			"hot_standby = on\n"
 			"port = %d\n"
-			"pooler_port = %d\n"
-			"wal_level = replica\n"
-			"archive_mode = off\n"		/* No archive mode */
-			"archive_command = ''\n"	/* No archive mode */
-			"max_wal_senders = 0\n"		/* Minimum WAL senders */
-			"# End of Addition\n",
+			"pooler_port = %d\n",
 			timeStampString(date, MAXTOKEN),
 			atoi(aval(VAR_coordSlavePorts)[idx]),
 			atoi(aval(VAR_coordSlavePoolerPorts)[idx]));
+
+	if (!isVarYes(VAR_coordUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"wal_level = replica\n"
+				"archive_mode = off\n"		/* No archive mode */
+				"archive_command = ''\n"	/* No archive mode */
+				"max_wal_senders = 0\n");	/* Minimum WAL senders */
+	}
+
+	fprintf(f, "# End of Addition\n");
 	pclose(f);
 	/* Update the slave recovery.conf */
 	if ((f = pgxc_popen_w(host, "cat >> %s/recovery.conf", dir)) == NULL)
@@ -1456,13 +1478,18 @@ int add_coordinatorSlave(char *name, char *host, int port, int pooler_port, char
 			"#==========================================\n"
 			"# Added to add the slave, %s\n"
 			"standby_mode = on\n"
-			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n"
-			"restore_command = 'cp %s/%%f %%p'\n"
-			"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n"
-			"# End of addition\n",
+			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n",
 			timeStampString(date, MAXTOKEN), aval(VAR_coordMasterServers)[idx], aval(VAR_coordPorts)[idx],
-			sval(VAR_pgxcOwner), aval(VAR_coordNames)[idx], 
-			aval(VAR_coordArchLogDirs)[idx], aval(VAR_coordArchLogDirs)[idx]);
+			sval(VAR_pgxcOwner), aval(VAR_coordNames)[idx]);
+
+	if (!isVarYes(VAR_coordUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"restore_command = 'cp %s/%%f %%p'\n"
+				"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n",
+				aval(VAR_coordArchLogDirs)[idx], aval(VAR_coordArchLogDirs)[idx]);
+	}
+	fprintf(f, "# End of addition\n");
 	pclose(f);
 
 	/* Start the slave */
@@ -1681,13 +1708,19 @@ int remove_coordinatorSlave(char *name, int clean_opt)
 		fprintf(f,
 				"#=======================================\n"
 				"# Updated to remove the slave %s\n"
-				"archive_mode = off\n"
-				"synchronous_standby_names = ''\n"
-				"archive_command = ''\n"
-				"max_wal_senders = 0\n"
-				"wal_level = minimal\n"
-				"# End of the update\n",
+				"synchronous_standby_names = ''\n",
 				timeStampString(date, MAXTOKEN));
+
+		if (!isVarYes(VAR_coordUserDefinedBackupSettings))
+		{
+			fprintf(f,
+					"wal_level = minimal\n"
+					"archive_mode = off\n"
+					"archive_command = ''\n"
+					"max_wal_senders = 0\n");
+		}
+
+		fprintf(f, "# End of the update\n");
 		pclose(f);
 	}
 	doImmediate(aval(VAR_coordMasterServers)[idx], NULL, "pg_ctl restart -Z coordinator -D %s", aval(VAR_coordMasterDirs)[idx]);

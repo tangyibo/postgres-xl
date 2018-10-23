@@ -156,7 +156,9 @@ cmd_t *prepare_initDatanodeMaster(char *nodeName)
 	fclose(f);
 	
 	/* Additional Initialization for log_shipping */
-	if (isVarYes(VAR_datanodeSlave) && !is_none(aval(VAR_datanodeSlaveServers)[idx]))
+	if (isVarYes(VAR_datanodeSlave) &&
+		!isVarYes(VAR_datanodeUserDefinedBackupSettings) &&
+		!is_none(aval(VAR_datanodeSlaveServers)[idx]))
 	{
 		cmd_t *cmd_cleanDir, *cmd_PgConf;
 		/* This datanode has a slave */
@@ -345,14 +347,19 @@ cmd_t *prepare_initDatanodeSlave(char *nodeName)
 			"#==========================================\n"
 			"# Added to initialize the slave, %s\n"
 			"standby_mode = on\n"
-			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n"
-			"restore_command = 'cp %s/%%f %%p'\n"
-			"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n",		
+			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n",
 			timeStampString(timestamp, MAXTOKEN),
-			aval(VAR_datanodeMasterServers)[idx], aval(VAR_datanodePorts)[idx], 
-			sval(VAR_pgxcOwner), aval(VAR_datanodeNames)[idx],
-			aval(VAR_datanodeArchLogDirs)[idx],
-			aval(VAR_datanodeArchLogDirs)[idx]);
+			aval(VAR_datanodeMasterServers)[idx], aval(VAR_datanodePorts)[idx],
+			sval(VAR_pgxcOwner), aval(VAR_datanodeNames)[idx]);
+
+	if (!isVarYes(VAR_datanodeUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"restore_command = 'cp %s/%%f %%p'\n"
+				"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n",
+				aval(VAR_datanodeArchLogDirs)[idx],
+				aval(VAR_datanodeArchLogDirs)[idx]);
+	}
 	fclose(f);
 
 	/* Configure slave's postgresql.conf */
@@ -1399,17 +1406,21 @@ int add_datanodeSlave(char *name, char *host, int port, int pooler, char *dir,
 	fprintf(f, 
 			"#========================================\n"
 			"# Addition for log shipping, %s\n"
-			"wal_level = replica\n"
-			"archive_mode = on\n"
-			"archive_command = 'rsync %%p %s@%s:%s/%%f'\n"
-			"max_wal_senders = %d\n"
 			"synchronous_commit = on\n"
-			"synchronous_standby_names = '%s'\n"
-			"# End of Addition\n",
-			timeStampString(date, MAXPATH),
-			sval(VAR_pgxcUser), host, archDir,
-			getDefaultWalSender(FALSE),
-			name);
+			"synchronous_standby_names = '%s'\n",
+			timeStampString(date, MAXPATH), name);
+
+	if (!isVarYes(VAR_datanodeUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"wal_level = replica\n"
+				"archive_mode = on\n"
+				"archive_command = 'rsync %%p %s@%s:%s/%%f'\n"
+				"max_wal_senders = %d\n",
+				sval(VAR_pgxcUser), host, archDir,
+				getDefaultWalSender(FALSE));
+	}
+	fprintf(f, "# End of Addition\n");
 	pclose(f);
 	/* pg_hba.conf for replication */
 	if ((f = pgxc_popen_w(aval(VAR_datanodeMasterServers)[idx], "cat >> %s/pg_hba.conf", aval(VAR_datanodeMasterDirs)[idx])) == NULL)
@@ -1516,13 +1527,17 @@ int add_datanodeSlave(char *name, char *host, int port, int pooler, char *dir,
 			"# Added to initialize the slave, %s\n"
 			"hot_standby = on\n"
 			"port = %s\n"
-			"pooler_port = %s\n"
-			"wal_level = replica\n"
-			"archive_mode = off\n"		/* No archive mode */
-			"archive_command = ''\n"	/* No archive mode */
-			"max_wal_senders = 0\n"		/* Minimum WAL senders */
-			"# End of Addition\n",
+			"pooler_port = %s\n",
 			timeStampString(date, MAXTOKEN), aval(VAR_datanodeSlavePorts)[idx], aval(VAR_datanodeSlavePoolerPorts)[idx]);
+	if (!isVarYes(VAR_datanodeUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"wal_level = replica\n"
+				"archive_mode = off\n"		/* No archive mode */
+				"archive_command = ''\n"	/* No archive mode */
+				"max_wal_senders = 0\n");	/* Minimum WAL senders */
+	}
+	fprintf(f, "# End of Addition\n");
 	pclose(f);
 	/* Update the slave recovery.conf */
 	if ((f = pgxc_popen_w(host, "cat >> %s/recovery.conf", dir)) == NULL)
@@ -1534,13 +1549,17 @@ int add_datanodeSlave(char *name, char *host, int port, int pooler, char *dir,
 			"#==========================================\n"
 			"# Added to add the slave, %s\n"
 			"standby_mode = on\n"
-			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n"
-			"restore_command = 'cp %s/%%f %%p'\n"
-			"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n"
-			"# End of addition\n",
+			"primary_conninfo = 'host = %s port = %s user = %s application_name = %s'\n",
 			timeStampString(date, MAXTOKEN), aval(VAR_datanodeMasterServers)[idx], aval(VAR_datanodePorts)[idx],
-			sval(VAR_pgxcOwner), aval(VAR_datanodeNames)[idx], 
-			aval(VAR_datanodeArchLogDirs)[idx], aval(VAR_datanodeArchLogDirs)[idx]);
+			sval(VAR_pgxcOwner), aval(VAR_datanodeNames)[idx]);
+	if (!isVarYes(VAR_datanodeUserDefinedBackupSettings))
+	{
+		fprintf(f,
+				"restore_command = 'cp %s/%%f %%p'\n"
+				"archive_cleanup_command = 'pg_archivecleanup %s %%r'\n",
+				aval(VAR_datanodeArchLogDirs)[idx], aval(VAR_datanodeArchLogDirs)[idx]);
+	}
+	fprintf(f, "# End of addition\n");
 	pclose(f);
 	/* Start the slave */
 	doImmediate(host, NULL, "pg_ctl start -w -Z datanode -D %s", dir);
@@ -1782,13 +1801,19 @@ int remove_datanodeSlave(char *name, int clean_opt)
 		fprintf(f,
 				"#=======================================\n"
 				"# Updated to remove the slave %s\n"
-				"archive_mode = off\n"
-				"synchronous_standby_names = ''\n"
-				"archive_command = ''\n"
-				"max_wal_senders = 0\n"
-				"wal_level = minimal\n"
-				"# End of the update\n",
+				"synchronous_standby_names = ''\n",
 				timeStampString(date, MAXTOKEN));
+
+		if (!isVarYes(VAR_datanodeUserDefinedBackupSettings))
+		{
+			fprintf(f,
+					"wal_level = minimal\n"
+					"archive_mode = off\n"
+					"archive_command = ''\n"
+					"max_wal_senders = 0\n");
+		}
+
+		fprintf(f, "# End of the update\n");
 		pclose(f);
 	}
 	doImmediate(aval(VAR_datanodeMasterServers)[idx], NULL, "pg_ctl restart -Z datanode -D %s", aval(VAR_datanodeMasterDirs)[idx]);

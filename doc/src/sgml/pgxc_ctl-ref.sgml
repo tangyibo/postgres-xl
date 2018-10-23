@@ -1308,6 +1308,21 @@ PGXC$ prepare config minimal my_minimal_config.conf
      </varlistentry>
     
      <varlistentry>
+      <term><option>coordUserDefinedBackupSettings</option></term>
+      <listitem>
+       <para>
+        Specify whether the system should use user-defined backup/recovery
+        settings. If <literal>y</literal> is specified then
+        <application>pgxc_ctl</application> will not overwrite the
+        <literal>archive_command</literal>, <literal>restore_command</literal>,
+        <literal>max_wal_senders</literal> etc while adding or removing a coordinator
+        standby. This can be useful when users want to setup their own backup
+        and recovery mechanism.
+       </para>
+      </listitem>
+     </varlistentry>
+    
+     <varlistentry>
       <term><option>coordSpecificExtraConfig</option></term>
       <listitem>
        <para>
@@ -1530,6 +1545,21 @@ PGXC$ prepare config minimal my_minimal_config.conf
         Array of the port number for each pooler.  The pooler takes care of the
         connection between a Coordinator and Datanode and needs a separate
         port.
+       </para>
+      </listitem>
+     </varlistentry>
+    
+     <varlistentry>
+      <term><option>datanodeUserDefinedBackupSettings</option></term>
+      <listitem>
+       <para>
+        Specify whether the system should use user-defined backup/recovery
+        settings. If <literal>y</literal> is specified then
+        <application>pgxc_ctl</application> will not overwrite the
+        <literal>archive_command</literal>, <literal>restore_command</literal>,
+        <literal>max_wal_senders</literal> etc while adding or removing a datanode
+        standby. This can be useful when users want to setup their own backup
+        and recovery mechanism.
        </para>
       </listitem>
      </varlistentry>

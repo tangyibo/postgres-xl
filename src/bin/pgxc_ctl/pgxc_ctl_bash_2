@@ -78,6 +78,7 @@ function print_values
 	print_array coordMasterServers
 	print_array coordMasterDirs
 	print_array coordMaxWALSenders
+	echo coordUserDefinedBackupSettings $coordUserDefinedBackupSettings
 
 	# Coordinators slave
 	echo coordSlave $coordSlave
@@ -116,6 +117,7 @@ function print_values
 	print_array datanodePoolerPorts
 #endif
 	print_array datanodePgHbaEntries
+	echo datanodeUserDefinedBackupSettings $datanodeUserDefinedBackupSettings
 	
 	# Datanodes masters
 	print_array datanodeMasterServers

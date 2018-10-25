@@ -570,7 +570,7 @@
 #define PACKAGE_NAME "Postgres-XL"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Postgres-XL 10r1beta1"
+#define PACKAGE_STRING "Postgres-XL 10r1"
 
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "10.5"

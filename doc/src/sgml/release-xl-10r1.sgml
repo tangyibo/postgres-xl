@@ -132,7 +132,7 @@ otherwise stated.
         Automatically trigger ANALYZE (COORDINATOR) on remote coordinators
        </para>
        <para>
-        When a table is manually or automatically analyzed, the coordiantor
+        When a table is manually or automatically analyzed, the coordinator
         will run ANALYZE (COORDINATOR) command to all other coordinators for them to
         update their planner stats. This ensures that the planner stats remain up to date on all
         coordinators in the cluster. The feature works when a table is analyzed

@@ -968,6 +968,7 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 				case RTE_JOIN:
 				case RTE_VALUES:
 				case RTE_CTE:
+				case RTE_FUNCTION:
 					continue;
 				case RTE_RELATION:
 					{

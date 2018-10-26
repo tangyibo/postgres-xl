@@ -458,8 +458,11 @@ libpq_executeFileMap(filemap_t *map)
 	/*
 	 * First create a temporary table, and load it with the blocks that we
 	 * need to fetch.
+	 *
+	 * Since Postgres-XL defaults to read-only transactions when connected to
+	 * the datanodes directly, we must overwrite that explicitly.
 	 */
-	sql = "CREATE TEMPORARY TABLE fetchchunks(path text, begin int8, len int4);";
+	sql = "BEGIN TRANSACTION READ WRITE; CREATE TEMPORARY TABLE fetchchunks(path text, begin int8, len int4); COMMIT";
 	res = PQexec(conn, sql);
 
 	if (PQresultStatus(res) != PGRES_COMMAND_OK)
@@ -467,7 +470,7 @@ libpq_executeFileMap(filemap_t *map)
 				 PQresultErrorMessage(res));
 	PQclear(res);
 
-	sql = "COPY fetchchunks FROM STDIN";
+	sql = "BEGIN TRANSACTION READ WRITE; COPY fetchchunks FROM STDIN; COMMIT";
 	res = PQexec(conn, sql);
 
 	if (PQresultStatus(res) != PGRES_COPY_IN)

@@ -291,7 +291,7 @@ CreateSharedProcArray(void)
 		procArray->numProcs = 0;
 		procArray->maxProcs = PROCARRAY_MAXPROCS;
 		procArray->maxKnownAssignedXids = TOTAL_MAX_CACHED_SUBXIDS +
-			CONTROL_INTERVAL;
+			CONTROL_INTERVAL + InitialGXIDValue_Default;
 		procArray->numKnownAssignedXids = 0;
 		procArray->tailKnownAssignedXids = 0;
 		procArray->headKnownAssignedXids = 0;

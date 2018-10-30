@@ -40,6 +40,7 @@ typedef struct vacuumingOptions
 	bool		and_analyze;
 	bool		full;
 	bool		freeze;
+	bool		coordinator_only;
 } vacuumingOptions;
 
 
@@ -110,6 +111,7 @@ main(int argc, char *argv[])
 		{"jobs", required_argument, NULL, 'j'},
 		{"maintenance-db", required_argument, NULL, 2},
 		{"analyze-in-stages", no_argument, NULL, 3},
+		{"coordinator-only", no_argument, NULL, 'C'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -140,7 +142,7 @@ main(int argc, char *argv[])
 
 	handle_help_version_opts(argc, argv, "vacuumdb", help);
 
-	while ((c = getopt_long(argc, argv, "h:p:U:wWeqd:zZFat:fvj:", long_options, &optindex)) != -1)
+	while ((c = getopt_long(argc, argv, "h:p:U:wWeqd:zZFat:fvj:C", long_options, &optindex)) != -1)
 	{
 		switch (c)
 		{
@@ -213,6 +215,9 @@ main(int argc, char *argv[])
 			case 3:
 				analyze_in_stages = vacopts.analyze_only = true;
 				break;
+			case 'C':
+				vacopts.coordinator_only = true;
+				break;
 			default:
 				fprintf(stderr, _("Try \"%s --help\" for more information.\n"), progname);
 				exit(1);
@@ -252,6 +257,15 @@ main(int argc, char *argv[])
 			exit(1);
 		}
 		/* allow 'and_analyze' with 'analyze_only' */
+	}
+	else
+	{
+		if (vacopts.coordinator_only)
+		{
+			fprintf(stderr, _("%s: cannot use the \"%s\" option when performing vacuum\n"),
+					progname, "coordinator-only");
+			exit(1);
+		}
 	}
 
 	setup_cancel_handler();
@@ -636,8 +650,25 @@ prepare_vacuum_command(PQExpBuffer sql, PGconn *conn,
 	if (vacopts->analyze_only)
 	{
 		appendPQExpBufferStr(sql, "ANALYZE");
-		if (vacopts->verbose)
-			appendPQExpBufferStr(sql, " VERBOSE");
+		if (vacopts->verbose || vacopts->coordinator_only)
+		{
+			const char *paren = " (";
+			const char *comma = ", ";
+			const char *sep = paren;
+
+			if (vacopts->verbose)
+			{
+				appendPQExpBuffer(sql, "%sVERBOSE", sep);
+				sep = comma;
+			}
+			if (vacopts->coordinator_only)
+			{
+				appendPQExpBuffer(sql, "%sCOORDINATOR", sep);
+				sep = comma;
+			}
+			if (sep != paren)
+				appendPQExpBufferChar(sql, ')');
+		}
 	}
 	else
 	{

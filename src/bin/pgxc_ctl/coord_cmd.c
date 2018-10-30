@@ -1277,6 +1277,12 @@ selfadd:
 		fprintf(f, "\\q\n");
 		pclose(f);
 	}
+
+	/*
+	 * Update planner stats on the newly added coordinator.
+	 */
+	doImmediateRaw("vacuumdb -a --analyze-only --coordinator-only -h %s -p %d",
+			host, port);
 	return 0;
 }
 

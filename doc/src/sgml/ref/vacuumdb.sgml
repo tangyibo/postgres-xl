@@ -253,6 +253,18 @@ PostgreSQL documentation
      </varlistentry>
 
      <varlistentry>
+      <term><option>-C</option></term>
+      <term><option>--coordinator-only</option></term>
+      <listitem>
+       <para>
+        Only update coordinator side statistics using the current statistics on
+        the datanodes. This is usually much quicker because the datanode
+        statistics are not recomputed.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry>
        <term><option>-?</></term>
        <term><option>--help</></term>
        <listitem>

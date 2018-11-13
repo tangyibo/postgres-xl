@@ -1186,7 +1186,7 @@ TransactionIdIsInProgressExtended(TransactionId xid, bool check_gtm)
 
 	if (check_gtm && ClusterMonitorTransactionIsInProgress(xid))
 	{
-		elog(LOG, "ClusterMonitor reports xid %u as in-progress", xid);
+		elog(DEBUG2, "ClusterMonitor reports xid %u as in-progress", xid);
 		LWLockRelease(ProcArrayLock);
 		return true;
 	}

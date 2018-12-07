@@ -237,18 +237,8 @@ CreatePortal(const char *name, bool allowDup, bool dupSilent)
 	/* put portal in table (sets portal->name) */
 	PortalHashTableInsert(portal, name);
 
-#ifdef PGXC
 	elog(DEBUG3, "Created portal %s and inserted an entry in the has table",
 			name);
-
-	if (PGXCNodeIdentifier == 0)
-	{
-		char *node_name;
-		node_name = str_tolower(PGXCNodeName, strlen(PGXCNodeName), DEFAULT_COLLATION_OID);
-		PGXCNodeIdentifier = get_pgxc_node_id(get_pgxc_nodeoid(node_name));
-		pfree(node_name);
-	}
-#endif
 
 	return portal;
 }

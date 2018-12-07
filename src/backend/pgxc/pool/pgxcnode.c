@@ -181,6 +181,16 @@ static List	*local_param_list = NIL;
 static StringInfo	session_params;
 static StringInfo	local_params;
 
+char		*PGXCNodeName = NULL;
+int			PGXCNodeId = 0;
+
+/*
+ * When a particular node starts up, store the node identifier in this variable
+ * so that we dont have to calculate it OR do a search in cache any where else
+ * This will have minimal impact on performance
+ */
+uint32			PGXCNodeIdentifier = 0;
+
 typedef struct
 {
 	NameData name;
@@ -252,6 +262,7 @@ InitMultinodeExecutor(bool is_force)
 	int				count;
 	Oid				*coOids, *dnOids;
 	MemoryContext	oldcontext;
+	char			*node_name;
 
 	/* Free all the existing information first */
 	if (is_force)
@@ -267,6 +278,11 @@ InitMultinodeExecutor(bool is_force)
 
 	/* Get classified list of node Oids */
 	PgxcNodeGetOids(&coOids, &dnOids, &NumCoords, &NumDataNodes, true);
+
+	/* Initialise node identifier */
+	node_name = str_tolower(PGXCNodeName, strlen(PGXCNodeName), DEFAULT_COLLATION_OID);
+	PGXCNodeIdentifier = get_pgxc_node_id(get_pgxc_nodeoid(node_name));
+	pfree(node_name);
 
 	/*
 	 * Coordinator and datanode handles should be available during all the

@@ -405,17 +405,6 @@ static bool LoadedSSL = false;
 static DNSServiceRef bonjour_sdref = NULL;
 #endif
 
-#ifdef PGXC
-char			*PGXCNodeName = NULL;
-int			PGXCNodeId = 0;
-/*
- * When a particular node starts up, store the node identifier in this variable
- * so that we dont have to calculate it OR do a search in cache any where else
- * This will have minimal impact on performance
- */
-uint32			PGXCNodeIdentifier = 0;
-#endif
-
 /*
  * postmaster.c - function prototypes
  */

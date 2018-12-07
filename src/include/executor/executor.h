@@ -115,7 +115,8 @@ extern bool execCurrentOf(CurrentOfExpr *cexpr,
 			  ItemPointer current_tid);
 
 #ifdef PGXC
-ScanState *search_plan_tree(PlanState *node, Oid table_oid);
+ScanState *search_plan_tree(PlanState *node, Oid table_oid,
+				bool *pending_rescan);
 #endif
 
 /*

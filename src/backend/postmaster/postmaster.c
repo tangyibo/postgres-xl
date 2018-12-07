@@ -2872,7 +2872,7 @@ pmdie(SIGNAL_ARGS)
 			if (ClusterMonPID != 0)
 				signal_child(ClusterMonPID, SIGTERM);
 #endif /* XCP */
-			if (pmState == PM_RECOVERY)
+			if (pmState == PM_STARTUP || pmState == PM_RECOVERY)
 			{
 				SignalSomeChildren(SIGTERM, BACKEND_TYPE_BGWORKER);
 

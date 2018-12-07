@@ -232,6 +232,7 @@ PTHREAD_LIBS		= @PTHREAD_LIBS@
 
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+PG_SYSROOT = @PG_SYSROOT@
 
 override CPPFLAGS := $(ICU_CFLAGS) $(CPPFLAGS)
 
@@ -316,6 +317,7 @@ else
 endif
 perl_archlibexp		= @perl_archlibexp@
 perl_privlibexp		= @perl_privlibexp@
+perl_includespec	= @perl_includespec@
 perl_embed_ccflags	= @perl_embed_ccflags@
 perl_embed_ldflags	= @perl_embed_ldflags@
 

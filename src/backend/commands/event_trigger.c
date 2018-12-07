@@ -1730,11 +1730,6 @@ EventTriggerCollectSimpleCommand(ObjectAddress address,
  * Note we don't collect the command immediately; instead we keep it in
  * currentCommand, and only when we're done processing the subcommands we will
  * add it to the command list.
- *
- * XXX -- this API isn't considering the possibility of an ALTER TABLE command
- * being called reentrantly by an event trigger function.  Do we need stackable
- * commands at this level?	Perhaps at least we should detect the condition and
- * raise an error.
  */
 void
 EventTriggerAlterTableStart(Node *parsetree)
@@ -1759,6 +1754,7 @@ EventTriggerAlterTableStart(Node *parsetree)
 	command->d.alterTable.subcmds = NIL;
 	command->parsetree = copyObject(parsetree);
 
+	command->parent = currentEventTriggerState->currentCommand;
 	currentEventTriggerState->currentCommand = command;
 
 	MemoryContextSwitchTo(oldcxt);
@@ -1799,6 +1795,7 @@ EventTriggerCollectAlterTableSubcmd(Node *subcmd, ObjectAddress address)
 		return;
 
 	Assert(IsA(subcmd, AlterTableCmd));
+	Assert(currentEventTriggerState->currentCommand != NULL);
 	Assert(OidIsValid(currentEventTriggerState->currentCommand->d.alterTable.objectId));
 
 	oldcxt = MemoryContextSwitchTo(currentEventTriggerState->cxt);
@@ -1824,10 +1821,14 @@ EventTriggerCollectAlterTableSubcmd(Node *subcmd, ObjectAddress address)
 void
 EventTriggerAlterTableEnd(void)
 {
+	CollectedCommand *parent;
+
 	/* ignore if event trigger context not set, or collection disabled */
 	if (!currentEventTriggerState ||
 		currentEventTriggerState->commandCollectionInhibited)
 		return;
+
+	parent = currentEventTriggerState->currentCommand->parent;
 
 	/* If no subcommands, don't collect */
 	if (list_length(currentEventTriggerState->currentCommand->d.alterTable.subcmds) != 0)
@@ -1839,7 +1840,7 @@ EventTriggerAlterTableEnd(void)
 	else
 		pfree(currentEventTriggerState->currentCommand);
 
-	currentEventTriggerState->currentCommand = NULL;
+	currentEventTriggerState->currentCommand = parent;
 }
 
 /*

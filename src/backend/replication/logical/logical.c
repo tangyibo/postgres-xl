@@ -87,6 +87,11 @@ CheckLogicalDecodingRequirements(void)
 			 errmsg("Postgres-XL does not support logical replication"),
 			 errdetail("The feature is not currently supported")));
 
+	/*
+	 * NB: Adding a new requirement likely means that RestoreSlotFromDisk()
+	 * needs the same check.
+	 */
+
 	if (wal_level < WAL_LEVEL_LOGICAL)
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),

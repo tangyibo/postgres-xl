@@ -679,6 +679,19 @@ create temp table temp_part partition of temp_parted for values in (1, 2); -- ok
 drop table perm_parted cascade;
 drop table temp_parted cascade;
 
+-- check that adding partitions to a table while it is being used is prevented
+create table tab_part_create (a int) partition by list (a);
+create or replace function func_part_create() returns trigger
+  language plpgsql as $$
+  begin
+    execute 'create table tab_part_create_1 partition of tab_part_create for values in (1)';
+    return null;
+  end $$;
+create trigger trig_part_create before insert on tab_part_create
+  for each statement execute procedure func_part_create();
+insert into tab_part_create values (1);
+drop table tab_part_create;
+drop function func_part_create();
 -- xl tests
 create table xl_parted (a int, b int, c text) partition by list (b) distribute by hash (b);
 create table xl_c1 partition of xl_parted for values in (1, 2, 3);

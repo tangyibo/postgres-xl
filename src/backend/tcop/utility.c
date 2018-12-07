@@ -1356,6 +1356,9 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 	bool		isTopLevel = (context == PROCESS_UTILITY_TOPLEVEL);
 	ParseState *pstate;
 
+	/* This can recurse, so check for excessive recursion */
+	check_stack_depth();
+
 	/*
 	 * For more detail see comments in function pgxc_lock_for_backup.
 	 *

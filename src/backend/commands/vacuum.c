@@ -256,10 +256,15 @@ vacuum(int options, RangeVar *relation, Oid relid, VacuumParams *params,
 	 * problematic.)
 	 *
 	 * For ANALYZE (no VACUUM): if inside a transaction block, we cannot
-	 * start/commit our own transactions.  Also, there's no need to do so if
-	 * only processing one relation.  For multiple relations when not within a
-	 * transaction block, and also in an autovacuum worker, use own
+	 * start/commit our own transactions. For multiple relations when not
+	 * within a transaction block, and also in an autovacuum worker, use own
 	 * transactions so we can release locks sooner.
+	 *
+	 * XL: We use own transactions even for a single relation case since that
+	 * allows us to safely analyze the remote coordinators too. We make
+	 * exception while running implicit ANALYZE as part of REFRESH MATERIALIZED
+	 * VIEW since that case demands that we must not close the current
+	 * transaction.
 	 */
 	if (options & VACOPT_VACUUM)
 		use_own_xacts = true;
@@ -272,8 +277,11 @@ vacuum(int options, RangeVar *relation, Oid relid, VacuumParams *params,
 			use_own_xacts = false;
 		else if (list_length(relations) > 1)
 			use_own_xacts = true;
-		else
+		else if (options & VACOPT_USE_OUTERXACT)
 			use_own_xacts = false;
+		else
+			use_own_xacts = true;
+
 	}
 
 	/*

@@ -637,7 +637,7 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 				get_namespace_name(RelationGetNamespace(tempRel)),
 				RelationGetRelationName(tempRel), -1);
 		stmt->relation = rv;
-		stmt->options = VACOPT_ANALYZE;
+		stmt->options = VACOPT_ANALYZE | VACOPT_USE_OUTERXACT;
 		ExecVacuum(stmt, true);
 	}
 #endif
@@ -857,7 +857,7 @@ refresh_by_match_merge(Oid matviewOid, Oid tempOid, Oid relowner,
 		VacuumStmt *stmt = makeNode(VacuumStmt);
 		RangeVar *rv = makeRangeVar(tempschema, diffname, -1);
 		stmt->relation = rv;
-		stmt->options = VACOPT_ANALYZE;
+		stmt->options = VACOPT_ANALYZE | VACOPT_USE_OUTERXACT;
 		ExecVacuum(stmt, true);
 	}
 #endif

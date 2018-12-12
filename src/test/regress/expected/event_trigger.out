@@ -304,16 +304,6 @@ NOTICE:  drop cascades to 3 other objects
 DETAIL:  drop cascades to table evttrig.one
 drop cascades to table evttrig.two
 drop cascades to table evttrig.parted
-NOTICE:  NORMAL: orig=t normal=f istemp=f type=schema identity=evttrig name={evttrig} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=table identity=evttrig.one name={evttrig,one} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=sequence identity=evttrig.one_col_a_seq name={evttrig,one_col_a_seq} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=default value identity=for evttrig.one.col_a name={evttrig,one,col_a} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=table identity=evttrig.two name={evttrig,two} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=table identity=evttrig.parted name={evttrig,parted} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=table identity=evttrig.part_1_10 name={evttrig,part_1_10} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=table identity=evttrig.part_10_20 name={evttrig,part_10_20} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=table identity=evttrig.part_10_15 name={evttrig,part_10_15} args={}
-NOTICE:  NORMAL: orig=f normal=t istemp=f type=table identity=evttrig.part_15_20 name={evttrig,part_15_20} args={}
 DROP TABLE a_temp_tbl;
 DROP EVENT TRIGGER regress_event_trigger_report_dropped;
 ERROR:  event trigger "regress_event_trigger_report_dropped" does not exist

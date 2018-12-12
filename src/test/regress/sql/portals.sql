@@ -481,7 +481,7 @@ CREATE TABLE current_check_2 () INHERITS (current_check);
 INSERT INTO current_check_1 SELECT i, 'p' || i FROM generate_series(1,9) i;
 INSERT INTO current_check_2 SELECT i, 'P' || i FROM generate_series(10,19) i;
 
-DECLARE c1 SCROLL CURSOR FOR SELECT * FROM current_check;
+DECLARE c1 SCROLL CURSOR FOR SELECT * FROM current_check ORDER BY currentid;
 
 -- This tests the fetch-backwards code path
 FETCH ABSOLUTE 12 FROM c1;

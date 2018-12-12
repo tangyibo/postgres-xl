@@ -1196,6 +1196,40 @@ ERROR:  WHERE CURRENT OF clause not yet supported
 SELECT stringu1 FROM onek WHERE stringu1 = 'DZAAAA';
 ERROR:  current transaction is aborted, commands ignored until end of transaction block
 ROLLBACK;
+-- Check behavior with rewinding to a previous child scan node,
+-- as per bug #15395
+BEGIN;
+CREATE TABLE current_check (currentid int, payload text);
+CREATE TABLE current_check_1 () INHERITS (current_check);
+CREATE TABLE current_check_2 () INHERITS (current_check);
+INSERT INTO current_check_1 SELECT i, 'p' || i FROM generate_series(1,9) i;
+INSERT INTO current_check_2 SELECT i, 'P' || i FROM generate_series(10,19) i;
+DECLARE c1 SCROLL CURSOR FOR SELECT * FROM current_check ORDER BY currentid;
+-- This tests the fetch-backwards code path
+FETCH ABSOLUTE 12 FROM c1;
+ currentid | payload 
+-----------+---------
+        12 | P12
+(1 row)
+
+FETCH ABSOLUTE 8 FROM c1;
+ currentid | payload 
+-----------+---------
+         8 | p8
+(1 row)
+
+DELETE FROM current_check WHERE CURRENT OF c1 RETURNING *;
+ERROR:  WHERE CURRENT OF clause not yet supported
+-- This tests the ExecutorRewind code path
+FETCH ABSOLUTE 13 FROM c1;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+FETCH ABSOLUTE 1 FROM c1;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+DELETE FROM current_check WHERE CURRENT OF c1 RETURNING *;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+SELECT * FROM current_check;
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK;
 -- Make sure snapshot management works okay, per bug report in
 -- 235395b90909301035v7228ce63q392931f15aa74b31@mail.gmail.com
 BEGIN;

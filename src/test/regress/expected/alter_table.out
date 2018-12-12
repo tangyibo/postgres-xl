@@ -3693,7 +3693,6 @@ alter table temp_part_parent attach partition temp_part_child
   for values in (1, 2); -- ok
 drop table perm_part_parent cascade;
 drop table temp_part_parent cascade;
-
 -- check that attaching partitions to a table while it is being used is
 -- prevented
 create table tab_part_attach (a int) partition by list (a);
@@ -3706,10 +3705,11 @@ create or replace function func_part_attach() returns trigger
   end $$;
 create trigger trig_part_attach before insert on tab_part_attach
   for each statement execute procedure func_part_attach();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 insert into tab_part_attach values (1);
-ERROR:  cannot ALTER TABLE "tab_part_attach" because it is being used by active queries in this session
-CONTEXT:  SQL statement "alter table tab_part_attach attach partition tab_part_attach_1 for values in (1)"
-PL/pgSQL function func_part_attach() line 4 at EXECUTE
+ERROR:  no partition of relation "tab_part_attach" found for row
+DETAIL:  Partition key of the failing row contains (a) = (1).
 drop table tab_part_attach;
 drop function func_part_attach();
 -- test case where the partitioning operator is a SQL function whose
@@ -3727,7 +3727,6 @@ alter table at_test_sql_partop attach partition at_test_sql_partop_1 for values 
 drop table at_test_sql_partop;
 drop operator class at_test_sql_partop using btree;
 drop function at_test_sql_partop;
-
 -- xl tests
 create table xl_parent (a int, b int, c text) partition by list (a);
 -- create a partition

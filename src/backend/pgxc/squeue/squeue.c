@@ -1061,10 +1061,20 @@ SharedQueueRead(SharedQueue squeue, int consumerIdx,
 			SetLatch(&sqsync->sqs_producer_latch);
 			LWLockRelease(sqsync->sqs_producer_lwlock);
 
-			/* Wait for notification about available info */
+			/*
+			 * Wait for notification about available info.
+			 *
+			 * We use a timed-wait to avoid non-interruptable waits, as seen
+			 * from some complaints about a backend remaining stuck even after
+			 * the query is cancelled.
+			 */
 			WaitLatch(&sqsync->sqs_consumer_sync[consumerIdx].cs_latch,
-					WL_LATCH_SET | WL_POSTMASTER_DEATH, -1,
+					WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_TIMEOUT,
+					10000L,
 					WAIT_EVENT_MQ_INTERNAL);
+
+			/* Interrupt may have come while waiting */
+			CHECK_FOR_INTERRUPTS();
 
 			/* got the notification, restore lock and try again */
 			LWLockAcquire(sqsync->sqs_producer_lwlock, LW_SHARED);
@@ -1955,9 +1965,24 @@ sq_pull_long_tuple(ConsState *cstate, RemoteDataRow datarow,
 			LWLockRelease(sync->cs_lwlock);
 			LWLockRelease(sqsync->sqs_producer_lwlock);
 
-			/* Wait for notification about available info */
-			WaitLatch(&sync->cs_latch, WL_LATCH_SET | WL_POSTMASTER_DEATH, -1,
+			/*
+			 * Wait for notification about available info. We use a timed-wait
+			 * to avoid infinite hang in case the producer does not produce
+			 * more data, for whatever reason. For example, we have seen issues
+			 * with query cancellation where a backend may remain stuck in
+			 * these waits.
+			 *
+			 * 10s wait is quite arbitrary, but matches with what we use
+			 * elsewhere in SharedQ code.
+			 */
+			WaitLatch(&sync->cs_latch,
+					WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_TIMEOUT,
+					10000L,
 					WAIT_EVENT_MQ_INTERNAL);
+
+			/* Interrupt may have come while waiting */
+			CHECK_FOR_INTERRUPTS();
+
 			/* got the notification, restore lock and try again */
 			LWLockAcquire(sqsync->sqs_producer_lwlock, LW_SHARED);
 			LWLockAcquire(sync->cs_lwlock, LW_EXCLUSIVE);

@@ -5072,11 +5072,23 @@ PostgresMain(int argc, char *argv[],
 					switch (command)
 					{
 						case CREATE_BARRIER_PREPARE:
+							/*
+							 * Start a transaction to ensure errors are handled
+							 * correctly.
+							 */
+							start_xact_command();
+
 							ProcessCreateBarrierPrepare(id);
 							break;
 
 						case CREATE_BARRIER_END:
 							ProcessCreateBarrierEnd(id);
+
+							/*
+							 * Matches start_xact_command() during the PREPARE
+							 * stage.
+							 */
+							finish_xact_command();
 							break;
 
 						case CREATE_BARRIER_EXECUTE:

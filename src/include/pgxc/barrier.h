@@ -33,6 +33,11 @@ typedef struct xl_barrier
 
 #define XLOG_BARRIER_CREATE	0x00
 
+extern void BarrierLockAcquireForBarrier(void);
+extern void BarrierLockReleaseForBarrier(void);
+extern void BarrierLockAcquireForXact(void);
+extern void BarrierLockReleaseForXact(void);
+
 extern void ProcessCreateBarrierPrepare(const char *id);
 extern void ProcessCreateBarrierEnd(const char *id);
 extern void ProcessCreateBarrierExecute(const char *id);

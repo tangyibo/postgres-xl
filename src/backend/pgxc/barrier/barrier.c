@@ -25,13 +25,95 @@
 #include "pgxc/pgxc.h"
 #include "nodes/nodes.h"
 #include "pgxc/pgxcnode.h"
-#include "storage/lwlock.h"
+#include "storage/lock.h"
 #include "tcop/dest.h"
 
 static const char *generate_barrier_id(const char *id);
 static PGXCNodeAllHandles *PrepareBarrier(const char *id);
 static void ExecuteBarrier(const char *id);
 static void EndBarrier(PGXCNodeAllHandles *handles, const char *id);
+
+/*
+ * Use some random values to uniquely identify the barrier lock.
+ *
+ * XXX The chances of this conflicting with anything real is so small that it
+ * doesn't seem worth doing anything special to either detect or avoid
+ * conflicts.
+ */
+#define BarrierLockTagMagic1	1696412986
+#define BarrierLockTagMagic2	155831266
+#define BarrierLockTagMagic3	227185880
+#define BarrierLockTagMagic4	21676
+
+/*
+ * This is same as an advisory lock, but we use DEFAULT_LOCKMETHOD to ensure
+ * that the lock is released in case of ereport.
+ */
+#define SET_BARRIER_LOCKTAG(locktag) \
+	((locktag).locktag_field1 = BarrierLockTagMagic1, \
+	 (locktag).locktag_field2 = BarrierLockTagMagic2, \
+	 (locktag).locktag_field3 = BarrierLockTagMagic3, \
+	 (locktag).locktag_field4 = BarrierLockTagMagic4, \
+	 (locktag).locktag_type = LOCKTAG_ADVISORY, \
+	 (locktag).locktag_lockmethodid = DEFAULT_LOCKMETHOD)
+
+/*
+ * Acquire the BarrierLock while generating a BARRIER. This locks out all other
+ * readers-writers. The lock is only obtained in a transaction boundary
+ * since we don't the callers to cross that boundary.
+ */
+void
+BarrierLockAcquireForBarrier(void)
+{
+	LOCKTAG			barrierlock;
+
+	SET_BARRIER_LOCKTAG(barrierlock);
+	LockAcquire(&barrierlock, AccessExclusiveLock, false, false);
+}
+
+/*
+ * Acquire the BarrierLock while starting a 2PC. The lock is obtained in a
+ * Share mode to ensure that multiple backends can run 2PC in parallel, but
+ * conflict with any ongoing CREATE BARRIER request.
+ *
+ * It's enough to obtain the lock in a transaction boundary because even though
+ * the local transaction may be prepared while running 2PC, the lock is not
+ * released until the prepared transaction is actually finished. That happens
+ * only after the 2PC is finished on all the remote nodes. So that seems enough
+ * to block in-flight 2PC while generating a BARRIER.
+ */
+void
+BarrierLockAcquireForXact(void)
+{
+	LOCKTAG			barrierlock;
+
+	SET_BARRIER_LOCKTAG(barrierlock);
+	LockAcquire(&barrierlock, ShareLock, false, false);
+}
+/*
+ * Acquire the BarrierLock in read mode.
+ */
+void
+BarrierLockReleaseForBarrier(void)
+{
+	LOCKTAG			barrierlock;
+
+	SET_BARRIER_LOCKTAG(barrierlock);
+	LockRelease(&barrierlock, AccessExclusiveLock, false);
+}
+
+/*
+ * Currently unused since the lock gets auto released once the transaction
+ * ends.
+ */
+void
+BarrierLockReleaseForXact(void)
+{
+	LOCKTAG			barrierlock;
+
+	SET_BARRIER_LOCKTAG(barrierlock);
+	LockRelease(&barrierlock, ShareLock, false);
+}
 
 /*
  * Prepare ourselves for an incoming BARRIER. We must disable all new 2PC
@@ -45,15 +127,11 @@ static void EndBarrier(PGXCNodeAllHandles *handles, const char *id);
  * new 2PC and there can not be any 2PC in-progress. This technique would
  * rely on assumption that an exclusive lock requester is not starved by
  * share lock requesters.
- *
- * Note: To ensure that the 2PC are not blocked for a long time, we should
- * set a timeout. The lock should be release after the timeout and the
- * barrier should be canceled.
  */
 void
 ProcessCreateBarrierPrepare(const char *id)
 {
-	StringInfoData buf;
+	StringInfoData	buf;
 
 	if (!IS_PGXC_REMOTE_COORDINATOR)
 		ereport(ERROR,
@@ -61,17 +139,13 @@ ProcessCreateBarrierPrepare(const char *id)
 				 errmsg("The CREATE BARRIER PREPARE message is expected to "
 						"arrive at a Coordinator from another Coordinator")));
 
-	LWLockAcquire(BarrierLock, LW_EXCLUSIVE);
+	/* Acquire the BarrierLock */
+	BarrierLockAcquireForBarrier();
 
 	pq_beginmessage(&buf, 'b');
 	pq_sendstring(&buf, id);
 	pq_endmessage(&buf);
 	pq_flush();
-
-	/*
-	 * TODO Start a timer to terminate the pending barrier after a specified
-	 * timeout
-	 */
 }
 
 /*
@@ -81,7 +155,7 @@ ProcessCreateBarrierPrepare(const char *id)
 void
 ProcessCreateBarrierEnd(const char *id)
 {
-	StringInfoData buf;
+	StringInfoData	buf;
 
 	if (!IS_PGXC_REMOTE_COORDINATOR)
 		ereport(ERROR,
@@ -89,16 +163,13 @@ ProcessCreateBarrierEnd(const char *id)
 				 errmsg("The CREATE BARRIER END message is expected to "
 						"arrive at a Coordinator from another Coordinator")));
 
-	LWLockRelease(BarrierLock);
+	/* Release the lock. */
+	BarrierLockReleaseForBarrier();
 
 	pq_beginmessage(&buf, 'b');
 	pq_sendstring(&buf, id);
 	pq_endmessage(&buf);
 	pq_flush();
-
-	/*
-	 * TODO Stop the timer
-	 */
 }
 
 /*
@@ -220,6 +291,9 @@ CheckBarrierCommandStatus(PGXCNodeAllHandles *conn_handles, const char *id,
 	for (conn = 0; conn < count; conn++)
 	{
 		PGXCNodeHandle *handle;
+		ResponseCombiner combiner;
+
+		InitResponseCombiner(&combiner, 1, COMBINE_TYPE_NONE);
 
 		if (conn < conn_handles->co_conn_count)
 			handle = conn_handles->coord_handles[conn];
@@ -231,7 +305,7 @@ CheckBarrierCommandStatus(PGXCNodeAllHandles *conn_handles, const char *id,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("Failed to receive response from the remote side")));
 
-		if (handle_response(handle, NULL) != RESPONSE_BARRIER_OK)
+		if (handle_response(handle, &combiner) != RESPONSE_BARRIER_OK)
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("CREATE BARRIER PREPARE command failed "
@@ -311,26 +385,22 @@ PrepareBarrier(const char *id)
 	elog(DEBUG2, "Preparing Coordinators for BARRIER");
 
 	/*
-	 * Send a CREATE BARRIER PREPARE message to all the Coordinators. We should
-	 * send an asynchronous request so that we can disable local commits and
-	 * then wait for the remote Coordinators to finish the work
+	 * Send a CREATE BARRIER PREPARE message to all the Coordinators. We send
+	 * an asynchronous request so that we can disable local commits and then
+	 * wait for the remote Coordinators to finish the work
 	 */
 	coord_handles = SendBarrierPrepareRequest(GetAllCoordNodes(), id);
 
 	/*
-	 * Disable local commits
+	 * Now disable 2PC originating at this coordinator.
 	 */
-	LWLockAcquire(BarrierLock, LW_EXCLUSIVE);
+	BarrierLockAcquireForBarrier();
 
 	elog(DEBUG2, "Disabled 2PC commits originating at the driving Coordinator");
 
 	/*
-	 * TODO Start a timer to cancel the barrier request in case of a timeout
-	 */
-
-	/*
 	 * Local in-flight commits are now over. Check status of the remote
-	 * Coordinators
+	 * Coordinators.
 	 */
 	CheckBarrierCommandStatus(coord_handles, id, "PREPARE");
 
@@ -427,8 +497,9 @@ static void
 EndBarrier(PGXCNodeAllHandles *prepared_handles, const char *id)
 {
 	/* Resume 2PC locally */
-	LWLockRelease(BarrierLock);
+	BarrierLockReleaseForBarrier();
 
+	/* and also on the remote coordinators. */
 	SendBarrierEndRequest(prepared_handles, id);
 
 	CheckBarrierCommandStatus(prepared_handles, id, "END");

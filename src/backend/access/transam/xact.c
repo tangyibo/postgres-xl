@@ -57,6 +57,7 @@
 #include "libpq/pqsignal.h"
 #include "miscadmin.h"
 #include "pgstat.h"
+#include "pgxc/barrier.h"
 #include "replication/logical.h"
 #include "replication/logicallauncher.h"
 #include "replication/origin.h"
@@ -2375,6 +2376,18 @@ CommitTransaction(void)
 	s->topGlobalTransansactionId = s->transactionId;
 	if (IS_PGXC_LOCAL_COORDINATOR)
 	{
+		/*
+		 * First ensure that there is no CREATE BARRIER request in-progress and
+		 * also block any further request until we finish the 2PC.
+		 *
+		 * The lock gets automatically released when the transaction ends.
+		 * Since we ensure that the local transaction is finished only after
+		 * the 2PC is run completely on the remote nodes, this seems
+		 * sufficient. The lock also gets released if an error occurs this
+		 * point onwards.
+		 */
+		BarrierLockAcquireForXact();
+
 		XactLocalNodePrepared = false;
 		if (savePrepareGID)
 		{
@@ -2477,12 +2490,13 @@ CommitTransaction(void)
 		 * ereport and we will run error recovery as part of AbortTransaction
 		 */
 		PreCommit_Remote(savePrepareGID, saveNodeString, XactLocalNodePrepared);
+
 		/*
 		 * Now that all the remote nodes have successfully prepared and
 		 * commited, commit the local transaction as well. Remember, any errors
 		 * before this point would have been reported via ereport. The fact
 		 * that we are here shows that the transaction has been committed
-		 * successfully on the remote nodes
+		 * successfully on the remote nodes.
 		 */
 		if (XactLocalNodePrepared)
 		{

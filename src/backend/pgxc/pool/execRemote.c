@@ -2516,8 +2516,6 @@ prepare_err:
 
 /*
  * Commit transactions on remote nodes.
- * If barrier lock is set wait while it is released.
- * Release remote connection after completion.
  */
 static void
 pgxc_node_remote_commit(void)
@@ -2531,16 +2529,6 @@ pgxc_node_remote_commit(void)
 	PGXCNodeAllHandles *handles = get_current_handles();
 
 	SetSendCommandId(false);
-
-	/*
-	 * Barrier:
-	 *
-	 * We should acquire the BarrierLock in SHARE mode here to ensure that
-	 * there are no in-progress barrier at this point. This mechanism would
-	 * work as long as LWLock mechanism does not starve a EXCLUSIVE lock
-	 * requester
-	 */
-	LWLockAcquire(BarrierLock, LW_SHARED);
 
 	for (i = 0; i < handles->dn_conn_count; i++)
 	{
@@ -2613,11 +2601,6 @@ pgxc_node_remote_commit(void)
 			}
 		}
 	}
-
-	/*
-	 * Release the BarrierLock.
-	 */
-	LWLockRelease(BarrierLock);
 
 	if (conn_count)
 	{

@@ -1641,7 +1641,7 @@ pgxc_merge_exec_nodes(ExecNodes *en1, ExecNodes *en2)
 		else
 		{
 			merged_en->nodeList = list_copy(en2->nodeList);
-			merged_en->baselocatortype = LOCATOR_TYPE_DISTRIBUTED;
+			merged_en->baselocatortype = en2->baselocatortype;
 		}
 		return merged_en;
 	}
@@ -1667,7 +1667,7 @@ pgxc_merge_exec_nodes(ExecNodes *en1, ExecNodes *en2)
 		else
 		{
 			merged_en->nodeList = list_copy(en1->nodeList);
-			merged_en->baselocatortype = LOCATOR_TYPE_DISTRIBUTED;
+			merged_en->baselocatortype = en1->baselocatortype;
 		}
 		return merged_en;
 	}

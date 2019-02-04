@@ -1274,11 +1274,12 @@ main(int argc, char **argv)
 		/* Rebuild option string to include Proxy ID */
 		if (strcmp(gtm_app, "gtm_proxy") == 0)
 		{
-			gtmdata_opt = (char *) pg_realloc(gtmdata_opt, strlen(gtmdata_opt) + 9);
+			char *new_gtmdata_opt  = (char *) pg_malloc(strlen(gtmdata_opt) + 9);
 			if (nodename)
-				sprintf(gtmdata_opt, "%s -i %s ", gtmdata_opt, nodename);
+				sprintf(new_gtmdata_opt, "%s -i %s ", gtmdata_opt, nodename);
 			else
-				sprintf(gtmdata_opt, "%s ", gtmdata_opt);
+				sprintf(new_gtmdata_opt, "%s ", gtmdata_opt);
+			gtmdata_opt = new_gtmdata_opt;
 		}
 	}
 

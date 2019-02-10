@@ -263,6 +263,7 @@ GTMPQgetResult(GTM_Conn *conn)
 	while ((res = pqParseInput(conn)) == NULL)
 	{
 		int			flushResult;
+		time_t		finish_time;
 
 		/*
 		 * If data remains unsent, send it.  Else we might be waiting for the
@@ -270,16 +271,35 @@ GTMPQgetResult(GTM_Conn *conn)
 		 */
 		while ((flushResult = gtmpqFlush(conn)) > 0)
 		{
-			if (gtmpqWait(false, true, conn))
+			if (conn->comm_timeout)
+				finish_time = time(NULL) + conn->comm_timeout;
+			else
+				finish_time = -1;
+
+			if (gtmpqWaitTimed(false, true, conn, finish_time))
 			{
-				flushResult = -1;
-				break;
+				/*
+				 * conn->errorMessage has been set by gtmpqWait or
+				 * gtmpqReadData.
+				 */
+				return NULL;
 			}
 		}
 
+		/*
+		 * By now we should have sent all pending data. If gtmpqFlush returned
+		 * failure (< 0), then this is an error condition.
+		 */
+		if (flushResult)
+			return NULL;
+
+		if (conn->comm_timeout)
+			finish_time = time(NULL) + conn->comm_timeout;
+		else
+			finish_time = -1;
+
 		/* Wait for some more data, and load it. */
-		if (flushResult ||
-			gtmpqWait(true, false, conn) ||
+		if (gtmpqWaitTimed(true, false, conn, finish_time) ||
 			gtmpqReadData(conn) < 0)
 		{
 			/*

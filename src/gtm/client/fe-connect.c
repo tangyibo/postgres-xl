@@ -59,6 +59,7 @@ static const GTMPQconninfoOption GTMPQconninfoOptions[] = {
 	{"remote_type", NULL},
 	{"postmaster", NULL},
 	{"client_id", NULL},
+	{"comm_timeout", NULL},
 	/* Terminating entry --- MUST BE LAST */
 	{NULL, NULL}
 };
@@ -176,6 +177,8 @@ connectOptions1(GTM_Conn *conn, const char *conninfo)
 	conn->pgport = tmp ? strdup(tmp) : NULL;
 	tmp = conninfo_getval(connOptions, "connect_timeout");
 	conn->connect_timeout = tmp ? strdup(tmp) : NULL;
+	tmp = conninfo_getval(connOptions, "comm_timeout");
+	conn->comm_timeout = tmp ? atoi(tmp) : 0;
 	tmp = conninfo_getval(connOptions, "node_name");
 	conn->gc_node_name = tmp ? strdup(tmp) : NULL;
 	tmp = conninfo_getval(connOptions, "postmaster");

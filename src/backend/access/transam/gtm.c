@@ -36,6 +36,7 @@
 char *GtmHost = "localhost";
 int GtmPort = 6666;
 static int GtmConnectTimeout = 60;
+static int GtmCommTimeout = 60;
 bool IsXidFromGTM = false;
 bool gtm_backup_barrier = false;
 extern bool FirstSnapshotSet;
@@ -82,9 +83,9 @@ InitGTM(void)
 			remote_type = GTM_NODE_DATANODE;
 
 		/* Use 60s as connection timeout */
-		sprintf(conn_str, "host=%s port=%d node_name=%s remote_type=%d postmaster=1 connect_timeout=%d",
+		sprintf(conn_str, "host=%s port=%d node_name=%s remote_type=%d postmaster=1 connect_timeout=%d comm_timeout=%d",
 								GtmHost, GtmPort, PGXCNodeName, remote_type,
-								GtmConnectTimeout);
+								GtmConnectTimeout, GtmCommTimeout);
 
 		/* Log activity of GTM connections */
 		elog(DEBUG1, "Postmaster: connection established to GTM with string %s", conn_str);
@@ -92,8 +93,9 @@ InitGTM(void)
 	else
 	{
 		/* Use 60s as connection timeout */
-		sprintf(conn_str, "host=%s port=%d node_name=%s connect_timeout=%d",
-				GtmHost, GtmPort, PGXCNodeName, GtmConnectTimeout);
+		sprintf(conn_str, "host=%s port=%d node_name=%s connect_timeout=%d comm_timeout=%d",
+				GtmHost, GtmPort, PGXCNodeName, GtmConnectTimeout,
+				GtmCommTimeout);
 
 		/* Log activity of GTM connections */
 		if (IsAutoVacuumWorkerProcess())

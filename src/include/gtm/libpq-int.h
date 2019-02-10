@@ -43,6 +43,7 @@ struct gtm_conn
 									 * over above. */
 	char		*pgport;			/* the server's communication port */
 	char		*connect_timeout;	/* connection timeout (numeric string) */
+	int			 comm_timeout;		/* communication timeout, 0 means infinite */
 	char		*gc_node_name;		/* PGXC Node Name */
 	int			remote_type;		/* is this a connection to/from a proxy ? */
 	int			is_postmaster;		/* is this connection to/from a postmaster instance */

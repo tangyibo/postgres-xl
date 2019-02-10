@@ -60,7 +60,7 @@ extern char *optarg;
 #ifdef  GTM_DEBUG
 #define PROXY_CLIENT_TIMEOUT	3600
 #else
-#define PROXY_CLIENT_TIMEOUT	20
+#define PROXY_CLIENT_TIMEOUT	60
 #endif
 #endif
 
@@ -1109,8 +1109,9 @@ GTMProxy_ThreadMain(void *argp)
 	/*
 	 * Set up connection with the GTM server
 	 */
-	sprintf(gtm_connect_string, "host=%s port=%d node_name=%s remote_type=%d",
-			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName, GTM_NODE_GTM_PROXY);
+	sprintf(gtm_connect_string, "host=%s port=%d node_name=%s remote_type=%d comm_timeout=%d",
+			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
+			GTM_NODE_GTM_PROXY, PROXY_CLIENT_TIMEOUT);
 
 	thrinfo->thr_gtm_conn = PQconnectGTM(gtm_connect_string);
 
@@ -1697,8 +1698,10 @@ HandleGTMError(GTM_Conn *gtm_conn)
 		/* Close and free previous connection object if still active */
 		GTMPQfinish(gtm_conn);
 		/* Reconnect */
-		sprintf(gtm_connect_string, "host=%s port=%d node_name=%s remote_type=%d",
-				GTMServerHost, GTMServerPortNumber, GTMProxyNodeName, GTM_NODE_GTM_PROXY);
+		sprintf(gtm_connect_string, "host=%s port=%d node_name=%s "
+				"remote_type=%d comm_timeout=%d",
+				GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
+				GTM_NODE_GTM_PROXY, PROXY_CLIENT_TIMEOUT);
 		gtm_conn = PQconnectGTM(gtm_connect_string);
 		/*
 		 * If reconnect succeeded the connection will be ready to use out of
@@ -2992,7 +2995,11 @@ UnregisterProxy(void)
 	if (gtmpqFlush(master_conn))
 		goto failed;
 
-	finish_time = time(NULL) + PROXY_CLIENT_TIMEOUT;
+	if (master_conn->comm_timeout)
+		finish_time = time(NULL) + master_conn->comm_timeout;
+	else
+		finish_time = -1;
+
 	if (gtmpqWaitTimed(true, false, master_conn, finish_time) ||
 		gtmpqReadData(master_conn) < 0)
 		goto failed;
@@ -3092,7 +3099,11 @@ RegisterProxy(bool is_reconnect)
 	if (gtmpqFlush(master_conn))
 		goto failed;
 
-	finish_time = time(NULL) + PROXY_CLIENT_TIMEOUT;
+	if (master_conn->comm_timeout)
+		finish_time = time(NULL) + master_conn->comm_timeout;
+	else
+		finish_time = -1;
+
 	if (gtmpqWaitTimed(true, false, master_conn, finish_time) ||
 		gtmpqReadData(master_conn) < 0)
 	{
@@ -3127,8 +3138,9 @@ ConnectGTM(void)
 	char conn_str[256];
 	GTM_Conn *conn;
 
-	sprintf(conn_str, "host=%s port=%d node_name=%s remote_type=%d postmaster=1",
-			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName, GTM_NODE_GTM_PROXY_POSTMASTER);
+	sprintf(conn_str, "host=%s port=%d node_name=%s remote_type=%d postmaster=1 comm_timeout=%d",
+			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
+			GTM_NODE_GTM_PROXY_POSTMASTER, PROXY_CLIENT_TIMEOUT);
 
 	conn = PQconnectGTM(conn_str);
 	if (GTMPQstatus(conn) != CONNECTION_OK)
@@ -3189,9 +3201,10 @@ workerThreadReconnectToGTM(void)
 		GTMPQfinish(GetMyThreadInfo->thr_gtm_conn);
 	}
 
-	sprintf(gtm_connect_string, "host=%s port=%d node_name=%s remote_type=%d client_id=%u",
+	sprintf(gtm_connect_string, "host=%s port=%d node_name=%s remote_type=%d "
+			"client_id=%u comm_timeout=%d",
 			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
-			GTM_NODE_GTM_PROXY, saveMyClientId);
+			GTM_NODE_GTM_PROXY, saveMyClientId, PROXY_CLIENT_TIMEOUT);
 	elog(DEBUG1, "Worker thread connecting to %s", gtm_connect_string);
 	GetMyThreadInfo->thr_gtm_conn = PQconnectGTM(gtm_connect_string);
 

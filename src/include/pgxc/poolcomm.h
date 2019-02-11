@@ -49,4 +49,5 @@ extern int	pool_recvres(PoolPort *port);
 extern int	pool_sendpids(PoolPort *port, int *pids, int count);
 extern int	pool_recvpids(PoolPort *port, int **pids);
 
+extern void RemovePoolerSocketFiles(void);
 #endif   /* POOLCOMM_H */

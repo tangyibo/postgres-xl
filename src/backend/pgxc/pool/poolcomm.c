@@ -32,6 +32,7 @@
 #include "storage/ipc.h"
 #include "utils/elog.h"
 #include "miscadmin.h"
+#include "nodes/pg_list.h"
 
 static int	pool_recvbuf(PoolPort *port);
 static int	pool_discardbytes(PoolPort *port, size_t len);
@@ -44,11 +45,11 @@ static int	pool_discardbytes(PoolPort *port, size_t len);
 			DEFAULT_PGSOCKET_DIR, \
 			(port))
 
-static char sock_path[MAXPGPATH];
+static List	*sock_paths = NIL;
 
 static void StreamDoUnlink(int code, Datum arg);
 
-static int	Lock_AF_UNIX(unsigned short port, const char *unixSocketName);
+static int	Lock_AF_UNIX(const char *unixSocketPath);
 #endif
 
 /*
@@ -61,10 +62,12 @@ pool_listen(unsigned short port, const char *unixSocketName)
 				len;
 	struct sockaddr_un unix_addr;
 	int			maxconn;
-
+	char		sock_path[MAXPGPATH];
 
 #ifdef HAVE_UNIX_SOCKETS
-	if (Lock_AF_UNIX(port, unixSocketName) < 0)
+	POOLER_UNIXSOCK_PATH(sock_path, port, unixSocketName);
+
+	if (Lock_AF_UNIX(sock_path) < 0)
 		return -1;
 
 	/* create a Unix domain stream socket */
@@ -77,8 +80,6 @@ pool_listen(unsigned short port, const char *unixSocketName)
 	strcpy(unix_addr.sun_path, sock_path);
 	len = sizeof(unix_addr.sun_family) +
 		strlen(unix_addr.sun_path) + 1;
-
-
 
 	/* bind the name to the descriptor */
 	if (bind(fd, (struct sockaddr *) & unix_addr, len) < 0)
@@ -96,8 +97,6 @@ pool_listen(unsigned short port, const char *unixSocketName)
 	/* tell kernel we're a server */
 	if (listen(fd, maxconn) < 0)
 		return -1;
-
-
 
 	/* Arrange to unlink the socket file at exit */
 	on_proc_exit(StreamDoUnlink, 0);
@@ -120,22 +119,53 @@ pool_listen(unsigned short port, const char *unixSocketName)
 static void
 StreamDoUnlink(int code, Datum arg)
 {
-	Assert(sock_path[0]);
-	unlink(sock_path);
+	ListCell *lc;
+
+	foreach (lc, sock_paths)
+	{
+		char	*path = (char *) lfirst(lc);
+		Assert(path);
+		unlink(path);
+	}
 }
 #endif   /* HAVE_UNIX_SOCKETS */
 
 #ifdef HAVE_UNIX_SOCKETS
 static int
-Lock_AF_UNIX(unsigned short port, const char *unixSocketName)
+Lock_AF_UNIX(const char *unixSocketPath)
 {
-	POOLER_UNIXSOCK_PATH(sock_path, port, unixSocketName);
+	CreateSocketLockFile(unixSocketPath, true, "");
 
-	CreateSocketLockFile(sock_path, true, "");
+	/*
+	 * Once we have the interlock, we can safely delete any pre-existing
+	 * socket file to avoid failure at bind() time.
+	 */
+	unlink(unixSocketPath);
 
-	unlink(sock_path);
+	/* Remember socket path for later maintenance. */
+	sock_paths = lappend(sock_paths, pstrdup(unixSocketPath));
 
 	return 0;
+}
+
+/*
+ * RemoveSocketFiles -- unlink socket files at pooler shutdown
+ */
+void
+RemovePoolerSocketFiles(void)
+{
+	ListCell   *l;
+
+	/* Loop through all created sockets... */
+	foreach(l, sock_paths)
+	{
+		char	   *sock_path = (char *) lfirst(l);
+
+		/* Ignore any error. */
+		(void) unlink(sock_path);
+	}
+	/* Since we're about to exit, no need to reclaim storage */
+	sock_paths = NIL;
 }
 #endif
 
@@ -148,6 +178,7 @@ pool_connect(unsigned short port, const char *unixSocketName)
 	int			fd,
 				len;
 	struct sockaddr_un unix_addr;
+	char		sock_path[MAXPGPATH];
 
 #ifdef HAVE_UNIX_SOCKETS
 	/* create a Unix domain stream socket */

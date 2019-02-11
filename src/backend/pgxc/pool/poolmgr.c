@@ -349,6 +349,8 @@ static int	is_pool_locked = false;
 static int	PoolListenSockets[POOLER_MAXLISTEN];
 static int	PoolListenSocketsCount = 0;
 
+#define POOLER_INVALIDSOCK	-1
+
 static int	node_info_check(PoolAgent *agent);
 static void agent_init(PoolAgent *agent, const char *database, const char *user_name,
 	                   const char *pgoptions);
@@ -1012,6 +1014,22 @@ agent_destroy(PoolAgent *agent)
 			break;
 		}
 	}
+}
+
+/*
+ * on_proc_exit callback to close pooler's listen sockets
+ */
+static void
+ClosePoolerPorts(int status, Datum arg)
+{
+	int i;
+
+	for (i = 0; i < PoolListenSocketsCount; i++)
+	{
+		if (PoolListenSockets[i] != POOLER_INVALIDSOCK)
+			close(PoolListenSockets[i]);
+	}
+	RemovePoolerSocketFiles();
 }
 
 /*
@@ -3191,6 +3209,11 @@ PoolerLoop(void)
 							"unix_socket_directories")));
 		}
 
+		for (i = 0; i < POOLER_MAXLISTEN; i++)
+			PoolListenSockets[i] = POOLER_INVALIDSOCK;
+
+		on_proc_exit(ClosePoolerPorts, 0);
+
 		foreach(l, elemlist)
 		{
 			char	   *socketdir = (char *) lfirst(l);
@@ -3314,12 +3337,7 @@ PoolerLoop(void)
 										  databasePools->user_name) == 0)
 					break;
 			
-			for (i = 0; i < PoolListenSocketsCount; i++)
-			{
-				if (PoolListenSockets[i] != 0)
-					close(PoolListenSockets[i]);
-			}
-			exit(0);
+			proc_exit(0);
 		}
 
 		/* wait for event */

@@ -345,13 +345,15 @@ static int	is_pool_locked = false;
  * File descriptor representing the pool manager UNIX socket. Sessions
  * are communicating with the pool manager though this file descriptor.
  */
-static int	server_fd = -1;
+#define POOLER_MAXLISTEN	16
+static int	PoolListenSockets[POOLER_MAXLISTEN];
+static int	PoolListenSocketsCount = 0;
 
 static int	node_info_check(PoolAgent *agent);
 static void agent_init(PoolAgent *agent, const char *database, const char *user_name,
 	                   const char *pgoptions);
 static void agent_destroy(PoolAgent *agent);
-static void agent_create(void);
+static void agent_create(int fd);
 static void agent_handle_input(PoolAgent *agent, StringInfo s);
 static DatabasePool *create_database_pool(const char *database, const char *user_name, const char *pgoptions);
 static void insert_database_pool(DatabasePool *pool);
@@ -697,7 +699,7 @@ GetPoolManagerHandle(void)
  * data through PoolHandle, and pool manager responds through PoolAgent.
  */
 static void
-agent_create(void)
+agent_create(int server_fd)
 {
 	MemoryContext oldcontext;
 	int			new_fd;
@@ -3167,6 +3169,7 @@ PoolerLoop(void)
 	time_t			last_maintenance = (time_t) 0;
 	int				maintenance_timeout;
 	struct pollfd	*pool_fd;
+	int				i;
 
 #ifdef HAVE_UNIX_SOCKETS
 	if (Unix_socket_directories)
@@ -3174,7 +3177,6 @@ PoolerLoop(void)
 		char	   *rawstring;
 		List	   *elemlist;
 		ListCell   *l;
-		int			success = 0;
 
 		/* Need a modifiable copy of Unix_socket_directories */
 		rawstring = pstrdup(Unix_socket_directories);
@@ -3193,6 +3195,16 @@ PoolerLoop(void)
 		{
 			char	   *socketdir = (char *) lfirst(l);
 			int			saved_errno;
+			int			server_fd;
+
+			if (PoolListenSocketsCount >=  POOLER_MAXLISTEN)
+			{
+				ereport(WARNING,
+						(errmsg("already created maximum (%d) pooler listen "
+								"sockets -- skipping unix socket dir \"%s\"",
+								POOLER_MAXLISTEN, socketdir)));
+				continue;
+			}
 
 			/* Connect to the pooler */
 			server_fd = pool_listen(PoolerPort, socketdir);
@@ -3205,11 +3217,11 @@ PoolerLoop(void)
 			}
 			else
 			{
-				success++;
+				PoolListenSockets[PoolListenSocketsCount++] = server_fd;
 			}
 		}
 
-		if (!success && elemlist != NIL)
+		if (!PoolListenSocketsCount && elemlist != NIL)
 			ereport(ERROR,
 					(errmsg("failed to start listening on Unix-domain socket for pooler: %m")));
 
@@ -3218,24 +3230,20 @@ PoolerLoop(void)
 	}
 #endif
 
-	pool_fd = (struct pollfd *) palloc((MaxConnections + 1) * sizeof(struct pollfd));
-
-	if (server_fd == -1)
-	{
-		/* log error */
-		return;
-	}
+	pool_fd = (struct pollfd *) palloc((MaxConnections + PoolListenSocketsCount) * sizeof(struct pollfd));
 
 	initStringInfo(&input_message);
 
-	pool_fd[0].fd = server_fd;
-	pool_fd[0].events = POLLIN; 
+	for (i = 0; i < PoolListenSocketsCount; i++)
+	{
+		pool_fd[i].fd = PoolListenSockets[i];
+		pool_fd[i].events = POLLIN; 
+	}
 
 	for (;;)
 	{
 
 		int			retval;
-		int			i;
 
 		/*
 		 * Emergency bailout if postmaster has died.  This is to avoid the
@@ -3245,12 +3253,12 @@ PoolerLoop(void)
 			exit(1);
 
 		/* watch for incoming messages */
-		for (i = 1; i <= agentCount; i++)
+		for (i = 0; i < agentCount; i++)
 		{
-			PoolAgent *agent = poolAgents[i - 1];
+			PoolAgent *agent = poolAgents[i];
 			int sockfd = Socket(agent->port);
-			pool_fd[i].fd = sockfd;
-			pool_fd[i].events = POLLIN;
+			pool_fd[PoolListenSocketsCount + i].fd = sockfd;
+			pool_fd[PoolListenSocketsCount + i].events = POLLIN;
 		}
 
 		if (PoolMaintenanceTimeout > 0)
@@ -3306,12 +3314,16 @@ PoolerLoop(void)
 										  databasePools->user_name) == 0)
 					break;
 			
-			close(server_fd);
+			for (i = 0; i < PoolListenSocketsCount; i++)
+			{
+				if (PoolListenSockets[i] != 0)
+					close(PoolListenSockets[i]);
+			}
 			exit(0);
 		}
 
 		/* wait for event */
-		retval = poll(pool_fd, agentCount + 1, maintenance_timeout);
+		retval = poll(pool_fd, PoolListenSocketsCount + agentCount, maintenance_timeout);
 		if (retval < 0)
 		{
 			if (errno == EINTR || errno == EAGAIN)
@@ -3331,14 +3343,17 @@ PoolerLoop(void)
 				PoolAgent *agent = poolAgents[i];
 				int sockfd = Socket(agent->port);
 
-				if ((sockfd == pool_fd[i + 1].fd) && 
-						(pool_fd[i + 1].revents & POLLIN))
+				if ((sockfd == pool_fd[PoolListenSocketsCount + i].fd) && 
+						(pool_fd[PoolListenSocketsCount + i].revents & POLLIN))
 					agent_handle_input(agent, &input_message);
 			}
 
 			/* New session without an existing agent. */
-			if (pool_fd[0].revents & POLLIN)
-				agent_create();
+			for (i = 0; i < PoolListenSocketsCount; i++)
+			{
+				if (pool_fd[i].revents & POLLIN)
+					agent_create(PoolListenSockets[i]);
+			}
 		}
 		else if (retval == 0)
 		{

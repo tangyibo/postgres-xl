@@ -348,6 +348,7 @@ const char *const config_type_names[] =\
 #define GTM_OPTNAME_STATUS_READER		"status_reader"
 #define GTM_OPTNAME_SYNCHRONOUS_BACKUP	"synchronous_backup"
 #define GTM_OPTNAME_WORKER_THREADS		"worker_threads"
+#define GTM_OPTNAME_COMM_TIMEOUT		"comm_timeout"
 
 
 #endif   /* GTM_OPT_H */

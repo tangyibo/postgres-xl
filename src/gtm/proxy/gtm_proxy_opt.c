@@ -55,6 +55,7 @@ extern int GTMProxyWorkerThreads;
 extern char *GTMProxyDataDir;
 extern char *GTMProxyConfigFileName;
 extern char *GTMConfigFileName;
+extern int	GTMProxyCommTimeout;
 
 
 /*
@@ -218,6 +219,17 @@ struct config_int ConfigureNamesInt[] =
 		},
 		&GTMProxyWorkerThreads,
 		GTM_PROXY_DEFAULT_WORKERS, 1, INT_MAX,
+		0, NULL
+	},
+	{
+		{
+			GTM_OPTNAME_COMM_TIMEOUT, GTMC_STARTUP,
+			gettext_noop("Timeout in second to wait for a response from the GTM. 0 means wait forever"),
+			NULL,
+			0
+		},
+		&GTMProxyCommTimeout,
+		0, 0, INT_MAX,
 		0, NULL
 	},
 	/* End-of-list marker */

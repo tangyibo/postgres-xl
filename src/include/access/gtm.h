@@ -16,6 +16,8 @@
 extern char *GtmHost;
 extern int GtmPort;
 extern bool gtm_backup_barrier;
+extern int	GtmCommTimeout;
+extern int	GtmConnectTimeout;
 
 extern bool IsXidFromGTM;
 extern GlobalTransactionId currentGxid;

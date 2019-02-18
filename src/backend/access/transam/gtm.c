@@ -35,8 +35,8 @@
 /* Configuration variables */
 char *GtmHost = "localhost";
 int GtmPort = 6666;
-static int GtmConnectTimeout = 60;
-static int GtmCommTimeout = 60;
+int GtmConnectTimeout = 60;
+int GtmCommTimeout = 60;
 bool IsXidFromGTM = false;
 bool gtm_backup_barrier = false;
 extern bool FirstSnapshotSet;

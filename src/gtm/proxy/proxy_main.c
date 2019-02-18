@@ -69,6 +69,7 @@ static char *progname = "gtm_proxy";
 char	   *ListenAddresses;
 int			GTMProxyPortNumber;
 int			GTMProxyWorkerThreads;
+int			GTMProxyCommTimeout = PROXY_CLIENT_TIMEOUT;
 char		*GTMProxyDataDir;
 char		*GTMProxyConfigFileName;
 char		*GTMConfigFileName;
@@ -1111,7 +1112,7 @@ GTMProxy_ThreadMain(void *argp)
 	 */
 	sprintf(gtm_connect_string, "host=%s port=%d node_name=%s remote_type=%d comm_timeout=%d",
 			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
-			GTM_NODE_GTM_PROXY, PROXY_CLIENT_TIMEOUT);
+			GTM_NODE_GTM_PROXY, GTMProxyCommTimeout);
 
 	thrinfo->thr_gtm_conn = PQconnectGTM(gtm_connect_string);
 
@@ -1701,7 +1702,7 @@ HandleGTMError(GTM_Conn *gtm_conn)
 		sprintf(gtm_connect_string, "host=%s port=%d node_name=%s "
 				"remote_type=%d comm_timeout=%d",
 				GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
-				GTM_NODE_GTM_PROXY, PROXY_CLIENT_TIMEOUT);
+				GTM_NODE_GTM_PROXY, GTMProxyCommTimeout);
 		gtm_conn = PQconnectGTM(gtm_connect_string);
 		/*
 		 * If reconnect succeeded the connection will be ready to use out of
@@ -3140,7 +3141,7 @@ ConnectGTM(void)
 
 	sprintf(conn_str, "host=%s port=%d node_name=%s remote_type=%d postmaster=1 comm_timeout=%d",
 			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
-			GTM_NODE_GTM_PROXY_POSTMASTER, PROXY_CLIENT_TIMEOUT);
+			GTM_NODE_GTM_PROXY_POSTMASTER, GTMProxyCommTimeout);
 
 	conn = PQconnectGTM(conn_str);
 	if (GTMPQstatus(conn) != CONNECTION_OK)
@@ -3204,7 +3205,7 @@ workerThreadReconnectToGTM(void)
 	sprintf(gtm_connect_string, "host=%s port=%d node_name=%s remote_type=%d "
 			"client_id=%u comm_timeout=%d",
 			GTMServerHost, GTMServerPortNumber, GTMProxyNodeName,
-			GTM_NODE_GTM_PROXY, saveMyClientId, PROXY_CLIENT_TIMEOUT);
+			GTM_NODE_GTM_PROXY, saveMyClientId, GTMProxyCommTimeout);
 	elog(DEBUG1, "Worker thread connecting to %s", gtm_connect_string);
 	GetMyThreadInfo->thr_gtm_conn = PQconnectGTM(gtm_connect_string);
 

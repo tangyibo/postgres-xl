@@ -3178,6 +3178,30 @@ static struct config_int ConfigureNamesInt[] =
 		NULL, NULL, NULL
 	},
 
+	{
+		{"gtm_connect_timeout", PGC_USERSET, UNGROUPED,
+			gettext_noop("Timeout in second to wait for GTM connection. "
+					"0 means wait forever."),
+			NULL,
+			0
+		},
+		&GtmConnectTimeout,
+		60, 0, INT_MAX,
+		NULL, NULL, NULL
+	},
+
+	{
+		{"gtm_comm_timeout", PGC_USERSET, UNGROUPED,
+			gettext_noop("Timeout in second to wait for a response from the "
+					"GTM or the GTM Proxy. 0 means wait forever."),
+			NULL,
+			0
+		},
+		&GtmCommTimeout,
+		0, 0, INT_MAX,
+		NULL, NULL, NULL
+	},
+
 #endif
 #endif /* PGXC */
 

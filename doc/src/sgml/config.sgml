@@ -8809,6 +8809,33 @@ LOG:  CleanUpLock: deleting: lock(0xb7acd844) id(24688,24696,0,0,0,1)
       </listitem>
      </varlistentry>
 
+     <varlistentry id="guc-gtm-connect-timeout" xreflabel="gtm_connect_timeout">
+      <term><varname>gtm_connect_timeout</varname> (<type>integer</type>)
+      <indexterm>
+       <primary><varname>gtm_connect_timeout</> configuration parameter</primary>
+      </indexterm>
+      </term>
+      <listitem>
+       <para>
+        Specifieis the timeout in seconds to wait for a successful connection
+        establishment with the GTM.
+       </para>
+      </listitem>
+     </varlistentry>
+
+     <varlistentry id="guc-gtm-comm-timeout" xreflabel="gtm_comm_timeout">
+      <term><varname>gtm_comm_timeout</varname> (<type>integer</type>)
+      <indexterm>
+       <primary><varname>gtm_comm_timeout</> configuration parameter</primary>
+      </indexterm>
+      </term>
+      <listitem>
+       <para>
+        Specifieis the timeout in seconds to wait for a response from the GTM.
+       </para>
+      </listitem>
+     </varlistentry>
+
      <varlistentry id="guc-xc-maintenance-mode" xreflabel="xc_maintenance_mode">
       <term><varname>xc_maintenance_mode</varname> (<type>bool</type>)
       <indexterm>

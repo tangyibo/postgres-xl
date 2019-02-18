@@ -269,6 +269,20 @@
     </listitem>
    </varlistentry>
 
+   <varlistentry id="gtm-proxy-opt-comm-timeout" xreflabel="gtm_proxy_opt_comm_timeout">
+    <term><varname>comm_timeout</varname> (<type>integer</type>)
+     <indexterm>
+      <primary><varname>comm_timeout</varname> configuration parameter</primary>
+     </indexterm>
+    </term>
+    <listitem>
+     <para>
+      Specifies the timeout in seconds to wait for a response from the GTtimeout in seconds to wait for a response from the GTM.
+      The default value is 0 which means wait forever.
+     </para>
+    </listitem>
+   </varlistentry>
+
   </variablelist>
 
  </refsect1>

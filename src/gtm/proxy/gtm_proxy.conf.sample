@@ -49,6 +49,9 @@
 								# (changes requires restart)
 #gtm_port = 					# Port number of the active GTM.
 								# (changes requires restart)
+#comm_timeout = 0				# Timeout in seconds to wait for a response
+								# from the GTM. The default is 0, which means
+								# wait forever.
 
 #------------------------------------------------------------------------------
 # Behavior at GTM communication error

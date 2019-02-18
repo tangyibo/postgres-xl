@@ -678,6 +678,11 @@
 
 #gtm_backup_barrier = off		# Specify to backup gtm restart point for each barrier.
 
+#gtm_connect_timeout = 60	# Timeout in seconds to wait for GTM connection
+							# establishment. 0 means wait forever.
+
+#gtm_comm_timeout = 0		# Timeout in seconds to wait for a response from
+							# the GTM. The default is 0, which means wait forever.
 
 #------------------------------------------------------------------------------
 # CONFIG FILE INCLUDES

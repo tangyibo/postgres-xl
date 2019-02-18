@@ -1,5 +1,137 @@
 <!-- doc/src/sgml/release-xl-10r1.sgml -->
 <!-- See header comment in release.sgml about typical markup -->
+ <sect1 id="release-xl-10r1.1">
+  <title>Postgres-XL Release 10r1.1</title>
+
+  <note>
+  <title>Release Date</title>
+  <simpara>2019-02-19</simpara>
+  </note>
+  <para>
+   This release includes all the bug fixes and security fixes from PostgreSQL
+10.6. In addition, there are a few Postgres-XL specific bug fixes in this
+release. For information about new features in the Postgres-XL 10r1 major release, see
+   <xref linkend="release-xl-10r1">.
+  </para>
+  <sect2>
+   <title>Migration to Version Postgres-XL 10r1.1</title>
+   <para>
+    A dump/restore is not required for those running Postgres-XL 10r1.
+   </para>
+  </sect2>
+  <sect2>
+   <title>Changes</title>
+   <itemizedlist>
+    <listitem>
+     <para>
+      Allow RECURSIVE queries to work on function scans.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a bug in standby's handling of known XIDs.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a problem with pg_rewind where it fails to create temporary objects
+on the datanode.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Add a new --coordinator-only option to vacuumdb.
+     </para>
+     <para>
+      This makes the facilities provided by ANALYZE (COORDINATOR) available to the
+vacuumdb command.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Overhaul CREATE BARRIER handling.
+     </para>
+     <para>
+      CREATE BARRIER mechanism now uses higher level locks for synchronization
+instead of using LWLocks across network calls. This makes CREATE BARRIER
+interruptible and also responsive to timeouts.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a bug where certain kinds of joins were not getting pushed down to
+the datanodes.
+     </para>
+     <para>
+      When a query involves a 3-way (or N-way) join between two distributed tables and
+    a replicated table, such joins should be shippable to datanodes as long as the
+    join between the distributed tables is an equi-join on the distributed column,
+    with the same distribution property AND the join between the result of the join
+    on distributed tables and the replicate table is either an INNER JOIN or a LEFT
+    JOIN where the right side is the replicated table. This fix allows such joins to
+    be pushed down to the datanodes.
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Implement additional coordinator/datanode GUCs to control communication between nodes and the
+GTM.
+     </para>
+     <itemizedlist>
+      <listitem>
+       <para>
+        <varname>gtm_connect_timeout</varname> specifies the timeout in
+seconds that a node waits for connecting to the GTM.
+       </para>
+       <para>
+         The default value of the GUC is <literal>60</literal>.
+       </para>
+      </listitem>
+      <listitem>
+       <para>
+        <varname>gtm_comm_timeout</varname> specifies the timeout in
+seconds that a node waits for the response from the GTM.
+       </para>
+       <para>
+        The default value of the GUC is <literal>0</literal> which means the
+node will wait forever for the response.  User may change value of this
+parameter if faced with unpleasant situations where the node infinitely waits
+for a response from the GTM. Otherwise this should be left to the default. 
+       </para>
+      </listitem>
+     </itemizedlist>
+    </listitem>
+    <listitem>
+     <para>
+      Add a new <varname>comm_timeout</varname> GUC to the GTM proxy.
+     </para>
+     <para>
+      This specifies a timeout in seconds that the proxy waits for response
+      from the GTM.The default value of the GUC is <literal>0</literal> which means the proxy
+      will wait forever for the response.  User may change value of this parameter in
+      GTM proxy's configuration file if faced with unpleasant situations where the
+      proxy infinitely waits for a response from the GTM. Otherwise this should be
+      left to the default. 
+     </para>
+    </listitem>
+
+    <listitem>
+     <para>
+      Fix a bug in handling of multiple unix domain socket directories on the
+GTM side.
+     </para>
+    </listitem>
+   </itemizedlist>
+  </sect2>
+ </sect1>
+
+
  <sect1 id="release-xl-10r1">
   <title>Postgres-XL Release 10r1</title>
 

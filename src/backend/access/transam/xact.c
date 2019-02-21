@@ -2749,7 +2749,7 @@ AtEOXact_GlobalTxn(bool commit)
 {
 	TransactionState s = CurrentTransactionState;
 
-	if (IS_PGXC_LOCAL_COORDINATOR)
+	if (IS_PGXC_LOCAL_COORDINATOR && !IsParallelWorker())
 	{
 		if (commit)
 		{
@@ -2783,7 +2783,7 @@ AtEOXact_GlobalTxn(bool commit)
 	 * So directly report transaction end. However this applies only if
 	 * the connection is directly from a client.
 	 */
-	else if (IsXidFromGTM)
+	else if (IsXidFromGTM && !IsParallelWorker())
 	{
 		IsXidFromGTM = false;
 		if (commit)

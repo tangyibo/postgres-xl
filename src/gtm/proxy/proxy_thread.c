@@ -16,12 +16,15 @@
 #include "gtm/gtm_proxy.h"
 #include "gtm/memutils.h"
 #include "gtm/libpq.h"
+#include "gtm/gtm_utils.h"
 
 static void *GTMProxy_ThreadMainWrapper(void *argp);
 static void GTMProxy_ThreadCleanup(void *argp);
 
 GTMProxy_Threads	GTMProxyThreadsData;
 GTMProxy_Threads *GTMProxyThreads = &GTMProxyThreadsData;
+
+extern int GTMProxyNumberDebugBuffers;
 
 #define GTM_PROXY_MIN_THREADS 32			/* Provision for minimum threads */
 #define GTM_PROXY_MAX_THREADS 1024		/* Max threads allowed in the GTMProxy */
@@ -322,6 +325,12 @@ GTMProxy_ThreadMainWrapper(void *argp)
 
 	SetMyThreadInfo(thrinfo);
 	MemoryContextSwitchTo(TopMemoryContext);
+
+	/*
+	 * Initialise debug buffers. Must be done after thread-specific info is
+	 * saved.
+	 */
+	initGTMDebugBuffers(GTMProxyNumberDebugBuffers);
 
 	pthread_cleanup_push(GTMProxy_ThreadCleanup, thrinfo);
 	thrinfo->thr_startroutine(thrinfo);

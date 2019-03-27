@@ -157,6 +157,8 @@ typedef enum GTM_ResultType
 typedef struct GTM_ProxyMsgHeader
 {
 	GTMProxy_ConnID	ph_conid;
+	uint16			ph_thrid;
+	uint32			ph_command_id;
 } GTM_ProxyMsgHeader;
 
 #endif

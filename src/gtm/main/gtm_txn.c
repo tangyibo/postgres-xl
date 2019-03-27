@@ -1710,11 +1710,7 @@ ProcessBeginTransactionCommand(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_BEGIN_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendbytes(&buf, (char *)&txn, sizeof(txn));
 	pq_sendbytes(&buf, (char *)&timestamp, sizeof (GTM_Timestamp));
 	pq_endmessage(myport, &buf);
@@ -1834,11 +1830,7 @@ retry:
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_BEGIN_GETGXID_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendbytes(&buf, (char *)&gxid, sizeof(gxid));
 	pq_sendbytes(&buf, (char *)&timestamp, sizeof (GTM_Timestamp));
 	pq_endmessage(myport, &buf);
@@ -1970,11 +1962,7 @@ ProcessBeginTransactionGetGXIDAutovacuumCommand(Port *myport, StringInfo message
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_BEGIN_GETGXID_AUTOVACUUM_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendbytes(&buf, (char *)&gxid, sizeof(gxid));
 	pq_endmessage(myport, &buf);
 
@@ -2084,11 +2072,7 @@ retry:
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_BEGIN_GETGXID_MULTI_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendbytes(&buf, (char *)&txn_count, sizeof(txn_count));
 	pq_sendbytes(&buf, (char *)txn_gxid, sizeof(GlobalTransactionId) * txn_count);
 	pq_sendbytes(&buf, (char *)&(timestamp), sizeof (GTM_Timestamp));
@@ -2218,11 +2202,7 @@ ProcessCommitTransactionCommand(Port *myport, StringInfo message, bool is_backup
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, TXN_COMMIT_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&gxid, sizeof(gxid));
 		pq_sendbytes(&buf, (char *)&status, sizeof(status));
 		pq_endmessage(myport, &buf);
@@ -2333,11 +2313,7 @@ ProcessCommitPreparedTransactionCommand(Port *myport, StringInfo message, bool i
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, TXN_COMMIT_PREPARED_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&gxid[0], sizeof(GlobalTransactionId));
 		pq_sendbytes(&buf, (char *)&status[0], 4);
 		pq_endmessage(myport, &buf);
@@ -2458,11 +2434,7 @@ retry:
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_GET_GID_DATA_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 
 	/* Send the two GXIDs */
 	pq_sendbytes(&buf, (char *)&gxid, sizeof(GlobalTransactionId));
@@ -2528,11 +2500,7 @@ ProcessGXIDListCommand(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_GXID_LIST_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 
 	pq_sendint(&buf, actlen, sizeof(int32));	/* size of serialized GTM_Transactions */
 	pq_sendbytes(&buf, data, actlen);			/* serialized GTM_Transactions */
@@ -2613,11 +2581,7 @@ ProcessRollbackTransactionCommand(Port *myport, StringInfo message, bool is_back
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, TXN_ROLLBACK_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&gxid, sizeof(gxid));
 		pq_sendint(&buf, status, sizeof(status));
 		pq_endmessage(myport, &buf);
@@ -2705,11 +2669,7 @@ ProcessCommitTransactionCommandMulti(Port *myport, StringInfo message, bool is_b
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, TXN_COMMIT_MULTI_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&txn_count, sizeof(txn_count));
 		pq_sendbytes(&buf, (char *)status, sizeof(int) * txn_count);
 		pq_endmessage(myport, &buf);
@@ -2794,11 +2754,7 @@ ProcessRollbackTransactionCommandMulti(Port *myport, StringInfo message, bool is
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, TXN_ROLLBACK_MULTI_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&txn_count, sizeof(txn_count));
 		pq_sendbytes(&buf, (char *)status, sizeof(int) * txn_count);
 		pq_endmessage(myport, &buf);
@@ -2895,11 +2851,7 @@ ProcessStartPreparedTransactionCommand(Port *myport, StringInfo message, bool is
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, TXN_START_PREPARED_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&gxid, sizeof(GlobalTransactionId));
 		pq_endmessage(myport, &buf);
 
@@ -2976,11 +2928,7 @@ ProcessPrepareTransactionCommand(Port *myport, StringInfo message, bool is_backu
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, TXN_PREPARE_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&gxid, sizeof(gxid));
 		pq_endmessage(myport, &buf);
 
@@ -3043,11 +2991,7 @@ ProcessGetGXIDTransactionCommand(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_GET_GXID_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendbytes(&buf, (char *)&txn, sizeof(txn));
 	pq_sendbytes(&buf, (char *)&gxid, sizeof(gxid));
 	pq_endmessage(myport, &buf);
@@ -3091,11 +3035,7 @@ ProcessGetNextGXIDTransactionCommand(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, TXN_GET_NEXT_GXID_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendint(&buf, next_gxid, sizeof(GlobalTransactionId));
 	pq_endmessage(myport, &buf);
 
@@ -3141,11 +3081,7 @@ ProcessReportXminCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, REPORT_XMIN_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&GTMTransactions.gt_latestCompletedXid, sizeof (GlobalTransactionId));
 		pq_sendbytes(&buf, (char *)&global_xmin, sizeof (GlobalTransactionId));
 		pq_sendbytes(&buf, (char *)&errcode, sizeof (errcode));

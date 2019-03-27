@@ -21,6 +21,7 @@
 
 #include "gtm/pqcomm.h"
 #include "gtm/gtm_c.h"
+#include "gtm/gtm_msg.h"
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -48,7 +49,8 @@ typedef struct Port
 	GTM_PortLastCall last_call;		/* Last syscall to this port */
 	int			last_errno;			/* Last errno. zero if the last call succeeds */
 
-	GTMProxy_ConnID	conn_id;		/* RequestID of this command */
+	/* Proxy header received with the last command */
+	GTM_ProxyMsgHeader	con_proxyhdr;
 
 	GTM_PGXCNodeType	remote_type;	/* Type of remote connection */
 	char		*node_name;

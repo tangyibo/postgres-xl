@@ -191,3 +191,94 @@ char *gtm_util_message_name(GTM_MessageType type)
 		return "UNKNOWN_MESSAGE";
 	return message_name[type];
 }
+
+void
+initGTMDebugBuffers(int num_buffers)
+{
+	int i;
+
+	if (num_buffers <= 0)
+		return;
+
+	GetMyThreadInfo->thr_num_debug_buffers = num_buffers;
+	GetMyThreadInfo->thr_debug_buffers = (StringInfo *) palloc0(
+			sizeof(StringInfo) * num_buffers);
+	for (i = 0; i < GetMyThreadInfo->thr_num_debug_buffers; i++)
+		GetMyThreadInfo->thr_debug_buffers[i] = makeStringInfo();
+
+	GetMyThreadInfo->thr_next_debug_buffer = 0;
+	GetMyThreadInfo->thr_msg_counter = 0;
+	GetMyThreadInfo->thr_debug_buffers_initialised = true;
+}
+
+static void
+setup_formatted_log_time(char *formatted_log_time)
+{
+	struct timeval tv;
+	time_t	stamp_time;
+	char		msbuf[8];
+
+	gettimeofday(&tv, NULL);
+	stamp_time = (time_t) tv.tv_sec;
+
+	strftime(formatted_log_time, FORMATTED_TS_LEN,
+				/* leave room for milliseconds... */
+				"%Y-%m-%d %H:%M:%S     %Z",
+				localtime(&stamp_time));
+
+	/* 'paste' milliseconds into place... */
+	sprintf(msbuf, ".%03d", (int) (tv.tv_usec / 1000));
+	strncpy(formatted_log_time + 19, msbuf, 4);
+}
+
+#define FORMATTED_TS_LEN	128
+void
+addGTMDebugMessage(int elevel, const char *fmt, ...)
+{
+	GTM_ThreadInfo	*thrinfo = (GTM_ThreadInfo *) GetMyThreadInfo;
+	StringInfo buf;
+
+	if (thrinfo->thr_debug_buffers_initialised)
+		buf = thrinfo->thr_debug_buffers[thrinfo->thr_next_debug_buffer];
+	else
+		buf = makeStringInfo();
+
+	resetStringInfo(buf);
+	thrinfo->thr_formatted_log_time[0] = '\0';
+	setup_formatted_log_time(thrinfo->thr_formatted_log_time);
+	appendStringInfo(buf, "[GTM_DEBUG Msg Counter: %d %s] ",
+			thrinfo->thr_msg_counter++,
+			thrinfo->thr_formatted_log_time);
+
+	for (;;)
+	{
+		va_list     args;
+		bool        success;
+
+		/* Try to format the data. */
+		va_start(args, fmt);
+		success = appendStringInfoVA(buf, fmt, args);
+		va_end(args);
+
+		if (success)
+			break;
+
+		/* Double the buffer size and try again. */
+		enlargeStringInfo(buf, buf->maxlen);
+	}
+
+	/* Emit to log as well, at the given level */
+	elog(elevel, "%s", buf->data);
+
+	if (thrinfo->thr_debug_buffers_initialised)
+	{
+		thrinfo->thr_next_debug_buffer++;
+		if (thrinfo->thr_next_debug_buffer == thrinfo->thr_num_debug_buffers)
+			thrinfo->thr_next_debug_buffer = 0;
+	}
+	else
+	{
+		pfree(buf->data);
+		pfree(buf);
+	}
+}

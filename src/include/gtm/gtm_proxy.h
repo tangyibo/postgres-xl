@@ -99,6 +99,12 @@ typedef struct GTMProxy_ThreadInfo
 	int						thr_qtype[GTM_PROXY_MAX_CONNECTIONS];
 	StringInfoData			thr_inBufData[GTM_PROXY_MAX_CONNECTIONS];
 
+	/*
+	 * A monotonically increasing sequence is used to stamp request/responses.
+	 * Objective is to use this for debugging purposes.
+	 */
+	uint32					thr_command_id;
+
 	gtm_List 					*thr_processed_commands;
 	gtm_List 					*thr_pending_commands[MSG_TYPE_COUNT];
 
@@ -133,6 +139,7 @@ extern GTMProxy_ThreadInfo * GTMProxy_GetThreadInfo(GTM_ThreadID thrid);
 extern GTMProxy_ThreadInfo *GTMProxy_ThreadAddConnection(GTMProxy_ConnectionInfo *conninfo);
 extern int GTMProxy_ThreadRemoveConnection(GTMProxy_ThreadInfo *thrinfo,
 		GTMProxy_ConnectionInfo *conninfo);
+extern void dumpGTMProxyDebugBuffers(bool current);
 
 /*
  * Command data - the only relevant information right now is the XID
@@ -185,6 +192,7 @@ typedef struct GTMProxy_CommandInfo
 	int						ci_res_index;
 	GTMProxy_CommandData	ci_data;
 	GTMProxy_ConnectionInfo	*ci_conn;
+	GTM_ProxyMsgHeader		ci_proxy_hdr;
 } GTMProxy_CommandInfo;
 
 /*

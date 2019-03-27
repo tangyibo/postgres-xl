@@ -56,6 +56,7 @@ extern char *GTMProxyDataDir;
 extern char *GTMProxyConfigFileName;
 extern char *GTMConfigFileName;
 extern int	GTMProxyCommTimeout;
+extern int	GTMProxyNumberDebugBuffers;
 
 
 /*
@@ -230,6 +231,17 @@ struct config_int ConfigureNamesInt[] =
 		},
 		&GTMProxyCommTimeout,
 		0, 0, INT_MAX,
+		0, NULL
+	},
+	{
+		{
+			GTM_OPTNAME_NUM_DEBUG_BUFFERS, GTMC_STARTUP,
+			gettext_noop("Sets number of debug buffers"),
+			NULL,
+			0
+		},
+		&GTMProxyNumberDebugBuffers,
+		1024, 0, 65535,
 		0, NULL
 	},
 	/* End-of-list marker */

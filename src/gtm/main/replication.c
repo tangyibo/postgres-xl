@@ -65,11 +65,7 @@ ProcessBeginReplicationInitialSyncRequest(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, NODE_BEGIN_REPLICATION_INIT_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_endmessage(myport, &buf);
 
 	/*
@@ -114,11 +110,7 @@ ProcessEndReplicationInitialSyncRequest(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, NODE_END_REPLICATION_INIT_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_endmessage(myport, &buf);
 
 	/*

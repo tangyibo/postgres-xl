@@ -96,6 +96,7 @@ GTM_ThreadInfo *GTM_ThreadCreate(GTM_ConnectionInfo *conninfo,
 
 extern void SaveControlInfo(void);
 void GTM_RestoreSeqInfo(FILE *ctlf, struct GTM_RestoreContext *context);
+extern void dumpGTMDebugBuffers(bool current);
 
 #define CONTROL_INTERVAL		50000
 

@@ -17,6 +17,8 @@
 #include "gtm/libpq-int.h"
 #include "gtm/gtm_msg.h"
 
-char *gtm_util_message_name(GTM_MessageType type);
+extern char *gtm_util_message_name(GTM_MessageType type);
+extern void addGTMDebugMessage(int elevel, const char *fmt, ...);
+extern void initGTMDebugBuffers(int num_buffers);
 
 #endif /* GTM_UTILS_H */

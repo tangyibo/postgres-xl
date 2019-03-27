@@ -46,6 +46,7 @@
 /* For reconnect control lock */
 #include "gtm/gtm_lock.h"
 #include "gtm/gtm_opt.h"
+#include "gtm/gtm_utils.h"
 
 extern int	optind;
 extern char *optarg;
@@ -78,6 +79,7 @@ char		*GTMServerHost;
 int			GTMServerPortNumber;
 
 int			GTMConnectRetryInterval = 60;
+int			GTMProxyNumberDebugBuffers;
 
 /*
  * Keepalives setup for the connection with GTM server
@@ -223,6 +225,7 @@ MainThreadInit()
 		exit(1);
 	}
 
+
 	TopMostThreadID = pthread_self();
 
 	return thrinfo;
@@ -238,6 +241,12 @@ InitGTMProxyProcess()
 	GTMProxy_ThreadInfo *thrinfo = MainThreadInit();
 	MyThreadID = pthread_self();
 	MemoryContextInit();
+
+	/*
+	 * Initialise debug buffers. Must be done after thread-specific info is
+	 * saved.
+	 */
+	initGTMDebugBuffers(GTMProxyNumberDebugBuffers);
 
 	/*
 	 * The memory context is now set up.
@@ -912,7 +921,7 @@ ConnCreate(int serverFd)
 		return NULL;
 	}
 
-	port->conn_id = InvalidGTMProxyConnID;
+	port->con_proxyhdr.ph_conid = InvalidGTMProxyConnID;
 
 	return port;
 }
@@ -1073,6 +1082,155 @@ initMasks(fd_set *rmask)
 
 	return maxsock + 1;
 }
+
+static void
+GTMProxy_DumpCommandInfo(StringInfo dump, GTMProxy_CommandInfo *cmdinfo)
+{
+	appendStringInfo(dump, "\n\t%s ", gtm_util_message_name(cmdinfo->ci_mtype));
+	appendStringInfo(dump, "proxyhdr:(%d/%d)\n",
+			cmdinfo->ci_proxy_hdr.ph_thrid,
+			cmdinfo->ci_proxy_hdr.ph_command_id);
+	appendStringInfo(dump, "\t\tci_res_index:%d,", cmdinfo->ci_res_index);
+	switch (cmdinfo->ci_mtype)
+	{
+		case MSG_TXN_BEGIN_GETGXID:
+			appendStringInfo(dump, "ci_data:(%c,%d,%s)",
+					cmdinfo->ci_data.cd_beg.rdonly,
+					cmdinfo->ci_data.cd_beg.iso_level,
+					cmdinfo->ci_data.cd_beg.global_sessionid);
+			break;
+		case MSG_TXN_COMMIT_MULTI:
+			appendStringInfo(dump, "ci_res_index:%d,", cmdinfo->ci_res_index);
+			appendStringInfo(dump, "ci_data:(%u)",
+					cmdinfo->ci_data.cd_rc.gxid);
+			break;
+		case MSG_TXN_ROLLBACK:
+			appendStringInfo(dump, "ci_res_index:%d,", cmdinfo->ci_res_index);
+			appendStringInfo(dump, "ci_data:(%u)",
+					cmdinfo->ci_data.cd_rc.gxid);
+			break;
+		case MSG_SNAPSHOT_GET_MULTI:
+			appendStringInfo(dump, "ci_res_index:%d,", cmdinfo->ci_res_index);
+			appendStringInfo(dump, "ci_data:(%u)",
+					cmdinfo->ci_data.cd_snap.gxid);
+			break;
+		case MSG_BACKEND_DISCONNECT:
+			appendStringInfo(dump, "ci_res_index:%d,", cmdinfo->ci_res_index);
+			break;
+		default:
+			break;
+	}
+}
+
+static void
+GTMProxy_DumpPendingCommands(GTMProxy_ThreadInfo *thrinfo)
+{
+	int	ii;
+	GTMProxy_CommandInfo 	*cmdinfo = NULL;
+	gtm_ListCell 			*elem = NULL;
+	StringInfoData			dump;
+
+	initStringInfo(&dump);
+
+	for (ii = 0; ii < MSG_TYPE_COUNT; ii++)
+	{
+		if (gtm_list_length(thrinfo->thr_pending_commands[ii]) == 0)
+			continue;
+		gtm_foreach (elem, thrinfo->thr_pending_commands[ii])
+		{
+			cmdinfo = (GTMProxy_CommandInfo *)gtm_lfirst(elem);
+			GTMProxy_DumpCommandInfo(&dump, cmdinfo);
+		}
+	}
+
+	if (dump.len)
+		addGTMDebugMessage(DEBUG1, "Dumping Pending Commands%s", dump.data);
+	pfree(dump.data);
+}
+
+static void
+GTMProxy_DumpProcessedCommands(GTMProxy_ThreadInfo *thrinfo)
+{
+	gtm_ListCell 			*elem = NULL;
+	StringInfoData			dump;
+
+	initStringInfo(&dump);
+
+	gtm_foreach(elem, thrinfo->thr_processed_commands)
+	{
+		GTMProxy_CommandInfo *cmdinfo = (GTMProxy_CommandInfo *)gtm_lfirst(elem);
+		GTMProxy_DumpCommandInfo(&dump, cmdinfo);
+	}
+
+	if (dump.len)
+		addGTMDebugMessage(DEBUG1, "Dumping Processed Commands%s", dump.data);
+	pfree(dump.data);
+}
+
+
+static void
+GTMProxy_DumpResponse(GTM_Result *res)
+{
+	StringInfoData			dump;
+
+	initStringInfo(&dump);
+
+	switch (res->gr_type)
+	{
+		case TXN_BEGIN_GETGXID_RESULT:
+			appendStringInfo(&dump, "gr_type:TXN_BEGIN_GETGXID_RESULT,");
+			appendStringInfo(&dump, "gr_proxyhdr:(%d/%d),",
+					res->gr_proxyhdr.ph_thrid, res->gr_proxyhdr.ph_command_id);
+			appendStringInfo(&dump, "gr_msglen:%d,", res->gr_msglen);
+			appendStringInfo(&dump, "gr_status:%d,", res->gr_status);
+			appendStringInfo(&dump, "txn_count:%d",
+					res->gr_resdata.grd_txn_get_multi.txn_count);
+
+			break;
+		case TXN_COMMIT_MULTI_RESULT:
+			appendStringInfo(&dump, "gr_type:TXN_COMMIT_MULTI_RESULT,");
+			appendStringInfo(&dump, "gr_proxyhdr:(%d/%d),",
+					res->gr_proxyhdr.ph_thrid, res->gr_proxyhdr.ph_command_id);
+			appendStringInfo(&dump, "gr_msglen:%d,", res->gr_msglen);
+			appendStringInfo(&dump, "gr_status:%d,", res->gr_status);
+			appendStringInfo(&dump, "txn_count:%d",
+					res->gr_resdata.grd_txn_rc_multi.txn_count);
+			break;
+		case TXN_ROLLBACK_RESULT:
+			appendStringInfo(&dump, "gr_type:TXN_ROLLBACK_RESULT,");
+			appendStringInfo(&dump, "gr_proxyhdr:(%d/%d),",
+					res->gr_proxyhdr.ph_thrid, res->gr_proxyhdr.ph_command_id);
+			appendStringInfo(&dump, "gr_msglen:%d,", res->gr_msglen);
+			appendStringInfo(&dump, "gr_status:%d,", res->gr_status);
+			appendStringInfo(&dump, "txn_count:%d,",
+					res->gr_resdata.grd_txn_rc_multi.txn_count);
+			break;
+		case SNAPSHOT_GET_MULTI_RESULT:
+			appendStringInfo(&dump, "gr_type:SNAPSHOT_GET_MULTI_RESULT,");
+			appendStringInfo(&dump, "gr_proxyhdr:(%d/%d),",
+					res->gr_proxyhdr.ph_thrid, res->gr_proxyhdr.ph_command_id);
+			appendStringInfo(&dump, "gr_msglen:%d,", res->gr_msglen);
+			appendStringInfo(&dump, "gr_status:%d,", res->gr_status);
+			appendStringInfo(&dump, "txn_count:%d,",
+					res->gr_resdata.grd_txn_snap_multi.txn_count);
+			appendStringInfo(&dump, "gr_snapshot.sn_snapid:%lu,",
+					res->gr_snapshot.sn_snapid);
+			appendStringInfo(&dump, "gr_snapshot.sn_xmin:%u,",
+					res->gr_snapshot.sn_xmin);
+			appendStringInfo(&dump, "gr_snapshot.sn_xmax:%u,",
+					res->gr_snapshot.sn_xmax);
+			appendStringInfo(&dump, "gr_snapshot.sn_xcnt:%u,",
+					res->gr_snapshot.sn_xcnt);
+			break;
+		default:
+			break;
+	}
+
+	if (dump.len)
+		addGTMDebugMessage(DEBUG1, "Dumping Response\n\t%s", dump.data);
+	pfree(dump.data);
+}
+
 
 /*
  * The main worker thread routine
@@ -1472,6 +1630,7 @@ setjmp_again:
 			}
 		}
 
+		GTMProxy_DumpPendingCommands(thrinfo);
 		/*
 		 * Ok. All the commands are processed. Commands which can be proxied
 		 * directly have been already sent to the GTM server. Now, group the
@@ -1496,6 +1655,7 @@ setjmp_again:
 		gtmpqFlush(thrinfo->thr_gtm_conn);
 		Disable_Longjmp();
 
+		GTMProxy_DumpProcessedCommands(thrinfo);
 		/*
 		 * Read back the responses and put them on to the right backend
 		 * connection.
@@ -1534,6 +1694,7 @@ setjmp_again:
 				Disable_Longjmp();
 			}
 
+			GTMProxy_DumpResponse(res);
 			ProcessResponse(thrinfo, cmdinfo, res);
 		}
 
@@ -2249,6 +2410,8 @@ GTMProxy_ProxyCommand(GTMProxy_ConnectionInfo *conninfo, GTM_Conn *gtm_conn,
 	Assert(IsProxiedMessage(mtype));
 
 	proxyhdr.ph_conid = conninfo->con_id;
+	proxyhdr.ph_command_id = thrinfo->thr_command_id++;
+	proxyhdr.ph_thrid = thrinfo->thr_localid;
 
 	unreadmsglen = pq_getmsgunreadlen(message);
 	unreadmsg = pq_getmsgbytes(message, unreadmsglen);
@@ -2267,6 +2430,7 @@ GTMProxy_ProxyCommand(GTMProxy_ConnectionInfo *conninfo, GTM_Conn *gtm_conn,
 	cmdinfo->ci_mtype = mtype;
 	cmdinfo->ci_conn = conninfo;
 	cmdinfo->ci_res_index = 0;
+	cmdinfo->ci_proxy_hdr = proxyhdr;
 	thrinfo->thr_processed_commands = gtm_lappend(thrinfo->thr_processed_commands, cmdinfo);
 
 	/* Finish the message. */
@@ -2389,6 +2553,9 @@ GTMProxy_HandleDisconnect(GTMProxy_ConnectionInfo *conninfo, GTM_Conn *gtm_conn)
 	int namelen;
 
 	proxyhdr.ph_conid = conninfo->con_id;
+	proxyhdr.ph_command_id = GetMyThreadInfo->thr_command_id++;
+	proxyhdr.ph_thrid = GetMyThreadInfo->thr_localid;
+
 	/* Start the message. */
 	if (gtmpqPutMsgStart('C', true, gtm_conn) ||
 		gtmpqPutnchar((char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader), gtm_conn) ||
@@ -2447,6 +2614,8 @@ GTMProxy_ProcessPendingCommands(GTMProxy_ThreadInfo *thrinfo)
 		 * Start a new group message and fill in the headers
 		 */
 		proxyhdr.ph_conid = InvalidGTMProxyConnID;
+		proxyhdr.ph_command_id = thrinfo->thr_command_id++;
+		proxyhdr.ph_thrid = thrinfo->thr_localid;
 
 		if (gtmpqPutMsgStart('C', true, gtm_conn) ||
 			gtmpqPutnchar((char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader), gtm_conn))
@@ -2466,6 +2635,7 @@ GTMProxy_ProcessPendingCommands(GTMProxy_ThreadInfo *thrinfo)
 					cmdinfo = (GTMProxy_CommandInfo *)gtm_lfirst(elem);
 					Assert(cmdinfo->ci_mtype == ii);
 					cmdinfo->ci_res_index = res_index++;
+					cmdinfo->ci_proxy_hdr = proxyhdr;
 					if (gtmpqPutInt(cmdinfo->ci_data.cd_beg.iso_level,
 								sizeof (GTM_IsolationLevel), gtm_conn) ||
 						gtmpqPutc(cmdinfo->ci_data.cd_beg.rdonly, gtm_conn) ||
@@ -2510,6 +2680,7 @@ GTMProxy_ProcessPendingCommands(GTMProxy_ThreadInfo *thrinfo)
 					cmdinfo = (GTMProxy_CommandInfo *)gtm_lfirst(elem);
 					Assert(cmdinfo->ci_mtype == ii);
 					cmdinfo->ci_res_index = res_index++;
+					cmdinfo->ci_proxy_hdr = proxyhdr;
 					{
 						if (gtmpqPutnchar((char *)&cmdinfo->ci_data.cd_rc.gxid,
 								sizeof (GlobalTransactionId), gtm_conn))
@@ -2551,6 +2722,7 @@ GTMProxy_ProcessPendingCommands(GTMProxy_ThreadInfo *thrinfo)
 					cmdinfo = (GTMProxy_CommandInfo *)gtm_lfirst(elem);
 					Assert(cmdinfo->ci_mtype == ii);
 					cmdinfo->ci_res_index = res_index++;
+					cmdinfo->ci_proxy_hdr = proxyhdr;
 					{
 						if (gtmpqPutnchar((char *)&cmdinfo->ci_data.cd_rc.gxid,
 								sizeof (GlobalTransactionId), gtm_conn))
@@ -2591,6 +2763,7 @@ GTMProxy_ProcessPendingCommands(GTMProxy_ThreadInfo *thrinfo)
 					cmdinfo = (GTMProxy_CommandInfo *)gtm_lfirst(elem);
 					Assert(cmdinfo->ci_mtype == ii);
 					cmdinfo->ci_res_index = res_index++;
+					cmdinfo->ci_proxy_hdr = proxyhdr;
 					{
 						if (gtmpqPutnchar((char *)&cmdinfo->ci_data.cd_rc.gxid,
 								sizeof (GlobalTransactionId), gtm_conn))
@@ -3217,4 +3390,56 @@ workerThreadReconnectToGTM(void)
 
 	/* Initialize the command processing */
 	GetMyThreadInfo->reconnect_issued = FALSE;
+}
+
+static void
+dumpGTMProxyDebugBuffersForThread(GTMProxy_ThreadInfo *thrinfo, FILE *fp)
+{
+	int	ii;
+
+	fprintf(fp, "====================================\n");
+	fprintf(fp, "Dumping GTM Proxy debug buffers for thread %d\n", thrinfo->thr_localid);
+	fprintf(fp, "====================================\n\n");
+
+	if (!thrinfo->thr_debug_buffers_initialised)
+	{
+		fprintf(fp, "GTM debug buffers not setup");
+		fflush(fp);
+		return;
+	}
+
+	for (ii = 0; ii < thrinfo->thr_num_debug_buffers; ii++)
+	{
+		if (thrinfo->thr_debug_buffers[ii]->len)
+			fprintf(fp, "%s\n", thrinfo->thr_debug_buffers[ii]->data);
+	}
+}
+
+void
+dumpGTMProxyDebugBuffers(bool current)
+{
+	FILE *fp = fopen("/tmp/gtm_proxy_debug.log", "a");
+
+	if (current)
+	{
+		GTMProxy_ThreadInfo	*thrinfo = GetMyThreadInfo;
+		dumpGTMProxyDebugBuffersForThread(thrinfo, fp);
+	}
+	else
+	{
+		int	ii;
+
+		GTM_RWLockAcquire(&GTMProxyThreads->gt_lock, GTM_LOCKMODE_READ);
+
+		for (ii = 0; ii < GTMProxyThreads->gt_thread_count; ii++)
+		{
+			GTMProxy_ThreadInfo	*thrinfo = GTMProxyThreads->gt_threads[ii];
+			dumpGTMProxyDebugBuffersForThread(thrinfo, fp);
+		}
+
+		GTM_RWLockRelease(&GTMProxyThreads->gt_lock);
+	}
+
+	fflush(fp);
+	fclose(fp);
 }

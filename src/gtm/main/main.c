@@ -75,6 +75,7 @@ char		*status_reader;
 bool		isStartUp;
 GTM_MutexLock   control_lock;
 char		GTMControlFileTmp[GTM_MAX_PATH];
+int			GTMNumberDebugBuffers;
 #define GTM_CONTROL_FILE_TMP		"gtm.control.tmp"
 
 /* If this is GTM or not */
@@ -192,6 +193,9 @@ InitGTMProcess()
 	GTM_ThreadInfo *thrinfo = MainThreadInit();
 	MyThreadID = pthread_self();
 	MemoryContextInit();
+
+	/* Must be done after CurrentMemoryContext is setup */
+	initGTMDebugBuffers(GTMNumberDebugBuffers);
 
 	/*
 	 * The memory context is now set up.
@@ -869,7 +873,7 @@ ConnCreate(int serverFd)
 		return NULL;
 	}
 
-	port->conn_id = InvalidGTMProxyConnID;
+	port->con_proxyhdr.ph_conid = InvalidGTMProxyConnID;
 	return port;
 }
 
@@ -1333,8 +1337,15 @@ ProcessCommand(Port *myport, StringInfo input_message)
 	else
 		proxyhdr.ph_conid = InvalidGTMProxyConnID;
 
-	myport->conn_id = proxyhdr.ph_conid;
+	myport->con_proxyhdr = proxyhdr;
+
 	mtype = pq_getmsgint(input_message, sizeof (GTM_MessageType));
+
+	addGTMDebugMessage(DEBUG1, "Processing %s command from %s, proxyhdr(%d/%d)",
+			gtm_util_message_name(mtype),
+			myport->node_name,
+			proxyhdr.ph_thrid,
+			proxyhdr.ph_command_id);
 
 	/*
 	 * The next line will have some overhead.  Better to be in
@@ -2279,11 +2290,7 @@ static void ProcessBarrierCommand(Port *myport, GTM_MessageType mtype, StringInf
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, BARRIER_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_endmessage(myport, &buf);
 
 		if (myport->remote_type != GTM_NODE_GTM_PROXY)
@@ -2544,4 +2551,56 @@ GTM_RestoreSeqInfo(FILE *ctlf, struct GTM_RestoreContext *context)
 		GTM_SeqRestore(&seqkey, increment_by, minval, maxval, startval, curval,
 					   state, cycle, called);
 	}
+}
+
+static void
+dumpGTMDebugBuffersForThread(GTM_ThreadInfo *thrinfo, FILE *fp)
+{
+	int	ii;
+
+	fprintf(fp, "====================================\n");
+	fprintf(fp, "Dumping GTM debug buffers for thread %d\n", thrinfo->thr_localid);
+	fprintf(fp, "====================================\n\n");
+
+	if (!thrinfo->thr_debug_buffers_initialised)
+	{
+		fprintf(fp, "GTM debug buffers not setup");
+		fflush(fp);
+		return;
+	}
+
+	for (ii = 0; ii < thrinfo->thr_num_debug_buffers; ii++)
+	{
+		if (thrinfo->thr_debug_buffers[ii]->len)
+			fprintf(fp, "%s\n", thrinfo->thr_debug_buffers[ii]->data);
+	}
+}
+
+void
+dumpGTMDebugBuffers(bool current)
+{
+	FILE *fp = fopen("/tmp/gtm_debug.log", "a");
+
+	if (current)
+	{
+		GTM_ThreadInfo	*thrinfo = GetMyThreadInfo;
+		dumpGTMDebugBuffersForThread(thrinfo, fp);
+	}
+	else
+	{
+		int	ii;
+
+		GTM_RWLockAcquire(&GTMThreads->gt_lock, GTM_LOCKMODE_READ);
+
+		for (ii = 0; ii < GTMThreads->gt_thread_count; ii++)
+		{
+			GTM_ThreadInfo	*thrinfo = GTMThreads->gt_threads[ii];
+			dumpGTMDebugBuffersForThread(thrinfo, fp);
+		}
+
+		GTM_RWLockRelease(&GTMThreads->gt_lock);
+	}
+
+	fflush(fp);
+	fclose(fp);
 }

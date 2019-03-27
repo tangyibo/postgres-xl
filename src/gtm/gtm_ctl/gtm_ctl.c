@@ -91,7 +91,6 @@ static void read_gtm_opts(void);
 static bool test_gtm_connection();
 static bool gtm_is_alive(pid_t pid);
 
-static void *pg_realloc(void *ptr, size_t size);
 static int RunAsDaemon(char *cmd);
 
 static char gtmopts_file[MAXPGPATH];
@@ -1300,20 +1299,4 @@ main(int argc, char **argv)
 	}
 
 	exit(0);
-}
-
-/*
- * Safer versions of standard realloc C library function. If an
- * out-of-memory condition occurs, these functions will bail out
- * safely; therefore, its return value is guaranteed to be non-NULL.
- */
-static void *
-pg_realloc(void *ptr, size_t size)
-{
-	void       *tmp;
-
-	tmp = realloc(ptr, size);
-	if (!tmp)
-		write_stderr("out of memory\n");
-	return tmp;
 }

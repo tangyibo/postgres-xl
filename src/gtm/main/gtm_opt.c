@@ -30,6 +30,7 @@
 #include "gtm/gtm_opt_tables.h"
 #include "gtm/gtm_opt.h"
 #include "gtm/gtm_standby.h"
+#include "gtm/gtm_utils.h"
 
 
 #define CONFIG_FILENAME "gtm.conf"
@@ -53,8 +54,7 @@ extern int tcp_keepalives_idle;
 extern int tcp_keepalives_count;
 extern int tcp_keepalives_interval;
 extern char *GTMDataDir;
-
-
+extern int GTMNumberDebugBuffers;
 
 /*
  * We have different sets for client and server message level options because
@@ -189,6 +189,16 @@ struct config_int ConfigureNamesInt[] =
 		},
 		&tcp_keepalives_count,
 		0, 0, INT_MAX,
+		0, NULL
+	},
+	{
+		{GTM_OPTNAME_NUM_DEBUG_BUFFERS, GTMC_STARTUP,
+			gettext_noop("Sets number of debug buffers in GTM"),
+			NULL,
+			0
+		},
+		&GTMNumberDebugBuffers,
+		1024, 0, 65535,
 		0, NULL
 	},
 	/* End-of-list marker */

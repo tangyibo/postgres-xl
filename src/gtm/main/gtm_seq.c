@@ -1232,11 +1232,7 @@ ProcessSequenceInitCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, SEQUENCE_INIT_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendint(&buf, seqkey.gsk_keylen, 4);
 		pq_sendbytes(&buf, seqkey.gsk_key, seqkey.gsk_keylen);
 		pq_endmessage(myport, &buf);
@@ -1347,11 +1343,7 @@ ProcessSequenceAlterCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, SEQUENCE_ALTER_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendint(&buf, seqkey.gsk_keylen, 4);
 		pq_sendbytes(&buf, seqkey.gsk_key, seqkey.gsk_keylen);
 		pq_endmessage(myport, &buf);
@@ -1444,11 +1436,7 @@ ProcessSequenceListCommand(Port *myport, StringInfo message)
 	pq_sendint(&buf, SEQUENCE_LIST_RESULT, 4);
 
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 
 	/* Send a number of sequences */
 	pq_sendint(&buf, seq_count, 4);
@@ -1522,11 +1510,7 @@ ProcessSequenceGetCurrentCommand(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, SEQUENCE_GET_CURRENT_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendint(&buf, seqkey.gsk_keylen, 4);
 	pq_sendbytes(&buf, seqkey.gsk_key, seqkey.gsk_keylen);
 	pq_sendbytes(&buf, (char *)&seqval, sizeof (GTM_Sequence));
@@ -1631,11 +1615,7 @@ ProcessSequenceGetNextCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, SEQUENCE_GET_NEXT_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendint(&buf, seqkey.gsk_keylen, 4);
 		pq_sendbytes(&buf, seqkey.gsk_key, seqkey.gsk_keylen);
 		pq_sendbytes(&buf, (char *)&seqval, sizeof (GTM_Sequence));
@@ -1744,11 +1724,7 @@ ProcessSequenceSetValCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, SEQUENCE_SET_VAL_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendint(&buf, seqkey.gsk_keylen, 4);
 		pq_sendbytes(&buf, seqkey.gsk_key, seqkey.gsk_keylen);
 		pq_endmessage(myport, &buf);
@@ -1817,11 +1793,7 @@ ProcessSequenceResetCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, SEQUENCE_RESET_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendint(&buf, seqkey.gsk_keylen, 4);
 		pq_sendbytes(&buf, seqkey.gsk_key, seqkey.gsk_keylen);
 		pq_endmessage(myport, &buf);
@@ -1902,11 +1874,7 @@ ProcessSequenceCloseCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, SEQUENCE_CLOSE_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendint(&buf, seqkey.gsk_keylen, 4);
 		pq_sendbytes(&buf, seqkey.gsk_key, seqkey.gsk_keylen);
 		pq_endmessage(myport, &buf);
@@ -2003,11 +1971,7 @@ ProcessSequenceRenameCommand(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, SEQUENCE_RENAME_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendint(&buf, newseqkey.gsk_keylen, 4);
 		pq_sendbytes(&buf, newseqkey.gsk_key, newseqkey.gsk_keylen);
 		pq_endmessage(myport, &buf);

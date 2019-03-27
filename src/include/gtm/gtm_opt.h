@@ -349,6 +349,7 @@ const char *const config_type_names[] =\
 #define GTM_OPTNAME_SYNCHRONOUS_BACKUP	"synchronous_backup"
 #define GTM_OPTNAME_WORKER_THREADS		"worker_threads"
 #define GTM_OPTNAME_COMM_TIMEOUT		"comm_timeout"
+#define GTM_OPTNAME_NUM_DEBUG_BUFFERS	"debug_buffers"
 
 
 #endif   /* GTM_OPT_H */

@@ -875,14 +875,9 @@ send_message_to_frontend(Port *myport, ErrorData *edata)
 	/* 'N' (Notice) is for nonfatal conditions, 'E' is for errors */
 	pq_beginmessage(&msgbuf, (edata->elevel < ERROR) ? 'N' : 'E');
 
+	/* Send the GTM Proxy header if we are dealing with a proxy */
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-
-		proxyhdr.ph_conid = myport->conn_id;
-		/* Send the GTM Proxy header if we are dealing with a proxy */
-		pq_sendbytes(&msgbuf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&msgbuf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 
 	pq_sendbyte(&msgbuf, PG_DIAG_SEVERITY);
 	pq_sendstring(&msgbuf, error_severity(edata->elevel));

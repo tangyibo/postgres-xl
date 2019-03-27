@@ -18,12 +18,15 @@
 #include "gtm/memutils.h"
 #include "gtm/gtm_txn.h"
 #include "gtm/libpq.h"
+#include "gtm/gtm_utils.h"
 
 static void *GTM_ThreadMainWrapper(void *argp);
 static void GTM_ThreadCleanup(void *argp);
 
 GTM_Threads	GTMThreadsData;
 GTM_Threads *GTMThreads = &GTMThreadsData;
+
+extern int GTMNumberDebugBuffers;
 
 /*
  * Max threads allowed in the GTM. If you change this, consider changing
@@ -417,6 +420,12 @@ GTM_ThreadMainWrapper(void *argp)
 
 	SetMyThreadInfo(thrinfo);
 	MemoryContextSwitchTo(TopMemoryContext);
+
+	/*
+	 * Initialise debug buffers. Must be done after thread-specific info is
+	 * saved.
+	 */
+	initGTMDebugBuffers(GTMNumberDebugBuffers);
 
 	pthread_cleanup_push(GTM_ThreadCleanup, thrinfo);
 	thrinfo->thr_startroutine(thrinfo);

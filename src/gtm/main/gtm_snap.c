@@ -94,6 +94,7 @@
 #include "gtm/libpq.h"
 #include "gtm/libpq-int.h"
 #include "gtm/pqformat.h"
+#include "gtm/gtm_utils.h"
 
 void
 GTM_AdvanceSnapshotCounter(void)
@@ -428,11 +429,7 @@ ProcessGetSnapshotCommand(Port *myport, StringInfo message, bool get_gxid)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, get_gxid ? SNAPSHOT_GXID_GET_RESULT : SNAPSHOT_GET_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendbytes(&buf, (char *)&gxid, sizeof (GlobalTransactionId));
 	pq_sendbytes(&buf, (char *)&txn_count, sizeof(txn_count));
 	pq_sendbytes(&buf, (char *)&status, sizeof(int) * txn_count);
@@ -499,11 +496,7 @@ ProcessGetSnapshotCommandMulti(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, SNAPSHOT_GET_MULTI_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendbytes(&buf, (char *)&txn_count, sizeof(txn_count));
 	pq_sendbytes(&buf, (char *)status, sizeof(int) * txn_count);
 	pq_sendbytes(&buf, (char *)&snapshot->sn_snapid, sizeof (uint64));
@@ -514,6 +507,16 @@ ProcessGetSnapshotCommandMulti(Port *myport, StringInfo message)
 	pq_sendint(&buf, sn_xcnt, sizeof (int));
 	pq_sendbytes(&buf, (char *)snapshot->sn_xip,
 				 sizeof(GlobalTransactionId) * sn_xcnt);
+
+	addGTMDebugMessage(DEBUG1, "Sending response for MSG_SNAPSHOT_GET_MULTI	"
+			"msglen:%d,"
+			"proxyhdr:(%d/%d),txn_count:%d,sn_snapid:%ld,sn_xmin:%u,xm_xmax:%u,"
+			"sn_xcnt:%d",
+			buf.len,
+			myport->con_proxyhdr.ph_thrid, myport->con_proxyhdr.ph_command_id,
+			txn_count, snapshot->sn_snapid, snapshot->sn_xmin,
+			snapshot->sn_xmax, sn_xcnt);
+
 	pq_endmessage(myport, &buf);
 
 	if (myport->remote_type != GTM_NODE_GTM_PROXY)

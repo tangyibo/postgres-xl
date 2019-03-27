@@ -222,11 +222,7 @@ ProcessPGXCNodeRegister(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, NODE_REGISTER_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&type, sizeof(GTM_PGXCNodeType));
 		/* Node name length */
 		pq_sendint(&buf, strlen(node_name), 4);
@@ -324,11 +320,7 @@ ProcessPGXCNodeUnregister(Port *myport, StringInfo message, bool is_backup)
 		pq_beginmessage(&buf, 'S');
 		pq_sendint(&buf, NODE_UNREGISTER_RESULT, 4);
 		if (myport->remote_type == GTM_NODE_GTM_PROXY)
-		{
-			GTM_ProxyMsgHeader proxyhdr;
-			proxyhdr.ph_conid = myport->conn_id;
-			pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-		}
+			pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 		pq_sendbytes(&buf, (char *)&type, sizeof(GTM_PGXCNodeType));
 		/* Node name length */
 		pq_sendint(&buf, strlen(node_name), 4);
@@ -401,11 +393,7 @@ ProcessPGXCNodeList(Port *myport, StringInfo message)
 	pq_beginmessage(&buf, 'S');
 	pq_sendint(&buf, NODE_LIST_RESULT, 4);
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_sendint(&buf, num_node, sizeof(int));   /* number of nodes */
 
 	/*
@@ -573,11 +561,7 @@ ProcessPGXCRegisterSession(Port *myport, StringInfo message)
 	pq_sendint(&buf, REGISTER_SESSION_RESULT, 4);
 	/* For proxy write out header */
 	if (myport->remote_type == GTM_NODE_GTM_PROXY)
-	{
-		GTM_ProxyMsgHeader proxyhdr;
-		proxyhdr.ph_conid = myport->conn_id;
-		pq_sendbytes(&buf, (char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader));
-	}
+		pq_sendbytes(&buf, (char *)&myport->con_proxyhdr, sizeof (GTM_ProxyMsgHeader));
 	pq_endmessage(myport, &buf);
 	/* Flush connections */
 	if (myport->remote_type != GTM_NODE_GTM_PROXY)

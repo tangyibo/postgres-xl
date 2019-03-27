@@ -25,9 +25,11 @@
 #define GTM_MAX_SIMUL_RWLOCKS	(1024 + 32)
 #define GTM_MAX_SIMUL_MUTEX		(32)
 
+#define FORMATTED_TS_LEN		128
+
 #define GTM_COMMON_THREAD_INFO \
 	GTM_ThreadID			thr_id; \
-	uint32					thr_localid; \
+	uint16					thr_localid; \
 	bool					is_main_thread; \
 	void * (* thr_startroutine)(void *); \
 	MemoryContext	thr_thread_context; \
@@ -43,7 +45,13 @@
 	int				thr_num_rwlocks_held;	\
 	GTM_RWLock		*thr_rwlocks_held[GTM_MAX_SIMUL_RWLOCKS];	\
 	int				thr_num_mutexlocks_held;	\
-	GTM_MutexLock	*thr_mutexlocks_held[GTM_MAX_SIMUL_MUTEX];
+	GTM_MutexLock	*thr_mutexlocks_held[GTM_MAX_SIMUL_MUTEX];	\
+	int				thr_num_debug_buffers; \
+	int				thr_next_debug_buffer; \
+	StringInfo		*thr_debug_buffers; \
+	bool			thr_debug_buffers_initialised; \
+	uint32			thr_msg_counter; \
+	char			thr_formatted_log_time[128]; \
 
 
 #endif

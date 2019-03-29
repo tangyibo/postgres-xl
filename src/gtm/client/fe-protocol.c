@@ -890,7 +890,12 @@ gtmpqFreeResultData(GTM_Result *result, GTM_PGXCNodeType remote_type)
 	 * need cleanup even at the proxy level
 	 */
 	if (remote_type == GTM_NODE_GTM_PROXY)
+	{
+		result->gr_type = INVALID_RESULT;
+		result->gr_msglen = 0;
+		result->gr_status = -1;
 		return;
+	}
 
 	switch (result->gr_type)
 	{

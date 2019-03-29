@@ -1663,7 +1663,6 @@ setjmp_again:
 		gtm_foreach(elem, thrinfo->thr_processed_commands)
 		{
 			GTMProxy_CommandInfo *cmdinfo = (GTMProxy_CommandInfo *)gtm_lfirst(elem);
-
 			/*
 			 * If this is a continuation of a multi-part command response, we
 			 * don't need to read another result from the stream. The previous
@@ -1671,9 +1670,18 @@ setjmp_again:
 			 */
 			if (cmdinfo->ci_res_index == 0)
 			{
+				addGTMDebugMessage(DEBUG1, "Expecting response for %s,"
+						"proxyhdr:(%d/%d)",
+						gtm_util_message_name(cmdinfo->ci_mtype),
+						cmdinfo->ci_proxy_hdr.ph_thrid,
+						cmdinfo->ci_proxy_hdr.ph_command_id);
+
 				Enable_Longjmp();
 				if ((res = GTMPQgetResult(thrinfo->thr_gtm_conn)) == NULL)
 				{
+					addGTMDebugMessage(DEBUG1, "GTMPQgetResult failed,"
+							"connection error message: %s",
+							thrinfo->thr_gtm_conn->errorMessage.data);
 					/*
 					 * Here's another place to check GTM communication error.
 					 * In this case, backup of each command will be taken care of
@@ -1681,7 +1689,8 @@ setjmp_again:
 					 * disconnect GTM connection, retry connection and then if it faile,
 					 * wait for reconnect from gtm_ctl.
 					 */
-					if ((thrinfo->thr_gtm_conn->last_errno != 0) || (thrinfo->thr_gtm_conn->status == CONNECTION_BAD))
+					if ((thrinfo->thr_gtm_conn->last_errno != 0) ||
+						(thrinfo->thr_gtm_conn->status == CONNECTION_BAD))
 					{
 						/*
 						 * Please note that error handling can end up with longjmp() and
@@ -1692,6 +1701,12 @@ setjmp_again:
 					elog(ERROR, "GTMPQgetResult failed");
 				}
 				Disable_Longjmp();
+			}
+			else
+			{
+				addGTMDebugMessage(DEBUG1, "Reusing previous result from GTM "
+						"for %s grouped message",
+						gtm_util_message_name(cmdinfo->ci_mtype));
 			}
 
 			GTMProxy_DumpResponse(res);
@@ -2620,6 +2635,12 @@ GTMProxy_ProcessPendingCommands(GTMProxy_ThreadInfo *thrinfo)
 		if (gtmpqPutMsgStart('C', true, gtm_conn) ||
 			gtmpqPutnchar((char *)&proxyhdr, sizeof (GTM_ProxyMsgHeader), gtm_conn))
 			elog(ERROR, "Error proxing data");
+
+		addGTMDebugMessage(DEBUG1, "Sending a new group message to GTM for %s,"
+				"number of members in group %d, proxyhdr(%d/%d)",
+				gtm_util_message_name(ii),
+				gtm_list_length(thrinfo->thr_pending_commands[ii]),
+				proxyhdr.ph_thrid, proxyhdr.thr_command_id);
 
 		switch (ii)
 		{

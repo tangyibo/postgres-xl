@@ -46,6 +46,7 @@
 	GTM_RWLock		*thr_rwlocks_held[GTM_MAX_SIMUL_RWLOCKS];	\
 	int				thr_num_mutexlocks_held;	\
 	GTM_MutexLock	*thr_mutexlocks_held[GTM_MAX_SIMUL_MUTEX];	\
+	GTM_RWLock		thr_debug_buffers_lock; \
 	int				thr_num_debug_buffers; \
 	int				thr_next_debug_buffer; \
 	StringInfo		*thr_debug_buffers; \

@@ -166,6 +166,7 @@ MainThreadInit()
 
 	thrinfo->is_main_thread = true;
 	GTM_RWLockInit(&thrinfo->thr_lock);
+	GTM_RWLockInit(&thrinfo->thr_debug_buffers_lock);
 
 	if (SetMyThreadInfo(thrinfo))
 	{
@@ -2562,10 +2563,12 @@ dumpGTMDebugBuffersForThread(GTM_ThreadInfo *thrinfo, FILE *fp)
 	fprintf(fp, "Dumping GTM debug buffers for thread %d\n", thrinfo->thr_localid);
 	fprintf(fp, "====================================\n\n");
 
+	GTM_RWLockAcquire(&thrinfo->thr_debug_buffers_lock, GTM_LOCKMODE_READ);
 	if (!thrinfo->thr_debug_buffers_initialised)
 	{
 		fprintf(fp, "GTM debug buffers not setup\n");
 		fflush(fp);
+		GTM_RWLockRelease(&thrinfo->thr_debug_buffers_lock);
 		return;
 	}
 
@@ -2574,6 +2577,7 @@ dumpGTMDebugBuffersForThread(GTM_ThreadInfo *thrinfo, FILE *fp)
 		if (thrinfo->thr_debug_buffers[ii]->len)
 			fprintf(fp, "%s\n", thrinfo->thr_debug_buffers[ii]->data);
 	}
+	GTM_RWLockRelease(&thrinfo->thr_debug_buffers_lock);
 }
 
 void
@@ -2586,18 +2590,18 @@ dumpGTMDebugBuffers(bool current)
 		GTM_ThreadInfo	*thrinfo = GetMyThreadInfo;
 		dumpGTMDebugBuffersForThread(thrinfo, fp);
 	}
+	else if (NumRWLocksHeld > 0)
+		fprintf(fp, "Thread holding RW locks - unsafe to dump buffers\n");
 	else
 	{
 		int	ii;
-
 		GTM_RWLockAcquire(&GTMThreads->gt_lock, GTM_LOCKMODE_READ);
-
-		for (ii = 0; ii < GTMThreads->gt_thread_count; ii++)
+		for (ii = 0; ii < GTMThreads->gt_array_size; ii++)
 		{
 			GTM_ThreadInfo	*thrinfo = GTMThreads->gt_threads[ii];
-			dumpGTMDebugBuffersForThread(thrinfo, fp);
+			if (thrinfo != NULL)
+				dumpGTMDebugBuffersForThread(thrinfo, fp);
 		}
-
 		GTM_RWLockRelease(&GTMThreads->gt_lock);
 	}
 

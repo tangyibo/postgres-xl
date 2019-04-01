@@ -146,6 +146,8 @@ GTMProxy_ThreadCreate(void *(* startroutine)(void *), int idx)
 	GTM_MutexLockInit(&thrinfo->thr_lock);
 	GTM_CVInit(&thrinfo->thr_cv);
 
+	GTM_RWLockInit(&thrinfo->thr_debug_buffers_lock);
+
 	/*
 	 * Initialize communication area with SIGUSR2 signal handler (reconnect)
 	 */

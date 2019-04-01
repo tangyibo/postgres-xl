@@ -201,6 +201,7 @@ initGTMDebugBuffers(int num_buffers)
 	if (num_buffers <= 0)
 		return;
 
+	GTM_RWLockAcquire(&GetMyThreadInfo->thr_debug_buffers_lock, GTM_LOCKMODE_WRITE);
 	GetMyThreadInfo->thr_num_debug_buffers = num_buffers;
 	GetMyThreadInfo->thr_debug_buffers = (StringInfo *) palloc0(
 			sizeof(StringInfo) * num_buffers);
@@ -210,6 +211,7 @@ initGTMDebugBuffers(int num_buffers)
 	GetMyThreadInfo->thr_next_debug_buffer = 0;
 	GetMyThreadInfo->thr_msg_counter = 0;
 	GetMyThreadInfo->thr_debug_buffers_initialised = true;
+	GTM_RWLockRelease(&GetMyThreadInfo->thr_debug_buffers_lock);
 }
 
 static void
@@ -238,6 +240,8 @@ addGTMDebugMessage(int elevel, const char *fmt, ...)
 {
 	GTM_ThreadInfo	*thrinfo = (GTM_ThreadInfo *) GetMyThreadInfo;
 	StringInfo buf;
+
+	GTM_RWLockAcquire(&thrinfo->thr_debug_buffers_lock, GTM_LOCKMODE_WRITE);
 
 	if (thrinfo->thr_debug_buffers_initialised)
 		buf = thrinfo->thr_debug_buffers[thrinfo->thr_next_debug_buffer];
@@ -268,16 +272,19 @@ addGTMDebugMessage(int elevel, const char *fmt, ...)
 		enlargeStringInfo(buf, buf->maxlen);
 	}
 
-	/* Emit to log as well, at the given level */
-	elog(elevel, "%s", buf->data);
-
 	if (thrinfo->thr_debug_buffers_initialised)
 	{
 		thrinfo->thr_next_debug_buffer++;
 		if (thrinfo->thr_next_debug_buffer == thrinfo->thr_num_debug_buffers)
 			thrinfo->thr_next_debug_buffer = 0;
 	}
-	else
+
+	GTM_RWLockRelease(&thrinfo->thr_debug_buffers_lock);
+
+	/* Emit to log as well, at the given level */
+	elog(elevel, "%s", buf->data);
+
+	if (!thrinfo->thr_debug_buffers_initialised)
 	{
 		pfree(buf->data);
 		pfree(buf);

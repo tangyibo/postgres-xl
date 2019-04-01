@@ -3428,12 +3428,21 @@ dumpGTMProxyDebugBuffersForThread(GTMProxy_ThreadInfo *thrinfo, FILE *fp)
 		fflush(fp);
 		return;
 	}
-
-	for (ii = 0; ii < thrinfo->thr_num_debug_buffers; ii++)
+	PG_TRY();
 	{
-		if (thrinfo->thr_debug_buffers[ii]->len)
-			fprintf(fp, "%s\n", thrinfo->thr_debug_buffers[ii]->data);
+		GTM_RWLockAcquire(&thrinfo->thr_debug_buffers_lock, GTM_LOCKMODE_READ);
+		for (ii = 0; ii < thrinfo->thr_num_debug_buffers; ii++)
+		{
+			if (thrinfo->thr_debug_buffers[ii]->len)
+				fprintf(fp, "%s\n", thrinfo->thr_debug_buffers[ii]->data);
+		}
+		GTM_RWLockRelease(&thrinfo->thr_debug_buffers_lock);
 	}
+	PG_CATCH();
+	{
+		GTM_RWLockRelease(&thrinfo->thr_debug_buffers_lock);
+	}
+	PG_END_TRY();
 }
 
 void
@@ -3446,18 +3455,19 @@ dumpGTMProxyDebugBuffers(bool current)
 		GTMProxy_ThreadInfo	*thrinfo = GetMyThreadInfo;
 		dumpGTMProxyDebugBuffersForThread(thrinfo, fp);
 	}
+	else if (NumRWLocksHeld > 0)
+		fprintf(fp, "Thread holding RW locks - unsafe to dump buffers\n");
 	else
 	{
 		int	ii;
 
 		GTM_RWLockAcquire(&GTMProxyThreads->gt_lock, GTM_LOCKMODE_READ);
-
-		for (ii = 0; ii < GTMProxyThreads->gt_thread_count; ii++)
+		for (ii = 0; ii < GTMProxyThreads->gt_array_size; ii++)
 		{
 			GTMProxy_ThreadInfo	*thrinfo = GTMProxyThreads->gt_threads[ii];
-			dumpGTMProxyDebugBuffersForThread(thrinfo, fp);
+			if (thrinfo != NULL)
+				dumpGTMProxyDebugBuffersForThread(thrinfo, fp);
 		}
-
 		GTM_RWLockRelease(&GTMProxyThreads->gt_lock);
 	}
 

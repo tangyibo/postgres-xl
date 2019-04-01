@@ -218,6 +218,7 @@ GTM_ThreadCreate(GTM_ConnectionInfo *conninfo,
 
 	thrinfo->thr_conn = conninfo;
 	GTM_RWLockInit(&thrinfo->thr_lock);
+	GTM_RWLockInit(&thrinfo->thr_debug_buffers_lock);
 
 	/*
 	 * The thread status is set to GTM_THREAD_STARTING and will be changed by

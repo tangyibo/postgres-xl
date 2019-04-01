@@ -2640,7 +2640,7 @@ GTMProxy_ProcessPendingCommands(GTMProxy_ThreadInfo *thrinfo)
 				"number of members in group %d, proxyhdr(%d/%d)",
 				gtm_util_message_name(ii),
 				gtm_list_length(thrinfo->thr_pending_commands[ii]),
-				proxyhdr.ph_thrid, proxyhdr.thr_command_id);
+				proxyhdr.ph_thrid, proxyhdr.ph_command_id);
 
 		switch (ii)
 		{
@@ -3424,7 +3424,7 @@ dumpGTMProxyDebugBuffersForThread(GTMProxy_ThreadInfo *thrinfo, FILE *fp)
 
 	if (!thrinfo->thr_debug_buffers_initialised)
 	{
-		fprintf(fp, "GTM debug buffers not setup");
+		fprintf(fp, "GTM debug buffers not setup\n");
 		fflush(fp);
 		return;
 	}

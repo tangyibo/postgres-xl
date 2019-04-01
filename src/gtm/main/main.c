@@ -2564,7 +2564,7 @@ dumpGTMDebugBuffersForThread(GTM_ThreadInfo *thrinfo, FILE *fp)
 
 	if (!thrinfo->thr_debug_buffers_initialised)
 	{
-		fprintf(fp, "GTM debug buffers not setup");
+		fprintf(fp, "GTM debug buffers not setup\n");
 		fflush(fp);
 		return;
 	}

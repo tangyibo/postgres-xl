@@ -192,6 +192,7 @@ char *gtm_util_message_name(GTM_MessageType type)
 	return message_name[type];
 }
 
+#ifdef GTM_DEBUG_TRACE
 void
 initGTMDebugBuffers(int num_buffers)
 {
@@ -282,3 +283,15 @@ addGTMDebugMessage(int elevel, const char *fmt, ...)
 		pfree(buf);
 	}
 }
+#else
+void
+initGTMDebugBuffers(int num_buffers)
+{
+	GetMyThreadInfo->thr_debug_buffers_initialised = false;
+}
+
+void
+addGTMDebugMessage(int elevel, const char *fmt, ...)
+{
+}
+#endif

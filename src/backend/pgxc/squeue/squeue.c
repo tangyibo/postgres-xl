@@ -974,6 +974,12 @@ SharedQueueRead(SharedQueue squeue, int consumerIdx,
 	int 		datalen;
 
 	Assert(cstate->cs_qlength > 0);
+	if (sqsync == NULL)
+	{
+		elog(ERROR, "SQueue %s - producer node %d, pid %d found sq_sync is NULL",
+				squeue->sq_key, squeue->sq_nodeid, squeue->sq_pid);
+		return false;
+	}
 
 	/*
 	 * If we run out of produced data while reading, we would like to wake up
@@ -1308,6 +1314,12 @@ SharedQueueResetNotConnected(SharedQueue squeue)
 
 	elog(DEBUG1, "SQueue %s, resetting all unconnected consumers",
 			squeue->sq_key);
+	if (sqsync == NULL)
+	{
+		elog(ERROR, "SQueue %s - producer node %d, pid %d found sq_sync is NULL",
+				squeue->sq_key, squeue->sq_nodeid, squeue->sq_pid);
+		return;
+	}
 
 	LWLockAcquire(squeue->sq_sync->sqs_producer_lwlock, LW_EXCLUSIVE);
 
@@ -1347,7 +1359,15 @@ bool
 SharedQueueWaitOnProducerLatch(SharedQueue squeue, long timeout)
 {
 	SQueueSync *sqsync = squeue->sq_sync;
-	int rc = WaitLatch(&sqsync->sqs_producer_latch,
+	int	rc;
+
+	if (sqsync == NULL)
+	{
+		elog(ERROR, "SQueue %s - producer node %d, pid %d found sq_sync is NULL",
+				squeue->sq_key, squeue->sq_nodeid, squeue->sq_pid);
+		return false;
+	}
+	rc = WaitLatch(&sqsync->sqs_producer_latch,
 			WL_LATCH_SET | WL_POSTMASTER_DEATH | WL_TIMEOUT,
 			timeout, WAIT_EVENT_MQ_INTERNAL);
 	ResetLatch(&sqsync->sqs_producer_latch);
@@ -1369,6 +1389,12 @@ SharedQueueCanPause(SharedQueue squeue)
 	int			ncons;
 	int 		i;
 
+	if (sqsync == NULL)
+	{
+		elog(ERROR, "SQueue %s - producer node %d, pid %d found sq_sync is NULL",
+				squeue->sq_key, squeue->sq_nodeid, squeue->sq_pid);
+		return false;
+	}
 	usedspace = 0;
 	ncons = 0;
 	for (i = 0; result && (i < squeue->sq_nconsumers); i++)
@@ -1522,6 +1548,12 @@ SharedQueueUnBind(SharedQueue squeue, bool failed)
 	elog(DEBUG1, "SQueue %s, unbinding the SQueue (failed: %c) - producer node %d, "
 			"pid %d, nconsumers %d", squeue->sq_key, failed ? 'T' : 'F',
 			squeue->sq_nodeid, squeue->sq_pid, squeue->sq_nconsumers);
+	if (sqsync == NULL)
+	{
+		elog(WARNING, "SQueue %s - producer node %d, pid %d found sq_sync is NULL",
+				squeue->sq_key, squeue->sq_nodeid, squeue->sq_pid);
+		return;
+	}
 
 CHECK:
 
@@ -1638,7 +1670,11 @@ CHECK:
 	/* All is done, clean up */
 	DisownLatch(&sqsync->sqs_producer_latch);
 
-	if (--squeue->sq_refcnt == 0)
+	/* Decrement the refcount only if I am the proudcer */
+	/* We expect comsumers never call SharedQueryUnbind().  This is a safeguard. */
+	if (squeue->sq_pid == MyProcPid)
+		squeue->sq_refcnt--;
+	if (squeue->sq_refcnt == 0)
 	{
 		/* Now it is OK to remove hash table entry */
 		squeue->sq_sync = NULL;

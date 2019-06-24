@@ -231,6 +231,8 @@ typedef enum
 
 #define GUC_UNIT				(GUC_UNIT_MEMORY | GUC_UNIT_TIME)
 
+/* quote as literal while sending to remote node.  */
+#define GUC_QUOTE_LITERAL	0x100000
 
 /* GUC vars that are actually declared in guc.c, rather than elsewhere */
 extern bool log_duration;

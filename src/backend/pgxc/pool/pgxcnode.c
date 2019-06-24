@@ -194,8 +194,8 @@ uint32			PGXCNodeIdentifier = 0;
 typedef struct
 {
 	NameData name;
-	NameData value;
 	int		 flags;
+	char	 value[1];
 } ParamEntry;
 
 
@@ -2691,9 +2691,9 @@ PGXCNodeSetParam(bool local, const char *name, const char *value, int flags)
 	if (value)
 	{
 		ParamEntry *entry;
-		entry = (ParamEntry *) palloc(sizeof (ParamEntry));
+		entry = (ParamEntry *) palloc0(sizeof (ParamEntry) + strlen(value));
 		strlcpy((char *) (&entry->name), name, NAMEDATALEN);
-		strlcpy((char *) (&entry->value), value, NAMEDATALEN);
+		strcpy((char *) (entry->value), value);
 		entry->flags = flags;
 
 		param_list = lappend(param_list, entry);
@@ -2762,7 +2762,7 @@ get_set_command(List *param_list, StringInfo command, bool local)
 	foreach (lc, param_list)
 	{
 		ParamEntry *entry = (ParamEntry *) lfirst(lc);
-		const char *value = NameStr(entry->value);
+		const char *value = entry->value;
 
 		if (strlen(value) == 0)
 			value = "''";

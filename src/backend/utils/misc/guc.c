@@ -11648,6 +11648,18 @@ quote_guc_value(const char *value, int flags)
 	if (flags & GUC_LIST_INPUT)
 	   return value;
 
+	if (flags & GUC_QUOTE_LITERAL)
+	{
+		char	*newval = palloc(strlen(value) + 3);
+		int		len = strlen(value);
+
+		newval[0] = '\'';
+		strcpy(newval + 1, value);
+		newval[len + 1] = '\'';
+		newval[len + 2] = '\0';
+		return newval;
+	}
+
 	/*
 	 * Otherwise quote the value. quote_identifier() takes care of correctly
 	 * quoting the value when needed, including GUC_UNIT_MEMORY and

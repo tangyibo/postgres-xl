@@ -238,10 +238,13 @@ pgxc_planner(Query *query, int cursorOptions, ParamListInfo boundParams)
 {
 	PlannedStmt *result;
 
-	/* see if can ship the query completely */
-	result = pgxc_FQS_planner(query, cursorOptions, boundParams);
-	if (result)
-		return result;
+	if (IS_PGXC_LOCAL_COORDINATOR)
+	{
+		/* see if can ship the query completely */
+		result = pgxc_FQS_planner(query, cursorOptions, boundParams);
+		if (result)
+			return result;
+	}
 
 	/* we need Coordinator for evaluation, invoke standard planner */
 	result = standard_planner(query, cursorOptions, boundParams);

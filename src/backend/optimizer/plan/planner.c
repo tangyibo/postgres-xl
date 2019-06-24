@@ -69,7 +69,7 @@ double		cursor_tuple_fraction = DEFAULT_CURSOR_TUPLE_FRACTION;
 int			force_parallel_mode = FORCE_PARALLEL_OFF;
 
 /* Hook for plugins to get control in planner() */
-planner_hook_type planner_hook = NULL;
+planner_hook_type planner_hook = pgxc_planner;
 
 /* Hook for plugins to get control when grouping_planner() plans upper rels */
 create_upper_paths_hook_type create_upper_paths_hook = NULL;
@@ -222,15 +222,6 @@ planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	if (planner_hook)
 		result = (*planner_hook) (parse, cursorOptions, boundParams);
 	else
-#ifdef PGXC
-		/*
-		 * A Coordinator receiving a query from another Coordinator
-		 * is not allowed to go into PGXC planner.
-		 */
-		if (IS_PGXC_LOCAL_COORDINATOR)
-			result = pgxc_planner(parse, cursorOptions, boundParams);
-		else
-#endif
 			result = standard_planner(parse, cursorOptions, boundParams);
 	return result;
 }

@@ -485,22 +485,27 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 	}
 
 	/*
-	 * If this is a baserel, consider gathering any partial paths we may have
-	 * created for it.  (If we tried to gather inheritance children, we could
-	 * end up with a very large number of gather nodes, each trying to grab
-	 * its own pool of workers, so don't do this for otherrels.  Instead,
-	 * we'll consider gathering partial paths for the parent appendrel.)
-	 */
-	if (rel->reloptkind == RELOPT_BASEREL)
-		generate_gather_paths(root, rel);
-
-	/*
 	 * Allow a plugin to editorialize on the set of Paths for this base
 	 * relation.  It could add new paths (such as CustomPaths) by calling
-	 * add_path(), or delete or modify paths added by the core code.
+	 * add_path(), or add_partial_path() if parallel aware.  It could also
+	 * delete or modify paths added by the core code.
 	 */
 	if (set_rel_pathlist_hook)
 		(*set_rel_pathlist_hook) (root, rel, rti, rte);
+
+	/*
+	 * If this is a baserel, we should normally consider gathering any partial
+	 * paths we may have created for it.  We have to do this after calling the
+	 * set_rel_pathlist_hook, else it cannot add partial paths to be included
+	 * here.
+	 *
+	 * However, if this is an inheritance child, skip it.  Otherwise, we could
+	 * end up with a very large number of gather nodes, each trying to grab
+	 * its own pool of workers.  Instead, we'll consider gathering partial
+	 * paths for the parent appendrel.
+	 */
+	if (rel->reloptkind == RELOPT_BASEREL)
+		generate_gather_paths(root, rel);
 
 	/* Now find the cheapest of the paths for this rel */
 	set_cheapest(rel);
@@ -1458,7 +1463,7 @@ add_paths_to_append_rel(PlannerInfo *root, RelOptInfo *rel,
 	/*
 	 * Consider an append of partial unordered, unparameterized partial paths.
 	 */
-	if (partial_subpaths_valid)
+	if (partial_subpaths_valid && partial_subpaths != NIL)
 	{
 		AppendPath *appendpath;
 		ListCell   *lc;
@@ -1761,9 +1766,11 @@ accumulate_append_subpath(List *subpaths, Path *path)
  *	  Build a dummy path for a relation that's been excluded by constraints
  *
  * Rather than inventing a special "dummy" path type, we represent this as an
- * AppendPath with no members (see also IS_DUMMY_PATH/IS_DUMMY_REL macros).
+ * AppendPath with no members (see also IS_DUMMY_APPEND/IS_DUMMY_REL macros).
  *
- * This is exported because inheritance_planner() has need for it.
+ * (See also mark_dummy_rel, which does basically the same thing, but is
+ * typically used to change a rel into dummy state after we already made
+ * paths for it.)
  */
 void
 set_dummy_rel_pathlist(RelOptInfo *rel)
@@ -1776,13 +1783,16 @@ set_dummy_rel_pathlist(RelOptInfo *rel)
 	rel->pathlist = NIL;
 	rel->partial_pathlist = NIL;
 
-	add_path(rel, (Path *) create_append_path(rel, NIL, NULL, 0, NIL));
+	/* Set up the dummy path */
+	add_path(rel, (Path *) create_append_path(rel, NIL,
+											  rel->lateral_relids,
+											  0, NIL));
 
 	/*
-	 * We set the cheapest path immediately, to ensure that IS_DUMMY_REL()
-	 * will recognize the relation as dummy if anyone asks.  This is redundant
-	 * when we're called from set_rel_size(), but not when called from
-	 * elsewhere, and doing it twice is harmless anyway.
+	 * We set the cheapest-path fields immediately, just in case they were
+	 * pointing at some discarded path.  This is redundant when we're called
+	 * from set_rel_size(), but not when called from elsewhere, and doing it
+	 * twice is harmless anyway.
 	 */
 	set_cheapest(rel);
 }

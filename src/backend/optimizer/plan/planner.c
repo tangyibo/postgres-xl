@@ -39,6 +39,7 @@
 #endif
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
+#include "optimizer/paramassign.h"
 #include "optimizer/pathnode.h"
 #include "optimizer/paths.h"
 #include "optimizer/plancat.h"
@@ -576,7 +577,7 @@ subquery_planner(PlannerGlobal *glob, Query *parse,
 	root->hasInheritedTarget = false;
 	root->hasRecursion = hasRecursion;
 	if (hasRecursion)
-		root->wt_param_id = SS_assign_special_param(root);
+		root->wt_param_id = assign_special_exec_param(root);
 	else
 		root->wt_param_id = -1;
 	root->non_recursive_path = NULL;
@@ -1445,7 +1446,7 @@ inheritance_planner(PlannerInfo *root)
 		 * If this child rel was excluded by constraint exclusion, exclude it
 		 * from the result plan.
 		 */
-		if (IS_DUMMY_PATH(subpath))
+		if (IS_DUMMY_REL(sub_final_rel))
 			continue;
 
 #ifdef XCP
@@ -1551,32 +1552,57 @@ inheritance_planner(PlannerInfo *root)
 	 * to get control here.
 	 */
 
-	/*
-	 * If we managed to exclude every child rel, return a dummy plan; it
-	 * doesn't even need a ModifyTable node.
-	 */
 	if (subpaths == NIL)
 	{
-		set_dummy_rel_pathlist(final_rel);
-		return;
+		/*
+		 * We managed to exclude every child rel, so generate a dummy path
+		 * representing the empty set.  Although it's clear that no data will
+		 * be updated or deleted, we will still need to have a ModifyTable
+		 * node so that any statement triggers are executed.  (This could be
+		 * cleaner if we fixed nodeModifyTable.c to support zero child nodes,
+		 * but that probably wouldn't be a net win.)
+		 */
+		List	   *tlist;
+		Path	   *dummy_path;
+
+		/* tlist processing never got done, either */
+		tlist = root->processed_tlist = preprocess_targetlist(root);
+		final_rel->reltarget = create_pathtarget(root, tlist);
+
+		/* Make a dummy path, cf set_dummy_rel_pathlist() */
+		dummy_path = (Path *) create_append_path(final_rel, NIL,
+												 NULL, 0, NIL);
+
+		/* These lists must be nonempty to make a valid ModifyTable node */
+		subpaths = list_make1(dummy_path);
+		subroots = list_make1(root);
+		resultRelations = list_make1_int(parse->resultRelation);
+		if (parse->withCheckOptions)
+			withCheckOptionLists = list_make1(parse->withCheckOptions);
+		if (parse->returningList)
+			returningLists = list_make1(parse->returningList);
 	}
-
-	/*
-	 * Put back the final adjusted rtable into the master copy of the Query.
-	 * (We mustn't do this if we found no non-excluded children.)
-	 */
-	parse->rtable = final_rtable;
-	root->simple_rel_array_size = save_rel_array_size;
-	root->simple_rel_array = save_rel_array;
-	/* Must reconstruct master's simple_rte_array, too */
-	root->simple_rte_array = (RangeTblEntry **)
-		palloc0((list_length(final_rtable) + 1) * sizeof(RangeTblEntry *));
-	rti = 1;
-	foreach(lc, final_rtable)
+	else
 	{
-		RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
+		/*
+		 * Put back the final adjusted rtable into the master copy of the
+		 * Query.  (We mustn't do this if we found no non-excluded children,
+		 * since we never saved an adjusted rtable at all.)
+		 */
+		parse->rtable = final_rtable;
+		root->simple_rel_array_size = save_rel_array_size;
+		root->simple_rel_array = save_rel_array;
 
-		root->simple_rte_array[rti++] = rte;
+		/* Must reconstruct master's simple_rte_array, too */
+		root->simple_rte_array = (RangeTblEntry **)
+			palloc0((list_length(final_rtable) + 1) * sizeof(RangeTblEntry *));
+		rti = 1;
+		foreach(lc, final_rtable)
+		{
+			RangeTblEntry *rte = lfirst_node(RangeTblEntry, lc);
+
+			root->simple_rte_array[rti++] = rte;
+		}
 	}
 
 	/*
@@ -1603,7 +1629,7 @@ inheritance_planner(PlannerInfo *root)
 									 returningLists,
 									 rowMarks,
 									 NULL,
-									 SS_assign_special_param(root)));
+									 assign_special_exec_param(root)));
 }
 
 /*--------------------
@@ -2153,7 +2179,7 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 		{
 			path = (Path *) create_lockrows_path(root, final_rel, path,
 												 root->rowMarks,
-												 SS_assign_special_param(root));
+												 assign_special_exec_param(root));
 		}
 
 		/*
@@ -2257,7 +2283,7 @@ grouping_planner(PlannerInfo *root, bool inheritance_update,
 										returningLists,
 										rowMarks,
 										parse->onConflict,
-										SS_assign_special_param(root));
+										assign_special_exec_param(root));
 		}
 		else
 			/* Adjust path by injecting a remote subplan, if appropriate. */
@@ -6982,7 +7008,7 @@ adjust_path_distribution(PlannerInfo *root, Query *parse, Path *path)
 		return path;
 
 	/* and also skip dummy paths */
-	if (IS_DUMMY_PATH(path))
+	if (IS_DUMMY_APPEND(path))
 		return path;
 
 	/*

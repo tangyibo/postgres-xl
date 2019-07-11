@@ -202,6 +202,7 @@ char	   *namespace_search_path = NULL;
 
 /* Local functions */
 static void recomputeNamespacePath(void);
+static void AccessTempTableNamespace(bool force);
 static void InitTempTableNamespace(void);
 static void RemoveTempRelations(Oid tempNamespaceId);
 static void RemoveTempRelationsCallback(int code, Datum arg);
@@ -452,9 +453,8 @@ RangeVarGetCreationNamespace(const RangeVar *newRelation)
 		/* check for pg_temp alias */
 		if (strcmp(newRelation->schemaname, "pg_temp") == 0)
 		{
-			/* Initialize temp namespace if first time through */
-			if (!OidIsValid(myTempNamespace))
-				InitTempTableNamespace();
+			/* Initialize temp namespace */
+			AccessTempTableNamespace(false);
 			return myTempNamespace;
 		}
 		/* use exact schema given */
@@ -463,9 +463,8 @@ RangeVarGetCreationNamespace(const RangeVar *newRelation)
 	}
 	else if (newRelation->relpersistence == RELPERSISTENCE_TEMP)
 	{
-		/* Initialize temp namespace if first time through */
-		if (!OidIsValid(myTempNamespace))
-			InitTempTableNamespace();
+		/* Initialize temp namespace */
+		AccessTempTableNamespace(false);
 		return myTempNamespace;
 	}
 	else
@@ -475,7 +474,7 @@ RangeVarGetCreationNamespace(const RangeVar *newRelation)
 		if (activeTempCreationPending)
 		{
 			/* Need to initialize temp namespace */
-			InitTempTableNamespace();
+			AccessTempTableNamespace(true);
 			return myTempNamespace;
 		}
 		namespaceId = activeCreationNamespace;
@@ -2932,9 +2931,8 @@ LookupCreationNamespace(const char *nspname)
 	/* check for pg_temp alias */
 	if (strcmp(nspname, "pg_temp") == 0)
 	{
-		/* Initialize temp namespace if first time through */
-		if (!OidIsValid(myTempNamespace))
-			InitTempTableNamespace();
+		/* Initialize temp namespace */
+		AccessTempTableNamespace(false);
 		return myTempNamespace;
 	}
 
@@ -2997,9 +2995,8 @@ QualifiedNameGetCreationNamespace(List *names, char **objname_p)
 		/* check for pg_temp alias */
 		if (strcmp(schemaname, "pg_temp") == 0)
 		{
-			/* Initialize temp namespace if first time through */
-			if (!OidIsValid(myTempNamespace))
-				InitTempTableNamespace();
+			/* Initialize temp namespace */
+			AccessTempTableNamespace(false);
 			return myTempNamespace;
 		}
 		/* use exact schema given */
@@ -3013,7 +3010,7 @@ QualifiedNameGetCreationNamespace(List *names, char **objname_p)
 		if (activeTempCreationPending)
 		{
 			/* Need to initialize temp namespace */
-			InitTempTableNamespace();
+			AccessTempTableNamespace(true);
 			return myTempNamespace;
 		}
 		namespaceId = activeCreationNamespace;
@@ -3804,6 +3801,38 @@ recomputeNamespacePath(void)
 }
 
 /*
+ * AccessTempTableNamespace
+ *		Provide access to a temporary namespace, potentially creating it
+ *		if not present yet.  This routine registers if the namespace gets
+ *		in use in this transaction.  'force' can be set to true to allow
+ *		the caller to enforce the creation of the temporary namespace for
+ *		use in this backend, which happens if its creation is pending.
+ */
+static void
+AccessTempTableNamespace(bool force)
+{
+	/*
+	 * Make note that this temporary namespace has been accessed in this
+	 * transaction.
+	 */
+	MyXactFlags |= XACT_FLAGS_ACCESSEDTEMPNAMESPACE;
+
+	/*
+	 * If the caller attempting to access a temporary schema expects the
+	 * creation of the namespace to be pending and should be enforced, then go
+	 * through the creation.
+	 */
+	if (!force && OidIsValid(myTempNamespace))
+		return;
+
+	/*
+	 * The temporary tablespace does not exist yet and is wanted, so
+	 * initialize it.
+	 */
+	InitTempTableNamespace();
+}
+
+/*
  * InitTempTableNamespace
  *		Initialize temp table namespace on first use in a particular backend
  */
@@ -4122,10 +4151,15 @@ RemoveTempRelationsCallback(int code, Datum arg)
 
 /*
  * Remove all temp tables from the temporary namespace.
+ *
+ * If we haven't set up one yet, but one exists from a previous crashed
+ * backend, clean that one; but only do this once in a session's life.
  */
 void
 ResetTempTableNamespace(void)
 {
+	static bool	TempNamespaceCleaned = false;
+
 	if (OidIsValid(myTempNamespace))
 		RemoveTempRelations(myTempNamespace);
 #ifdef XCP
@@ -4142,6 +4176,20 @@ ResetTempTableNamespace(void)
 			RemoveTempRelations(namespaceId);
 	}
 #endif
+	else if (MyBackendId != InvalidBackendId && !RecoveryInProgress() &&
+			 !TempNamespaceCleaned)
+	{
+		char		namespaceName[NAMEDATALEN];
+		Oid			namespaceId;
+
+		snprintf(namespaceName, sizeof(namespaceName), "pg_temp_%d",
+				 MyBackendId);
+		namespaceId = get_namespace_oid(namespaceName, true);
+		if (OidIsValid(namespaceId))
+			RemoveTempRelations(namespaceId);
+	}
+
+	TempNamespaceCleaned = true;
 }
 
 
@@ -4297,7 +4345,7 @@ fetch_search_path(bool includeImplicit)
 	 */
 	if (activeTempCreationPending)
 	{
-		InitTempTableNamespace();
+		AccessTempTableNamespace(true);
 		recomputeNamespacePath();
 	}
 

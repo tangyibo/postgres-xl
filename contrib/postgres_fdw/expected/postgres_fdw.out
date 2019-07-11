@@ -2814,6 +2814,46 @@ select sum(c1) from ft1 group by c2 having avg(c1 * (random() <= 1)::int) > 100 
                Remote SQL: SELECT "C 1", c2 FROM "S 1"."T 1"
 (10 rows)
 
+-- Remote aggregate in combination with a local Param (for the output
+-- of an initplan) can be trouble, per bug #15781
+explain (verbose, costs off)
+select exists(select 1 from pg_enum), sum(c1) from ft1;
+                    QUERY PLAN                    
+--------------------------------------------------
+ Foreign Scan
+   Output: $0, (sum(ft1.c1))
+   Relations: Aggregate on (public.ft1)
+   Remote SQL: SELECT sum("C 1") FROM "S 1"."T 1"
+   InitPlan 1 (returns $0)
+     ->  Seq Scan on pg_catalog.pg_enum
+(6 rows)
+
+select exists(select 1 from pg_enum), sum(c1) from ft1;
+ exists |  sum   
+--------+--------
+ t      | 500500
+(1 row)
+
+explain (verbose, costs off)
+select exists(select 1 from pg_enum), sum(c1) from ft1 group by 1;
+                    QUERY PLAN                     
+---------------------------------------------------
+ GroupAggregate
+   Output: ($0), sum(ft1.c1)
+   Group Key: $0
+   InitPlan 1 (returns $0)
+     ->  Seq Scan on pg_catalog.pg_enum
+   ->  Foreign Scan on public.ft1
+         Output: $0, ft1.c1
+         Remote SQL: SELECT "C 1" FROM "S 1"."T 1"
+(8 rows)
+
+select exists(select 1 from pg_enum), sum(c1) from ft1 group by 1;
+ exists |  sum   
+--------+--------
+ t      | 500500
+(1 row)
+
 -- Testing ORDER BY, DISTINCT, FILTER, Ordered-sets and VARIADIC within aggregates
 -- ORDER BY within aggregate, same column used to order
 explain (verbose, costs off)
@@ -3420,6 +3460,62 @@ select c2, sum from "S 1"."T 1" t1, lateral (select sum(t2.c1 + t1."C 1") sum fr
 (2 rows)
 
 reset enable_hashagg;
+-- bug #15613: bad plan for foreign table scan with lateral reference
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT ref_0.c2, subq_1.*
+FROM
+    "S 1"."T 1" AS ref_0,
+    LATERAL (
+        SELECT ref_0."C 1" c1, subq_0.*
+        FROM (SELECT ref_0.c2, ref_1.c3
+              FROM ft1 AS ref_1) AS subq_0
+             RIGHT JOIN ft2 AS ref_3 ON (subq_0.c3 = ref_3.c3)
+    ) AS subq_1
+WHERE ref_0."C 1" < 10 AND subq_1.c3 = '00001'
+ORDER BY ref_0."C 1";
+                                               QUERY PLAN                                                
+---------------------------------------------------------------------------------------------------------
+ Nested Loop
+   Output: ref_0.c2, ref_0."C 1", (ref_0.c2), ref_1.c3, ref_0."C 1"
+   ->  Nested Loop
+         Output: ref_0.c2, ref_0."C 1", ref_1.c3, (ref_0.c2)
+         ->  Index Scan using t1_pkey on "S 1"."T 1" ref_0
+               Output: ref_0."C 1", ref_0.c2, ref_0.c3, ref_0.c4, ref_0.c5, ref_0.c6, ref_0.c7, ref_0.c8
+               Index Cond: (ref_0."C 1" < 10)
+         ->  Foreign Scan on public.ft1 ref_1
+               Output: ref_1.c3, ref_0.c2
+               Remote SQL: SELECT c3 FROM "S 1"."T 1" WHERE ((c3 = '00001'::text))
+   ->  Materialize
+         Output: ref_3.c3
+         ->  Foreign Scan on public.ft2 ref_3
+               Output: ref_3.c3
+               Remote SQL: SELECT c3 FROM "S 1"."T 1" WHERE ((c3 = '00001'::text))
+(15 rows)
+
+SELECT ref_0.c2, subq_1.*
+FROM
+    "S 1"."T 1" AS ref_0,
+    LATERAL (
+        SELECT ref_0."C 1" c1, subq_0.*
+        FROM (SELECT ref_0.c2, ref_1.c3
+              FROM ft1 AS ref_1) AS subq_0
+             RIGHT JOIN ft2 AS ref_3 ON (subq_0.c3 = ref_3.c3)
+    ) AS subq_1
+WHERE ref_0."C 1" < 10 AND subq_1.c3 = '00001'
+ORDER BY ref_0."C 1";
+ c2 | c1 | c2 |  c3   
+----+----+----+-------
+  1 |  1 |  1 | 00001
+  2 |  2 |  2 | 00001
+  3 |  3 |  3 | 00001
+  4 |  4 |  4 | 00001
+  5 |  5 |  5 | 00001
+  6 |  6 |  6 | 00001
+  7 |  7 |  7 | 00001
+  8 |  8 |  8 | 00001
+  9 |  9 |  9 | 00001
+(9 rows)
+
 -- Check with placeHolderVars
 explain (verbose, costs off)
 select sum(q.a), count(q.b) from ft4 left join (select 13, avg(ft1.c1), sum(ft2.c1) from ft1 right join ft2 on (ft1.c1 = ft2.c1)) q(a, b, c) on (ft4.c1 <= q.b);
@@ -6302,6 +6398,25 @@ SELECT * from loc1;
   2 | skidoo triggered !
 (2 rows)
 
+EXPLAIN (verbose, costs off)
+UPDATE rem1 set f1 = 10;          -- all columns should be transmitted
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Update on public.rem1
+   Remote SQL: UPDATE public.loc1 SET f1 = $2, f2 = $3 WHERE ctid = $1
+   ->  Foreign Scan on public.rem1
+         Output: 10, f2, ctid, rem1.*
+         Remote SQL: SELECT f1, f2, ctid FROM public.loc1 FOR UPDATE
+(5 rows)
+
+UPDATE rem1 set f1 = 10;
+SELECT * from loc1;
+ f1 |               f2               
+----+--------------------------------
+ 10 | skidoo triggered ! triggered !
+ 10 | skidoo triggered ! triggered !
+(2 rows)
+
 DELETE FROM rem1;
 -- Add a second trigger, to check that the changes are propagated correctly
 -- from trigger to trigger
@@ -6414,7 +6529,7 @@ NOTICE:  trig_row_after(23, skidoo) AFTER ROW INSERT ON rem1
 NOTICE:  NEW: (13,"test triggered !")
   ctid  
 --------
- (0,27)
+ (0,29)
 (1 row)
 
 -- cleanup
@@ -6518,10 +6633,10 @@ BEFORE UPDATE ON rem1
 FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo');
 EXPLAIN (verbose, costs off)
 UPDATE rem1 set f2 = '';          -- can't be pushed down
-                             QUERY PLAN                              
----------------------------------------------------------------------
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
  Update on public.rem1
-   Remote SQL: UPDATE public.loc1 SET f2 = $2 WHERE ctid = $1
+   Remote SQL: UPDATE public.loc1 SET f1 = $2, f2 = $3 WHERE ctid = $1
    ->  Foreign Scan on public.rem1
          Output: f1, ''::text, ctid, rem1.*
          Remote SQL: SELECT f1, f2, ctid FROM public.loc1 FOR UPDATE
@@ -7142,12 +7257,12 @@ AFTER UPDATE OR DELETE ON bar2
 FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo');
 explain (verbose, costs off)
 update bar set f2 = f2 + 100;
-                                      QUERY PLAN                                      
---------------------------------------------------------------------------------------
+                                               QUERY PLAN                                               
+--------------------------------------------------------------------------------------------------------
  Update on public.bar
    Update on public.bar
    Foreign Update on public.bar2
-     Remote SQL: UPDATE public.loct2 SET f2 = $2 WHERE ctid = $1 RETURNING f1, f2, f3
+     Remote SQL: UPDATE public.loct2 SET f1 = $2, f2 = $3, f3 = $4 WHERE ctid = $1 RETURNING f1, f2, f3
    ->  Seq Scan on public.bar
          Output: bar.f1, (bar.f2 + 100), bar.ctid
    ->  Foreign Scan on public.bar2

@@ -668,6 +668,16 @@ select count(*) from (select c5, count(c1) from ft1 group by c5, sqrt(c2) having
 explain (verbose, costs off)
 select sum(c1) from ft1 group by c2 having avg(c1 * (random() <= 1)::int) > 100 order by 1;
 
+-- Remote aggregate in combination with a local Param (for the output
+-- of an initplan) can be trouble, per bug #15781
+explain (verbose, costs off)
+select exists(select 1 from pg_enum), sum(c1) from ft1;
+select exists(select 1 from pg_enum), sum(c1) from ft1;
+
+explain (verbose, costs off)
+select exists(select 1 from pg_enum), sum(c1) from ft1 group by 1;
+select exists(select 1 from pg_enum), sum(c1) from ft1 group by 1;
+
 
 -- Testing ORDER BY, DISTINCT, FILTER, Ordered-sets and VARIADIC within aggregates
 
@@ -877,6 +887,32 @@ explain (verbose, costs off)
 select c2, sum from "S 1"."T 1" t1, lateral (select sum(t2.c1 + t1."C 1") sum from ft2 t2 group by t2.c1) qry where t1.c2 * 2 = qry.sum and t1.c2 < 3 and t1."C 1" < 100 order by 1;
 select c2, sum from "S 1"."T 1" t1, lateral (select sum(t2.c1 + t1."C 1") sum from ft2 t2 group by t2.c1) qry where t1.c2 * 2 = qry.sum and t1.c2 < 3 and t1."C 1" < 100 order by 1;
 reset enable_hashagg;
+
+-- bug #15613: bad plan for foreign table scan with lateral reference
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT ref_0.c2, subq_1.*
+FROM
+    "S 1"."T 1" AS ref_0,
+    LATERAL (
+        SELECT ref_0."C 1" c1, subq_0.*
+        FROM (SELECT ref_0.c2, ref_1.c3
+              FROM ft1 AS ref_1) AS subq_0
+             RIGHT JOIN ft2 AS ref_3 ON (subq_0.c3 = ref_3.c3)
+    ) AS subq_1
+WHERE ref_0."C 1" < 10 AND subq_1.c3 = '00001'
+ORDER BY ref_0."C 1";
+
+SELECT ref_0.c2, subq_1.*
+FROM
+    "S 1"."T 1" AS ref_0,
+    LATERAL (
+        SELECT ref_0."C 1" c1, subq_0.*
+        FROM (SELECT ref_0.c2, ref_1.c3
+              FROM ft1 AS ref_1) AS subq_0
+             RIGHT JOIN ft2 AS ref_3 ON (subq_0.c3 = ref_3.c3)
+    ) AS subq_1
+WHERE ref_0."C 1" < 10 AND subq_1.c3 = '00001'
+ORDER BY ref_0."C 1";
 
 -- Check with placeHolderVars
 explain (verbose, costs off)
@@ -1381,6 +1417,11 @@ SELECT * from loc1;
 UPDATE rem1 set f2 = '';
 SELECT * from loc1;
 UPDATE rem1 set f2 = 'skidoo' RETURNING f2;
+SELECT * from loc1;
+
+EXPLAIN (verbose, costs off)
+UPDATE rem1 set f1 = 10;          -- all columns should be transmitted
+UPDATE rem1 set f1 = 10;
 SELECT * from loc1;
 
 DELETE FROM rem1;

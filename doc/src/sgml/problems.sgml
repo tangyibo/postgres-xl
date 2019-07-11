@@ -308,15 +308,6 @@
    message, perhaps parts of the error message.
   </para>
 
-  <para>
-   Also, please do <emphasis>not</emphasis> send reports to
-   the developers' mailing list <email>postgres-xl-developers@lists.sourceforge.net</email>.
-   This list is for discussing the
-   development of <productname>Postgres-XL</productname>, and it would be nice
-   if we could keep the bug reports separate. We might choose to take up a
-   discussion about your bug report on <literal>postgres-xl-developers</literal>,
-   if the problem needs more review.
-  </para>
 
   <para>
    If you have a problem with the documentation, the best place to report it

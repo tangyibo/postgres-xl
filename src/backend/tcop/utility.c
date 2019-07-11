@@ -1656,7 +1656,7 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 			{
 				UnlistenStmt *stmt = (UnlistenStmt *) parsetree;
 
-				PreventCommandDuringRecovery("UNLISTEN");
+				/* we allow UNLISTEN during recovery, as it's a noop */
 				CheckRestrictedOperation("UNLISTEN");
 				if (stmt->conditionname)
 					Async_Unlisten(stmt->conditionname);
@@ -1991,6 +1991,13 @@ standard_ProcessUtility(PlannedStmt *pstmt,
 	ProcessUtilityPost(pstmt, queryString, context, queryEnv, sentToRemote);
 
 	free_parsestate(pstate);
+
+	/*
+	 * Make effects of commands visible, for instance so that
+	 * PreCommit_on_commit_actions() can see them (see for example bug
+	 * #15631).
+	 */
+	CommandCounterIncrement();
 }
 
 /*

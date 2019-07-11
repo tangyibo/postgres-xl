@@ -3306,6 +3306,7 @@ l1:
 	if (RelationNeedsWAL(relation))
 	{
 		xl_heap_delete xlrec;
+		xl_heap_header xlhdr;
 		XLogRecPtr	recptr;
 
 		/* For logical decode we need combocids to properly decode the catalog */
@@ -3336,8 +3337,6 @@ l1:
 		 */
 		if (old_key_tuple != NULL)
 		{
-			xl_heap_header xlhdr;
-
 			xlhdr.t_infomask2 = old_key_tuple->t_data->t_infomask2;
 			xlhdr.t_infomask = old_key_tuple->t_data->t_infomask;
 			xlhdr.t_hoff = old_key_tuple->t_data->t_hoff;
@@ -4180,7 +4179,7 @@ l2:
 		 * Since the new tuple is going into the same page, we might be able
 		 * to do a HOT update.  Check if any of the index columns have been
 		 * changed. If the page was already full, we may have skipped checking
-		 * for index columns. If so, HOT update is possible.
+		 * for index columns, and also can't do a HOT update.
 		 */
 		if (hot_attrs_checked && !bms_overlap(modified_attrs, hot_attrs))
 			use_hot_update = true;

@@ -81,7 +81,7 @@ $$ language plpgsql;
 CREATE TABLE trunc_stats_test(id serial);
 CREATE TABLE trunc_stats_test1(id serial, id2 serial);
 CREATE TABLE trunc_stats_test2(id serial);
-CREATE TABLE trunc_stats_test3(id serial);
+CREATE TABLE trunc_stats_test3(id serial, stuff text);
 CREATE TABLE trunc_stats_test4(id serial);
 
 -- check that n_live_tup is reset to 0 after truncate

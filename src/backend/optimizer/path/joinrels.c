@@ -28,7 +28,6 @@ static void make_rels_by_clauseless_joins(PlannerInfo *root,
 							  ListCell *other_rels);
 static bool has_join_restriction(PlannerInfo *root, RelOptInfo *rel);
 static bool has_legal_joinclause(PlannerInfo *root, RelOptInfo *rel);
-static bool is_dummy_rel(RelOptInfo *rel);
 static void mark_dummy_rel(RelOptInfo *rel);
 static bool restriction_is_constant_false(List *restrictlist,
 							  RelOptInfo *joinrel,
@@ -612,20 +611,15 @@ join_is_legal(PlannerInfo *root, RelOptInfo *rel1, RelOptInfo *rel2,
 				{
 					SpecialJoinInfo *sjinfo = (SpecialJoinInfo *) lfirst(l);
 
+					/* ignore full joins --- their ordering is predetermined */
+					if (sjinfo->jointype == JOIN_FULL)
+						continue;
+
 					if (bms_overlap(sjinfo->min_lefthand, join_plus_rhs) &&
 						!bms_is_subset(sjinfo->min_righthand, join_plus_rhs))
 					{
 						join_plus_rhs = bms_add_members(join_plus_rhs,
 														sjinfo->min_righthand);
-						more = true;
-					}
-					/* full joins constrain both sides symmetrically */
-					if (sjinfo->jointype == JOIN_FULL &&
-						bms_overlap(sjinfo->min_righthand, join_plus_rhs) &&
-						!bms_is_subset(sjinfo->min_lefthand, join_plus_rhs))
-					{
-						join_plus_rhs = bms_add_members(join_plus_rhs,
-														sjinfo->min_lefthand);
 						more = true;
 					}
 				}
@@ -1177,10 +1171,38 @@ have_dangerous_phv(PlannerInfo *root,
 /*
  * is_dummy_rel --- has relation been proven empty?
  */
-static bool
+bool
 is_dummy_rel(RelOptInfo *rel)
 {
-	return IS_DUMMY_REL(rel);
+	Path	   *path;
+
+	/*
+	 * A rel that is known dummy will have just one path that is a childless
+	 * Append.  (Even if somehow it has more paths, a childless Append will
+	 * have cost zero and hence should be at the front of the pathlist.)
+	 */
+	if (rel->pathlist == NIL)
+		return false;
+	path = (Path *) linitial(rel->pathlist);
+
+	/*
+	 * Initially, a dummy path will just be a childless Append.  But in later
+	 * planning stages we might stick a ProjectSetPath and/or ProjectionPath
+	 * on top, since Append can't project.  Rather than make assumptions about
+	 * which combinations can occur, just descend through whatever we find.
+	 */
+	for (;;)
+	{
+		if (IsA(path, ProjectionPath))
+			path = ((ProjectionPath *) path)->subpath;
+		else if (IsA(path, ProjectSetPath))
+			path = ((ProjectSetPath *) path)->subpath;
+		else
+			break;
+	}
+	if (IS_DUMMY_APPEND(path))
+		return true;
+	return false;
 }
 
 /*
@@ -1218,7 +1240,9 @@ mark_dummy_rel(RelOptInfo *rel)
 	rel->partial_pathlist = NIL;
 
 	/* Set up the dummy path */
-	add_path(rel, (Path *) create_append_path(rel, NIL, NULL, 0, NIL));
+	add_path(rel, (Path *) create_append_path(rel, NIL,
+											  rel->lateral_relids,
+											  0, NIL));
 
 	/* Set or update cheapest_total_path and related fields */
 	set_cheapest(rel);

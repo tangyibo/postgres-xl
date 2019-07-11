@@ -17,7 +17,7 @@ dnl Read the Autoconf manual for details.
 dnl
 m4_pattern_forbid(^PGAC_)dnl to catch undefined macros
 
-AC_INIT([PostgreSQL], [10.6 (Postgres-XL 10r1.1)], [bugs@postgres-xl.org])
+AC_INIT([PostgreSQL], [10.9 (Postgres-XL 10r1.1)], [bugs@postgres-xl.org])
 
 m4_if(m4_defn([m4_PACKAGE_VERSION]), [2.69], [], [m4_fatal([Autoconf version 2.69 is required.
 Untested combinations of 'autoconf' and PostgreSQL versions are not
@@ -1483,7 +1483,33 @@ PGAC_FUNC_WCSTOMBS_L
 LIBS_including_readline="$LIBS"
 LIBS=`echo "$LIBS" | sed -e 's/-ledit//g' -e 's/-lreadline//g'`
 
-AC_CHECK_FUNCS([cbrt clock_gettime dlopen fdatasync getifaddrs getpeerucred getrlimit mbstowcs_l memmove poll posix_fallocate pstat pthread_is_threaded_np readlink setproctitle setsid shm_open symlink sync_file_range towlower utime utimes wcstombs wcstombs_l])
+AC_CHECK_FUNCS(m4_normalize([
+	cbrt
+	clock_gettime
+	dlopen
+	fdatasync
+	getifaddrs
+	getpeerucred
+	getrlimit
+	mbstowcs_l
+	memmove
+	poll
+	posix_fallocate
+	pstat
+	pthread_is_threaded_np
+	readlink
+	setproctitle
+	setsid
+	shm_open
+	symlink
+	sync_file_range
+	towlower
+	uselocale
+	utime
+	utimes
+	wcstombs
+	wcstombs_l
+]))
 
 AC_REPLACE_FUNCS(fseeko)
 case $host_os in
@@ -1499,10 +1525,11 @@ esac
 # posix_fadvise() is a no-op on Solaris, so don't incur function overhead
 # by calling it, 2009-04-02
 # http://src.opensolaris.org/source/xref/onnv/onnv-gate/usr/src/lib/libc/port/gen/posix_fadvise.c
-if test "$PORTNAME" != "solaris"; then
+dnl must use AS_IF here, else AC_REQUIRES inside AC_CHECK_DECLS malfunctions
+AS_IF([test "$PORTNAME" != "solaris"], [
 AC_CHECK_FUNCS(posix_fadvise)
 AC_CHECK_DECLS(posix_fadvise, [], [], [#include <fcntl.h>])
-fi
+]) # fi
 
 AC_CHECK_DECLS(fdatasync, [], [], [#include <unistd.h>])
 AC_CHECK_DECLS([strlcat, strlcpy])
@@ -1631,9 +1658,9 @@ else
   AC_LIBOBJ(getopt_long)
 fi
 
-# Solaris' getopt() doesn't do what we want for long options, so always use
-# our version on that platform.
-if test "$PORTNAME" = "solaris"; then
+# On OpenBSD and Solaris, getopt() doesn't do what we want for long options
+# (i.e., allow '-' as a flag character), so use our version on those platforms.
+if test "$PORTNAME" = "openbsd" -o "$PORTNAME" = "solaris"; then
   AC_LIBOBJ(getopt)
 fi
 
@@ -1646,6 +1673,7 @@ fi
 
 # Win32 (really MinGW) support
 if test "$PORTNAME" = "win32"; then
+  AC_CHECK_FUNCS(_configthreadlocale)
   AC_REPLACE_FUNCS(gettimeofday)
   AC_LIBOBJ(dirmod)
   AC_LIBOBJ(kill)

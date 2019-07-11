@@ -160,6 +160,21 @@ CREATE TEMP TABLE z1 (aa TEXT) DISTRIBUTE BY HASH(aa);
 CREATE TEMP TABLE z (b TEXT, PRIMARY KEY(aa, b)) inherits (z1);
 INSERT INTO z VALUES (NULL, 'text'); -- should fail
 
+-- Check inherited UPDATE with all children excluded
+create table some_tab (a int, b int);
+create table some_tab_child () inherits (some_tab);
+insert into some_tab_child values(1,2);
+
+explain (verbose, costs off)
+update some_tab set a = a + 1 where false;
+update some_tab set a = a + 1 where false;
+explain (verbose, costs off)
+update some_tab set a = a + 1 where false returning b, a;
+update some_tab set a = a + 1 where false returning b, a;
+table some_tab;
+
+drop table some_tab cascade;
+
 -- Check UPDATE with inherited target and an inherited source table
 create temp table foo(f1 int, f2 int);
 create temp table foo2(f3 int) inherits (foo);
@@ -224,6 +239,9 @@ insert into parted_tab values (1, 'a'), (2, 'a'), (3, 'a');
 --  (select 0 from parted_tab union all select 1 from parted_tab) ss (a)
 --where parted_tab.a = ss.a;
 select tableoid::regclass::text as relname, parted_tab.* from parted_tab order by 1,2;
+
+-- modifies partition key, but no rows will actually be updated
+explain update parted_tab set a = 2 where false;
 
 drop table parted_tab;
 drop table some_tab cascade;

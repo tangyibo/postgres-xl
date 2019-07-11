@@ -175,6 +175,7 @@ static char *pgdata_native;
 static int	n_connections = 10;
 static int	n_buffers = 50;
 static char *dynamic_shared_memory_type = NULL;
+static const char *default_timezone = NULL;
 
 /*
  * Warning messages for authentication methods
@@ -1007,6 +1008,11 @@ test_config_settings(void)
 	else
 		printf("%dkB\n", n_buffers * (BLCKSZ / 1024));
 
+	printf(_("selecting default timezone ... "));
+	fflush(stdout);
+	default_timezone = select_default_timezone(share_path);
+	printf("%s\n", default_timezone ? default_timezone : "GMT");
+
 	printf(_("selecting dynamic shared memory implementation ... "));
 	fflush(stdout);
 	dynamic_shared_memory_type = choose_dsm_implementation();
@@ -1022,7 +1028,6 @@ setup_config(void)
 	char	  **conflines;
 	char		repltok[MAXPGPATH];
 	char		path[MAXPGPATH];
-	const char *default_timezone;
 	char	   *autoconflines[3];
 
 	fputs(_("creating configuration files ... "), stdout);
@@ -1102,7 +1107,6 @@ setup_config(void)
 	conflines = replace_token(conflines, "#pgxc_node_name = ''", repltok);
 #endif
 
-	default_timezone = select_default_timezone(share_path);
 	if (default_timezone)
 	{
 		snprintf(repltok, sizeof(repltok), "timezone = '%s'",
@@ -2890,7 +2894,7 @@ create_xlog_or_symlink(void)
 			exit_nicely();
 		}
 #else
-		fprintf(stderr, _("%s: symlinks are not supported on this platform"));
+		fprintf(stderr, _("%s: symlinks are not supported on this platform\n"), progname);
 		exit_nicely();
 #endif
 	}

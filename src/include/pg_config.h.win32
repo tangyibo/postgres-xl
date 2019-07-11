@@ -494,6 +494,9 @@
 /* Define to 1 if you have the `unsetenv' function. */
 /* #undef HAVE_UNSETENV */
 
+/* Define to 1 if you have the `uselocale' function. */
+/* #undef HAVE_USELOCALE */
+
 /* Define to 1 if you have the `utime' function. */
 #define HAVE_UTIME 1
 
@@ -536,6 +539,9 @@
 /* Define to 1 if your compiler understands __builtin_unreachable. */
 /* #undef HAVE__BUILTIN_UNREACHABLE */
 
+/* Define to 1 if you have the `_configthreadlocale' function. */
+#define HAVE__CONFIGTHREADLOCALE 1
+
 /* Define to 1 if you have __cpuid. */
 #define HAVE__CPUID 1
 
@@ -573,7 +579,7 @@
 #define PACKAGE_STRING "Postgres-XL 10r1.1"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "10.6"
+#define PACKAGE_VERSION "10.9"
 
 /* Define to the name of a signed 128-bit integer type. */
 #undef PG_INT128_TYPE
@@ -582,10 +588,10 @@
 #define PG_INT64_TYPE long long int
 
 /* PostgreSQL version as a string */
-#define PG_VERSION "10.6"
+#define PG_VERSION "10.9"
 
 /* PostgreSQL version as a number */
-#define PG_VERSION_NUM 100006
+#define PG_VERSION_NUM 100009
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "postgres-xl"

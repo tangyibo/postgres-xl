@@ -203,7 +203,6 @@ SELECT lo_close(fd) FROM lotest_stash_values;
 END;
 
 SELECT lo_export(loid, '@abs_builddir@/results/lotest.txt') FROM lotest_stash_values;
-COPY lotest_stash_values TO '@abs_builddir@/results/lotest.txt';
 \lo_import '@abs_builddir@/results/lotest.txt'
 
 \set newloid :LASTOID
@@ -224,7 +223,7 @@ TRUNCATE lotest_stash_values;
 
 \lo_unlink :newloid
 
-\lo_import 'results/lotest.txt'
+\lo_import '@abs_builddir@/results/lotest.txt'
 
 \set newloid_1 :LASTOID
 

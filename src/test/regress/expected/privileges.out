@@ -237,16 +237,19 @@ EXPLAIN (COSTS OFF) SELECT * FROM atest12 x, atest12 y
 -- This should also be a nestloop, but the security barrier forces the inner
 -- scan to be materialized
 EXPLAIN (COSTS OFF) SELECT * FROM atest12sbv x, atest12sbv y WHERE x.a = y.b;
-                QUERY PLAN                 
--------------------------------------------
- Nested Loop
-   Join Filter: (atest12.a = atest12_1.b)
-   ->  Seq Scan on atest12
-         Filter: (b <<< 5)
-   ->  Materialize
-         ->  Seq Scan on atest12 atest12_1
+                              QUERY PLAN                               
+-----------------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         Join Filter: (atest12.a = b)
+         ->  Seq Scan on atest12
                Filter: (b <<< 5)
-(7 rows)
+         ->  Materialize
+               ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+                     Distribute results by H: b
+                     ->  Seq Scan on atest12 atest12_1
+                           Filter: (b <<< 5)
+(10 rows)
 
 -- Check if regress_user2 can break security.
 SET SESSION AUTHORIZATION regress_user2;
@@ -261,73 +264,84 @@ ERROR:  permission denied for relation atest12
 -- This plan should use hashjoin, as it will expect many rows to be selected.
 SET random_page_cost = 8.5;
 EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: (b <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
+
+RESET random_page_cost;
+-- These plans should continue to use a nestloop, since they execute with the
+-- privileges of the view owner.
+EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: (b <<< 5)
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
+
+EXPLAIN (COSTS OFF) SELECT * FROM atest12sbv x, atest12sbv y WHERE x.a = y.b;
                               QUERY PLAN                               
 -----------------------------------------------------------------------
  Remote Subquery Scan on all (datanode_1,datanode_2)
-   ->  Hash Join
-         Hash Cond: (atest12.a = atest12_1.b)
+   ->  Nested Loop
+         Join Filter: (atest12.a = b)
          ->  Seq Scan on atest12
                Filter: (b <<< 5)
-         ->  Hash
+         ->  Materialize
                ->  Remote Subquery Scan on all (datanode_1,datanode_2)
                      Distribute results by H: b
                      ->  Seq Scan on atest12 atest12_1
                            Filter: (b <<< 5)
 (10 rows)
 
-RESET random_page_cost;
--- These plans should continue to use a nestloop, since they execute with the
--- privileges of the view owner.
-EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
-                   QUERY PLAN                    
--------------------------------------------------
- Nested Loop
-   ->  Seq Scan on atest12 atest12_1
-         Filter: (b <<< 5)
-   ->  Index Scan using atest12_a_idx on atest12
-         Index Cond: (a = atest12_1.b)
-         Filter: (b <<< 5)
-(6 rows)
-
-EXPLAIN (COSTS OFF) SELECT * FROM atest12sbv x, atest12sbv y WHERE x.a = y.b;
-                QUERY PLAN                 
--------------------------------------------
- Nested Loop
-   Join Filter: (atest12.a = atest12_1.b)
-   ->  Seq Scan on atest12
-         Filter: (b <<< 5)
-   ->  Materialize
-         ->  Seq Scan on atest12 atest12_1
-               Filter: (b <<< 5)
-(7 rows)
-
 -- A non-security barrier view does not guard against information leakage.
 EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y
   WHERE x.a = y.b and abs(y.a) <<< 5;
-                   QUERY PLAN                    
--------------------------------------------------
- Nested Loop
-   ->  Seq Scan on atest12 atest12_1
-         Filter: ((b <<< 5) AND (abs(a) <<< 5))
-   ->  Index Scan using atest12_a_idx on atest12
-         Index Cond: (a = atest12_1.b)
-         Filter: (b <<< 5)
-(6 rows)
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Seq Scan on atest12 atest12_1
+                     Filter: ((b <<< 5) AND (abs(a) <<< 5))
+         ->  Index Scan using atest12_a_idx on atest12
+               Index Cond: (a = atest12_1.b)
+               Filter: (b <<< 5)
+(9 rows)
 
 -- But a security barrier view isolates the leaky operator.
 EXPLAIN (COSTS OFF) SELECT * FROM atest12sbv x, atest12sbv y
   WHERE x.a = y.b and abs(y.a) <<< 5;
-             QUERY PLAN              
--------------------------------------
- Nested Loop
-   Join Filter: (atest12_1.a = y.b)
-   ->  Subquery Scan on y
-         Filter: (abs(y.a) <<< 5)
-         ->  Seq Scan on atest12
+                           QUERY PLAN                            
+-----------------------------------------------------------------
+ Remote Subquery Scan on all (datanode_1,datanode_2)
+   ->  Nested Loop
+         Join Filter: (atest12_1.a = y.b)
+         ->  Remote Subquery Scan on all (datanode_1,datanode_2)
+               Distribute results by H: b
+               ->  Subquery Scan on y
+                     Filter: (abs(y.a) <<< 5)
+                     ->  Seq Scan on atest12
+                           Filter: (b <<< 5)
+         ->  Seq Scan on atest12 atest12_1
                Filter: (b <<< 5)
-   ->  Seq Scan on atest12 atest12_1
-         Filter: (b <<< 5)
-(8 rows)
+(11 rows)
 
 -- Now regress_user1 grants sufficient access to regress_user2.
 SET SESSION AUTHORIZATION regress_user1;

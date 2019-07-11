@@ -378,7 +378,7 @@ TRUNCATE lotest_stash_values;
 \lo_unlink :newloid
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
-\lo_import 'results/lotest.txt'
+\lo_import '@abs_builddir@/results/lotest.txt'
 ERROR:  Postgres-XL does not yet support large objects
 DETAIL:  The feature is not currently supported
 \set newloid_1 :LASTOID

@@ -5573,30 +5573,34 @@ select * from
 explain (verbose, costs off)
 select * from int8_tbl i8 left join lateral
   (select *, i8.q2 from int4_tbl where false) ss on true;
-              QUERY PLAN              
---------------------------------------
+                   QUERY PLAN                   
+------------------------------------------------
  Nested Loop Left Join
    Output: i8.q1, i8.q2, f1, (i8.q2)
-   ->  Seq Scan on public.int8_tbl i8
+   ->  Remote Subquery Scan on all (datanode_1)
          Output: i8.q1, i8.q2
+         ->  Seq Scan on public.int8_tbl i8
+               Output: i8.q1, i8.q2
    ->  Result
          Output: f1, i8.q2
          One-Time Filter: false
-(7 rows)
+(9 rows)
 
 explain (verbose, costs off)
 select * from int8_tbl i8 left join lateral
   (select *, i8.q2 from int4_tbl i1, int4_tbl i2 where false) ss on true;
-               QUERY PLAN                
------------------------------------------
+                   QUERY PLAN                   
+------------------------------------------------
  Nested Loop Left Join
    Output: i8.q1, i8.q2, f1, f1, (i8.q2)
-   ->  Seq Scan on public.int8_tbl i8
+   ->  Remote Subquery Scan on all (datanode_1)
          Output: i8.q1, i8.q2
+         ->  Seq Scan on public.int8_tbl i8
+               Output: i8.q1, i8.q2
    ->  Result
          Output: f1, f1, i8.q2
          One-Time Filter: false
-(7 rows)
+(9 rows)
 
 -- check handling of nested appendrels inside LATERAL
 select * from

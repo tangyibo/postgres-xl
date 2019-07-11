@@ -86,13 +86,17 @@ INSERT INTO few VALUES(1, 'a', 'foo'),(2, 'a', 'bar'),(3, 'b', 'bar');
 -- SRF with a provably-dummy relation
 explain (verbose, costs off)
 SELECT unnest(ARRAY[1, 2]) FROM few WHERE false;
-              QUERY PLAN              
---------------------------------------
- ProjectSet
-   Output: unnest('{1,2}'::integer[])
-   ->  Result
-         One-Time Filter: false
-(4 rows)
+                                QUERY PLAN                                 
+---------------------------------------------------------------------------
+ Remote Fast Query Execution
+   Output: unnest(ARRAY[1, 2])
+   Node/s: datanode_1, datanode_2
+   Remote query: SELECT unnest(ARRAY[1, 2]) AS unnest FROM few WHERE false
+   ->  ProjectSet
+         Output: unnest('{1,2}'::integer[])
+         ->  Result
+               One-Time Filter: false
+(8 rows)
 
 SELECT unnest(ARRAY[1, 2]) FROM few WHERE false;
  unnest 

@@ -101,8 +101,8 @@ create table parted_copytest (
 	b int,
 	c text
 ) partition by list (b);
-create table parted_copytest_a1 (c text, b int, a int);
-create table parted_copytest_a2 (a int, c text, b int);
+create table parted_copytest_a1 (a int, c text, b int) distribute by hash(a);
+create table parted_copytest_a2 (a int, c text, b int) distribute by hash(a);
 alter table parted_copytest attach partition parted_copytest_a1 for values in(1);
 alter table parted_copytest attach partition parted_copytest_a2 for values in(2);
 -- We must insert enough rows to trigger multi-inserts.  These are only

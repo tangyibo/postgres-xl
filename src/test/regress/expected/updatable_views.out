@@ -2660,6 +2660,8 @@ $$
 language plpgsql;
 create trigger base_tab_def_view_instrig instead of insert on base_tab_def_view
   for each row execute procedure base_tab_def_view_instrig_func();
+ERROR:  Postgres-XL does not support TRIGGER yet
+DETAIL:  The feature is not currently supported
 truncate base_tab_def;
 insert into base_tab_def values (1);
 insert into base_tab_def values (2), (3);
@@ -2681,19 +2683,20 @@ select * from base_tab_def order by a;
   4 | Table default | Table default |              | 
   5 | Table default | Table default |              | 
   6 | Table default | Table default |              | 
- 11 | View default  |               | View default | 
- 12 | View default  |               | View default | 
- 13 | View default  |               | View default | 
- 14 | View default  |               | View default | 
- 15 | View default  |               | View default | 
- 16 | View default  |               | View default | 
- 17 | View default  |               | View default | 
-    | View default  |               | View default | 
+ 11 | View default  | Table default | View default | 
+ 12 | View default  | Table default | View default | 
+ 13 | View default  | Table default | View default | 
+ 14 | View default  | Table default | View default | 
+ 15 | View default  | Table default | View default | 
+ 16 | View default  | Table default | View default | 
+ 17 | View default  | Table default | View default | 
+    | View default  | Table default | View default | 
 (14 rows)
 
 -- Using an unconditional DO INSTEAD rule should also cause NULLs to be
 -- inserted where there are no view defaults.
 drop trigger base_tab_def_view_instrig on base_tab_def_view;
+ERROR:  trigger "base_tab_def_view_instrig" for table "base_tab_def_view" does not exist
 drop function base_tab_def_view_instrig_func;
 create rule base_tab_def_view_ins_rule as on insert to base_tab_def_view
   do instead insert into base_tab_def values (new.a, new.b, new.c, new.d, new.e);

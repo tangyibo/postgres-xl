@@ -2881,6 +2881,18 @@ PrepareTransaction(void)
 	if (IS_PGXC_DATANODE || !IsConnFromCoord())
 	{
 		char		*nodestring;
+
+		/*
+		 * Before we prepare remote nodes, check if we have accessed any temp
+		 * tables and bail out. We do this extra check here to avoid any
+		 * in-doubt prepared transactions on remote node. See below to know
+		 * more about why prepare transactions are blocked.
+		 */
+		if ((MyXactFlags & XACT_FLAGS_ACCESSEDTEMPREL))
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("cannot PREPARE a transaction that has operated on temporary tables")));
+
 		if (saveNodeString)
 		{
 			pfree(saveNodeString);

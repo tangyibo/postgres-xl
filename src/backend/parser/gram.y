@@ -10958,6 +10958,11 @@ ExecuteStmt: EXECUTE name execute_param_clause
 					ctas->if_not_exists = true;
 					/* cram additional flags into the IntoClause */
 					$7->rel->relpersistence = $2;
+#ifdef PGXC
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("CREATE TABLE IF NOT EXISTS AS EXECUTE not yet supported")));
+#endif
 					$7->skipData = !($12);
 					$$ = (Node *) ctas;
 				}

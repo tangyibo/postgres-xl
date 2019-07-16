@@ -994,7 +994,6 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 		case T_AlterRoleSetStmt:
 		case T_DropRoleStmt:
 		case T_ReassignOwnedStmt:
-		case T_LockStmt:
 		case T_AlterOwnerStmt:
 		case T_AlterDomainStmt:
 		case T_DefineStmt:
@@ -1023,6 +1022,38 @@ ProcessUtilityPost(PlannedStmt *pstmt,
 		case T_AlterPolicyStmt: /* ALTER POLICY */
 		case T_CreateAmStmt:
 			exec_type = EXEC_ON_ALL_NODES;
+			break;
+
+		case T_LockStmt:
+			if (IS_PGXC_LOCAL_COORDINATOR)
+			{
+				ListCell	*cell;
+				LockStmt	*stmt = (LockStmt *) parsetree;
+				bool		found_temp = false;
+				bool		found_regular = false;
+
+				foreach(cell, stmt->relations)
+				{
+					Oid relid;
+					RangeVar *rel = (RangeVar *) lfirst(cell);
+
+					relid = RangeVarGetRelid(rel, NoLock, false);
+					if (IsTempTable(relid))
+						is_temp = found_temp = true;
+					else
+						found_regular = true;
+				}
+
+				if (found_regular && found_temp)
+					ereport(ERROR,
+							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+							 errmsg("Cannot LOCK temp and non-temp tables "
+								 "in a single statement")));
+				if (is_temp)
+					exec_type = EXEC_ON_DATANODES;
+				else
+					exec_type = EXEC_ON_ALL_NODES;
+			}
 			break;
 
 		case T_TruncateStmt:

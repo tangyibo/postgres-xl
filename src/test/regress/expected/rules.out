@@ -1309,7 +1309,7 @@ key_dependent_view| SELECT view_base_table.key,
     view_base_table.data
    FROM view_base_table
   GROUP BY view_base_table.key;
-key_dependent_view_no_cols| SELECT
+key_dependent_view_no_cols| SELECT *
    FROM view_base_table
   GROUP BY view_base_table.key
  HAVING (length((view_base_table.data)::text) > 0);

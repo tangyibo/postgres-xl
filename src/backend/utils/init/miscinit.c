@@ -654,6 +654,7 @@ SetGlobalSession(Oid coordid, int coordpid)
 	BackendId 		firstBackend = InvalidBackendId;
 	int				bCount = 0;
 	int				bPids[MaxBackends];
+	unsigned int	retry_count = 0;
 
 	/* If nothing changed do nothing */
 	if (MyCoordId == coordid && MyCoordPid == coordpid)
@@ -697,7 +698,14 @@ retry:
 		 */
 		if (bCount > 0)
 		{
-			/* XXX sleep ? */
+			/*
+			 * Sleep for a short while and try again. Emit a WARNING if we
+			 * retry often.
+			 */
+			pg_usleep(1000*1000L);
+			if (++retry_count % 100 == 0)
+				elog(WARNING, "Retrying %uth time for the first "
+						"backend to initialise", retry_count);
 			goto retry;
 		}
 		else
